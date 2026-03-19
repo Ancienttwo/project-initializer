@@ -1,0 +1,46 @@
+# ===== Dot-Prefixed Directories =====
+.*/
+
+# ===== Build Artifacts =====
+artifacts/
+dist/
+build/
+.next/
+.nuxt/
+.output/
+coverage/
+
+# ===== Environment Variables =====
+.env
+.env.*
+!.env.example
+
+# ===== Dependencies =====
+node_modules/
+.pnpm-store/
+bun.lockb
+
+# ===== OS Metadata =====
+.DS_Store
+
+# ===== Logs & Debug =====
+*.log
+npm-debug.log*
+pnpm-debug.log*
+debug.log
+
+# ===== Package Archives =====
+*.tar.gz
+*.tgz
+*.zip
+
+# ===== Database =====
+*.sqlite
+*.db
+*.sql.gz
+
+# ===== Secrets & Keys =====
+*.pem
+*.key
+*.p12
+secrets/

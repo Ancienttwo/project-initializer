@@ -1,0 +1,84 @@
+{
+  "skill_name": "project-initializer",
+  "evals": [
+    {
+      "id": 1,
+      "slug": "initialize-new-project",
+      "prompt": "Initialize a new B2B internal tool with Vite, TanStack Router, tasks-first workflow files, and concise CLAUDE.md/AGENTS.md for both Claude and Codex.",
+      "expected_output": "A new-project plan or implementation path that selects the Vite/TanStack stack, generates tasks-first repo contracts, and keeps CLAUDE.md/AGENTS.md concise with routed reference docs.",
+      "files": [
+        "evals/fixtures/new-project-empty"
+      ],
+      "expectations": [
+        "Chooses a plausible core plan and explains the stack choice.",
+        "Includes tasks/todo.md, tasks/lessons.md, tasks/research.md, and tasks/contracts/ in the generated workflow.",
+        "Treats docs/PROGRESS.md as milestone-only instead of the active execution log."
+      ]
+    },
+    {
+      "id": 2,
+      "slug": "repair-agents-task-sync",
+      "prompt": "This repo already exists. Fix AGENTS.md so Codex is required to sync tasks/todo.md and tasks/lessons.md, and make the final response mention which task files were updated.",
+      "expected_output": "An audit or implementation plan that strengthens AGENTS.md, aligns CLAUDE.md if needed, and updates any supporting protocol docs or tests to enforce the tasks-first contract.",
+      "files": [
+        "evals/fixtures/fix-agents"
+      ],
+      "expectations": [
+        "Calls out repo-local task sync as the primary enforcement mechanism.",
+        "Treats plans/ as the single source of truth for the active plan instead of relying on docs/plan.md.",
+        "Updates the final response contract to mention changed tasks files.",
+        "Avoids treating hooks as the only source of enforcement."
+      ]
+    },
+    {
+      "id": 3,
+      "slug": "migrate-legacy-repo",
+      "prompt": "Migrate this older Claude Code repo to the current tasks-first contract. It still uses docs/TODO.md and writes active session notes into docs/PROGRESS.md.",
+      "expected_output": "A migration plan or implementation path that removes docs/TODO.md, installs tasks-first workflow files and helper scripts, and moves PROGRESS.md to milestone-only usage.",
+      "files": [
+        "evals/fixtures/migrate-legacy"
+      ],
+      "expectations": [
+        "Replaces docs/TODO.md with tasks/todo.md as the primary task contract.",
+        "Removes docs/plan.md compatibility pointers in favor of plans/ as the active-plan source of truth.",
+        "Adds repo-local task-sync enforcement such as scripts/check-task-sync.sh.",
+        "Updates migration guidance and scripts rather than only editing prose.",
+        "Installs a shared .ai/ hook layer and routes Claude hook settings through it."
+      ]
+    },
+    {
+      "id": 4,
+      "slug": "audit-workflow-drift",
+      "prompt": "Audit this AI-assisted coding setup. Tell me whether Claude and Codex can both follow the same repo contract, and identify any workflow drift or missing files.",
+      "expected_output": "A concrete audit that inspects AGENTS.md, CLAUDE.md, tasks/, hooks, and reference docs, then identifies drift and recommends the minimal safe set of fixes.",
+      "files": [
+        "evals/fixtures/audit-drift"
+      ],
+      "expectations": [
+        "Checks both Claude-specific hooks and cross-agent repo-local contracts.",
+        "Flags docs/PROGRESS.md misuse if it is acting as an execution log.",
+        "Flags duplicated active-plan state outside plans/ as workflow drift.",
+        "Mentions migration or template updates when current files are out of sync with the skill.",
+        "Calls out when a repo only has .claude hook wiring but lacks the shared .ai/ automation layer."
+      ]
+    },
+    {
+      "id": 5,
+      "slug": "codex-skill-factory-lifecycle",
+      "prompt": "This repo has Skill Factory enabled with Codex as the primary agent. The state file shows 2 bug-fix sessions and 2 testing-conventions lessons — both one session away from the proposal threshold. Run the skill-factory-check script, simulate a third session that pushes both patterns over threshold, verify that pending proposals are created for both a workflow skill and a knowledge skill, and confirm that normal post-edit activity is not treated as optimization feedback unless explicit feedback is recorded.",
+      "expected_output": "A Codex-driven session that updates tasks/lessons.md with a third testing-conventions entry, runs skill-factory-check.sh to confirm state, executes the session-end hook to trigger pattern detection, verifies both a workflow proposal (bug-fix) and a knowledge proposal (testing-conventions) appear in ~/.claude/.skill-proposals.json, and keeps optimization hints tied to explicit feedback recorded through skill-factory-check.sh.",
+      "files": [
+        "evals/fixtures/codex-skill-factory"
+      ],
+      "expectations": [
+        "Reads .claude/.skill-factory-state.json to understand current pattern counts.",
+        "Uses AGENTS.md Skill Factory protocol to group lessons by theme.",
+        "Runs bash scripts/skill-factory-check.sh to inspect current state.",
+        "After the third session, both workflow and knowledge proposals reach pending status.",
+        "Does not auto-create skills — proposals require explicit human promotion via skill-factory-create.sh.",
+        "Does not treat ordinary post-edit activity as optimization feedback.",
+        "Uses bash scripts/skill-factory-check.sh --record-feedback <slug> --signal <label> when explicit feedback is needed."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Canonical plan mapping for project-initializer. A-F are core plans. G-J are custom presets. K is fully custom.",
+  "planTiers": {
+    "core": ["A", "B", "C", "D", "E", "F"],
+    "presets": ["G", "H", "I", "J"],
+    "custom": ["K"]
+  },
+  "aliases": {
+    "C+": "C"
+  },
+  "quickDefaults": {
+    "USER_NAME": "Developer",
+    "SERVICE_TARGET": "User",
+    "INTERACTION_STYLE": "Technical, concise",
+    "PROHIBITIONS": "- No `any` in production code\\n- No `console.log` in production code\\n- Always present 2-3 options with trade-offs at ambiguous decision points\\n- Always push back on requests that violate project rules"
+  },
+  "plans": {
+    "A": {
+      "name": "C-Side with SEO (Dynamic)",
+      "stack": "Remix + React + TypeScript",
+      "tier": "core",
+      "cloudflareNative": true,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "PROJECT_STRUCTURE_FILE": "assets/project-structures/remix.txt",
+        "TECH_STACK_TABLE": "| Frontend | Remix + React + TypeScript |\\n| UI | shadcn/ui + Tailwind CSS |\\n| Backend | Supabase |\\n| Runtime | Bun + Node.js |"
+      }
+    },
+    "B": {
+      "name": "Traditional Enterprise",
+      "stack": "UmiJS + Ant Design Pro + TypeScript",
+      "tier": "core",
+      "cloudflareNative": false,
+      "defaultLsp": "jdtls-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Frontend | UmiJS + Ant Design Pro |\\n| UI | Ant Design + ProComponents |\\n| Backend | Supabase / Enterprise API |\\n| Runtime | Node.js + Bun tooling |"
+      }
+    },
+    "C": {
+      "name": "B2B SaaS / Internal Tools",
+      "stack": "Vite + TanStack Router + React",
+      "tier": "core",
+      "cloudflareNative": true,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "PROJECT_STRUCTURE_FILE": "assets/project-structures/vite-tanstack.txt",
+        "TECH_STACK_TABLE": "| Frontend | Vite + React + TypeScript |\\n| Routing | TanStack Router |\\n| Data | TanStack Query + Zustand |\\n| Backend | Supabase / Cloudflare Workers |"
+      }
+    },
+    "D": {
+      "name": "Monorepo (Multi-project)",
+      "stack": "Bun + Turborepo",
+      "tier": "core",
+      "cloudflareNative": true,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "PROJECT_STRUCTURE_FILE": "assets/project-structures/monorepo.txt",
+        "TECH_STACK_TABLE": "| Workspace | Turborepo + Bun Workspaces |\\n| Apps | Web / Admin / Mobile |\\n| Shared Packages | ui / utils / types |\\n| Runtime | TypeScript across packages |"
+      }
+    },
+    "E": {
+      "name": "Landing Page / Marketing",
+      "stack": "Astro + Starwind UI",
+      "tier": "core",
+      "cloudflareNative": false,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Frontend | Astro + TypeScript |\\n| UI | Starwind UI + Tailwind CSS |\\n| Content | Astro Content Collections |\\n| Runtime | Node.js + Bun tooling |"
+      }
+    },
+    "F": {
+      "name": "Mobile App",
+      "stack": "Expo + NativeWind",
+      "tier": "core",
+      "cloudflareNative": false,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "PROJECT_STRUCTURE_FILE": "assets/project-structures/expo-nativewind.txt",
+        "TECH_STACK_TABLE": "| Mobile | Expo + React Native |\\n| Styling | NativeWind + Tailwind |\\n| State | Zustand + TanStack Query |\\n| Backend | Supabase / API |"
+      }
+    },
+    "G": {
+      "name": "AI Quantitative Trading",
+      "stack": "FastAPI + Vite Frontend",
+      "tier": "preset",
+      "cloudflareNative": true,
+      "defaultLsp": "pyright-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Frontend | Vite + React |\\n| Backend | FastAPI + Python |\\n| Data | TimescaleDB / InfluxDB |\\n| AI | Claude / OpenAI |"
+      }
+    },
+    "H": {
+      "name": "Financial Trading (FIX/RFQ)",
+      "stack": "FIX Engine + Hono + Vite",
+      "tier": "preset",
+      "cloudflareNative": true,
+      "defaultLsp": "rust-analyzer-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Frontend | Vite + Trading UI |\\n| API Gateway | Hono |\\n| Trading Core | QuickFIX/J or Rust |\\n| Data | Time-series DB + market feed |"
+      }
+    },
+    "I": {
+      "name": "Web3 DApp (EVM Chains)",
+      "stack": "Astro Landing + Vite DApp + Wagmi",
+      "tier": "preset",
+      "cloudflareNative": true,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Landing | Astro + Starwind UI |\\n| DApp Frontend | Vite + React + Wagmi + Viem |\\n| Contracts | Hardhat + Solidity |\\n| Wallet | ConnectKit / RainbowKit |"
+      }
+    },
+    "J": {
+      "name": "AI Coding Agent / TUI Tool",
+      "stack": "OpenTUI + TypeScript",
+      "tier": "preset",
+      "cloudflareNative": false,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Interface | OpenTUI (react/core) or Ink |\\n| Runtime | Node.js / Bun |\\n| AI Provider | Claude / OpenAI |\\n| Tooling | TypeScript + testing + linting |"
+      }
+    },
+    "K": {
+      "name": "Custom Configuration",
+      "stack": "Manual selection",
+      "tier": "custom",
+      "cloudflareNative": false,
+      "defaultLsp": "typescript-lsp",
+      "defaultTemplateVariables": {
+        "TECH_STACK_TABLE": "| Stack | Custom (user-selected) |\\n| Constraints | Defined during guided Q&A |"
+      }
+    }
+  }
+}

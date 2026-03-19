@@ -1,0 +1,172 @@
+import { describe, test, expect } from "bun:test";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+
+const ROOT = join(import.meta.dir, "..");
+
+function read(relPath: string): string {
+  return readFileSync(join(ROOT, relPath), "utf-8");
+}
+
+describe("Bootstrap Script Contracts", () => {
+  test("SKILL.md should stay within 500-line budget", () => {
+    const skill = read("SKILL.md");
+    expect(skill.split("\n").length).toBeLessThanOrEqual(500);
+  });
+
+  test("Skill Factory route should point to the guide and generated skill contract", () => {
+    const skill = read("SKILL.md");
+    const guide = read("references/skill-factory-guide.md");
+
+    expect(skill).toContain("references/skill-factory-guide.md");
+    expect(guide).toContain("agents/openai.yaml");
+    expect(guide).toContain("history.jsonl");
+    expect(guide).toContain("--record-feedback <slug>");
+  });
+
+  test("Codex agent metadata should exist for user-level installation", () => {
+    const metadata = read("agents/openai.yaml");
+    expect(metadata).toContain("interface:");
+    expect(metadata).toContain('display_name: "Project Initializer"');
+    expect(metadata).toContain("short_description:");
+    expect(metadata).toContain("default_prompt:");
+  });
+
+  test("create-project-dirs should create tasks primary files", () => {
+    const content = read("scripts/create-project-dirs.sh");
+
+    expect(content).toContain("mkdir -p tasks");
+    expect(content).toContain("mkdir -p tasks/archive");
+    expect(content).toContain("mkdir -p tasks/contracts");
+    expect(content).toContain("mkdir -p plans/archive");
+    expect(content).toContain("cat > tasks/todo.md");
+    expect(content).toContain("cat > tasks/lessons.md");
+    expect(content).toContain("cat > tasks/research.md");
+    expect(content).not.toContain("docs/TODO.md");
+    expect(content).toContain("scripts/new-plan.sh");
+    expect(content).toContain("scripts/plan-to-todo.sh");
+    expect(content).toContain("scripts/archive-workflow.sh");
+    expect(content).toContain("scripts/verify-contract.sh");
+    expect(content).toContain("scripts/check-task-sync.sh");
+    expect(content).toContain("scripts/ensure-task-workflow.sh");
+    expect(content).toContain("scripts/check-task-workflow.sh");
+    expect(content).toContain("scripts/skill-factory-create.sh");
+    expect(content).toContain("scripts/skill-factory-check.sh");
+    expect(content).toContain("check:task-sync");
+    expect(content).toContain("check:task-workflow");
+    expect(content).toContain("contract.template.md");
+    expect(content).toContain("spa-day-protocol.md");
+    expect(content).toContain("cat > .claude/settings.json");
+    expect(content).toContain("mkdir -p .ai/hooks");
+    expect(content).toContain(".ai/hooks/run-hook.sh");
+    expect(content).toContain(".skill-factory-state.json");
+    expect(content).toContain("install_skill_factory_files");
+    expect(content).toContain("Project Milestones");
+    expect(content).toContain("milestone checkpoints only");
+    expect(content).toContain("**Source Plan**: (none)");
+    expect(content).not.toContain("\"$TOOL_INPUT\"");
+    expect(content).not.toContain("\"$PROMPT\"");
+  });
+
+  test("init-project should scaffold tasks primary workflow", () => {
+    const content = read("scripts/init-project.sh");
+
+    expect(content).toContain("mkdir -p tasks");
+    expect(content).toContain("mkdir -p tasks/archive");
+    expect(content).toContain("mkdir -p tasks/contracts");
+    expect(content).toContain("mkdir -p plans/archive");
+    expect(content).toContain("cat > tasks/todo.md");
+    expect(content).toContain("cat > tasks/lessons.md");
+    expect(content).toContain("tasks/research.md");
+    expect(content).not.toContain("docs/TODO.md");
+    expect(content).toContain("install_workflow_helpers");
+    expect(content).toContain("install_workflow_templates");
+    expect(content).toContain("contract.template.md");
+    expect(content).toContain("verify-contract.sh");
+    expect(content).toContain("check-task-sync.sh");
+    expect(content).toContain("ensure-task-workflow.sh");
+    expect(content).toContain("check-task-workflow.sh");
+    expect(content).toContain("install_skill_factory_assets");
+    expect(content).toContain("scripts/skill-factory-create.sh");
+    expect(content).toContain("scripts/skill-factory-check.sh");
+    expect(content).toContain("check:task-sync");
+    expect(content).toContain("check:task-workflow");
+    expect(content).toContain("spa-day-protocol.md");
+    expect(content).toContain("cat > .claude/settings.json");
+    expect(content).toContain(".ai/hooks/run-hook.sh");
+    expect(content).toContain("mkdir -p .ai/hooks");
+    expect(content).toContain(".skill-factory-state.json");
+    expect(content).toContain("skill-factory-session-end.sh");
+    expect(content).toContain("Project Milestones");
+    expect(content).toContain("milestone checkpoints only");
+    expect(content).toContain("**Source Plan**: (none)");
+    expect(content).not.toContain(".*/");
+    expect(content).toContain("ensure_runtime_gitignore_block");
+    expect(content).not.toContain("\"$TOOL_INPUT\"");
+    expect(content).not.toContain("\"$PROMPT\"");
+    expect(content).toContain("cp \"$ASSETS_REF_DIR\"/*.md docs/reference-configs/");
+  });
+
+  test("prompt-guard should monitor tasks-first files", () => {
+    const content = read("assets/hooks/prompt-guard.sh");
+    const workflowState = read("assets/hooks/lib/workflow-state.sh");
+
+    expect(content).toContain("tasks/todo.md");
+    expect(content).toContain("tasks/lessons.md");
+    expect(content).toContain("tasks/research.md");
+    expect(workflowState).toContain("git status --porcelain=v1");
+    expect(content).toContain("has_changes_glob");
+    expect(content).toContain("PlanStatusGuard");
+    expect(content).toContain("ensure-task-workflow.sh");
+    expect(content).toContain("exit 1");
+  });
+
+  test("hook template should reference existing local hook scripts", () => {
+    const settings = read("assets/hooks/settings.template.json");
+    const hookCommands = [...settings.matchAll(/\.ai\/hooks\/([A-Za-z0-9.-]+\.sh)/g)].map((m) => m[1]);
+
+    expect(hookCommands.length).toBeGreaterThan(0);
+    for (const fileName of hookCommands) {
+      expect(existsSync(join(ROOT, "assets/hooks", fileName))).toBe(true);
+    }
+
+    expect(hookCommands).toContain("run-hook.sh");
+    expect(settings).toContain(".ai/hooks/run-hook.sh");
+    expect(settings).toContain("worktree-guard.sh");
+    expect(settings).toContain("pre-edit-guard.sh");
+    expect(settings).toContain("post-edit-guard.sh");
+    expect(settings).toContain("prompt-guard.sh");
+    expect(settings).toContain("skill-factory-session-end.sh");
+    expect(settings).toContain("post-bash.sh");
+    expect(settings).toContain("context-pressure-hook.sh");
+    expect(settings).not.toContain("bash -lc");
+    expect(settings).not.toContain("atomic-pending.sh");
+    expect(settings).not.toContain("atomic-commit.sh");
+    expect(settings).not.toContain("\"$TOOL_INPUT\"");
+    expect(settings).not.toContain("\"$PROMPT\"");
+  });
+
+  test("setup script should install global policy hooks", () => {
+    const setup = read("scripts/setup-plugins.sh");
+    expect(setup).toContain("install_permissionless_policy_hooks");
+    expect(setup).toContain("worktree-guard.sh");
+    expect(setup).toContain("atomic-pending.sh");
+    expect(setup).toContain("hook-input.sh");
+    expect(setup).toContain("atomic-commit.sh");
+  });
+
+  test("hook docs and scripts should use ToolUse event names", () => {
+    const skill = read("SKILL.md");
+    const plugins = read("references/plugins-core.md");
+    const setup = read("scripts/setup-plugins.sh");
+    const legacyPre = `PreTool${"Call"}`;
+    const legacyPost = `PostTool${"Call"}`;
+
+    expect(skill).not.toContain(legacyPre);
+    expect(skill).not.toContain(legacyPost);
+    expect(plugins).not.toContain(legacyPre);
+    expect(plugins).not.toContain(legacyPost);
+    expect(setup).not.toContain(legacyPre);
+    expect(setup).not.toContain(legacyPost);
+  });
+});

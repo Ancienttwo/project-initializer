@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sessions": {
+    "recent": [
+      {
+        "ts": 1741824000,
+        "agent": "codex",
+        "intent_category": "bug-fix",
+        "plan_slug": "auth-middleware",
+        "lessons_added": 1,
+        "todo_completed": 2,
+        "todo_total": 5
+      },
+      {
+        "ts": 1741996800,
+        "agent": "codex",
+        "intent_category": "bug-fix",
+        "plan_slug": "auth-middleware",
+        "lessons_added": 1,
+        "todo_completed": 3,
+        "todo_total": 5
+      }
+    ]
+  },
+  "patterns": {
+    "workflow": {
+      "bug-fix": { "count": 2, "last_seen": 1741996800, "plan_slugs": ["auth-middleware"] }
+    },
+    "knowledge": {
+      "testing-conventions": { "count": 2, "lessons": ["Always write integration tests for API endpoints", "Integration tests must hit a real database"] }
+    }
+  },
+  "optimization_hints": [],
+  "dismissed": []
+}

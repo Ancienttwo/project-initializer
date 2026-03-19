@@ -1,0 +1,132 @@
+#!/bin/bash
+# Prompt Guard Hook — UserPromptSubmit
+# Detects bug-fix / feature requests and injects TDD/BDD context.
+# Detects research/plan annotation changes and enforces "don't implement yet".
+
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/hook-input.sh"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/lib/workflow-state.sh"
+
+is_implement_intent() {
+  echo "$PROMPT_TEXT" | grep -qEi "(implement|execute|build it|do it|实现|执行|开始写|动手)"
+}
+
+is_done_intent() {
+  echo "$PROMPT_TEXT" | grep -qEi "(done|complete|completed|finished|mark done|完成|结束|收工)"
+}
+
+is_spa_day_intent() {
+  echo "$PROMPT_TEXT" | grep -qEi "(spa day|audit rules|consolidate|cleanup rules|规则清理|规则审计|合并规则|瘦身)"
+}
+
+PROMPT_TEXT="$(hook_get_prompt "${1:-}")"
+
+implement_intent=0
+if is_implement_intent; then
+  implement_intent=1
+fi
+
+done_intent=0
+if is_done_intent; then
+  done_intent=1
+fi
+
+if [ "$implement_intent" -eq 0 ]; then
+  if [ -f "tasks/todo.md" ] && has_changes "tasks/todo.md"; then
+    echo "[PlanGuard] tasks/todo.md has been modified. Read annotations and update the plan. Do not implement yet."
+  fi
+
+  if [ -f "tasks/lessons.md" ] && has_changes "tasks/lessons.md"; then
+    echo "[LessonGuard] tasks/lessons.md has updates. Review prevention rules before coding."
+  fi
+
+  if [ -f "tasks/research.md" ] && has_changes "tasks/research.md"; then
+    echo "[ResearchGuard] tasks/research.md updated. Review research deeply before planning or implementation."
+  fi
+
+  changed_plan="$(has_changes_glob '^plans/plan-.*\.md$' || true)"
+  if [ -n "$changed_plan" ]; then
+    echo "[AnnotationGuard] ${changed_plan} has annotations. Process all notes and revise. Do not implement yet."
+  fi
+fi
+
+if [ "$implement_intent" -eq 1 ]; then
+  active_plan="$(get_active_plan || true)"
+  if [ -z "$active_plan" ] || [ ! -f "$active_plan" ]; then
+    echo "[PlanStatusGuard] No active plan found in plans/. Run: bash scripts/ensure-task-workflow.sh --slug <slug> --title <title>"
+    exit 1
+  fi
+
+  plan_status="$(get_plan_status "$active_plan")"
+  if [ "$plan_status" = "Draft" ] || [ "$plan_status" = "Annotating" ]; then
+    echo "[PlanStatusGuard] Plan status is '$plan_status' in $active_plan. Complete annotation cycle first."
+    exit 1
+  fi
+
+  if [ "$plan_status" = "Approved" ] || [ "$plan_status" = "Executing" ]; then
+    todo_source="$(get_todo_source_plan || true)"
+    if [ "$todo_source" != "$active_plan" ]; then
+      echo "[TodoGuard] Active plan is '$plan_status' in $active_plan but tasks/todo.md is not synchronized."
+      echo "[TodoGuard] Run: bash scripts/plan-to-todo.sh --plan $active_plan"
+      exit 1
+    fi
+  fi
+fi
+
+if [ "$done_intent" -eq 1 ]; then
+  active_plan="$(get_active_plan || true)"
+  if [ -z "$active_plan" ] || [ ! -f "$active_plan" ]; then
+    echo "[ContractGuard] Done intent detected, but no active plan found. Complete plan workflow first."
+    exit 1
+  fi
+
+  contract_file="$(derive_contract_path "$active_plan" || true)"
+  if [ -z "$contract_file" ]; then
+    echo "[ContractGuard] Could not derive contract path from plan: $active_plan"
+    exit 1
+  fi
+
+  if [ ! -f "$contract_file" ]; then
+    echo "[ContractGuard] Missing task contract: $contract_file"
+    exit 1
+  fi
+
+  if [ -f "scripts/verify-contract.sh" ]; then
+    if ! bash "scripts/verify-contract.sh" --contract "$contract_file" --strict; then
+      echo "[ContractGuard] Contract verification failed: $contract_file"
+      exit 1
+    fi
+  else
+    echo "[ContractGuard] verify-contract.sh not found at scripts/verify-contract.sh (degraded mode: skipping strict verification)."
+  fi
+fi
+
+if is_spa_day_intent; then
+  if [ -f "docs/reference-configs/spa-day-protocol.md" ]; then
+    echo "[SpaDay] Follow docs/reference-configs/spa-day-protocol.md for consolidation."
+  else
+    echo "[SpaDay] spa-day protocol missing. Add docs/reference-configs/spa-day-protocol.md."
+  fi
+fi
+
+# --- TDD/BDD Context Injection ---
+if echo "$PROMPT_TEXT" | grep -qEi "(fix|patch|bug|修复|修bug|修 bug|改bug)"; then
+  echo "[TDD] Bug-fix intent detected. Reproduce with a failing test first."
+  echo "  检测到修复请求：先写失败测试复现问题，再重写实现。"
+fi
+if echo "$PROMPT_TEXT" | grep -qEi "(new feature|feature|implement|build|新功能|实现|开发功能|执行)"; then
+  echo "[BDD] Feature intent detected. Define Given-When-Then acceptance scenarios first."
+  echo "  检测到新功能请求：先定义 Given-When-Then 验收场景。"
+fi
+
+if [[ -f "$SCRIPT_DIR/lib/skill-factory.sh" ]]; then
+  # shellcheck source=/dev/null
+  . "$SCRIPT_DIR/lib/skill-factory.sh"
+  sf_collect_signal "$PROMPT_TEXT" "$implement_intent" "$done_intent" || true
+  sf_check_proposals || true
+  sf_check_optimization || true
+fi

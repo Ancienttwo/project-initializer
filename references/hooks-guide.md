@@ -1,0 +1,68 @@
+# Hooks Configuration Guide
+
+Use this guide for **Q8: Configure Hooks** details.
+
+## Project Hook Source of Truth
+
+- Repo-local `tasks/` files are the primary cross-agent contract.
+- Repo-local `plans/` files are the sole source of truth for the active plan.
+- Shared hook implementation: `.ai/hooks/`.
+- Team-configurable Claude adapter: `.claude/settings.json` (committable).
+- Personal overrides only: `.claude/settings.local.json` (optional).
+- Claude compatibility shims: `.claude/hooks/`.
+
+Use `.ai/hooks/` as the shared implementation layer. Use hooks as Claude-specific accelerators, not as the only source of workflow enforcement.
+
+## Hook Presets
+
+### A) Balanced Shared Guardrails (recommended)
+- Runtime profile: Plan-only (recommended), configurable to Permissionless/Standard.
+- `PreToolUse (Edit|Write)`: worktree guard (warn by default, opt-in hard block), pre-edit guard (TDD/BDD + asset-layer reminders).
+- `PostToolUse (Edit|Write)`: post-edit guard (doc drift + task handoff summary).
+- `PostToolUse (Bash)`: post-bash advisory reminders.
+- `PostToolUse (all tools)`: context-pressure session monitor.
+- `UserPromptSubmit`: prompt guard (plan sync + TDD/BDD reminders).
+- `Stop`: skill-factory session-end summarizer.
+- Automatic checkpoint commits are disabled in the shared default.
+
+### B) Balanced + Release Guard
+- Same as A, plus `changelog-guard.sh` for repos that want release reminders.
+
+### C) Balanced + Advisory Extras
+- Same as A, plus optional advisory hooks like `anti-simplification.sh` when teams explicitly want more reminders beyond the default `post-bash.sh` and `context-pressure-hook.sh`.
+
+### D) Minimal
+- `UserPromptSubmit` only.
+
+### E) No Hooks
+- Skip project-level hook config.
+
+### F) Custom
+- Define explicit matcher + command sets.
+
+## Hook Files to Copy
+
+| Asset File | Target Path |
+|---|---|
+| `assets/hooks/hook-input.sh` | `.ai/hooks/hook-input.sh` and `.claude/hooks/hook-input.sh` |
+| `assets/hooks/run-hook.sh` | `.ai/hooks/run-hook.sh` (main) and `.claude/hooks/run-hook.sh` (shim) |
+| `assets/hooks/*.sh` | `.ai/hooks/*.sh` (main) and `.claude/hooks/*.sh` (compatibility shims) |
+| `assets/hooks/lib/` | `.ai/hooks/lib/` (main) and `.claude/hooks/lib/` (compatibility copy) |
+| `assets/hooks/settings.template.json` | `.claude/settings.json` |
+
+Optional hook assets:
+- `assets/hooks/tdd-guard-hook.sh`
+- `assets/hooks/pre-code-change.sh`
+- `assets/hooks/anti-simplification.sh`
+- `assets/hooks/post-bash.sh`
+- `assets/hooks/context-pressure-hook.sh`
+- `assets/hooks/changelog-guard.sh`
+- `assets/hooks/atomic-pending.sh`
+- `assets/hooks/atomic-commit.sh`
+
+## Customization Notes
+
+- Non-monorepo projects can remove package-related doc drift triggers.
+- Non-Expo projects can remove Metro config drift checks.
+- Non-Turborepo projects can remove `turbo.json` drift checks.
+- Skill Factory state is runtime-only. Ignore `.claude/.skill-factory-state.json` and related session marker files.

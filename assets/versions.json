@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Centralized version configuration for project-initializer. Format: 'package': 'version' (use .x for major version tracking)",
+  
+  "core": {
+    "vite": "7.x",
+    "react": "19",
+    "typescript": "5.x",
+    "bun": "1.x"
+  },
+  
+  "routing": {
+    "tanstack-router": "1.x",
+    "tanstack-query": "5.x",
+    "remix": "2.x",
+    "expo-router": "4.x"
+  },
+  
+  "ui": {
+    "shadcn-ui": "latest",
+    "ant-design": "5.x",
+    "ant-design-x": "2.0",
+    "ant-design-pro": "6.x",
+    "tailwindcss": "4.x",
+    "nativewind": "4.x",
+    "heroui-native": "1.0.0-beta",
+    "heroui": "3.x-beta"
+  },
+  
+  "state": {
+    "zustand": "5.x",
+    "jotai": "2.x"
+  },
+  
+  "backend": {
+    "hono": "4.x",
+    "fastapi": "0.110+",
+    "sqlalchemy": "2.0"
+  },
+  
+  "mobile": {
+    "react-native": "0.84+",
+    "expo": "55"
+  },
+
+  "frameworks": {
+    "umijs": "4.x",
+    "astro": "5.x",
+    "turborepo": "2.x"
+  },
+  
+  "web3": {
+    "wagmi": "2.x",
+    "viem": "2.x",
+    "connectkit": "2.x",
+    "hardhat": "2.x",
+    "openzeppelin": "5.x"
+  },
+
+  "astro-ui": {
+    "starwind-ui": "1.x"
+  },
+
+  "enhancement": {
+    "shikijs": "3.x",
+    "dnd-kit": "6.x",
+    "framer-motion": "12.x",
+    "lexical": "0.x",
+    "d3": "7.x"
+  },
+
+  "tools": {
+    "biome": "2.x",
+    "vitest": "4.x",
+    "playwright": "1.x"
+  }
+}

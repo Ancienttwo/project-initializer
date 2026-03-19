@@ -1,0 +1,20 @@
+{
+  "workspaceRoot": "../project-initializer-workspace",
+  "summaryPath": "evals/benchmark.md",
+  "agents": {
+    "claude": {
+      "command": "claude",
+      "args": []
+    },
+    "codex": {
+      "command": "codex",
+      "args": []
+    }
+  },
+  "profiles": {
+    "with_skill": {
+      "skillPath": "."
+    },
+    "without_skill": {}
+  }
+}

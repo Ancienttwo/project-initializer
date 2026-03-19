@@ -1,0 +1,7 @@
+{
+  "name": "fix-agents-fixture",
+  "private": true,
+  "scripts": {
+    "test": "echo \"no tests yet\""
+  }
+}

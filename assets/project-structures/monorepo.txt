@@ -1,0 +1,62 @@
+# Bun + Turborepo Monorepo Structure
+
+{{PROJECT_NAME}}/
+├── apps/
+│   ├── web/                      # Main web app (Vite + React)
+│   │   ├── src/
+│   │   │   ├── routes/
+│   │   │   ├── components/
+│   │   │   └── main.tsx
+│   │   ├── package.json
+│   │   └── vite.config.ts
+│   │
+│   ├── admin/                    # Admin dashboard (optional)
+│   │   ├── app/
+│   │   └── package.json
+│   │
+│   └── mobile/                   # Mobile app (optional)
+│       ├── src/
+│       └── package.json
+│
+├── packages/
+│   ├── ui/                       # Shared UI components
+│   │   ├── src/
+│   │   │   ├── button.tsx
+│   │   │   ├── input.tsx
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── utils/                    # Shared utilities
+│   │   ├── src/
+│   │   │   ├── format.ts
+│   │   │   ├── validate.ts
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   ├── types/                    # Shared TypeScript types
+│   │   ├── src/
+│   │   │   ├── user.ts
+│   │   │   ├── database.ts
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   └── tsconfig/                 # Shared TypeScript configs
+│       ├── base.json
+│       ├── react.json
+│       └── package.json
+│
+├── docs/                         # Project documentation
+│   ├── architecture/
+│   │   ├── ARCHITECTURE.md
+│   │   └── tech-stack.md
+│   ├── PROGRESS.md
+│   └── CHANGELOG.md
+├── .ops/                         # Operations (not in Git)
+├── artifacts/                    # Build outputs (not in Git)
+├── turbo.json                    # Turborepo config
+├── package.json                  # Root package.json
+├── bun.lockb                     # Bun lockfile
+├── .gitignore
+├── CLAUDE.md                     # AI development guide
+└── README.md

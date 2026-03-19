@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Test coverage
+coverage/
+
+# Bun
+bun.lockb
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/settings.json
+
+# Sisyphus internal state (not project deliverables)
+.sisyphus/boulder.json
+.sisyphus/notepads/
+
+# Local Claude overrides/state
+# BEGIN: claude-runtime-temp (managed by project-initializer)
+.claude/settings.local.json
+.claude/.atomic_pending
+.claude/.session-id
+.claude/.tool-call-count
+.claude/.session-handoff.md
+.claude/.skill-factory-state.json
+.claude/.skill-factory-session.json
+.claude/.skill-factory-session-marker.json
+.claude/.skill-factory-user/
+.claude/.context-pressure/
+.claude/*.tmp
+.claude/*.bak
+.claude/*.bak.*
+.claude/*.backup-*
+# END: claude-runtime-temp

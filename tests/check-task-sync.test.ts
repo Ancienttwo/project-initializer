@@ -1,0 +1,131 @@
+import { describe, test, expect } from "bun:test";
+import {
+  copyFileSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { spawnSync } from "child_process";
+
+const ROOT = join(import.meta.dir, "..");
+const HELPER = join(ROOT, "assets", "templates", "helpers", "check-task-sync.sh");
+
+function run(cwd: string, args: string[]) {
+  return spawnSync(args[0], args.slice(1), { cwd, encoding: "utf-8" });
+}
+
+function setupRepo(): string {
+  const cwd = mkdtempSync(join(tmpdir(), "task-sync-"));
+  mkdirSync(join(cwd, "src"), { recursive: true });
+  mkdirSync(join(cwd, "tasks", "archive"), { recursive: true });
+  mkdirSync(join(cwd, "docs"), { recursive: true });
+  mkdirSync(join(cwd, "scripts"), { recursive: true });
+
+  copyFileSync(HELPER, join(cwd, "scripts", "check-task-sync.sh"));
+  expect(run(cwd, ["chmod", "+x", "scripts/check-task-sync.sh"]).status).toBe(0);
+  expect(run(cwd, ["git", "init"]).status).toBe(0);
+  expect(run(cwd, ["git", "config", "user.email", "test@example.com"]).status).toBe(0);
+  expect(run(cwd, ["git", "config", "user.name", "Test User"]).status).toBe(0);
+
+  writeFileSync(join(cwd, "src", "app.ts"), "export const value = 1;\n");
+  writeFileSync(join(cwd, "tasks", "todo.md"), "# Task Execution Checklist (Primary)\n");
+  writeFileSync(join(cwd, "tasks", "lessons.md"), "# Lessons Learned (Self-Improvement Loop)\n");
+  writeFileSync(join(cwd, "tasks", "research.md"), "# Project Research Notes\n");
+  writeFileSync(join(cwd, "docs", "PROGRESS.md"), "# Project Milestones\n");
+
+  expect(run(cwd, ["git", "add", "."]).status).toBe(0);
+  expect(run(cwd, ["git", "commit", "-m", "init"]).status).toBe(0);
+  return cwd;
+}
+
+describe("check-task-sync helper", () => {
+  test("fails when working tree has code changes without task updates", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "src", "app.ts"), "export const value = 2;\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("without tasks/ synchronization");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("passes when code changes include tasks/todo.md updates", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "src", "app.ts"), "export const value = 2;\n");
+      writeFileSync(join(cwd, "tasks", "todo.md"), "# Task Execution Checklist (Primary)\n- [x] updated\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("passes when code changes include tasks/lessons.md updates", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "src", "app.ts"), "export const value = 2;\n");
+      writeFileSync(join(cwd, "tasks", "lessons.md"), "# Lessons Learned (Self-Improvement Loop)\n- rule\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("passes when only tasks files changed", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "tasks", "research.md"), "# Project Research Notes\n- finding\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("Only tasks/");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("passes when only docs/PROGRESS.md changed", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "docs", "PROGRESS.md"), "# Project Milestones\n- [x] milestone\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("fails when code changes only update docs/PROGRESS.md", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "src", "app.ts"), "export const value = 2;\n");
+      writeFileSync(join(cwd, "docs", "PROGRESS.md"), "# Project Milestones\n- [x] milestone\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(1);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("prefers staged changes over working tree changes", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "src", "app.ts"), "export const value = 2;\n");
+      writeFileSync(join(cwd, "tasks", "todo.md"), "# Task Execution Checklist (Primary)\n- [x] staged\n");
+      expect(run(cwd, ["git", "add", "tasks/todo.md"]).status).toBe(0);
+
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("Only tasks/ or docs/PROGRESS.md changed.");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});

@@ -1,0 +1,49 @@
+# Remix Project Structure
+
+{{PROJECT_NAME}}/
+├── app/
+│   ├── routes/                   # Remix routes
+│   │   ├── _index.tsx           # Home (/)
+│   │   ├── admin._index.tsx     # Admin home (/admin)
+│   │   ├── admin.users.tsx      # User list (/admin/users)
+│   │   └── admin.users.$id.tsx  # User detail (/admin/users/:id)
+│   ├── components/
+│   │   ├── ui/                  # shadcn/ui components
+│   │   ├── layout/              # Layout components
+│   │   │   ├── header.tsx
+│   │   │   ├── sidebar.tsx
+│   │   │   └── footer.tsx
+│   │   └── features/            # Business components
+│   ├── lib/
+│   │   ├── supabase.server.ts   # Supabase server client
+│   │   ├── supabase.client.ts   # Supabase browser client
+│   │   ├── utils.ts
+│   │   └── cn.ts
+│   ├── hooks/                   # Custom hooks
+│   ├── stores/                  # Zustand stores
+│   ├── types/
+│   │   └── database.types.ts
+│   ├── utils/
+│   │   ├── auth.server.ts       # Auth utilities
+│   │   └── session.server.ts    # Session management
+│   ├── styles/
+│   │   └── globals.css
+│   ├── root.tsx                 # Root component
+│   └── entry.client.tsx         # Client entry
+├── public/                      # Static assets
+├── docs/                        # Project documentation
+│   ├── architecture/
+│   │   ├── ARCHITECTURE.md
+│   │   └── tech-stack.md
+│   ├── PROGRESS.md
+│   └── CHANGELOG.md
+├── .ops/                        # Operations (not in Git)
+├── artifacts/                   # Build outputs (not in Git)
+├── .env.example
+├── .gitignore
+├── package.json
+├── remix.config.js
+├── tailwind.config.ts
+├── tsconfig.json
+├── CLAUDE.md                    # AI development guide
+└── README.md

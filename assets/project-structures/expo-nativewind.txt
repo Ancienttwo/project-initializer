@@ -1,0 +1,51 @@
+# Expo + NativeWind Project Structure
+
+{{PROJECT_NAME}}/
+├── src/
+│   ├── app/                      # Expo Router (file-based routing)
+│   │   ├── _layout.tsx          # Root layout
+│   │   ├── index.tsx            # Home screen
+│   │   ├── (auth)/              # Auth group
+│   │   │   ├── login.tsx
+│   │   │   └── register.tsx
+│   │   └── (tabs)/              # Tab navigation
+│   │       ├── _layout.tsx      # Tab layout
+│   │       ├── home.tsx
+│   │       ├── profile.tsx
+│   │       └── settings.tsx
+│   ├── components/
+│   │   ├── ui/                  # UI components
+│   │   │   ├── Button.tsx
+│   │   │   ├── Input.tsx
+│   │   │   └── Card.tsx
+│   │   ├── layout/              # Layout components
+│   │   └── features/            # Business components
+│   ├── lib/
+│   │   ├── supabase.ts          # Supabase client
+│   │   └── utils.ts
+│   ├── hooks/                   # Custom hooks
+│   ├── stores/                  # Zustand stores
+│   ├── types/                   # TypeScript types
+│   └── constants/               # App constants
+│       ├── colors.ts
+│       └── config.ts
+├── assets/                      # Images, fonts, etc.
+│   ├── images/
+│   └── fonts/
+├── docs/                        # Project documentation
+│   ├── architecture/
+│   │   ├── ARCHITECTURE.md
+│   │   └── tech-stack.md
+│   ├── PROGRESS.md
+│   └── CHANGELOG.md
+├── .ops/                        # Operations (not in Git)
+├── .env.example
+├── .gitignore
+├── app.json                     # Expo config
+├── babel.config.js
+├── tailwind.config.js           # NativeWind config
+├── metro.config.js
+├── package.json
+├── tsconfig.json
+├── CLAUDE.md                    # AI development guide
+└── README.md

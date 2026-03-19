@@ -1,0 +1,43 @@
+## Workflow Orchestration
+
+### 1. Research Before Planning
+- Deeply read relevant code paths and persist findings to `tasks/research.md`.
+- Capture hidden contracts, edge cases, and integration risks before proposing changes.
+
+### 2. Annotation Cycle
+- Iterate plan updates directly in `plans/plan-*.md` via inline notes.
+- Treat the latest non-archived `plans/plan-*.md` file as active.
+- Do not implement while plan status is `Draft` or `Annotating`.
+
+### 3. Plan Node Default
+- Enter plan mode for non-trivial tasks.
+- If no active plan exists, run `bash scripts/ensure-task-workflow.sh --slug <slug> --title <title>`.
+- Re-plan when execution drifts.
+
+### 4. Subagent Strategy
+- Offload independent research tracks.
+- Keep one ownership boundary per subagent.
+
+### 5. Self-Improvement Loop
+- Append correction-derived rules to `tasks/lessons.md`.
+
+### 6. Verification Before Done
+- No task completion without test/build evidence.
+
+### 6b. Contract Verification
+- Define per-task contract files in `tasks/contracts/`.
+- Verify contract exit criteria before claiming completion.
+- Use `scripts/verify-contract.sh --contract tasks/contracts/{slug}.contract.md --strict`.
+
+### 7. Balanced Elegance
+- Redesign hacky non-trivial fixes before shipping.
+
+### 8. Autonomous Bug Fixing
+- Start fixing when logs/tests provide sufficient evidence.
+
+### 9. Spa Day
+- Periodically consolidate conflicting rules and stale references.
+- Follow `docs/reference-configs/spa-day-protocol.md` for cleanup cadence.
+
+Detailed patterns:
+- `docs/reference-configs/workflow-orchestration.md`

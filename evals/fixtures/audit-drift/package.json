@@ -1,0 +1,7 @@
+{
+  "name": "audit-drift-fixture",
+  "private": true,
+  "scripts": {
+    "lint": "echo \"lint placeholder\""
+  }
+}

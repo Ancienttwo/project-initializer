@@ -1,0 +1,14 @@
+{
+  "questions": [
+    {
+      "id": "q1",
+      "name": "Primary goal coverage",
+      "question": "Does the output satisfy the stated goal?",
+      "pass": "The output completes the requested job without omitting the core objective.",
+      "fail": "The output misses the main job or only partially addresses it."
+    }
+  ],
+  "testPrompts": [
+    "Replace with a realistic prompt for this skill."
+  ]
+}

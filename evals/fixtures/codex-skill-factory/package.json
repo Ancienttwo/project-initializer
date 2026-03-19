@@ -1,0 +1,8 @@
+{
+  "name": "codex-skill-factory-fixture",
+  "private": true,
+  "scripts": {
+    "check:task-sync": "bash scripts/check-task-sync.sh",
+    "check:task-workflow": "bash scripts/check-task-workflow.sh --strict"
+  }
+}
