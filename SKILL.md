@@ -75,8 +75,9 @@ For a new project:
 2. Confirm only the decisions that materially affect the generated project.
 3. Assemble concise `CLAUDE.md` and `AGENTS.md`.
 4. Generate tasks-first workflow files and helper scripts.
-5. Generate reference configs and stack docs.
-6. Make sure the repo includes repo-local task sync enforcement.
+5. Install shared hooks into `.ai/hooks/` from `assets/hooks/`, create `.claude/hooks/` compatibility shims that delegate to `.ai/hooks/`, and write `.claude/settings.json` with hook commands referencing `.ai/hooks/run-hook.sh`. Load `references/hooks-guide.md` for the hook architecture.
+6. Generate reference configs and stack docs.
+7. Make sure the repo includes repo-local task sync enforcement.
 
 Load on demand:
 
@@ -144,6 +145,8 @@ The skill can generate or maintain:
 - `CLAUDE.md`
 - `AGENTS.md`
 - `.ai/hooks/*`
+- `.claude/hooks/*` (compatibility shims delegating to `.ai/hooks/`)
+- `.claude/settings.json` (hook adapter referencing `.ai/hooks/run-hook.sh`)
 - `docs/brief.md`
 - `docs/tech-stack.md`
 - `docs/decisions.md`
