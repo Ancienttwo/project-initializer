@@ -93,6 +93,34 @@ exit 7
   return { claude: claudePath, codex: codexPath, fail: failPath };
 }
 
+function writeEvalManifest(path: string, pattern = "skill"): void {
+  writeFileSync(
+    path,
+    JSON.stringify(
+      {
+        skill_name: "project-initializer",
+        evals: [
+          {
+            id: 1,
+            slug: "repair-agents-task-sync",
+            prompt: "Fix AGENTS.md and keep tasks aligned.",
+            expected_output: "A task-sync aware response.",
+            files: ["evals/fixtures/fix-agents"],
+            graders: {
+              files_exist: ["final-response.md"],
+              files_contain: [{ path: "final-response.md", pattern }],
+            },
+            expectations: ["Mentions task-sync expectations."],
+          },
+        ],
+      },
+      null,
+      2
+    ) + "\n",
+    "utf-8"
+  );
+}
+
 describe("run-skill-evals helpers", () => {
   test("formatIterationName builds a stable timestamped label", () => {
     const value = formatIterationName(new Date("2026-03-06T01:02:03Z"), "Bench Smoke");
@@ -119,14 +147,17 @@ describe("run-skill-evals helpers", () => {
 });
 
 describe("run-skill-evals execution", () => {
-  test("runs a filtered benchmark matrix with stubbed claude and codex commands", () => {
+  test("runs a filtered benchmark matrix with grader metadata", () => {
     const tempDir = tempPath("benchmark-run");
     const stubDir = join(tempDir, "bin");
     mkdirSync(stubDir, { recursive: true });
     const summaryPath = join(tempDir, "benchmark.md");
     const workspaceRoot = join(tempDir, "workspace");
     const configPath = join(tempDir, "benchmark.config.json");
+    const evalsPath = join(tempDir, "evals.json");
     const stubs = createStubCommands(stubDir);
+
+    writeEvalManifest(evalsPath);
 
     writeFileSync(
       configPath,
@@ -153,6 +184,7 @@ describe("run-skill-evals execution", () => {
       const report = runSkillEvals({
         repoRoot: ROOT,
         configPath,
+        evalsPath,
         evalFilters: ["repair-agents-task-sync"],
         now: new Date("2026-03-06T01:02:03Z"),
       });
@@ -165,12 +197,16 @@ describe("run-skill-evals execution", () => {
       expect(summary).toContain("## claude / with_skill");
       expect(summary).toContain("## codex / without_skill");
       expect(summary).toContain("repair-agents-task-sync");
+      expect(summary).toContain("graders pass");
 
       const claudeWithSkill = report.records.find(
         (record) => record.agent === "claude" && record.profile === "with_skill"
       );
       expect(claudeWithSkill).toBeDefined();
       expect(claudeWithSkill?.changedFiles.length).toBeGreaterThan(0);
+      expect(claudeWithSkill?.graderStatus).toBe("passed");
+      expect(claudeWithSkill?.graderSummary.total).toBeGreaterThan(0);
+      expect(claudeWithSkill?.graderReportPath).not.toBeNull();
       expect(existsSync(join(claudeWithSkill!.workspacePath, ".claude/skills/project-initializer"))).toBe(
         true
       );
@@ -188,14 +224,76 @@ describe("run-skill-evals execution", () => {
     }
   });
 
-  test("records failures without crashing the full report generation", () => {
+  test("records failures when graders fail even if agent exits 0", () => {
+    const tempDir = tempPath("benchmark-grader-fail");
+    const stubDir = join(tempDir, "bin");
+    mkdirSync(stubDir, { recursive: true });
+    const summaryPath = join(tempDir, "benchmark.md");
+    const workspaceRoot = join(tempDir, "workspace");
+    const configPath = join(tempDir, "benchmark.config.json");
+    const evalsPath = join(tempDir, "evals.json");
+    const stubs = createStubCommands(stubDir);
+
+    writeEvalManifest(evalsPath, "this-pattern-will-not-match");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          workspaceRoot,
+          summaryPath,
+          agents: {
+            claude: { command: stubs.claude, args: [] },
+            codex: { command: stubs.codex, args: [] },
+          },
+          profiles: {
+            with_skill: { skillPath: ROOT },
+            without_skill: {},
+          },
+        },
+        null,
+        2
+      ) + "\n",
+      "utf-8"
+    );
+
+    try {
+      const report = runSkillEvals({
+        repoRoot: ROOT,
+        configPath,
+        evalsPath,
+        agent: "claude",
+        profile: "with_skill",
+        evalFilters: ["repair-agents-task-sync"],
+        now: new Date("2026-03-06T01:02:03Z"),
+      });
+
+      expect(report.records).toHaveLength(1);
+      expect(report.records[0].status).toBe("failed");
+      expect(report.records[0].exitCode).toBe(0);
+      expect(report.records[0].graderStatus).toBe("failed");
+      expect(report.records[0].graderSummary.failed).toBeGreaterThan(0);
+      expect(readFileSync(report.records[0].metadataPath, "utf-8")).toContain('"graderStatus": "failed"');
+
+      const rendered = buildBenchmarkSummary(report, ROOT);
+      expect(rendered).toContain("failed");
+      expect(rendered).toContain("Grader results");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("records agent process failures without crashing the full report generation", () => {
     const tempDir = tempPath("benchmark-fail");
     const stubDir = join(tempDir, "bin");
     mkdirSync(stubDir, { recursive: true });
     const summaryPath = join(tempDir, "benchmark.md");
     const workspaceRoot = join(tempDir, "workspace");
     const configPath = join(tempDir, "benchmark.config.json");
+    const evalsPath = join(tempDir, "evals.json");
     const stubs = createStubCommands(stubDir);
+
+    writeEvalManifest(evalsPath);
 
     writeFileSync(
       configPath,
@@ -222,6 +320,7 @@ describe("run-skill-evals execution", () => {
       const report = runSkillEvals({
         repoRoot: ROOT,
         configPath,
+        evalsPath,
         agent: "claude",
         profile: "with_skill",
         evalFilters: ["repair-agents-task-sync"],
@@ -231,6 +330,7 @@ describe("run-skill-evals execution", () => {
       expect(report.records).toHaveLength(1);
       expect(report.records[0].status).toBe("failed");
       expect(report.records[0].exitCode).toBe(7);
+      expect(report.records[0].agentStatus).toBe("failed");
       expect(readFileSync(report.records[0].stderrPath, "utf-8")).toContain("simulated failure");
 
       const rendered = buildBenchmarkSummary(report, ROOT);

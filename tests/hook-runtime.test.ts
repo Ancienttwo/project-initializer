@@ -523,6 +523,25 @@ describe("Hook runtime behavior", () => {
 
       expect(res.status).toBe(1);
       expect(res.stdout).toContain("[PlanStatusGuard]");
+      expect(res.stdout).toContain('"guard":"PlanStatusGuard"');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("prompt-guard: blocks new plan creation when research is missing or stale", () => {
+    const cwd = tmpWorkspace("prompt-guard-research-gate");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+
+      const res = runHook("prompt-guard.sh", cwd, {
+        stdin: JSON.stringify({ user_message: "请创建计划" }),
+      });
+
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("[ResearchGate]");
+      expect(res.stdout).toContain('"guard":"ResearchGate"');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -669,6 +688,34 @@ describe("Hook runtime behavior", () => {
     }
   });
 
+  test("pre-edit-guard: blocks invalid plan status jumps", () => {
+    const cwd = tmpWorkspace("pre-edit-plan-transition");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+      mkdirSync(join(cwd, "plans"), { recursive: true });
+      writeFileSync(
+        join(cwd, "plans/plan-20260304-1500-demo.md"),
+        "# Plan: demo\n\n> **Status**: Draft\n\n## Annotations\n<!-- [NOTE]: add detail -->\n"
+      );
+
+      const res = runHook("pre-edit-guard.sh", cwd, {
+        stdin: JSON.stringify({
+          tool_input: {
+            file_path: "plans/plan-20260304-1500-demo.md",
+            content: "# Plan: demo\n\n> **Status**: Approved\n\n## Annotations\n<!-- [NOTE]: add detail -->\n",
+          },
+        }),
+      });
+
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("[PlanTransitionGuard]");
+      expect(res.stdout).toContain('"guard":"PlanTransitionGuard"');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   test("post-edit-guard: combines doc drift and task handoff", () => {
     const cwd = tmpWorkspace("post-edit-guard");
     try {
@@ -708,6 +755,7 @@ describe("Hook runtime behavior", () => {
       expect(handoffRes.status).toBe(0);
       expect(handoffRes.stdout).toContain("[TaskHandoff]");
       expect(existsSync(join(cwd, ".claude/.task-handoff.md"))).toBe(true);
+      expect(readFileSync(join(cwd, ".claude/.task-state.json"), "utf-8")).toContain('"status":"in_progress"');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -750,6 +798,80 @@ describe("Hook runtime behavior", () => {
       expect(handoff).toContain("finish first task");
       expect(handoff).toContain("Progress");
       expect(handoff).toContain("plans/plan-20260304-1410-demo.md");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("post-edit-guard: runs continuous contract verification for referenced files", () => {
+    const cwd = tmpWorkspace("post-edit-contract-verify");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+      mkdirSync(join(cwd, "plans"), { recursive: true });
+      mkdirSync(join(cwd, "tasks/contracts"), { recursive: true });
+      mkdirSync(join(cwd, "scripts"), { recursive: true });
+      mkdirSync(join(cwd, "src"), { recursive: true });
+
+      writeFileSync(
+        join(cwd, "plans/plan-20260304-1600-demo.md"),
+        "# Plan: demo\n\n> **Status**: Executing\n"
+      );
+      writeFileSync(
+        join(cwd, "tasks/contracts/demo.contract.md"),
+        [
+          "# Contract",
+          "",
+          "> **Status**: Pending",
+          "",
+          "```yaml",
+          "exit_criteria:",
+          "  files_exist:",
+          "    - src/demo.ts",
+          "```",
+          "",
+        ].join("\n")
+      );
+      writeFileSync(
+        join(cwd, "scripts/verify-contract.sh"),
+        "#!/bin/bash\nset -euo pipefail\necho \"[ContractVerify] total=1 failed=1 status=Pending->Partial\"\nexit 1\n"
+      );
+      expect(run("chmod", ["+x", "scripts/verify-contract.sh"], cwd).status).toBe(0);
+      writeFileSync(join(cwd, "src/demo.ts"), "export const demo = true;\n");
+
+      const res = runHook("post-edit-guard.sh", cwd, {
+        stdin: JSON.stringify({ tool_input: { file_path: "src/demo.ts" } }),
+      });
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("[ContractVerify]");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("trace-event hook writes structured JSONL output", () => {
+    const cwd = tmpWorkspace("trace-hook");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+
+      const res = runHook("trace-event.sh", cwd, {
+        stdin: JSON.stringify({
+          hook_event_name: "PostToolUse",
+          tool_name: "Edit",
+          duration_ms: 42,
+          tool_input: { file_path: "src/demo.ts" },
+          tool_response: { exit_code: 0 },
+        }),
+      });
+
+      expect(res.status).toBe(0);
+      const trace = readFileSync(join(cwd, ".claude/.trace.jsonl"), "utf-8");
+      expect(trace).toContain('"event_type":"PostToolUse"');
+      expect(trace).toContain('"tool_name":"Edit"');
+      expect(trace).toContain('"file_path":"src/demo.ts"');
+      expect(trace).toContain('"duration_ms":42');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

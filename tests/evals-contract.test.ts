@@ -13,6 +13,15 @@ describe("Skill eval assets", () => {
       prompt: string;
       expected_output: string;
       files: string[];
+      graders: {
+        files_exist?: string[];
+        files_contain?: Array<{ path: string; pattern: string }>;
+        commands_succeed?: string[];
+      };
+      anti_graders?: {
+        files_not_exist?: string[];
+        files_not_contain?: Array<{ path: string; pattern: string }>;
+      };
       expectations: string[];
     }>;
   };
@@ -37,6 +46,17 @@ describe("Skill eval assets", () => {
     expect(combined).toContain(".ai/");
   });
 
+  test("eval asset defines deterministic graders", () => {
+    for (const entry of evals.evals) {
+      expect(entry.graders).toBeDefined();
+      expect(
+        (entry.graders.files_exist?.length ?? 0) +
+          (entry.graders.files_contain?.length ?? 0) +
+          (entry.graders.commands_succeed?.length ?? 0)
+      ).toBeGreaterThan(0);
+    }
+  });
+
   test("eval ids and slugs are unique and outputs are non-empty", () => {
     const ids = new Set<number>();
     const slugs = new Set<string>();
@@ -52,6 +72,18 @@ describe("Skill eval assets", () => {
       expect(entry.files.length).toBeGreaterThan(0);
       for (const file of entry.files) {
         expect(existsSync(join(ROOT, file))).toBe(true);
+      }
+      if (entry.graders.files_contain) {
+        for (const grader of entry.graders.files_contain) {
+          expect(grader.path.length).toBeGreaterThan(0);
+          expect(grader.pattern.length).toBeGreaterThan(0);
+        }
+      }
+      if (entry.anti_graders?.files_not_contain) {
+        for (const grader of entry.anti_graders.files_not_contain) {
+          expect(grader.path.length).toBeGreaterThan(0);
+          expect(grader.pattern.length).toBeGreaterThan(0);
+        }
       }
       expect(entry.expectations.length).toBeGreaterThan(0);
       for (const expectation of entry.expectations) {

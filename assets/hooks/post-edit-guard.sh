@@ -1,6 +1,6 @@
 #!/bin/bash
 # Post-Edit Guard — PostToolUse on Edit|Write
-# Combines doc-drift reminders with task handoff generation.
+# Combines doc-drift reminders, continuous contract verification, and task handoff generation.
 
 set -euo pipefail
 export LC_ALL=C
@@ -16,13 +16,27 @@ run_skill_factory_activity() {
     return 0
   fi
 
-  # Source lazily so older generated projects without Skill Factory still work,
-  # and so both the early-return path and the task-handoff path share one hook.
   # shellcheck source=/dev/null
   . "$SCRIPT_DIR/lib/skill-factory.sh"
   sf_record_usage_activity "$FILE_PATH" || true
   if [[ "$FILE_PATH" == "tasks/lessons.md" ]]; then
     sf_read_new_lessons || true
+  fi
+}
+
+run_continuous_contract_verification() {
+  local active_plan contract_file
+
+  [[ -f "scripts/verify-contract.sh" ]] || return 0
+
+  active_plan="$(get_active_plan || true)"
+  [[ -n "$active_plan" && -f "$active_plan" ]] || return 0
+
+  contract_file="$(derive_contract_path "$active_plan" || true)"
+  [[ -n "$contract_file" && -f "$contract_file" ]] || return 0
+
+  if contract_references_path "$contract_file" "$FILE_PATH"; then
+    bash "scripts/verify-contract.sh" --contract "$contract_file" --quiet || true
   fi
 }
 
@@ -72,6 +86,8 @@ if [[ "$BASENAME" =~ ^wrangler.*\.toml$ ]]; then
   echo "  Check: docs/guides/cf-deployment.md bindings/routes may need updating"
 fi
 
+run_continuous_contract_verification
+
 if [[ "$FILE_PATH" != "tasks/todo.md" ]] || [[ ! -f "tasks/todo.md" ]]; then
   run_skill_factory_activity
   exit 0
@@ -79,26 +95,21 @@ fi
 
 mkdir -p .claude
 
-STATE_FILE=".claude/.task-state.json"
+STATE_FILE="$(workflow_task_state_file)"
 HANDOFF_FILE=".claude/.task-handoff.md"
 
-total_tasks="$(grep -E '^[[:space:]]*-[[:space:]]\[[ xX]\][[:space:]]+' tasks/todo.md | wc -l | tr -d ' ')"
-done_tasks="$(grep -E '^[[:space:]]*-[[:space:]]\[[xX]\][[:space:]]+' tasks/todo.md | wc -l | tr -d ' ')"
+prev_done="$(workflow_read_state_field "$STATE_FILE" "done_tasks" 2>/dev/null || echo 0)"
+prev_done="${prev_done:-0}"
 
-prev_done=0
-if [[ -f "$STATE_FILE" ]]; then
-  if command -v jq >/dev/null 2>&1; then
-    prev_done="$(jq -r '.done_tasks // 0' "$STATE_FILE" 2>/dev/null || echo 0)"
-  else
-    prev_done="$(grep -Eo '"done_tasks":[[:space:]]*[0-9]+' "$STATE_FILE" | grep -Eo '[0-9]+' | head -1)"
-    prev_done="${prev_done:-0}"
-  fi
-fi
+workflow_sync_task_state_from_todo "tasks/todo.md" "$STATE_FILE"
+
+done_tasks="$(workflow_read_state_field "$STATE_FILE" "done_tasks" 2>/dev/null || echo 0)"
+total_tasks="$(workflow_read_state_field "$STATE_FILE" "total_tasks" 2>/dev/null || echo 0)"
+done_tasks="${done_tasks:-0}"
+total_tasks="${total_tasks:-0}"
 
 if [[ "$done_tasks" -le "$prev_done" ]]; then
-  cat > "$STATE_FILE" <<EOF_STATE
-{"done_tasks": $done_tasks, "total_tasks": $total_tasks}
-EOF_STATE
+  run_skill_factory_activity
   exit 0
 fi
 
@@ -146,10 +157,6 @@ ${remaining_tasks}
 
 - ${diff_stat}
 EOF_HANDOFF
-
-cat > "$STATE_FILE" <<EOF_STATE
-{"done_tasks": $done_tasks, "total_tasks": $total_tasks}
-EOF_STATE
 
 echo "[TaskHandoff] Task completion advanced (${done_tasks}/${total_tasks}). Wrote ${HANDOFF_FILE}."
 

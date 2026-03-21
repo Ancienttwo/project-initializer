@@ -23,6 +23,10 @@ is_spa_day_intent() {
   echo "$PROMPT_TEXT" | grep -qEi "(spa day|audit rules|consolidate|cleanup rules|规则清理|规则审计|合并规则|瘦身)"
 }
 
+is_plan_creation_intent() {
+  echo "$PROMPT_TEXT" | grep -qEi "(new plan|create plan|write plan|draft plan|新建计划|创建计划|写计划|制定计划|补计划)"
+}
+
 PROMPT_TEXT="$(hook_get_prompt "${1:-}")"
 
 implement_intent=0
@@ -33,6 +37,26 @@ fi
 done_intent=0
 if is_done_intent; then
   done_intent=1
+fi
+
+if is_plan_creation_intent; then
+  if ! has_research_for_new_plan; then
+    latest_plan="$(get_latest_plan || true)"
+    if [[ -n "$latest_plan" ]]; then
+      echo "[ResearchGate] tasks/research.md must exist and be newer than $latest_plan before creating a new plan."
+      hook_structured_error \
+        "ResearchGate" \
+        "Research is missing or older than the latest plan ($latest_plan)." \
+        "Update tasks/research.md with fresh findings before drafting a new plan."
+    else
+      echo "[ResearchGate] tasks/research.md must exist before creating the first plan."
+      hook_structured_error \
+        "ResearchGate" \
+        "Research is missing for first-plan creation." \
+        "Create tasks/research.md with current findings before drafting the plan."
+    fi
+    exit 1
+  fi
 fi
 
 if [ "$implement_intent" -eq 0 ]; then
@@ -58,12 +82,20 @@ if [ "$implement_intent" -eq 1 ]; then
   active_plan="$(get_active_plan || true)"
   if [ -z "$active_plan" ] || [ ! -f "$active_plan" ]; then
     echo "[PlanStatusGuard] No active plan found in plans/. Run: bash scripts/ensure-task-workflow.sh --slug <slug> --title <title>"
+    hook_structured_error \
+      "PlanStatusGuard" \
+      "No active plan found in plans/." \
+      "Run bash scripts/ensure-task-workflow.sh --slug <slug> --title <title> before implementation."
     exit 1
   fi
 
   plan_status="$(get_plan_status "$active_plan")"
   if [ "$plan_status" = "Draft" ] || [ "$plan_status" = "Annotating" ]; then
     echo "[PlanStatusGuard] Plan status is '$plan_status' in $active_plan. Complete annotation cycle first."
+    hook_structured_error \
+      "PlanStatusGuard" \
+      "Plan status is $plan_status in $active_plan." \
+      "Complete the annotation cycle and move the plan to Approved before implementation."
     exit 1
   fi
 
@@ -72,6 +104,10 @@ if [ "$implement_intent" -eq 1 ]; then
     if [ "$todo_source" != "$active_plan" ]; then
       echo "[TodoGuard] Active plan is '$plan_status' in $active_plan but tasks/todo.md is not synchronized."
       echo "[TodoGuard] Run: bash scripts/plan-to-todo.sh --plan $active_plan"
+      hook_structured_error \
+        "TodoGuard" \
+        "tasks/todo.md is not synchronized with $active_plan." \
+        "Run bash scripts/plan-to-todo.sh --plan $active_plan before implementation."
       exit 1
     fi
   fi
@@ -81,23 +117,39 @@ if [ "$done_intent" -eq 1 ]; then
   active_plan="$(get_active_plan || true)"
   if [ -z "$active_plan" ] || [ ! -f "$active_plan" ]; then
     echo "[ContractGuard] Done intent detected, but no active plan found. Complete plan workflow first."
+    hook_structured_error \
+      "ContractGuard" \
+      "Done intent detected without an active plan." \
+      "Finish the plan workflow and ensure plans/ contains the active plan before marking work done."
     exit 1
   fi
 
   contract_file="$(derive_contract_path "$active_plan" || true)"
   if [ -z "$contract_file" ]; then
     echo "[ContractGuard] Could not derive contract path from plan: $active_plan"
+    hook_structured_error \
+      "ContractGuard" \
+      "Could not derive a contract path from $active_plan." \
+      "Rename the plan to plan-<timestamp>-<slug>.md so the matching contract can be resolved."
     exit 1
   fi
 
   if [ ! -f "$contract_file" ]; then
     echo "[ContractGuard] Missing task contract: $contract_file"
+    hook_structured_error \
+      "ContractGuard" \
+      "Missing task contract $contract_file." \
+      "Create the contract or regenerate tasks from the active plan before marking work done."
     exit 1
   fi
 
   if [ -f "scripts/verify-contract.sh" ]; then
     if ! bash "scripts/verify-contract.sh" --contract "$contract_file" --strict; then
       echo "[ContractGuard] Contract verification failed: $contract_file"
+      hook_structured_error \
+        "ContractGuard" \
+        "Contract verification failed for $contract_file." \
+        "Resolve the failing exit criteria in the contract before marking work done."
       exit 1
     fi
   else

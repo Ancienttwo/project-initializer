@@ -8,9 +8,37 @@ export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/hook-input.sh"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/lib/workflow-state.sh"
 
 FILE_PATH="$(hook_get_file_path "${1:-}")"
+WRITE_PAYLOAD="$(hook_get_write_payload "${1:-}")"
 [[ -z "$FILE_PATH" ]] && exit 0
+
+if [[ "$FILE_PATH" =~ ^plans/plan-.*\.md$ ]] && [[ -f "$FILE_PATH" || -n "$WRITE_PAYLOAD" ]]; then
+  current_status=""
+  if [[ -f "$FILE_PATH" ]]; then
+    current_status="$(get_plan_status "$FILE_PATH" || true)"
+  fi
+  next_status="$(workflow_extract_status_from_text "$WRITE_PAYLOAD")"
+
+  if [[ -n "$current_status" && -n "$next_status" && "$current_status" != "$next_status" ]]; then
+    if [[ "$WRITE_PAYLOAD" == *"[NOTE]:"* ]]; then
+      note_count="$(workflow_plan_note_count_in_text "$WRITE_PAYLOAD")"
+    else
+      note_count="$(workflow_plan_note_count "$FILE_PATH")"
+    fi
+
+    if ! transition_error="$(validate_plan_transition "$current_status" "$next_status" "$note_count")"; then
+      echo "[PlanTransitionGuard] $transition_error"
+      hook_structured_error \
+        "PlanTransitionGuard" \
+        "$transition_error" \
+        "Respect the Draft -> Annotating -> Approved flow and resolve required [NOTE]: annotations before changing status."
+      exit 1
+    fi
+  fi
+fi
 
 if echo "$FILE_PATH" | grep -qE "(^|/)(contracts|specs|tests)(/|$)|(\.contract\.|\.spec\.)"; then
   echo "[AssetLayer] Immutable file detected: $FILE_PATH"

@@ -19,5 +19,9 @@ describe("workflow-state shared library", () => {
     expect(content).toContain("derive_contract_path()");
     expect(content).toContain("workflow_todo_total()");
     expect(content).toContain("workflow_todo_done()");
+    expect(content).toContain("workflow_sync_task_state_from_todo()");
+    expect(content).toContain("has_research_for_new_plan()");
+    expect(content).toContain("validate_plan_transition()");
+    expect(content).toContain("contract_references_path()");
   });
 });

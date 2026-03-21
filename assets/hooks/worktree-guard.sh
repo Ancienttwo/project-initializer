@@ -5,18 +5,9 @@
 
 set -u
 
-# Resolve repo root — hooks may run from any cwd
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${HOOK_REPO_ROOT:-}"
-if [ -z "$REPO_ROOT" ]; then
-  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || true
-fi
-if [ -z "$REPO_ROOT" ]; then
-  REPO_ROOT="$(cd "$SCRIPT_DIR/../.." 2>/dev/null && pwd)" || true
-fi
-if [ -n "$REPO_ROOT" ]; then
-  cd "$REPO_ROOT" 2>/dev/null || true
-fi
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/hook-input.sh"
 
 REQUIRE_MARKER=".claude/.require-worktree"
 
@@ -35,6 +26,10 @@ if [[ -f "$REQUIRE_MARKER" ]]; then
   echo "  Enforcement marker found: $REQUIRE_MARKER"
   echo "  Use a linked worktree for write operations."
   echo "  Example: git worktree add ../<repo>-wt-<branch> -b <branch>"
+  hook_structured_error \
+    "WorktreeGuard" \
+    "Primary working tree detected at $GIT_DIR while $REQUIRE_MARKER is present." \
+    "Create and switch to a linked worktree before retrying the write operation."
   exit 1
 fi
 

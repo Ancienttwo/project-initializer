@@ -95,6 +95,10 @@ describe("Workflow helper scripts", () => {
       expect(todo).toContain("**Status**: Executing");
       expect(todo).toContain("- [ ] Step one");
       expect(existsSync(join(cwd, "tasks/contracts/demo.contract.md"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/.task-state.json"))).toBe(true);
+      const taskState = readFileSync(join(cwd, ".claude/.task-state.json"), "utf-8");
+      expect(taskState).toContain('"source_plan": "plans/plan-20260304-1400-demo.md"');
+      expect(taskState).toContain('"status":"in_progress"');
 
       const updatedPlan = readFileSync(planFile, "utf-8");
       expect(updatedPlan).toContain("**Status**: Executing");
@@ -352,6 +356,57 @@ describe("Workflow helper scripts", () => {
       expect(res.status).toBe(1);
       const updated = readFileSync(contractPath, "utf-8");
       expect(updated).toContain("> **Status**: Partial");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("verify-contract quiet mode should emit only summary and report file", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-quiet");
+    try {
+      mkdirSync(join(cwd, "scripts"), { recursive: true });
+      mkdirSync(join(cwd, "src"), { recursive: true });
+      copyHelpers(cwd);
+
+      writeFileSync(join(cwd, "src/index.ts"), "export const quiet = true;\n");
+      writeFileSync(
+        join(cwd, "task.contract.md"),
+        [
+          "# Task Contract: quiet",
+          "",
+          "> **Status**: Pending",
+          "",
+          "```yaml",
+          "exit_criteria:",
+          "  files_exist:",
+          "    - src/index.ts",
+          "  files_not_contain:",
+          "    - path: src/index.ts",
+          "      pattern: \"forbidden\"",
+          "```",
+          "",
+        ].join("\n")
+      );
+
+      const res = run(
+        "bash",
+        [
+          "scripts/verify-contract.sh",
+          "--contract",
+          "task.contract.md",
+          "--strict",
+          "--quiet",
+          "--report-file",
+          "report.json",
+        ],
+        cwd
+      );
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("[ContractVerify]");
+      expect(res.stdout).not.toContain("[PASS]");
+      expect(readFileSync(join(cwd, "report.json"), "utf-8")).toContain('"failed": 0');
+      expect(readFileSync(join(cwd, "report.json"), "utf-8")).toContain('"kind":"files_not_contain"');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

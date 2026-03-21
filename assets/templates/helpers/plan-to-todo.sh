@@ -10,6 +10,30 @@ Usage: scripts/plan-to-todo.sh --plan <plan-file>
 USAGE_EOF
 }
 
+# Source shared workflow-state library if available (installed via migration).
+# This avoids duplicating task-state JSON generation logic.
+_WF_LIB=".ai/hooks/lib/workflow-state.sh"
+if [[ -f "$_WF_LIB" ]]; then
+  # shellcheck source=/dev/null
+  . "$_WF_LIB"
+  _HAS_WF_LIB=1
+else
+  _HAS_WF_LIB=0
+fi
+
+# Fallback json_escape only when workflow-state.sh is not available
+if [[ "$_HAS_WF_LIB" -eq 0 ]]; then
+  workflow_json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    printf '%s' "$value"
+  }
+fi
+
 extract_status() {
   local file="$1"
   awk '/\*\*Status\*\*:/ {sub(/^.*\*\*Status\*\*: */, ""); gsub(/\r/, ""); print; exit}' "$file" | xargs
@@ -112,6 +136,81 @@ CONTRACT_TEMPLATE_EOF
   mv "$tmp_file" "$contract_file"
 }
 
+# Delegate to workflow-state.sh if available; inline fallback otherwise.
+# This ensures a single source of truth for task-state JSON generation.
+if [[ "$_HAS_WF_LIB" -eq 0 ]]; then
+  workflow_sync_task_state_from_todo() {
+    local todo_file="${1:-tasks/todo.md}"
+    local state_file="${2:-.claude/.task-state.json}"
+    local source_plan="${3:-}"
+    local timestamp
+    local tmp_state
+    local total=0
+    local done=0
+    local promoted_in_progress=0
+    local first=1
+
+    mkdir -p "$(dirname "$state_file")"
+    timestamp="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+
+    {
+      echo "{"
+      printf '  "done_tasks": 0,\n'
+      printf '  "total_tasks": 0,\n'
+      printf '  "source_plan": "%s",\n' "$(workflow_json_escape "${source_plan:-}")"
+      printf '  "updated_at": "%s",\n' "$(workflow_json_escape "$timestamp")"
+      echo '  "tasks": ['
+
+      while IFS= read -r line; do
+        printf '%s\n' "$line" | grep -Eq '^[[:space:]]*-[[:space:]]\[[ xX]\][[:space:]]+' || continue
+        total=$((total + 1))
+        local desc
+        desc="$(printf '%s' "$line" | sed -E 's/^[[:space:]]*-[[:space:]]\[[ xX]\][[:space:]]+//')"
+        local status="pending"
+        local passes="false"
+
+        if [[ "$line" =~ \[[xX]\] ]]; then
+          status="completed"
+          passes="true"
+          done=$((done + 1))
+        elif [[ "$promoted_in_progress" -eq 0 ]]; then
+          status="in_progress"
+          promoted_in_progress=1
+        fi
+
+        if [[ "$first" -eq 0 ]]; then
+          echo ","
+        fi
+        first=0
+
+        printf '    {"id":"task-%s","desc":"%s","status":"%s","passes":%s,"verification_evidence":[]}' \
+          "$total" \
+          "$(workflow_json_escape "$desc")" \
+          "$status" \
+          "$passes"
+      done < "$todo_file"
+
+      echo
+      echo "  ]"
+      echo "}"
+    } > "$state_file"
+
+    tmp_state="$(mktemp)"
+    awk -v done="$done" -v total="$total" '
+      {
+        if ($0 ~ /"done_tasks":/) {
+          printf "  \"done_tasks\": %s,\n", done
+        } else if ($0 ~ /"total_tasks":/) {
+          printf "  \"total_tasks\": %s,\n", total
+        } else {
+          print
+        }
+      }
+    ' "$state_file" > "$tmp_state"
+    mv "$tmp_state" "$state_file"
+  }
+fi
+
 plan_file=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -151,6 +250,7 @@ fi
 
 mkdir -p tasks/archive
 mkdir -p tasks/contracts
+mkdir -p .claude
 
 timestamp="$(date +%Y%m%d-%H%M)"
 timestamp_human="$(date '+%Y-%m-%d %H:%M')"
@@ -199,6 +299,8 @@ fi
   echo "- Behavior diff notes:"
   echo "- Risks / follow-ups:"
 } > tasks/todo.md
+
+workflow_sync_task_state_from_todo "tasks/todo.md" ".claude/.task-state.json" "$plan_file"
 
 render_contract_file "$plan_file" "$contract_file" "$slug" "$timestamp_human"
 

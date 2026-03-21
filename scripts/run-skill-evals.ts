@@ -31,6 +31,8 @@ export interface EvalEntry {
   expected_output: string;
   files: string[];
   expectations: string[];
+  graders: EvalGraders;
+  anti_graders?: EvalAntiGraders;
 }
 
 export interface EvalManifest {
@@ -80,6 +82,14 @@ export interface RunMetadata {
   command: string;
   cwd: string;
   exitCode: number | null;
+  agentStatus: "dry_run" | "success" | "failed";
+  graderStatus: "skipped" | "passed" | "failed";
+  graderReportPath: string | null;
+  graderSummary: {
+    total: number;
+    failed: number;
+  };
+  graderResults: GraderResult[];
   durationMs: number;
   dryRun: boolean;
   status: "dry_run" | "success" | "failed";
@@ -112,6 +122,40 @@ interface CommandSpec {
   command: string;
   args: string[];
   env: Record<string, string>;
+}
+
+export interface PathPatternCheck {
+  path: string;
+  pattern: string;
+}
+
+export interface EvalGraders {
+  files_exist?: string[];
+  files_contain?: PathPatternCheck[];
+  commands_succeed?: string[];
+}
+
+export interface EvalAntiGraders {
+  files_not_exist?: string[];
+  files_not_contain?: PathPatternCheck[];
+}
+
+export interface GraderResult {
+  kind: string;
+  target: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface GraderReport {
+  contract: string;
+  previous_status: string;
+  next_status: string;
+  quiet: boolean;
+  strict: boolean;
+  total: number;
+  failed: number;
+  results: GraderResult[];
 }
 
 const ARTIFACT_FILES = [
@@ -474,6 +518,86 @@ function relativeLink(fromRoot: string, targetPath: string): string {
   return rel.startsWith(".") ? rel : `./${rel}`;
 }
 
+function escapeYamlSingleQuoted(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function renderEvalContract(evalEntry: EvalEntry): string {
+  const lines: string[] = [
+    `# Eval Contract: ${evalEntry.slug}`,
+    "",
+    "> **Status**: Pending",
+    "",
+    "```yaml",
+    "exit_criteria:",
+  ];
+
+  const appendList = (section: string, values: string[] | undefined): void => {
+    if (!values || values.length === 0) return;
+    lines.push(`  ${section}:`);
+    for (const value of values) {
+      lines.push(`    - ${escapeYamlSingleQuoted(value)}`);
+    }
+  };
+
+  const appendPathPatterns = (
+    section: string,
+    values: PathPatternCheck[] | undefined
+  ): void => {
+    if (!values || values.length === 0) return;
+    lines.push(`  ${section}:`);
+    for (const value of values) {
+      lines.push(`    - path: ${escapeYamlSingleQuoted(value.path)}`);
+      lines.push(`      pattern: ${escapeYamlSingleQuoted(value.pattern)}`);
+    }
+  };
+
+  appendList("files_exist", evalEntry.graders.files_exist);
+  appendList("commands_succeed", evalEntry.graders.commands_succeed);
+  appendPathPatterns("files_contain", evalEntry.graders.files_contain);
+  appendList("files_not_exist", evalEntry.anti_graders?.files_not_exist);
+  appendPathPatterns("files_not_contain", evalEntry.anti_graders?.files_not_contain);
+
+  lines.push("```", "");
+  return `${lines.join("\n")}\n`;
+}
+
+function runEvalGraders(repoRoot: string, workspacePath: string, evalEntry: EvalEntry): {
+  report: GraderReport;
+  reportPath: string;
+} {
+  const verifyScriptPath = join(repoRoot, "assets", "templates", "helpers", "verify-contract.sh");
+  const contractPath = join(workspacePath, "eval-grader.contract.md");
+  const reportPath = join(workspacePath, "eval-grader-report.json");
+  writeTextFile(contractPath, renderEvalContract(evalEntry));
+
+  const result = runProcess(
+    "bash",
+    [
+      verifyScriptPath,
+      "--contract",
+      contractPath,
+      "--strict",
+      "--quiet",
+      "--report-file",
+      reportPath,
+    ],
+    workspacePath,
+    {}
+  );
+
+  if (!existsSync(reportPath)) {
+    throw new Error(
+      `Eval grader report missing for ${evalEntry.slug}: ${result.stderr.trim() || "no report generated"}`
+    );
+  }
+
+  return {
+    report: readJsonFile<GraderReport>(reportPath),
+    reportPath,
+  };
+}
+
 function buildRunMetadata(params: {
   agent: AgentName;
   profile: ProfileName;
@@ -481,6 +605,8 @@ function buildRunMetadata(params: {
   workspacePath: string;
   command: string;
   exitCode: number | null;
+  graderReportPath: string | null;
+  graderReport: GraderReport | null;
   durationMs: number;
   dryRun: boolean;
   stdoutPath: string;
@@ -507,11 +633,27 @@ function buildRunMetadata(params: {
     command: params.command,
     cwd: params.workspacePath,
     exitCode: params.exitCode,
+    agentStatus: params.dryRun
+      ? "dry_run"
+      : params.exitCode === 0
+        ? "success"
+        : "failed",
+    graderStatus: params.dryRun
+      ? "skipped"
+      : (params.graderReport?.failed ?? 0) === 0
+        ? "passed"
+        : "failed",
+    graderReportPath: params.graderReportPath,
+    graderSummary: {
+      total: params.graderReport?.total ?? 0,
+      failed: params.graderReport?.failed ?? 0,
+    },
+    graderResults: params.graderReport?.results ?? [],
     durationMs: params.durationMs,
     dryRun: params.dryRun,
     status: params.dryRun
       ? "dry_run"
-      : params.exitCode === 0
+      : params.exitCode === 0 && (params.graderReport?.failed ?? 0) === 0
         ? "success"
         : "failed",
     stdoutPath: params.stdoutPath,
@@ -572,6 +714,8 @@ function runSingleEval(params: {
   let exitCode: number | null = 0;
   let stdout = "";
   let stderr = "";
+  let graderReport: GraderReport | null = null;
+  let graderReportPath: string | null = null;
   const startedAt = Date.now();
 
   if (dryRun) {
@@ -596,6 +740,12 @@ function runSingleEval(params: {
     ? { changedFiles: [] as string[], diffPatch: "", diffStat: "" }
     : captureGitArtifacts(runPath);
 
+  if (!dryRun) {
+    const grading = runEvalGraders(repoRoot, runPath, evalEntry);
+    graderReport = grading.report;
+    graderReportPath = grading.reportPath;
+  }
+
   writeTextFile(
     changedFilesPath,
     gitArtifacts.changedFiles.length > 0 ? `${gitArtifacts.changedFiles.join("\n")}\n` : ""
@@ -609,6 +759,8 @@ function runSingleEval(params: {
     workspacePath: runPath,
     command: toShellCommand(commandSpec),
     exitCode,
+    graderReportPath,
+    graderReport,
     durationMs,
     dryRun,
     stdoutPath,
@@ -664,11 +816,17 @@ export function buildBenchmarkSummary(report: IterationReport, repoRoot: string)
       );
       if (records.length === 0) continue;
 
-      lines.push(`## ${agent} / ${profile}`, "", "| Eval | Status | Exit | Duration | Changed Files | Raw Artifacts |", "| --- | --- | --- | ---: | ---: | --- |");
+      lines.push(`## ${agent} / ${profile}`, "", "| Eval | Status | Exit / Graders | Duration | Changed Files | Raw Artifacts |", "| --- | --- | --- | ---: | ---: | --- |");
       for (const record of records) {
         const runLink = relativeLink(repoRoot, record.workspacePath);
+        const graderCell =
+          record.graderStatus === "skipped"
+            ? "graders skipped"
+            : record.graderSummary.failed === 0
+              ? "graders pass"
+              : `graders fail (${record.graderSummary.failed})`;
         lines.push(
-          `| ${record.evalSlug} | ${record.status} | ${record.exitCode ?? "n/a"} | ${record.durationMs}ms | ${record.changedFiles.length} | [workspace](${runLink}) |`
+          `| ${record.evalSlug} | ${record.status} | ${record.exitCode ?? "n/a"} / ${graderCell} | ${record.durationMs}ms | ${record.changedFiles.length} | [workspace](${runLink}) |`
         );
       }
       lines.push("");
@@ -679,10 +837,18 @@ export function buildBenchmarkSummary(report: IterationReport, repoRoot: string)
         lines.push(`- Workspace: [${relativeLink(repoRoot, record.workspacePath)}](${relativeLink(repoRoot, record.workspacePath)})`);
         lines.push(`- Changed files: ${record.changedFiles.length > 0 ? `\`${record.changedFiles.join("`, `")}\`` : "none"}`);
         lines.push(`- Diff summary: ${record.diffStat.length > 0 ? record.diffStat : "no diff captured"}`);
+        lines.push(`- Agent status: ${record.agentStatus} (exit ${record.exitCode ?? "n/a"})`);
+        lines.push(`- Graders: ${record.graderStatus} (${record.graderSummary.total - record.graderSummary.failed}/${record.graderSummary.total} passed)`);
         lines.push(`- Final response excerpt: ${record.finalResponseExcerpt.length > 0 ? record.finalResponseExcerpt : "(empty)"}`);
         lines.push("- Expectations:");
         for (const expectation of record.expectations) {
           lines.push(`  - ${expectation}`);
+        }
+        if (record.graderResults.length > 0) {
+          lines.push("- Grader results:");
+          for (const graderResult of record.graderResults) {
+            lines.push(`  - ${graderResult.passed ? "PASS" : "FAIL"} ${graderResult.kind}: ${graderResult.message}`);
+          }
         }
         lines.push("");
       }

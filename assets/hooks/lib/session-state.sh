@@ -7,7 +7,8 @@ session_state_new_session_id() {
     return
   fi
 
-  printf 'session-%s-%s' "$(date +%Y%m%d%H%M%S)" "$RANDOM"
+  local agent_name="${CLAUDE_AGENT_NAME:-${CODEX_AGENT_NAME:-unknown}}"
+  printf 'session-%s-%s-%s-%s' "$(date +%Y%m%d%H%M%S)" "$agent_name" "$$" "$RANDOM"
 }
 
 session_state_resolve_key() {

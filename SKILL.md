@@ -1,6 +1,6 @@
 ---
 name: project-initializer
-description: Create, migrate, audit, and repair AI-assisted project scaffolding for TypeScript/React/Node-style repos. Use whenever the user wants to initialize a new project, generate or update CLAUDE.md or AGENTS.md, migrate an existing repo to a tasks-first workflow, add repo-local task sync contracts, or audit an AI coding setup for Claude and Codex compatibility. Trigger even when the user only mentions "set up the repo", "fix AGENTS.md", "add task sync", "migrate Claude Code config", "generate CLAUDE.md", or "make this project ready for AI-assisted development."
+description: Use when initializing, migrating, auditing, or repairing AI-assisted project scaffolding such as CLAUDE.md, AGENTS.md, tasks/, hooks, and repo-local contracts. Not for runtime debugging or generic non-AI setup.
 ---
 
 # Project Initializer
@@ -15,6 +15,12 @@ Build or modernize a repository so it works as an AI-assisted coding project wit
 - reference configs and workflow scripts
 
 Treat this skill as a router. Keep `SKILL.md` focused on when to use the skill and which path to follow. Load detailed references only when needed.
+
+## When not to use
+
+- Do not use this skill for runtime bug debugging inside an already healthy AI workflow.
+- Do not use this skill for generic app scaffolding that does not involve AI-agent routing, hooks, or tasks-first contracts.
+- Do not use this skill when the user only wants product behavior changes unrelated to repo workflow setup.
 
 ## Choose the right path
 

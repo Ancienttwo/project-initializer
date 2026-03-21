@@ -9,6 +9,22 @@
       "files": [
         "evals/fixtures/new-project-empty"
       ],
+      "graders": {
+        "files_exist": [
+          "final-response.md"
+        ],
+        "files_contain": [
+          { "path": "final-response.md", "pattern": "tasks/todo\\.md" },
+          { "path": "final-response.md", "pattern": "tasks/lessons\\.md" },
+          { "path": "final-response.md", "pattern": "tasks/research\\.md" },
+          { "path": "final-response.md", "pattern": "AGENTS\\.md" }
+        ]
+      },
+      "anti_graders": {
+        "files_not_contain": [
+          { "path": "final-response.md", "pattern": "docs/PROGRESS\\.md.*active execution log" }
+        ]
+      },
       "expectations": [
         "Chooses a plausible core plan and explains the stack choice.",
         "Includes tasks/todo.md, tasks/lessons.md, tasks/research.md, and tasks/contracts/ in the generated workflow.",
@@ -23,6 +39,21 @@
       "files": [
         "evals/fixtures/fix-agents"
       ],
+      "graders": {
+        "files_exist": [
+          "final-response.md"
+        ],
+        "files_contain": [
+          { "path": "final-response.md", "pattern": "tasks/todo\\.md" },
+          { "path": "final-response.md", "pattern": "tasks/lessons\\.md" },
+          { "path": "final-response.md", "pattern": "plans/" }
+        ]
+      },
+      "anti_graders": {
+        "files_not_contain": [
+          { "path": "final-response.md", "pattern": "hooks as the only source of enforcement" }
+        ]
+      },
       "expectations": [
         "Calls out repo-local task sync as the primary enforcement mechanism.",
         "Treats plans/ as the single source of truth for the active plan instead of relying on docs/plan.md.",
@@ -38,6 +69,22 @@
       "files": [
         "evals/fixtures/migrate-legacy"
       ],
+      "graders": {
+        "files_exist": [
+          "final-response.md"
+        ],
+        "files_contain": [
+          { "path": "final-response.md", "pattern": "tasks/todo\\.md" },
+          { "path": "final-response.md", "pattern": "docs/TODO\\.md" },
+          { "path": "final-response.md", "pattern": "scripts/check-task-sync\\.sh" },
+          { "path": "final-response.md", "pattern": "\\.ai/" }
+        ]
+      },
+      "anti_graders": {
+        "files_not_contain": [
+          { "path": "final-response.md", "pattern": "delete user content without archive" }
+        ]
+      },
       "expectations": [
         "Replaces docs/TODO.md with tasks/todo.md as the primary task contract.",
         "Removes docs/plan.md compatibility pointers in favor of plans/ as the active-plan source of truth.",
@@ -54,6 +101,22 @@
       "files": [
         "evals/fixtures/audit-drift"
       ],
+      "graders": {
+        "files_exist": [
+          "final-response.md"
+        ],
+        "files_contain": [
+          { "path": "final-response.md", "pattern": "AGENTS\\.md" },
+          { "path": "final-response.md", "pattern": "CLAUDE\\.md" },
+          { "path": "final-response.md", "pattern": "tasks/" },
+          { "path": "final-response.md", "pattern": "\\.ai/" }
+        ]
+      },
+      "anti_graders": {
+        "files_not_contain": [
+          { "path": "final-response.md", "pattern": "only.*hook.*fix" }
+        ]
+      },
       "expectations": [
         "Checks both Claude-specific hooks and cross-agent repo-local contracts.",
         "Flags docs/PROGRESS.md misuse if it is acting as an execution log.",
@@ -70,6 +133,22 @@
       "files": [
         "evals/fixtures/codex-skill-factory"
       ],
+      "graders": {
+        "files_exist": [
+          "final-response.md"
+        ],
+        "files_contain": [
+          { "path": "final-response.md", "pattern": "\\.skill-factory-state\\.json" },
+          { "path": "final-response.md", "pattern": "skill-factory-check\\.sh" },
+          { "path": "final-response.md", "pattern": "\\.skill-proposals\\.json" },
+          { "path": "final-response.md", "pattern": "skill-factory-create\\.sh" }
+        ]
+      },
+      "anti_graders": {
+        "files_not_contain": [
+          { "path": "final-response.md", "pattern": "auto-create skills" }
+        ]
+      },
       "expectations": [
         "Reads .claude/.skill-factory-state.json to understand current pattern counts.",
         "Uses AGENTS.md Skill Factory protocol to group lessons by theme.",

@@ -31,6 +31,7 @@ describe("Template Assembly", () => {
     expect(names).toContain("06-cloudflare");
     expect(names).toContain("07-footer");
     expect(names).toContain("08-orchestration");
+    expect(names).toContain("09-compact-instructions");
   });
 
   test("should read partial content", () => {

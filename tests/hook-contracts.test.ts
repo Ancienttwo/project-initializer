@@ -34,6 +34,7 @@ describe("Hook contracts", () => {
     expect(script).toContain("[AssetLayer]");
     expect(script).toContain("[BDD Guard]");
     expect(script).toContain("[TDD Guard]");
+    expect(script).toContain("PlanTransitionGuard");
   });
 
   test("worktree-guard should be warning-first with marker-based enforcement", () => {
@@ -41,7 +42,8 @@ describe("Hook contracts", () => {
     expect(script).toContain(".claude/.require-worktree");
     expect(script).toContain("Warning: primary working tree detected");
     expect(script).toContain("Mutation blocked");
-    expect(script).toContain("HOOK_REPO_ROOT");
+    expect(script).toContain("hook-input.sh");
+    expect(script).toContain("hook_structured_error");
   });
 
   test("context-pressure should use stable session-id file and one-time flags", () => {
@@ -63,6 +65,7 @@ describe("Hook contracts", () => {
     expect(script).toContain("AnnotationGuard");
     expect(script).toContain("PlanStatusGuard");
     expect(script).toContain("ContractGuard");
+    expect(script).toContain("ResearchGate");
     expect(script).toContain("done");
     expect(script).toContain("完成");
     expect(script).toContain("scripts/verify-contract.sh");
@@ -84,6 +87,8 @@ describe("Hook contracts", () => {
     expect(script).toContain("[DocDrift]");
     expect(script).toContain("[TaskHandoff]");
     expect(script).toContain("tasks/todo.md");
+    expect(script).toContain("--quiet");
+    expect(script).toContain("contract_references_path");
   });
 
   test("tdd-guard should use extension-based BDD/TDD heuristic", () => {
@@ -106,6 +111,7 @@ describe("Hook contracts", () => {
     expect(settings).toContain(".ai/hooks/run-hook.sh");
     expect(settings).toContain("pre-edit-guard.sh");
     expect(settings).toContain("post-edit-guard.sh");
+    expect(settings).toContain("trace-event.sh");
     expect(settings).toContain("skill-factory-session-end.sh");
     expect(settings).toContain("post-bash.sh");
     expect(settings).toContain("context-pressure-hook.sh");
@@ -113,5 +119,12 @@ describe("Hook contracts", () => {
     expect(settings).not.toContain("atomic-commit.sh");
     expect(settings).not.toContain('"$TOOL_INPUT"');
     expect(settings).not.toContain('"$PROMPT"');
+  });
+
+  test("trace hook should record structured JSONL events", () => {
+    const script = read("assets/hooks/trace-event.sh");
+    expect(script).toContain(".trace.jsonl");
+    expect(script).toContain('"event_type"');
+    expect(script).toContain("session_state_resolve_key");
   });
 });

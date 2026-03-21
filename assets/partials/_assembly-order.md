@@ -13,6 +13,7 @@ This document defines the order used to assemble `CLAUDE.md`.
 6. {{#IF CLOUDFLARE_NATIVE}}06-cloudflare.partial.md{{/IF}}
 7. 07-footer.partial.md
 8. 08-orchestration.partial.md
+9. 09-compact-instructions.partial.md
 ```
 
 ## Conditional Logic

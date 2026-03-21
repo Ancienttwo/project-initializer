@@ -3,11 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE_EOF'
-Usage: scripts/verify-contract.sh --contract <contract-file> [--strict]
+Usage: scripts/verify-contract.sh --contract <contract-file> [--strict] [--quiet] [--report-file <path>]
 
 Options:
-  --contract <path>  Contract markdown file with a YAML exit_criteria block
-  --strict           Exit with code 1 when any criteria fail
+  --contract <path>     Contract markdown file with a YAML exit_criteria block
+  --strict              Exit with code 1 when any criteria fail
+  --quiet               Suppress per-check logs; only print on failure or status change
+  --report-file <path>  Write structured JSON results for downstream tooling
 USAGE_EOF
 }
 
@@ -20,6 +22,21 @@ strip_quotes() {
     value="${value:1:${#value}-2}"
   fi
   printf '%s' "$value"
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+read_contract_status() {
+  local file="$1"
+  awk '/^\> \*\*Status\*\*:/ {sub(/^.*\> \*\*Status\*\*: */, ""); gsub(/\r/, ""); print; exit}' "$file" | xargs
 }
 
 update_contract_status() {
@@ -49,8 +66,85 @@ update_contract_status() {
   mv "$tmp_file" "$file"
 }
 
+append_result() {
+  local kind="$1"
+  local target="$2"
+  local passed="$3"
+  local message="$4"
+  RESULT_KINDS+=("$kind")
+  RESULT_TARGETS+=("$target")
+  RESULT_PASSED+=("$passed")
+  RESULT_MESSAGES+=("$message")
+}
+
+log_check() {
+  local prefix="$1"
+  local message="$2"
+
+  if [[ "$quiet" -eq 1 ]]; then
+    return
+  fi
+
+  echo "[$prefix] $message"
+}
+
+pass() {
+  local kind="$1"
+  local target="$2"
+  local message="$3"
+  total=$((total + 1))
+  append_result "$kind" "$target" "true" "$message"
+  log_check "PASS" "$message"
+}
+
+fail() {
+  local kind="$1"
+  local target="$2"
+  local message="$3"
+  total=$((total + 1))
+  failed=$((failed + 1))
+  append_result "$kind" "$target" "false" "$message"
+  log_check "FAIL" "$message"
+}
+
+write_report() {
+  local report_path="$1"
+  local idx
+
+  [[ -n "$report_path" ]] || return 0
+
+  mkdir -p "$(dirname "$report_path")"
+
+  {
+    echo "{"
+    printf '  "contract": "%s",\n' "$(json_escape "$contract_file")"
+    printf '  "previous_status": "%s",\n' "$(json_escape "$previous_status")"
+    printf '  "next_status": "%s",\n' "$(json_escape "$next_status")"
+    printf '  "quiet": %s,\n' "$([[ "$quiet" -eq 1 ]] && echo true || echo false)"
+    printf '  "strict": %s,\n' "$([[ "$strict" -eq 1 ]] && echo true || echo false)"
+    printf '  "total": %s,\n' "$total"
+    printf '  "failed": %s,\n' "$failed"
+    echo '  "results": ['
+    for idx in "${!RESULT_KINDS[@]}"; do
+      if [[ "$idx" -gt 0 ]]; then
+        echo ","
+      fi
+      printf '    {"kind":"%s","target":"%s","passed":%s,"message":"%s"}' \
+        "$(json_escape "${RESULT_KINDS[$idx]}")" \
+        "$(json_escape "${RESULT_TARGETS[$idx]}")" \
+        "${RESULT_PASSED[$idx]}" \
+        "$(json_escape "${RESULT_MESSAGES[$idx]}")"
+    done
+    echo
+    echo "  ]"
+    echo "}"
+  } > "$report_path"
+}
+
 contract_file=""
 strict=0
+quiet=0
+report_file=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -62,6 +156,15 @@ while [[ $# -gt 0 ]]; do
     --strict)
       strict=1
       shift
+      ;;
+    --quiet)
+      quiet=1
+      shift
+      ;;
+    --report-file)
+      [[ -n "${2:-}" ]] || { echo "Error: --report-file requires a value" >&2; usage; exit 2; }
+      report_file="$2"
+      shift 2
       ;;
     --help|-h)
       usage
@@ -86,6 +189,9 @@ if [[ ! -f "$contract_file" ]]; then
   exit 2
 fi
 
+previous_status="$(read_contract_status "$contract_file")"
+previous_status="${previous_status:-Pending}"
+
 yaml_block="$(
   awk '
     BEGIN { in_block = 0; printed = 0 }
@@ -96,8 +202,20 @@ yaml_block="$(
 )"
 
 if [[ -z "$yaml_block" ]]; then
-  echo "[ContractVerify] No YAML exit criteria block found in $contract_file"
-  update_contract_status "$contract_file" "Pending"
+  next_status="Pending"
+  update_contract_status "$contract_file" "$next_status"
+  total=0
+  failed=0
+  RESULT_KINDS=()
+  RESULT_TARGETS=()
+  RESULT_PASSED=()
+  RESULT_MESSAGES=()
+  write_report "$report_file"
+  if [[ "$quiet" -eq 0 ]]; then
+    echo "[ContractVerify] No YAML exit criteria block found in $contract_file"
+  elif [[ "$previous_status" != "$next_status" ]]; then
+    echo "[ContractVerify] status ${previous_status} -> ${next_status}"
+  fi
   if [[ "$strict" -eq 1 ]]; then
     exit 1
   fi
@@ -109,6 +227,9 @@ declare -a tests_pass=()
 declare -a commands_succeed=()
 declare -a contain_paths=()
 declare -a contain_patterns=()
+declare -a files_not_exist=()
+declare -a not_contain_paths=()
+declare -a not_contain_patterns=()
 
 section=""
 pending_path=""
@@ -142,17 +263,29 @@ while IFS= read -r raw_line; do
       pending_path=""
       continue
       ;;
+    files_not_exist:)
+      section="files_not_exist"
+      pending_path=""
+      continue
+      ;;
+    files_not_contain:)
+      section="files_not_contain"
+      pending_path=""
+      continue
+      ;;
   esac
 
   case "$section" in
-    files_exist|commands_succeed)
+    files_exist|commands_succeed|files_not_exist)
       if [[ "$trimmed" =~ ^-[[:space:]]*(.+)$ ]]; then
         item="$(strip_quotes "${BASH_REMATCH[1]}")"
         [[ -n "$item" ]] || continue
         if [[ "$section" == "files_exist" ]]; then
           files_exist+=("$item")
-        else
+        elif [[ "$section" == "commands_succeed" ]]; then
           commands_succeed+=("$item")
+        else
+          files_not_exist+=("$item")
         fi
       fi
       ;;
@@ -162,14 +295,19 @@ while IFS= read -r raw_line; do
         [[ -n "$item" ]] && tests_pass+=("$item")
       fi
       ;;
-    files_contain)
+    files_contain|files_not_contain)
       if [[ "$trimmed" =~ ^-[[:space:]]*path:[[:space:]]*(.+)$ ]]; then
         pending_path="$(strip_quotes "${BASH_REMATCH[1]}")"
       elif [[ "$trimmed" =~ ^pattern:[[:space:]]*(.+)$ ]]; then
         pattern="$(strip_quotes "${BASH_REMATCH[1]}")"
         if [[ -n "$pending_path" ]]; then
-          contain_paths+=("$pending_path")
-          contain_patterns+=("$pattern")
+          if [[ "$section" == "files_contain" ]]; then
+            contain_paths+=("$pending_path")
+            contain_patterns+=("$pattern")
+          else
+            not_contain_paths+=("$pending_path")
+            not_contain_patterns+=("$pattern")
+          fi
           pending_path=""
         fi
       fi
@@ -179,69 +317,96 @@ done <<< "$yaml_block"
 
 total=0
 failed=0
+RESULT_KINDS=()
+RESULT_TARGETS=()
+RESULT_PASSED=()
+RESULT_MESSAGES=()
 
-pass() {
-  local msg="$1"
-  total=$((total + 1))
-  echo "[PASS] $msg"
-}
+if ((${#files_exist[@]})); then
+  for path in "${files_exist[@]}"; do
+    if [[ -e "$path" ]]; then
+      pass "files_exist" "$path" "files_exist: $path"
+    else
+      fail "files_exist" "$path" "files_exist: $path"
+    fi
+  done
+fi
 
-fail() {
-  local msg="$1"
-  total=$((total + 1))
-  failed=$((failed + 1))
-  echo "[FAIL] $msg"
-}
+if ((${#tests_pass[@]})); then
+  for path in "${tests_pass[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      fail "tests_pass" "$path" "tests_pass file missing: $path"
+      continue
+    fi
 
-for path in "${files_exist[@]}"; do
-  if [[ -e "$path" ]]; then
-    pass "files_exist: $path"
-  else
-    fail "files_exist: $path"
-  fi
-done
+    if ! command -v bun >/dev/null 2>&1; then
+      fail "tests_pass" "$path" "tests_pass cannot run (bun not found): $path"
+      continue
+    fi
 
-for path in "${tests_pass[@]}"; do
-  if [[ ! -f "$path" ]]; then
-    fail "tests_pass file missing: $path"
-    continue
-  fi
+    if bun test "$path" >/tmp/contract-test.log 2>&1; then
+      pass "tests_pass" "$path" "tests_pass: $path"
+    else
+      fail "tests_pass" "$path" "tests_pass: $path"
+    fi
+  done
+fi
 
-  if ! command -v bun >/dev/null 2>&1; then
-    fail "tests_pass cannot run (bun not found): $path"
-    continue
-  fi
+if ((${#commands_succeed[@]})); then
+  for cmd in "${commands_succeed[@]}"; do
+    if bash -lc "$cmd" >/tmp/contract-command.log 2>&1; then
+      pass "commands_succeed" "$cmd" "commands_succeed: $cmd"
+    else
+      fail "commands_succeed" "$cmd" "commands_succeed: $cmd"
+    fi
+  done
+fi
 
-  if bun test "$path" >/tmp/contract-test.log 2>&1; then
-    pass "tests_pass: $path"
-  else
-    fail "tests_pass: $path"
-  fi
-done
+if ((${#contain_paths[@]})); then
+  for idx in "${!contain_paths[@]}"; do
+    path="${contain_paths[$idx]}"
+    pattern="${contain_patterns[$idx]}"
 
-for cmd in "${commands_succeed[@]}"; do
-  if bash -lc "$cmd" >/tmp/contract-command.log 2>&1; then
-    pass "commands_succeed: $cmd"
-  else
-    fail "commands_succeed: $cmd"
-  fi
-done
+    if [[ ! -f "$path" ]]; then
+      fail "files_contain" "$path" "files_contain missing file: $path"
+      continue
+    fi
 
-for idx in "${!contain_paths[@]}"; do
-  path="${contain_paths[$idx]}"
-  pattern="${contain_patterns[$idx]}"
+    if grep -Eq "$pattern" "$path"; then
+      pass "files_contain" "$path" "files_contain: $path =~ $pattern"
+    else
+      fail "files_contain" "$path" "files_contain: $path !~ $pattern"
+    fi
+  done
+fi
 
-  if [[ ! -f "$path" ]]; then
-    fail "files_contain missing file: $path"
-    continue
-  fi
+if ((${#files_not_exist[@]})); then
+  for path in "${files_not_exist[@]}"; do
+    if [[ ! -e "$path" ]]; then
+      pass "files_not_exist" "$path" "files_not_exist: $path"
+    else
+      fail "files_not_exist" "$path" "files_not_exist: $path"
+    fi
+  done
+fi
 
-  if grep -Eq "$pattern" "$path"; then
-    pass "files_contain: $path =~ $pattern"
-  else
-    fail "files_contain: $path !~ $pattern"
-  fi
-done
+if ((${#not_contain_paths[@]})); then
+  for idx in "${!not_contain_paths[@]}"; do
+    path="${not_contain_paths[$idx]}"
+    pattern="${not_contain_patterns[$idx]}"
+
+    if [[ ! -f "$path" ]]; then
+      pass "files_not_contain" "$path" "files_not_contain missing file: $path"
+      continue
+    fi
+
+    if grep -Eq "$pattern" "$path"; then
+      fail "files_not_contain" "$path" "files_not_contain: $path =~ $pattern"
+    else
+      pass "files_not_contain" "$path" "files_not_contain: $path !~ $pattern"
+    fi
+  done
+fi
 
 next_status="Fulfilled"
 if [[ "$total" -eq 0 ]]; then
@@ -251,10 +416,16 @@ elif [[ "$failed" -gt 0 ]]; then
 fi
 
 update_contract_status "$contract_file" "$next_status"
+write_report "$report_file"
 
-echo "[ContractVerify] total=$total failed=$failed status=$next_status"
+if [[ "$quiet" -eq 1 ]]; then
+  if [[ "$failed" -gt 0 || "$previous_status" != "$next_status" ]]; then
+    echo "[ContractVerify] total=$total failed=$failed status=${previous_status}->${next_status}"
+  fi
+else
+  echo "[ContractVerify] total=$total failed=$failed status=$next_status"
+fi
 
 if [[ "$strict" -eq 1 && "$failed" -gt 0 ]]; then
   exit 1
 fi
-
