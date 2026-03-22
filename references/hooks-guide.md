@@ -20,7 +20,7 @@ Use `.ai/hooks/` as the shared implementation layer. Use hooks as Claude-specifi
 - `PreToolUse (Edit|Write)`: worktree guard (warn by default, opt-in hard block), pre-edit guard (TDD/BDD + asset-layer reminders).
 - `PostToolUse (Edit|Write)`: post-edit guard (doc drift + task handoff summary).
 - `PostToolUse (Bash)`: post-bash advisory reminders.
-- `PostToolUse (all tools)`: context-pressure session monitor.
+- `PostToolUse (all tools)`: `trace-event.sh` structured JSONL trace + context-pressure session monitor.
 - `UserPromptSubmit`: prompt guard (plan sync + TDD/BDD reminders).
 - `Stop`: skill-factory session-end summarizer.
 - Automatic checkpoint commits are disabled in the shared default.

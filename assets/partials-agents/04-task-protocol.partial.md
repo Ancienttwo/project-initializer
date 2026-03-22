@@ -30,6 +30,7 @@ RULES:
   - Group repeated lessons by theme so Skill Factory can promote them into knowledge skills
   - Treat `.ai/hooks/` as the shared automation entrypoint when repo scripts reference hook-backed workflow checks
   - Treat `.claude/settings.json` as the Claude-specific adapter, not the cross-agent source of truth
+  - For Codex sessions, treat `bash scripts/check-task-sync.sh` and `bash scripts/check-task-workflow.sh --strict` as required repo-local checks
   - Before ending a session, refresh `.claude/.task-handoff.md` when the task state changed
   - If you explicitly use a generated skill, mark it with `bash scripts/skill-factory-check.sh --mark-used <slug> --type <workflow|knowledge>`
   - Check pending Skill Factory proposals with `bash scripts/skill-factory-check.sh`

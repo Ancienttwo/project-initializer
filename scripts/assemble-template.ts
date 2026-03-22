@@ -65,6 +65,19 @@ export interface SkillVersionManifest {
   };
 }
 
+interface RuntimeProfileConfig {
+  label: string;
+  claudePolicy: string;
+  codexPolicy: string;
+}
+
+interface QuestionPackRuntimeConfig {
+  inferredDefaults?: {
+    runtimeProfile?: string;
+  };
+  runtimeProfiles?: Record<string, RuntimeProfileConfig>;
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -78,6 +91,7 @@ const PARTIALS_AGENTS_DIR = join(ASSETS_DIR, "partials-agents");
 const VERSIONS_FILE = join(ASSETS_DIR, "versions.json");
 const SKILL_VERSION_FILE = join(ASSETS_DIR, "skill-version.json");
 const PLAN_MAP_FILE = join(ASSETS_DIR, "plan-map.json");
+const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v1.json");
 
 const TARGET_DIRS: Record<TemplateTarget, string> = {
   claude: PARTIALS_DIR,
@@ -115,6 +129,7 @@ const ALLOWED_UNRESOLVED_PATTERNS: RegExp[] = [
 ];
 
 let cachedPlanMap: PlanMap | null = null;
+let cachedQuestionPackRuntimeConfig: QuestionPackRuntimeConfig | null = null;
 
 // ============================================================================
 // Core Functions
@@ -289,6 +304,79 @@ export function loadPlanMap(planMapFilePath: string = PLAN_MAP_FILE): PlanMap {
   }
 
   return map;
+}
+
+function normalizeRuntimeProfileToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function loadQuestionPackRuntimeConfig(
+  questionPackFilePath: string = QUESTION_PACK_FILE
+): QuestionPackRuntimeConfig {
+  if (questionPackFilePath === QUESTION_PACK_FILE && cachedQuestionPackRuntimeConfig) {
+    return cachedQuestionPackRuntimeConfig;
+  }
+
+  if (!existsSync(questionPackFilePath)) {
+    throw new Error(`initializer-question-pack not found at ${questionPackFilePath}`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(questionPackFilePath, "utf-8"));
+  } catch (error) {
+    throw new Error(
+      `Failed to parse initializer-question-pack at ${questionPackFilePath}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`Invalid initializer-question-pack format at ${questionPackFilePath}`);
+  }
+
+  const config = parsed as QuestionPackRuntimeConfig;
+  if (!config.runtimeProfiles || typeof config.runtimeProfiles !== "object") {
+    throw new Error(`initializer-question-pack missing runtimeProfiles at ${questionPackFilePath}`);
+  }
+
+  if (questionPackFilePath === QUESTION_PACK_FILE) {
+    cachedQuestionPackRuntimeConfig = config;
+  }
+
+  return config;
+}
+
+function resolveRuntimeProfileConfig(
+  runtimeProfileLabel: string,
+  runtimeMode: string
+): RuntimeProfileConfig {
+  const config = loadQuestionPackRuntimeConfig();
+  const profiles = Object.entries(config.runtimeProfiles ?? {});
+  const candidates = [runtimeProfileLabel, runtimeMode]
+    .filter((value): value is string => Boolean(value))
+    .map(normalizeRuntimeProfileToken);
+
+  for (const [key, profile] of profiles) {
+    const keyToken = normalizeRuntimeProfileToken(key);
+    const labelToken = normalizeRuntimeProfileToken(profile.label);
+
+    if (
+      candidates.includes(keyToken) ||
+      candidates.includes(labelToken) ||
+      candidates.some((candidate) => candidate.length > 0 && labelToken.startsWith(candidate))
+    ) {
+      return profile;
+    }
+  }
+
+  const defaultKey = config.inferredDefaults?.runtimeProfile ?? "plan-only";
+  return (
+    config.runtimeProfiles?.[defaultKey] ?? {
+      label: "Plan-only (recommended)",
+      claudePolicy: "(default permissions)",
+      codexPolicy: "sandbox_mode=platform-default, approval_policy=on-failure",
+    }
+  );
 }
 
 /**
@@ -541,13 +629,26 @@ export function assembleTemplate(options: AssemblyOptions): string {
   const skillVersion = loadSkillVersion();
 
   // Merge all variables (user variables take precedence)
-  const allVariables: Record<string, string> = {
+  const mergedVariables: Record<string, string> = {
     ...versions,
     ...getDefaultTemplateVariables(resolvedPlanType, planMap, quickMode),
     ...variables,
     PLAN_TYPE: resolvedPlanType,
     SKILL_VERSION: skillVersion.version,
     TEMPLATE_VERSION: skillVersion.templateVersion,
+  };
+
+  const runtimeProfileConfig = resolveRuntimeProfileConfig(
+    mergedVariables.RUNTIME_PROFILE ?? "",
+    mergedVariables.RUNTIME_MODE ?? ""
+  );
+
+  const allVariables: Record<string, string> = {
+    ...mergedVariables,
+    CLAUDE_POLICY:
+      mergedVariables.CLAUDE_POLICY ?? runtimeProfileConfig.claudePolicy,
+    CODEX_POLICY:
+      mergedVariables.CODEX_POLICY ?? runtimeProfileConfig.codexPolicy,
   };
 
   // Get partials

@@ -32,12 +32,9 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, ".claude/skill-factory/rubric.template.json"))).toBe(true);
 
       const settings = readFileSync(join(cwd, ".claude/settings.json"), "utf-8");
-      expect(settings).toContain(".ai/hooks/run-hook.sh");
-      expect(settings).toContain("pre-edit-guard.sh");
-      expect(settings).toContain("post-edit-guard.sh");
-      expect(settings).toContain("skill-factory-session-end.sh");
-      expect(settings).toContain("post-bash.sh");
-      expect(settings).toContain("context-pressure-hook.sh");
+      const settingsTemplate = readFileSync(join(ROOT, "assets/hooks/settings.template.json"), "utf-8");
+      expect(settings).toBe(settingsTemplate);
+      expect(settings).toContain("trace-event.sh");
       expect(settings).not.toContain("task-handoff.sh");
 
       const progress = readFileSync(join(cwd, "docs/PROGRESS.md"), "utf-8");

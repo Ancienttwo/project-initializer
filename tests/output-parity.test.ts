@@ -165,6 +165,12 @@ describe("Output Quality Gates", () => {
       variables: { PROJECT_NAME: "RuntimeDefaults" },
     });
 
+    const agentsOutput = assembleTemplate({
+      target: "agents",
+      planType: "C",
+      variables: { PROJECT_NAME: "RuntimeDefaults" },
+    });
+
     expect(output).toContain("Default Runtime Profile");
     expect(output).toContain("Plan-only (recommended)");
     expect(output).toContain("MODE: Plan-only (recommended)");
@@ -174,6 +180,7 @@ describe("Output Quality Gates", () => {
     expect(output).toContain("COMMIT_POLICY: explicit commits after green checks; no automatic checkpoint hook");
     expect(output).toContain("Plan-only by default for file mutations");
     expect(output).toContain("Primary worktree warns by default; enforce via `.claude/.require-worktree`");
+    expect(agentsOutput).toContain("sandbox_mode=platform-default, approval_policy=on-failure");
   });
 
   test("should reference project-local reference configs", () => {
@@ -210,6 +217,9 @@ describe("Output Quality Gates", () => {
     expect(claude).toContain("Self-Improvement Loop");
     expect(agents).toContain("Self-Improvement Loop");
     expect(agents).toContain("skill-factory-check.sh");
+    expect(agents).toContain("check-task-sync.sh");
+    expect(agents).toContain("check-task-workflow.sh --strict");
+    expect(agents).toContain("verify-contract.sh --contract <active-plan-contract> --strict");
     expect(agents).toContain("mark-used");
     expect(claude).toContain("latest non-archived `plans/plan-*.md` file");
     expect(agents).toContain("single source of truth for the current active plan");

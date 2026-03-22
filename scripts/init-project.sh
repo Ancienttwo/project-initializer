@@ -33,6 +33,10 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+install_hook_settings_template() {
+    cp "$ASSETS_HOOKS_DIR/settings.template.json" .claude/settings.json
+}
+
 ensure_runtime_gitignore_block() {
     local file_path="$1"
     local begin_marker="# BEGIN: claude-runtime-temp (managed by project-initializer)"
@@ -596,50 +600,7 @@ EOF
     install_skill_factory_assets
     ensure_task_sync_package_script
 
-    cat > .claude/settings.json << 'EOF'
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          { "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" worktree-guard.sh" },
-          { "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" pre-edit-guard.sh" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          { "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" post-edit-guard.sh" }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" post-bash.sh" }
-        ]
-      },
-      {
-        "hooks": [
-          { "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" context-pressure-hook.sh" }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [{ "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" prompt-guard.sh" }]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [{ "type": "command", "command": "repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; HOOK_REPO_ROOT=\"$repo\" bash \"$repo/.ai/hooks/run-hook.sh\" skill-factory-session-end.sh" }]
-      }
-    ]
-  }
-}
-EOF
+    install_hook_settings_template
 
     install_hook_assets
 
@@ -836,4 +797,6 @@ main() {
     echo ""
 }
 
-main
+if [[ "${PROJECT_INITIALIZER_SOURCE_ONLY:-0}" != "1" ]]; then
+    main
+fi

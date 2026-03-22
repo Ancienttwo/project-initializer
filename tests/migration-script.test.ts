@@ -118,6 +118,7 @@ describe("Migration script contract", () => {
 
       const settings = readFileSync(join(repo, ".claude/settings.json"), "utf-8");
       expect(settings).toContain(".ai/hooks/run-hook.sh");
+      expect(settings).toContain("trace-event.sh");
 
       const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf-8"));
       expect(pkg.scripts["check:task-sync"]).toBe("bash scripts/check-task-sync.sh");
@@ -125,6 +126,154 @@ describe("Migration script contract", () => {
 
       const gitignore = readFileSync(join(repo, ".gitignore"), "utf-8");
       expect(gitignore).toContain("# BEGIN: claude-runtime-temp (managed by project-initializer)");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("should preserve custom settings hooks while appending missing defaults", () => {
+    const repo = mkdtempSync(join(tmpdir(), "migration-merge-"));
+    try {
+      mkdirSync(join(repo, ".claude"), { recursive: true });
+      writeFileSync(join(repo, "package.json"), JSON.stringify({ name: "demo", scripts: {} }, null, 2));
+      writeFileSync(
+        join(repo, ".claude/settings.json"),
+        JSON.stringify(
+          {
+            permissions: { allow: ["Bash(git status)"] },
+            hooks: {
+              PostToolUse: [
+                {
+                  matcher: "Bash",
+                  hooks: [{ type: "command", command: "bash .claude/hooks/custom-bash.sh" }],
+                },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      const res = spawnSync(
+        "bash",
+        ["scripts/migrate-project-template.sh", "--repo", repo, "--apply"],
+        { cwd: ROOT, encoding: "utf-8" }
+      );
+
+      expect(res.status).toBe(0);
+      const settings = JSON.parse(readFileSync(join(repo, ".claude/settings.json"), "utf-8"));
+      expect(settings.permissions.allow).toContain("Bash(git status)");
+      const postToolUse = settings.hooks.PostToolUse.flatMap((entry: any) => entry.hooks ?? []);
+      const commands = postToolUse.map((entry: any) => entry.command);
+      expect(commands).toContain("bash .claude/hooks/custom-bash.sh");
+      expect(commands.some((command: string) => command.includes("post-bash.sh"))).toBe(true);
+      expect(commands.some((command: string) => command.includes("trace-event.sh"))).toBe(true);
+      expect(commands.some((command: string) => command.includes("context-pressure-hook.sh"))).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("should move hooks from settings.local.json without overwriting existing arrays", () => {
+    const repo = mkdtempSync(join(tmpdir(), "migration-local-hooks-"));
+    try {
+      mkdirSync(join(repo, ".claude"), { recursive: true });
+      writeFileSync(join(repo, "package.json"), JSON.stringify({ name: "demo", scripts: {} }, null, 2));
+      writeFileSync(
+        join(repo, ".claude/settings.json"),
+        JSON.stringify(
+          {
+            hooks: {
+              PostToolUse: [
+                {
+                  matcher: "Bash",
+                  hooks: [{ type: "command", command: "bash .claude/hooks/custom-existing.sh" }],
+                },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+      writeFileSync(
+        join(repo, ".claude/settings.local.json"),
+        JSON.stringify(
+          {
+            theme: "local-only",
+            hooks: {
+              PostToolUse: [
+                {
+                  matcher: "Bash",
+                  hooks: [{ type: "command", command: "bash .claude/hooks/local-only.sh" }],
+                },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      const res = spawnSync(
+        "bash",
+        ["scripts/migrate-project-template.sh", "--repo", repo, "--apply"],
+        { cwd: ROOT, encoding: "utf-8" }
+      );
+
+      expect(res.status).toBe(0);
+      const settings = JSON.parse(readFileSync(join(repo, ".claude/settings.json"), "utf-8"));
+      const commands = settings.hooks.PostToolUse.flatMap((entry: any) => entry.hooks ?? []).map((entry: any) => entry.command);
+      expect(commands).toContain("bash .claude/hooks/custom-existing.sh");
+      expect(commands).toContain("bash .claude/hooks/local-only.sh");
+
+      const settingsLocal = JSON.parse(readFileSync(join(repo, ".claude/settings.local.json"), "utf-8"));
+      expect(settingsLocal.hooks).toBeUndefined();
+      expect(settingsLocal.theme).toBe("local-only");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("should not overwrite existing settings when jq is unavailable", () => {
+    const repo = mkdtempSync(join(tmpdir(), "migration-no-jq-"));
+    try {
+      mkdirSync(join(repo, ".claude"), { recursive: true });
+      writeFileSync(join(repo, "package.json"), JSON.stringify({ name: "demo", scripts: {} }, null, 2));
+      const originalSettings = JSON.stringify(
+        {
+          permissions: { allow: ["Bash(git status)"] },
+          hooks: {
+            UserPromptSubmit: [
+              {
+                hooks: [{ type: "command", command: "bash .claude/hooks/custom-only.sh" }],
+              },
+            ],
+          },
+        },
+        null,
+        2
+      );
+      writeFileSync(join(repo, ".claude/settings.json"), originalSettings + "\n");
+
+      const res = spawnSync(
+        "/bin/bash",
+        ["scripts/migrate-project-template.sh", "--repo", repo, "--apply"],
+        {
+          cwd: ROOT,
+          encoding: "utf-8",
+          env: {
+            ...process.env,
+            PROJECT_INITIALIZER_JQ_BIN: "/nonexistent/jq",
+          },
+        }
+      );
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("leaving existing file unchanged");
+      const settings = readFileSync(join(repo, ".claude/settings.json"), "utf-8");
+      expect(settings).toBe(originalSettings + "\n");
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

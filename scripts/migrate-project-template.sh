@@ -17,6 +17,7 @@ HOOK_ASSETS_DIR="$SKILL_ROOT/assets/hooks"
 TEMPLATE_ASSETS_DIR="$SKILL_ROOT/assets/templates"
 HELPER_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/helpers"
 SKILL_FACTORY_ASSETS_DIR="$SKILL_ROOT/assets/skill-factory"
+JQ_BIN="${PROJECT_INITIALIZER_JQ_BIN:-jq}"
 
 MODE="dry-run"
 TARGET_REPO=""
@@ -35,6 +36,97 @@ USAGE_EOF
 
 log() {
   echo "[migrate] $*"
+}
+
+has_jq() {
+  command -v "$JQ_BIN" >/dev/null 2>&1
+}
+
+merge_hook_settings_json() {
+  local base_file="$1"
+  local patch_file="$2"
+  local output_file="$3"
+
+  node - "$base_file" "$patch_file" "$output_file" <<'NODE_EOF'
+const fs = require("fs");
+
+const [, , basePath, patchPath, outputPath] = process.argv;
+
+function readJson(path) {
+  return JSON.parse(fs.readFileSync(path, "utf8"));
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function matcherOf(block) {
+  return block && Object.prototype.hasOwnProperty.call(block, "matcher")
+    ? block.matcher ?? null
+    : null;
+}
+
+function ensureHooksArray(block) {
+  if (!Array.isArray(block.hooks)) {
+    block.hooks = [];
+  }
+  return block.hooks;
+}
+
+function hasCommand(block, command) {
+  return ensureHooksArray(block).some((hook) => (hook?.command ?? "") === command);
+}
+
+function mergeEventBlocks(baseBlocks, patchBlocks) {
+  const result = Array.isArray(baseBlocks) ? clone(baseBlocks) : [];
+
+  for (const patchBlock of Array.isArray(patchBlocks) ? patchBlocks : []) {
+    const matcher = matcherOf(patchBlock);
+    const patchHooks = Array.isArray(patchBlock?.hooks) ? patchBlock.hooks : [];
+
+    for (const patchHook of patchHooks) {
+      const command = patchHook?.command ?? "";
+      if (!command) continue;
+
+      const existingWithCommand = result.find(
+        (block) => matcherOf(block) === matcher && hasCommand(block, command)
+      );
+      if (existingWithCommand) continue;
+
+      const targetBlock = result.find((block) => matcherOf(block) === matcher);
+      if (targetBlock) {
+        ensureHooksArray(targetBlock).push(clone(patchHook));
+        continue;
+      }
+
+      const newBlock = matcher === null
+        ? { hooks: [clone(patchHook)] }
+        : { matcher, hooks: [clone(patchHook)] };
+      result.push(newBlock);
+    }
+  }
+
+  return result;
+}
+
+const base = readJson(basePath);
+const patch = readJson(patchPath);
+
+const merged = {
+  ...clone(base),
+  ...clone(Object.fromEntries(Object.entries(patch).filter(([key]) => key !== "hooks"))),
+};
+
+const baseHooks = (base && typeof base.hooks === "object" && base.hooks !== null) ? clone(base.hooks) : {};
+const patchHooks = (patch && typeof patch.hooks === "object" && patch.hooks !== null) ? patch.hooks : {};
+
+merged.hooks = baseHooks;
+for (const [eventName, patchBlocks] of Object.entries(patchHooks)) {
+  merged.hooks[eventName] = mergeEventBlocks(baseHooks[eventName], patchBlocks);
+}
+
+fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2) + "\n");
+NODE_EOF
 }
 
 run_or_echo() {
@@ -459,13 +551,16 @@ EOF_HOOK_SHIM
     fi
   done < <(find "$HOOK_ASSETS_DIR" -mindepth 1 -maxdepth 1 -type f -name '*.sh' | sort)
 
-  backup_if_exists "$project_settings"
-
   if [[ "$MODE" == "apply" ]]; then
-    if [[ -f "$project_settings" ]] && command -v jq >/dev/null 2>&1; then
-      jq -s '.[0] * .[1]' "$project_settings" "$HOOK_ASSETS_DIR/settings.template.json" > "$project_settings.tmp"
-      mv "$project_settings.tmp" "$project_settings"
-      log "Merged hook template into .claude/settings.json"
+    if [[ -f "$project_settings" ]]; then
+      if has_jq && command -v node >/dev/null 2>&1; then
+        backup_if_exists "$project_settings"
+        merge_hook_settings_json "$project_settings" "$HOOK_ASSETS_DIR/settings.template.json" "$project_settings.tmp"
+        mv "$project_settings.tmp" "$project_settings"
+        log "Merged hook template into .claude/settings.json"
+      else
+        log "Skipping automatic merge for .claude/settings.json because jq or node is unavailable; leaving existing file unchanged"
+      fi
     else
       cp "$HOOK_ASSETS_DIR/settings.template.json" "$project_settings"
       log "Wrote .claude/settings.json from template"
@@ -476,18 +571,17 @@ EOF_HOOK_SHIM
 
   if [[ -f "$project_settings_local" ]]; then
     if [[ "$MODE" == "apply" ]]; then
-      if command -v jq >/dev/null 2>&1; then
-        if jq -e '.hooks != null' "$project_settings_local" >/dev/null 2>&1; then
+      if has_jq && command -v node >/dev/null 2>&1; then
+        if "$JQ_BIN" -e '.hooks != null' "$project_settings_local" >/dev/null 2>&1; then
           backup_if_exists "$project_settings_local"
-          jq -s '.[0] * {hooks: ((.[0].hooks // {}) * (.[1].hooks // {}))}' \
-            "$project_settings" "$project_settings_local" > "$project_settings.tmp"
+          merge_hook_settings_json "$project_settings" "$project_settings_local" "$project_settings.tmp"
           mv "$project_settings.tmp" "$project_settings"
-          jq 'del(.hooks)' "$project_settings_local" > "$project_settings_local.tmp"
+          "$JQ_BIN" 'del(.hooks)' "$project_settings_local" > "$project_settings_local.tmp"
           mv "$project_settings_local.tmp" "$project_settings_local"
           log "Moved hooks from settings.local.json into settings.json"
         fi
       else
-        log "jq not found; cannot auto-migrate hooks from settings.local.json"
+        log "Skipping hooks migration from settings.local.json because jq or node is unavailable; leaving files unchanged"
       fi
     else
       echo "[dry-run] inspect and migrate hooks from \"$project_settings_local\" into \"$project_settings\""

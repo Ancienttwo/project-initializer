@@ -36,9 +36,13 @@ describe("AGENTS Target Assembly", () => {
     expect(output).toContain("sync tasks/");
     expect(output).toContain("Default to **Plan-only**.");
     expect(output).toContain("Runtime profile: Plan-only (recommended).");
+    expect(output).toContain("Codex runtime expectation: `sandbox_mode=platform-default, approval_policy=on-failure`.");
     expect(output).toContain(".claude/.require-worktree");
     expect(output).toContain("single source of truth for the current active plan");
     expect(output).toContain("ensure-task-workflow.sh");
+    expect(output).toContain("bash scripts/check-task-sync.sh");
+    expect(output).toContain("bash scripts/check-task-workflow.sh --strict");
+    expect(output).toContain("bash scripts/verify-contract.sh --contract <active-plan-contract> --strict");
     expect(output).toContain("Which `tasks/*.md` files were updated");
   });
 
