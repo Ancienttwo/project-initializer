@@ -12,10 +12,10 @@
 - Prefer modifying existing files over unnecessary file creation.
 
 ### Final Response Contract
-1. What changed
-2. Verification evidence
-3. Which `tasks/*.md` files were updated
-4. Known risks/gaps
-5. Optional next steps
+1. What changed — list modified files with one-line summary each
+2. Verification evidence — paste tool output: test results, build logs, or `git diff --stat`
+3. Which `tasks/*.md` files were updated — list file names and what changed in each
+4. Known risks/gaps — bullet list with severity tag: `[HIGH]`, `[MEDIUM]`, `[LOW]`
+5. Optional next steps — actionable items the next session or user should address
 
 ---

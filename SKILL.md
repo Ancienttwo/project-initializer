@@ -218,6 +218,7 @@ Do not vendor the upstream `skill-creator` runner or viewer into this repo. Keep
 - `scripts/create-project-dirs.sh`
 - `scripts/migrate-project-template.sh`
 - `scripts/setup-plugins.sh`
+- `scripts/switch-plan.sh`
 - `scripts/check-versions.ts`
 - `scripts/check-skill-version.ts`
 - `scripts/run-skill-hook.ts`

@@ -34,6 +34,25 @@ json_escape() {
   printf '%s' "$value"
 }
 
+resolve_bun_bin() {
+  if [[ -n "${BUN_BIN:-}" ]] && [[ -x "${BUN_BIN}" ]]; then
+    printf '%s' "$BUN_BIN"
+    return 0
+  fi
+
+  if command -v bun >/dev/null 2>&1; then
+    command -v bun
+    return 0
+  fi
+
+  if [[ -x "${HOME}/.bun/bin/bun" ]]; then
+    printf '%s' "${HOME}/.bun/bin/bun"
+    return 0
+  fi
+
+  return 1
+}
+
 read_contract_status() {
   local file="$1"
   awk '/^\> \*\*Status\*\*:/ {sub(/^.*\> \*\*Status\*\*: */, ""); gsub(/\r/, ""); print; exit}' "$file" | xargs
@@ -183,6 +202,8 @@ if [[ -z "$contract_file" ]]; then
   usage
   exit 2
 fi
+
+trap 'rm -f /tmp/contract-test.log /tmp/contract-command.log' EXIT
 
 if [[ ! -f "$contract_file" ]]; then
   echo "[ContractVerify] Contract file not found: $contract_file" >&2
@@ -339,12 +360,13 @@ if ((${#tests_pass[@]})); then
       continue
     fi
 
-    if ! command -v bun >/dev/null 2>&1; then
+    bun_bin="$(resolve_bun_bin || true)"
+    if [[ -z "$bun_bin" ]]; then
       fail "tests_pass" "$path" "tests_pass cannot run (bun not found): $path"
       continue
     fi
 
-    if bun test "$path" >/tmp/contract-test.log 2>&1; then
+    if "$bun_bin" test "$path" >/tmp/contract-test.log 2>&1; then
       pass "tests_pass" "$path" "tests_pass: $path"
     else
       fail "tests_pass" "$path" "tests_pass: $path"

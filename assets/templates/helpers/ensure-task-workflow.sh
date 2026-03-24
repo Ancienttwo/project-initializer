@@ -15,6 +15,14 @@ normalize_slug() {
 }
 
 get_active_plan() {
+  if [[ -f ".claude/.active-plan" ]]; then
+    local marker_plan
+    marker_plan="$(cat ".claude/.active-plan" 2>/dev/null | xargs)"
+    if [[ -n "$marker_plan" && -f "$marker_plan" ]]; then
+      printf '%s' "$marker_plan"
+      return 0
+    fi
+  fi
   local latest
   latest="$(find plans -maxdepth 1 -type f -name 'plan-*.md' 2>/dev/null | sort | tail -1)"
   if [[ -n "$latest" ]]; then

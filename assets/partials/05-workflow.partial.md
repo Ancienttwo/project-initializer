@@ -9,7 +9,8 @@ PLAN_LOOP:
   RESEARCH_FILE: tasks/research.md
   PLAN_DIR: plans/
   PLAN_ARCHIVE: plans/archive/
-  ACTIVE_PLAN_RULE: latest timestamped file in plans/
+  ACTIVE_PLAN_RULE: .claude/.active-plan marker if present, otherwise latest timestamped file in plans/
+  PLAN_SWITCH: scripts/switch-plan.sh --plan <plan-file> | --list
   PRIMARY_FILE: tasks/todo.md
   TODO_ARCHIVE: tasks/archive/
   CONTRACT_DIR: tasks/contracts/
@@ -22,17 +23,11 @@ PLAN_LOOP:
 
 ### Task Management Protocol
 
-- Treat `tasks/` as the primary cross-agent contract; hooks are enhancements, not the only enforcement layer.
-- For non-chat tasks, sync `tasks/` whenever substantive repo changes are made.
-- Research deeply first for unfamiliar areas and persist findings in `tasks/research.md`.
-- Plan in `plans/plan-YYYYMMDD-HHMM-{slug}.md` with explicit trade-offs and task breakdown.
-- Treat the latest non-archived `plans/plan-*.md` file as the active plan.
-- Process all annotation notes before implementation.
-- Extract approved plan tasks into `tasks/todo.md`, archiving prior todo to `tasks/archive/`.
-- Create `tasks/contracts/{slug}.contract.md` with machine-verifiable exit criteria.
+Core rules (canonical source: see Workflow Orchestration section below):
+- `tasks/` is the primary cross-agent contract; hooks are enhancements only.
+- Treat the latest non-archived `plans/plan-*.md` as the active plan.
 - Mark done only with verification evidence.
-- Convert user corrections into prevention rules in `tasks/lessons.md`.
-- Use `docs/PROGRESS.md` for milestone updates only, not the active execution log.
+- `docs/PROGRESS.md` is for milestones only, not the active execution log.
 
 ### Release, Git, and Deployment References
 

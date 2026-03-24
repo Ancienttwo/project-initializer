@@ -6,7 +6,8 @@
 
 ### 2. Annotation Cycle
 - Iterate plan updates directly in `plans/plan-*.md` via inline notes.
-- Treat the latest non-archived `plans/plan-*.md` file as active.
+- Treat the latest non-archived `plans/plan-*.md` file as active (or `.claude/.active-plan` if set).
+- Switch between concurrent plans with `bash scripts/switch-plan.sh --plan <plan-file>`.
 - Do not implement while plan status is `Draft` or `Annotating`.
 
 ### 3. Plan Node Default

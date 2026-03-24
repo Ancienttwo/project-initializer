@@ -132,11 +132,26 @@ fi
 diff_stat="$(git diff --shortstat HEAD 2>/dev/null | tr -d '\n')"
 diff_stat="${diff_stat:-no uncommitted diff against HEAD}"
 
-active_plan="(none)"
-parsed="$(find plans -maxdepth 1 -type f -name 'plan-*.md' 2>/dev/null | sort | tail -1)"
-if [[ -n "$parsed" ]]; then
-  active_plan="$parsed"
+active_plan="$(get_active_plan || true)"
+if [[ -z "$active_plan" ]]; then
+  active_plan="(none)"
 fi
+
+plan_status="(unknown)"
+if [[ "$active_plan" != "(none)" && -f "$active_plan" ]]; then
+  plan_status="$(awk '/^\> \*\*Status\*\*:/ {sub(/^.*\> \*\*Status\*\*: */, ""); gsub(/\r/, ""); print; exit}' "$active_plan" | xargs)"
+  plan_status="${plan_status:-(unknown)}"
+fi
+
+next_task="$(
+  grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md \
+    | head -1 \
+    | sed -E 's/^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+//'
+)"
+next_task="${next_task:-(none)}"
+
+changed_files="$(git diff --name-only HEAD 2>/dev/null | head -10)"
+changed_files="${changed_files:-(none)}"
 
 cat > "$HANDOFF_FILE" <<EOF_HANDOFF
 # Task Handoff Summary
@@ -145,6 +160,10 @@ cat > "$HANDOFF_FILE" <<EOF_HANDOFF
 > **Progress**: ${done_tasks}/${total_tasks}
 > **Active Plan**: ${active_plan}
 
+## Plan Status
+
+- ${plan_status}
+
 ## Just Completed
 
 - ${just_completed}
@@ -152,6 +171,16 @@ cat > "$HANDOFF_FILE" <<EOF_HANDOFF
 ## Remaining Tasks
 
 ${remaining_tasks}
+
+## Next Actions
+
+- Next task: ${next_task}
+
+## Key Artifacts
+
+\`\`\`
+${changed_files}
+\`\`\`
 
 ## Working Tree Snapshot
 

@@ -20,7 +20,8 @@ RULES:
   - For non-chat tasks, sync tasks/ whenever substantive work changes the repo
   - Research first for unfamiliar areas and persist findings in tasks/research.md
   - Plan with trade-offs in plans/plan-{timestamp}-{slug}.md
-  - Treat the latest non-archived plans/plan-*.md file as the active plan
+  - Treat the latest non-archived plans/plan-*.md file as the active plan, or .claude/.active-plan if explicitly set
+  - Switch between concurrent plans: bash scripts/switch-plan.sh --plan <plan-file>
   - Process annotation notes before implementing
   - Extract approved plan tasks into tasks/todo.md
   - Define task contracts in tasks/contracts/{slug}.contract.md
@@ -39,6 +40,14 @@ RULES:
 
 ACTIVE_PLAN:
   - plans/ is the single source of truth for the current active plan
+
+STATUS:
+  ENUM: [Draft, Annotating, Approved, Executing, Archived]
+  LOCATION: "> **Status**: {value}" line in plan file (must be exact, no trailing whitespace)
+  TRANSITIONS:
+    - Draft -> Annotating -> Approved -> Executing -> Archived
+    - Annotating -> Draft (rollback when plan direction needs rethinking)
+  GUARD: do not implement when status is Draft or Annotating
 ```
 
 ---

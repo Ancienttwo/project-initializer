@@ -212,7 +212,7 @@ describe("Output Quality Gates", () => {
     expect(claude).toContain("tasks/lessons.md");
     expect(agents).toContain("tasks/todo.md");
     expect(agents).toContain("tasks/lessons.md");
-    expect(claude).toContain("sync `tasks/`");
+    expect(claude).toContain("cross-agent contract");
     expect(agents).toContain("sync tasks/");
     expect(claude).toContain("Self-Improvement Loop");
     expect(agents).toContain("Self-Improvement Loop");

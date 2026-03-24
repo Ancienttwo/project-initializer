@@ -129,6 +129,25 @@ fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2) + "\n");
 NODE_EOF
 }
 
+resolve_js_runtime() {
+  if command -v node >/dev/null 2>&1; then
+    printf 'node'
+    return 0
+  fi
+
+  if command -v bun >/dev/null 2>&1; then
+    printf 'bun'
+    return 0
+  fi
+
+  if [[ -x "${HOME}/.bun/bin/bun" ]]; then
+    printf '%s' "${HOME}/.bun/bin/bun"
+    return 0
+  fi
+
+  return 1
+}
+
 run_or_echo() {
   local cmd="$1"
   if [[ "$MODE" == "apply" ]]; then
@@ -165,6 +184,8 @@ ensure_runtime_gitignore_block() {
 .claude/.skill-factory-session-marker.json
 .claude/.skill-factory-user/
 .claude/.context-pressure/
+.claude/.active-plan
+.claude/.plan-state/
 .claude/*.tmp
 .claude/*.bak
 .claude/*.bak.*
@@ -250,8 +271,9 @@ install_helpers() {
     run_or_echo "cp \"$HELPER_ASSETS_DIR/check-task-sync.sh\" \"$scripts_dir/check-task-sync.sh\""
     run_or_echo "cp \"$HELPER_ASSETS_DIR/ensure-task-workflow.sh\" \"$scripts_dir/ensure-task-workflow.sh\""
     run_or_echo "cp \"$HELPER_ASSETS_DIR/check-task-workflow.sh\" \"$scripts_dir/check-task-workflow.sh\""
+    run_or_echo "cp \"$HELPER_ASSETS_DIR/switch-plan.sh\" \"$scripts_dir/switch-plan.sh\""
     if [[ "$MODE" == "apply" ]]; then
-      chmod +x "$scripts_dir/new-plan.sh" "$scripts_dir/plan-to-todo.sh" "$scripts_dir/archive-workflow.sh" "$scripts_dir/verify-contract.sh" "$scripts_dir/check-task-sync.sh" "$scripts_dir/ensure-task-workflow.sh" "$scripts_dir/check-task-workflow.sh" || true
+      chmod +x "$scripts_dir/new-plan.sh" "$scripts_dir/plan-to-todo.sh" "$scripts_dir/archive-workflow.sh" "$scripts_dir/verify-contract.sh" "$scripts_dir/check-task-sync.sh" "$scripts_dir/ensure-task-workflow.sh" "$scripts_dir/check-task-workflow.sh" "$scripts_dir/switch-plan.sh" || true
     fi
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
@@ -299,8 +321,9 @@ ensure_task_sync_package_script() {
     return
   fi
 
-  if command -v node >/dev/null 2>&1; then
-    node -e '
+  js_runtime="$(resolve_js_runtime || true)"
+  if [[ -n "$js_runtime" ]]; then
+    "$js_runtime" -e '
 const fs = require("fs");
 const file = process.argv[1];
 const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -314,7 +337,7 @@ fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
     return
   fi
 
-  log "Warning: node not found. Could not inject task workflow scripts into $package_file"
+  log "Warning: no JavaScript runtime found. Could not inject task workflow scripts into $package_file"
 }
 
 create_task_files_if_missing() {

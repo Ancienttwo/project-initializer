@@ -89,7 +89,25 @@ get_latest_plan() {
 }
 
 get_active_plan() {
+  if [[ -f ".claude/.active-plan" ]]; then
+    local marker_plan
+    marker_plan="$(cat ".claude/.active-plan" 2>/dev/null | xargs)"
+    if [[ -n "$marker_plan" && -f "$marker_plan" ]]; then
+      printf '%s' "$marker_plan"
+      return 0
+    fi
+  fi
   get_latest_plan
+}
+
+set_active_plan() {
+  local plan_file="$1"
+  mkdir -p .claude
+  printf '%s' "$plan_file" > ".claude/.active-plan"
+}
+
+clear_active_plan() {
+  rm -f ".claude/.active-plan"
 }
 
 get_plan_status() {
@@ -341,6 +359,10 @@ validate_plan_transition() {
         echo "Annotating -> Approved requires all [NOTE]: annotations to be resolved."
         return 1
       fi
+      ;;
+    Annotating:Draft)
+      echo "[PlanState] Rollback: Annotating -> Draft (plan direction rethink)."
+      return 0
       ;;
     Draft:Approved|Draft:Executing|Annotating:Executing)
       echo "Status jump ${current_status} -> ${next_status} skips required workflow gates."

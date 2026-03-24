@@ -26,12 +26,12 @@ echo "$COUNT" > "$COUNT_FILE"
 echo "$COUNT" > ".claude/.tool-call-count"
 
 if [[ "$COUNT" -ge 30 && ! -f "$WARN_FILE" ]]; then
-  echo "[ContextMonitor] Yellow zone (~40-50%). Finish current subtask, then /compact."
+  echo "[ContextMonitor] Yellow zone (~30 tool calls). Finish current subtask, then /compact."
   touch "$WARN_FILE"
 fi
 
 if [[ "$COUNT" -ge 50 && ! -f "$RED_FILE" ]]; then
-  echo "[ContextMonitor] Red zone (~60%+). STOP and generate handoff summary now."
+  echo "[ContextMonitor] Red zone (~50 tool calls). STOP and generate handoff summary now."
 
   HANDOFF_FILE=".claude/.session-handoff.md"
   {

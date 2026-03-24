@@ -529,7 +529,7 @@ describe("Hook runtime behavior", () => {
     }
   });
 
-  test("prompt-guard: blocks new plan creation when research is missing or stale", () => {
+  test("prompt-guard: warns on first plan creation when research is missing (no existing plans)", () => {
     const cwd = tmpWorkspace("prompt-guard-research-gate");
     try {
       initGitRepo(cwd);
@@ -539,9 +539,8 @@ describe("Hook runtime behavior", () => {
         stdin: JSON.stringify({ user_message: "请创建计划" }),
       });
 
-      expect(res.status).toBe(1);
-      expect(res.stdout).toContain("[ResearchGate]");
-      expect(res.stdout).toContain('"guard":"ResearchGate"');
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("[ResearchGate] WARNING");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

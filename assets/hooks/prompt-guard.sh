@@ -48,14 +48,11 @@ if is_plan_creation_intent; then
         "ResearchGate" \
         "Research is missing or older than the latest plan ($latest_plan)." \
         "Update tasks/research.md with fresh findings before drafting a new plan."
+      exit 1
     else
-      echo "[ResearchGate] tasks/research.md must exist before creating the first plan."
-      hook_structured_error \
-        "ResearchGate" \
-        "Research is missing for first-plan creation." \
-        "Create tasks/research.md with current findings before drafting the plan."
+      echo "[ResearchGate] WARNING: tasks/research.md does not exist yet. Consider creating it with current findings before drafting the plan."
+      echo "  首次创建计划：建议先写 tasks/research.md，但不阻塞。"
     fi
-    exit 1
   fi
 fi
 
@@ -104,10 +101,11 @@ if [ "$implement_intent" -eq 1 ]; then
     if [ "$todo_source" != "$active_plan" ]; then
       echo "[TodoGuard] Active plan is '$plan_status' in $active_plan but tasks/todo.md is not synchronized."
       echo "[TodoGuard] Run: bash scripts/plan-to-todo.sh --plan $active_plan"
+      echo "[TodoGuard] Or if switching between plans: bash scripts/switch-plan.sh --plan $active_plan"
       hook_structured_error \
         "TodoGuard" \
         "tasks/todo.md is not synchronized with $active_plan." \
-        "Run bash scripts/plan-to-todo.sh --plan $active_plan before implementation."
+        "Run bash scripts/plan-to-todo.sh --plan $active_plan or bash scripts/switch-plan.sh --plan $active_plan"
       exit 1
     fi
   fi

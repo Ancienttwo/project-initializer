@@ -147,6 +147,21 @@ cat > tasks/todo.md <<'TODO_EOF'
 - Risks / follow-ups:
 TODO_EOF
 
+# Clear active-plan marker if it pointed to the archived plan
+if [[ -f ".claude/.active-plan" ]]; then
+  marker_value="$(cat ".claude/.active-plan" 2>/dev/null | xargs)"
+  if [[ "$marker_value" == "$plan_file" || "$marker_value" == "./$plan_file" ]]; then
+    rm -f ".claude/.active-plan"
+    echo "Cleared .claude/.active-plan (archived plan was active)"
+  fi
+fi
+
+# Clean up saved plan state backups
+plan_key="$(basename "$plan_file" .md)"
+rm -f ".claude/.plan-state/${plan_key}.todo.md.bak"
+rm -f ".claude/.plan-state/${plan_key}.task-state.json.bak"
+rm -f ".claude/.plan-state/${plan_key}.task-handoff.md.bak"
+
 echo "Archived plan to: $archive_plan_path"
 if [[ -f "docs/reference-configs/spa-day-protocol.md" ]]; then
   echo "Next: run a periodic cleanup using docs/reference-configs/spa-day-protocol.md"

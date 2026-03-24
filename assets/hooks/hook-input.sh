@@ -68,6 +68,10 @@ hook_json_get() {
     parsed="$(hook_json_extract_with_bun "$HOOK_STDIN_JSON" "$path" || true)"
   fi
 
+  if [[ -z "$parsed" && -n "$HOOK_STDIN_JSON" ]]; then
+    echo "[HookInput] WARN: JSON parse failed for path: $path (neither jq nor bun succeeded)" >&2
+  fi
+
   if [[ -n "$parsed" ]]; then
     printf '%s' "$parsed"
   else
