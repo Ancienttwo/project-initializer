@@ -435,3 +435,142 @@ contract_references_path() {
 
   return 1
 }
+
+workflow_contract_slug() {
+  local active_plan slug
+  active_plan="$(get_active_plan || true)"
+  [[ -n "$active_plan" ]] || return 1
+  slug="$(basename "$active_plan" | sed -E 's/^plan-[0-9]{8}-[0-9]{4}-//; s/\.md$//')"
+  [[ -n "$slug" ]] || return 1
+  printf '%s' "$slug"
+}
+
+workflow_active_contract() {
+  local active_plan contract_file
+  active_plan="$(get_active_plan || true)"
+  [[ -n "$active_plan" ]] || return 1
+  contract_file="$(derive_contract_path "$active_plan" || true)"
+  [[ -n "$contract_file" ]] || return 1
+  printf '%s' "$contract_file"
+}
+
+workflow_active_review() {
+  local slug
+  slug="$(workflow_contract_slug || true)"
+  [[ -n "$slug" ]] || return 1
+  printf 'tasks/reviews/%s.review.md' "$slug"
+}
+
+workflow_checks_file() {
+  printf '.ai/harness/checks/latest.json'
+}
+
+workflow_handoff_file() {
+  printf '.ai/harness/handoff/current.md'
+}
+
+workflow_review_recommends_pass() {
+  local review_file="${1:-}"
+  [[ -n "$review_file" && -f "$review_file" ]] || return 1
+  grep -Eq '^> \*\*Recommendation\*\*:[[:space:]]*pass[[:space:]]*$' "$review_file"
+}
+
+workflow_contract_allows_path() {
+  local contract_file="$1"
+  local file_path="$2"
+  local yaml_block section trimmed item pattern
+
+  [[ -f "$contract_file" ]] || return 1
+  [[ "$file_path" == "$contract_file" ]] && return 0
+
+  yaml_block="$(
+    awk '
+      BEGIN { in_block = 0; printed = 0 }
+      /^```yaml[[:space:]]*$/ && printed == 0 { in_block = 1; next }
+      /^```[[:space:]]*$/ && in_block == 1 { printed = 1; in_block = 0; exit }
+      in_block == 1 { print }
+    ' "$contract_file"
+  )"
+
+  section=""
+  while IFS= read -r line; do
+    trimmed="$(printf '%s' "$line" | sed -E 's/[[:space:]]+$//; s/^[[:space:]]+//')"
+    [[ -z "$trimmed" ]] && continue
+
+    case "$trimmed" in
+      allowed_paths:)
+        section="allowed_paths"
+        continue
+        ;;
+      exit_criteria:|files_exist:|tests_pass:|commands_succeed:|files_contain:|artifacts_exist:|qa_scores:|manual_checks:)
+        section=""
+        continue
+        ;;
+    esac
+
+    if [[ "$section" == "allowed_paths" && "$trimmed" =~ ^-[[:space:]]*(.+)$ ]]; then
+      item="$(workflow_strip_quotes "${BASH_REMATCH[1]}")"
+      pattern="$item"
+      if [[ "$pattern" == */ ]]; then
+        [[ "$file_path" == "$pattern"* ]] && return 0
+      elif [[ "$file_path" == $pattern ]]; then
+        return 0
+      fi
+    fi
+  done <<< "$yaml_block"
+
+  return 1
+}
+
+workflow_write_handoff() {
+  local reason="${1:-session-stop}"
+  local handoff_file active_plan active_contract active_review checks_file next_task changed_files diff_stat spec_file
+
+  handoff_file="$(workflow_handoff_file)"
+  checks_file="$(workflow_checks_file)"
+  spec_file="docs/spec.md"
+  active_plan="$(get_active_plan || true)"
+  active_contract="$(workflow_active_contract || true)"
+  active_review="$(workflow_active_review || true)"
+
+  mkdir -p "$(dirname "$handoff_file")"
+
+  next_task="$(
+    grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null \
+      | head -1 \
+      | sed -E 's/^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+//'
+  )"
+  next_task="${next_task:-(none)}"
+
+  changed_files="$(git diff --name-only HEAD 2>/dev/null | head -10)"
+  changed_files="${changed_files:-(none)}"
+
+  diff_stat="$(git diff --shortstat HEAD 2>/dev/null | tr -d '\n')"
+  diff_stat="${diff_stat:-no uncommitted diff against HEAD}"
+
+  cat > "$handoff_file" <<EOF_HANDOFF
+# Harness Handoff
+
+> **Generated**: $(date '+%Y-%m-%d %H:%M:%S')
+> **Reason**: ${reason}
+
+## Active Artifacts
+
+- Spec: ${spec_file}
+- Plan: ${active_plan:-(none)}
+- Contract: ${active_contract:-(none)}
+- Review: ${active_review:-(none)}
+- Checks: ${checks_file}
+
+## Current Status
+
+- Next recommended action: ${next_task}
+- Working tree: ${diff_stat}
+
+## Changed Files
+
+\`\`\`
+${changed_files}
+\`\`\`
+EOF_HANDOFF
+}

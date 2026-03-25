@@ -39,11 +39,12 @@ describe("AGENTS Target Assembly", () => {
     expect(output).toContain("Codex runtime expectation: `sandbox_mode=platform-default, approval_policy=on-failure`.");
     expect(output).toContain(".claude/.require-worktree");
     expect(output).toContain("single source of truth for the current active plan");
-    expect(output).toContain("ensure-task-workflow.sh");
+    expect(output).toContain("new-spec.sh");
+    expect(output).toContain("new-sprint.sh");
     expect(output).toContain("bash scripts/check-task-sync.sh");
     expect(output).toContain("bash scripts/check-task-workflow.sh --strict");
     expect(output).toContain("bash scripts/verify-contract.sh --contract <active-plan-contract> --strict");
-    expect(output).toContain("Which `tasks/*.md` files were updated");
+    expect(output).toContain("Which workflow artifacts were updated");
   });
 
   test("should preserve core governance semantics between CLAUDE and AGENTS", () => {
@@ -63,10 +64,10 @@ describe("AGENTS Target Assembly", () => {
     expect(agents.toLowerCase()).toContain("verification");
     expect(claude.toLowerCase()).toContain("plan");
     expect(agents.toLowerCase()).toContain("plan");
-    expect(claude.toLowerCase()).toContain("rewrite over patch");
-    expect(agents.toLowerCase()).toContain("rewrite over patch");
-    expect(claude.toLowerCase()).toContain("source of truth");
-    expect(agents.toLowerCase()).toContain("source of truth");
+    expect(claude.toLowerCase()).toContain("product truth");
+    expect(agents.toLowerCase()).toContain("product truth");
+    expect(claude.toLowerCase()).toContain("execution truth");
+    expect(agents.toLowerCase()).toContain("single source of truth");
   });
 
   test("should render cloudflare section for both targets when enabled by plan", () => {

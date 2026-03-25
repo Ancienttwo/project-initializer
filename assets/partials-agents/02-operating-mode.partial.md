@@ -5,8 +5,13 @@
 - Claude runtime expectation: `{{CLAUDE_POLICY}}`.
 - Codex runtime expectation: `{{CODEX_POLICY}}`.
 - Do not implement until the user explicitly asks to implement.
+- Stable product truth: `docs/spec.md`.
 - Research contract: `tasks/research.md`.
 - Canonical execution contract: `tasks/todo.md`.
+- Sprint done contract: `tasks/contracts/`.
+- Evaluator verdicts: `tasks/reviews/`.
+- Structured checks: `.ai/harness/checks/latest.json`.
+- Session handoff: `.ai/harness/handoff/current.md`.
 - Lessons contract: `tasks/lessons.md`.
 - Plan directory: `plans/` (timestamped plans).
 - Active plan rule: latest non-archived `plans/plan-*.md` file.

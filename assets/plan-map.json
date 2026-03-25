@@ -21,6 +21,11 @@
       "stack": "Remix + React + TypeScript",
       "tier": "core",
       "cloudflareNative": true,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "browser-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "PROJECT_STRUCTURE_FILE": "assets/project-structures/remix.txt",
@@ -32,6 +37,11 @@
       "stack": "UmiJS + Ant Design Pro + TypeScript",
       "tier": "core",
       "cloudflareNative": false,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "browser-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "jdtls-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Frontend | UmiJS + Ant Design Pro |\\n| UI | Ant Design + ProComponents |\\n| Backend | Supabase / Enterprise API |\\n| Runtime | Node.js + Bun tooling |"
@@ -42,6 +52,11 @@
       "stack": "Vite + TanStack Router + React",
       "tier": "core",
       "cloudflareNative": true,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "browser-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "PROJECT_STRUCTURE_FILE": "assets/project-structures/vite-tanstack.txt",
@@ -53,6 +68,11 @@
       "stack": "Bun + Turborepo",
       "tier": "core",
       "cloudflareNative": true,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "command-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "PROJECT_STRUCTURE_FILE": "assets/project-structures/monorepo.txt",
@@ -64,6 +84,11 @@
       "stack": "Astro + Starwind UI",
       "tier": "core",
       "cloudflareNative": false,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "browser-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Frontend | Astro + TypeScript |\\n| UI | Starwind UI + Tailwind CSS |\\n| Content | Astro Content Collections |\\n| Runtime | Node.js + Bun tooling |"
@@ -74,6 +99,11 @@
       "stack": "Expo + NativeWind",
       "tier": "core",
       "cloudflareNative": false,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "browser-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "PROJECT_STRUCTURE_FILE": "assets/project-structures/expo-nativewind.txt",
@@ -85,6 +115,11 @@
       "stack": "FastAPI + Vite Frontend",
       "tier": "preset",
       "cloudflareNative": true,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "command-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "pyright-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Frontend | Vite + React |\\n| Backend | FastAPI + Python |\\n| Data | TimescaleDB / InfluxDB |\\n| AI | Claude / OpenAI |"
@@ -95,6 +130,11 @@
       "stack": "FIX Engine + Hono + Vite",
       "tier": "preset",
       "cloudflareNative": true,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "command-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "rust-analyzer-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Frontend | Vite + Trading UI |\\n| API Gateway | Hono |\\n| Trading Core | QuickFIX/J or Rust |\\n| Data | Time-series DB + market feed |"
@@ -105,6 +145,11 @@
       "stack": "Astro Landing + Vite DApp + Wagmi",
       "tier": "preset",
       "cloudflareNative": true,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "browser-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Landing | Astro + Starwind UI |\\n| DApp Frontend | Vite + React + Wagmi + Viem |\\n| Contracts | Hardhat + Solidity |\\n| Wallet | ConnectKit / RainbowKit |"
@@ -115,6 +160,11 @@
       "stack": "OpenTUI + TypeScript",
       "tier": "preset",
       "cloudflareNative": false,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "command-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Interface | OpenTUI (react/core) or Ink |\\n| Runtime | Node.js / Bun |\\n| AI Provider | Claude / OpenAI |\\n| Tooling | TypeScript + testing + linting |"
@@ -125,6 +175,11 @@
       "stack": "Manual selection",
       "tier": "custom",
       "cloudflareNative": false,
+      "defaultHarnessProfiles": {
+        "orchestration": "shared-long-running-harness",
+        "evaluation": "command-qa",
+        "handoff": "artifact-aware"
+      },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Stack | Custom (user-selected) |\\n| Constraints | Defined during guided Q&A |"

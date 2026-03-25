@@ -250,13 +250,17 @@ fi
 
 mkdir -p tasks/archive
 mkdir -p tasks/contracts
+mkdir -p tasks/reviews
 mkdir -p .claude
+mkdir -p .ai/harness/checks
+mkdir -p .ai/harness/handoff
 
 timestamp="$(date +%Y%m%d-%H%M)"
 timestamp_human="$(date '+%Y-%m-%d %H:%M')"
 plan_base="$(basename "$plan_file")"
 slug="$(echo "$plan_base" | sed -E 's/^plan-[0-9]{8}-[0-9]{4}-//; s/\.md$//')"
 contract_file="tasks/contracts/${slug}.contract.md"
+review_file="tasks/reviews/${slug}.review.md"
 
 if [[ -f "tasks/todo.md" ]] && grep -q '[^[:space:]]' tasks/todo.md; then
   archive_file="$(unique_archive_path "tasks/archive/todo-${timestamp}-${slug}.md")"
@@ -303,6 +307,20 @@ fi
 workflow_sync_task_state_from_todo "tasks/todo.md" ".claude/.task-state.json" "$plan_file"
 
 render_contract_file "$plan_file" "$contract_file" "$slug" "$timestamp_human"
+
+if [[ -f ".claude/templates/review.template.md" ]]; then
+  sed \
+    -e "s/{{TASK_SLUG}}/${slug}/g" \
+    -e "s|{{PLAN_FILE}}|${plan_file}|g" \
+    -e "s|{{CONTRACT_FILE}}|${contract_file}|g" \
+    -e "s|{{CHECKS_FILE}}|.ai/harness/checks/latest.json|g" \
+    -e "s/{{TIMESTAMP}}/${timestamp_human}/g" \
+    .claude/templates/review.template.md > "$review_file"
+fi
+
+if [[ ! -f ".ai/harness/checks/latest.json" ]]; then
+  echo "{}" > .ai/harness/checks/latest.json
+fi
 
 rm -f "$tasks_tmp"
 set_plan_status "$plan_file" "Executing"

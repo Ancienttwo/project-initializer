@@ -4,8 +4,9 @@ CLAUDE.md is a routing card. Keep context minimal and load only what the current
 
 ### Always Read First
 
+- `docs/spec.md`: stable product truth
 - `tasks/todo.md`: primary execution checklist and evidence log
-- `tasks/lessons.md`: prevention rules from user corrections
+- `.ai/harness/handoff/current.md`: resumable cross-session state
 
 ### Load On Demand
 
@@ -13,15 +14,14 @@ CLAUDE.md is a routing card. Keep context minimal and load only what the current
 |---------|----------------|
 | Deep codebase investigation | `tasks/research.md` |
 | Active implementation planning | `plans/plan-*.md` |
+| Sprint done definition | `tasks/contracts/<slug>.contract.md` |
+| Evaluator verdict | `tasks/reviews/<slug>.review.md` |
+| Latest verification evidence | `.ai/harness/checks/latest.json` |
 | Historical implementation context | `plans/archive/` and `tasks/archive/` |
-| Coding/refactor standards | `docs/reference-configs/coding-standards.md` |
-| Test and delivery protocol | `docs/reference-configs/development-protocol.md` |
-| Git strategy | `docs/reference-configs/git-strategy.md` |
-| Release/changelog process | `docs/reference-configs/changelog-versioning.md` |
-| Deployment decisions | `docs/reference-configs/release-deploy.md` |
-| Workflow orchestration | `docs/reference-configs/workflow-orchestration.md` |
-| AI workflow playbooks | `docs/reference-configs/ai-workflows.md` |
-| Periodic consolidation | `docs/reference-configs/spa-day-protocol.md` |
+| Harness runtime model | `docs/reference-configs/harness-overview.md` |
+| Sprint contract rules | `docs/reference-configs/sprint-contracts.md` |
+| Evaluator scoring | `docs/reference-configs/evaluator-rubric.md` |
+| Handoff expectations | `docs/reference-configs/handoff-protocol.md` |
 | Product and architecture context | `docs/brief.md`, `docs/decisions.md`, `docs/tech-stack.md` |
 | Milestones and release history | `docs/PROGRESS.md`, `docs/CHANGELOG.md` |
 

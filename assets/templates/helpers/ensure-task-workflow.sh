@@ -35,6 +35,16 @@ get_active_plan() {
 ensure_templates() {
   mkdir -p .claude/templates
 
+  if [[ ! -f ".claude/templates/spec.template.md" ]]; then
+    cat > .claude/templates/spec.template.md <<'SPEC_TEMPLATE_EOF'
+# Product Spec: {{PROJECT_NAME}}
+
+> **Status**: Draft
+> **Last Updated**: {{TIMESTAMP}}
+> **Owner**: Planner
+SPEC_TEMPLATE_EOF
+  fi
+
   if [[ ! -f ".claude/templates/research.template.md" ]]; then
     cat > .claude/templates/research.template.md <<'RESEARCH_TEMPLATE_EOF'
 # {{PROJECT_NAME}} — Research Notes
@@ -141,6 +151,19 @@ exit_criteria:
 - What to verify visually:
 CONTRACT_TEMPLATE_EOF
   fi
+
+  if [[ ! -f ".claude/templates/review.template.md" ]]; then
+    cat > .claude/templates/review.template.md <<'REVIEW_TEMPLATE_EOF'
+# Sprint Review: {{TASK_SLUG}}
+
+> **Status**: Pending
+> **Plan**: {{PLAN_FILE}}
+> **Contract**: {{CONTRACT_FILE}}
+> **Checks File**: {{CHECKS_FILE}}
+> **Last Updated**: {{TIMESTAMP}}
+> **Recommendation**: fail
+REVIEW_TEMPLATE_EOF
+  fi
 }
 
 ensure_idle_todo() {
@@ -166,7 +189,16 @@ TODO_EOF
 }
 
 ensure_auxiliary_files() {
-  mkdir -p plans plans/archive tasks/archive tasks/contracts docs scripts
+  mkdir -p plans plans/archive tasks/archive tasks/contracts tasks/reviews docs scripts .ai/harness/checks .ai/harness/handoff
+
+  if [[ ! -f "docs/spec.md" ]]; then
+    cat > docs/spec.md <<'SPEC_EOF'
+# Product Spec
+
+> **Status**: Draft
+> **Owner**: Planner
+SPEC_EOF
+  fi
 
   if [[ ! -f "tasks/lessons.md" ]]; then
     cat > tasks/lessons.md <<'LESSONS_EOF'
@@ -225,6 +257,18 @@ RESEARCH_EOF
 - Record releases, migrations, and major checkpoints here.
 PROGRESS_EOF
   fi
+
+  if [[ ! -f ".ai/harness/checks/latest.json" ]]; then
+    echo "{}" > ".ai/harness/checks/latest.json"
+  fi
+
+  if [[ ! -f ".ai/harness/handoff/current.md" ]]; then
+    cat > ".ai/harness/handoff/current.md" <<'HANDOFF_EOF'
+# Harness Handoff
+
+> **Reason**: bootstrap
+HANDOFF_EOF
+  fi
 }
 
 slug=""
@@ -262,6 +306,12 @@ active_plan="$(get_active_plan || true)"
 if [[ -n "$active_plan" ]]; then
   echo "Workflow ready. Active plan: $active_plan"
   exit 0
+fi
+
+if [[ ! -f "docs/spec.md" ]]; then
+  if [[ -x "scripts/new-spec.sh" ]]; then
+    bash "scripts/new-spec.sh"
+  fi
 fi
 
 if [[ -z "$slug" ]]; then

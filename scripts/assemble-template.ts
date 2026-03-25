@@ -38,6 +38,11 @@ export interface PlanConfig {
   cloudflareNative: boolean;
   tier?: "core" | "preset" | "custom";
   defaultLsp?: string;
+  defaultHarnessProfiles?: {
+    orchestration: string;
+    evaluation: string;
+    handoff: string;
+  };
   defaultTemplateVariables?: Record<string, string>;
 }
 
@@ -91,7 +96,7 @@ const PARTIALS_AGENTS_DIR = join(ASSETS_DIR, "partials-agents");
 const VERSIONS_FILE = join(ASSETS_DIR, "versions.json");
 const SKILL_VERSION_FILE = join(ASSETS_DIR, "skill-version.json");
 const PLAN_MAP_FILE = join(ASSETS_DIR, "plan-map.json");
-const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v1.json");
+const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v2.json");
 
 const TARGET_DIRS: Record<TemplateTarget, string> = {
   claude: PARTIALS_DIR,
@@ -111,13 +116,14 @@ const FALLBACK_TEMPLATE_VARIABLES: Record<string, string> = {
     "- Always push back on requests that violate project rules",
   PROJECT_STRUCTURE:
     "{{PROJECT_NAME}}/\n" +
-    "├── specs/\n" +
-    "├── contracts/\n" +
+    "├── docs/spec.md\n" +
+    "├── plans/\n" +
+    "├── tasks/contracts/\n" +
+    "├── tasks/reviews/\n" +
     "├── tests/\n" +
     "├── src/\n" +
-    "├── docs/\n" +
     "├── tasks/\n" +
-    "├── .ops/\n" +
+    "├── .ai/harness/\n" +
     "└── artifacts/",
   TECH_STACK_TABLE:
     "| Stack | Select based on chosen plan |\n" +

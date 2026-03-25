@@ -2,37 +2,44 @@
 
 ```yaml
 TASK_SOURCES:
+  - docs/spec.md
   - tasks/research.md
   - tasks/todo.md
   - tasks/contracts/
+  - tasks/reviews/
   - tasks/lessons.md
+  - .ai/harness/checks/latest.json
+  - .ai/harness/handoff/current.md
   - plans/
   - docs/PROGRESS.md
 
-PHASES: research -> plan -> annotate -> todo -> implement -> verify -> feedback
+PHASES: research -> spec -> plan -> contract -> todo -> implement -> verify -> review -> handoff
 
 ARCHIVE:
   PLAN: plans/archive/
   TODO: tasks/archive/
 
 RULES:
-  - Treat repo-local tasks/ files as the primary cross-agent workflow contract
+  - Treat repo-local artifact files as the primary cross-agent workflow contract
   - For non-chat tasks, sync tasks/ whenever substantive work changes the repo
   - Research first for unfamiliar areas and persist findings in tasks/research.md
+  - Keep stable product intent in docs/spec.md
   - Plan with trade-offs in plans/plan-{timestamp}-{slug}.md
   - Treat the latest non-archived plans/plan-*.md file as the active plan, or .claude/.active-plan if explicitly set
   - Switch between concurrent plans: bash scripts/switch-plan.sh --plan <plan-file>
   - Process annotation notes before implementing
   - Extract approved plan tasks into tasks/todo.md
   - Define task contracts in tasks/contracts/{slug}.contract.md
+  - Define evaluator verdicts in tasks/reviews/{slug}.review.md
   - Verify contracts before claiming completion
+  - Require review pass before claiming completion
   - Track progress with verification evidence in tasks/todo.md
   - Record correction-derived prevention rules in tasks/lessons.md
   - Group repeated lessons by theme so Skill Factory can promote them into knowledge skills
   - Treat `.ai/hooks/` as the shared automation entrypoint when repo scripts reference hook-backed workflow checks
   - Treat `.claude/settings.json` as the Claude-specific adapter, not the cross-agent source of truth
   - For Codex sessions, treat `bash scripts/check-task-sync.sh` and `bash scripts/check-task-workflow.sh --strict` as required repo-local checks
-  - Before ending a session, refresh `.claude/.task-handoff.md` when the task state changed
+  - Before ending a session, refresh `.ai/harness/handoff/current.md` when the task state changed
   - If you explicitly use a generated skill, mark it with `bash scripts/skill-factory-check.sh --mark-used <slug> --type <workflow|knowledge>`
   - Check pending Skill Factory proposals with `bash scripts/skill-factory-check.sh`
   - Use docs/PROGRESS.md for milestones only, not active execution logs

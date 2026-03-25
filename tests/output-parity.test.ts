@@ -82,8 +82,8 @@ describe("Core Philosophy Preservation", () => {
     },
   });
 
-  test("output should contain IMMUTABLE LAYER", () => {
-    expect(output).toContain("IMMUTABLE LAYER");
+  test("output should contain PRODUCT TRUTH", () => {
+    expect(output).toContain("PRODUCT TRUTH");
   });
 
   test("output should contain MUTABLE LAYER", () => {
@@ -103,7 +103,8 @@ describe("Core Philosophy Preservation", () => {
   });
 
   test("output should contain source-of-truth principle", () => {
-    expect(output.toLowerCase()).toContain("source of truth");
+    expect(output.toLowerCase()).toContain("product truth");
+    expect(output.toLowerCase()).toContain("execution truth");
   });
 
   test("output should contain Good Taste principles", () => {
@@ -189,10 +190,10 @@ describe("Output Quality Gates", () => {
       variables: { PROJECT_NAME: "Test" },
     });
 
-    expect(output).toContain("docs/reference-configs/changelog-versioning.md");
-    expect(output).toContain("docs/reference-configs/git-strategy.md");
-    expect(output).toContain("docs/reference-configs/release-deploy.md");
-    expect(output).toContain("docs/reference-configs/ai-workflows.md");
+    expect(output).toContain("docs/reference-configs/harness-overview.md");
+    expect(output).toContain("docs/reference-configs/sprint-contracts.md");
+    expect(output).toContain("docs/reference-configs/evaluator-rubric.md");
+    expect(output).toContain("docs/reference-configs/handoff-protocol.md");
     expect(output).not.toContain("assets/reference-configs/");
   });
 
@@ -212,15 +213,17 @@ describe("Output Quality Gates", () => {
     expect(claude).toContain("tasks/lessons.md");
     expect(agents).toContain("tasks/todo.md");
     expect(agents).toContain("tasks/lessons.md");
-    expect(claude).toContain("cross-agent contract");
-    expect(agents).toContain("sync tasks/");
+    expect(claude).toContain("product truth");
+    expect(agents).toContain("repo-local artifact files");
+    expect(claude).toContain("tasks/contracts/");
+    expect(agents).toContain("tasks/reviews/");
     expect(claude).toContain("Self-Improvement Loop");
     expect(agents).toContain("Self-Improvement Loop");
     expect(agents).toContain("skill-factory-check.sh");
     expect(agents).toContain("check-task-sync.sh");
     expect(agents).toContain("check-task-workflow.sh --strict");
     expect(agents).toContain("verify-contract.sh --contract <active-plan-contract> --strict");
-    expect(agents).toContain("mark-used");
+    expect(agents).toContain(".ai/harness/checks/latest.json");
     expect(claude).toContain("latest non-archived `plans/plan-*.md` file");
     expect(agents).toContain("single source of truth for the current active plan");
     expect(claude.toLowerCase()).toContain("milestone");

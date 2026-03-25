@@ -5,7 +5,7 @@
 - Favor derivation over duplicated state.
 
 ### Single Source of Truth
-- `specs/`, `contracts/`, `tests/` are authoritative.
+- `docs/spec.md`, `tasks/contracts/`, `tasks/reviews/`, and `tests/` are authoritative.
 - `src/` is mutable implementation.
 - Rewrite over patch when contracts diverge.
 
@@ -14,7 +14,7 @@
 - Keep compatibility debt explicit through deprecation + replacement mapping.
 
 See details in:
-- `docs/reference-configs/coding-standards.md`
-- `docs/reference-configs/development-protocol.md`
+- `docs/reference-configs/sprint-contracts.md`
+- `docs/reference-configs/evaluator-rubric.md`
 
 ---

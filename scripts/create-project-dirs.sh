@@ -88,6 +88,14 @@ GITIGNORE_EOF
 write_templates() {
   mkdir -p .claude/templates
 
+  cat > .claude/templates/spec.template.md <<'SPEC_TEMPLATE_EOF'
+# Product Spec: {{PROJECT_NAME}}
+
+> **Status**: Draft
+> **Last Updated**: {{TIMESTAMP}}
+> **Owner**: Planner
+SPEC_TEMPLATE_EOF
+
   cat > .claude/templates/research.template.md <<'RESEARCH_TEMPLATE_EOF'
 # {{PROJECT_NAME}} — Research Notes
 
@@ -152,7 +160,7 @@ RESEARCH_TEMPLATE_EOF
 PLAN_TEMPLATE_EOF
 
   cat > .claude/templates/contract.template.md <<'CONTRACT_TEMPLATE_EOF'
-# Task Contract: {{TASK_SLUG}}
+# Sprint Contract: {{TASK_SLUG}}
 
 > **Status**: Pending
 > **Plan**: {{PLAN_FILE}}
@@ -189,6 +197,17 @@ exit_criteria:
 - Screenshot path (optional):
 - What to verify visually:
 CONTRACT_TEMPLATE_EOF
+
+  cat > .claude/templates/review.template.md <<'REVIEW_TEMPLATE_EOF'
+# Sprint Review: {{TASK_SLUG}}
+
+> **Status**: Pending
+> **Plan**: {{PLAN_FILE}}
+> **Contract**: {{CONTRACT_FILE}}
+> **Checks File**: {{CHECKS_FILE}}
+> **Last Updated**: {{TIMESTAMP}}
+> **Recommendation**: fail
+REVIEW_TEMPLATE_EOF
 }
 
 install_workflow_helpers() {
@@ -196,9 +215,23 @@ install_workflow_helpers() {
 
   if [[ -d "$ASSETS_TEMPLATES_DIR/helpers" ]]; then
     cp "$ASSETS_TEMPLATES_DIR/helpers/"*.sh scripts/ 2>/dev/null || true
-    chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh 2>/dev/null || true
+    chmod +x scripts/new-spec.sh scripts/new-sprint.sh scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/prepare-handoff.sh scripts/verify-contract.sh scripts/verify-sprint.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh 2>/dev/null || true
     return
   fi
+
+  cat > scripts/new-spec.sh <<'NEW_SPEC_STUB_EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: new-spec.sh"
+exit 1
+NEW_SPEC_STUB_EOF
+
+  cat > scripts/new-sprint.sh <<'NEW_SPRINT_STUB_EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: new-sprint.sh"
+exit 1
+NEW_SPRINT_STUB_EOF
 
   cat > scripts/new-plan.sh <<'NEW_PLAN_STUB_EOF'
 #!/bin/bash
@@ -206,6 +239,13 @@ set -euo pipefail
 echo "Missing helper template: new-plan.sh"
 exit 1
 NEW_PLAN_STUB_EOF
+
+  cat > scripts/prepare-handoff.sh <<'PREPARE_HANDOFF_STUB_EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: prepare-handoff.sh"
+exit 1
+PREPARE_HANDOFF_STUB_EOF
 
   cat > scripts/plan-to-todo.sh <<'PLAN_TO_TODO_STUB_EOF'
 #!/bin/bash
@@ -228,6 +268,13 @@ echo "Missing helper template: verify-contract.sh"
 exit 1
 VERIFY_CONTRACT_STUB_EOF
 
+  cat > scripts/verify-sprint.sh <<'VERIFY_SPRINT_STUB_EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: verify-sprint.sh"
+exit 1
+VERIFY_SPRINT_STUB_EOF
+
   cat > scripts/check-task-sync.sh <<'CHECK_TASK_SYNC_STUB_EOF'
 #!/bin/bash
 set -euo pipefail
@@ -249,7 +296,7 @@ echo "Missing helper template: check-task-workflow.sh"
 exit 1
 CHECK_TASK_WORKFLOW_STUB_EOF
 
-  chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh
+  chmod +x scripts/new-spec.sh scripts/new-sprint.sh scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/prepare-handoff.sh scripts/verify-contract.sh scripts/verify-sprint.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh
 }
 
 install_skill_factory_files() {
@@ -364,56 +411,28 @@ mkdir -p docs/archives
 mkdir -p docs/reference-configs
 mkdir -p tasks/archive
 mkdir -p tasks/contracts
+mkdir -p tasks/reviews
 mkdir -p plans/archive
 mkdir -p scripts
 mkdir -p .claude/hooks
 mkdir -p .ai/hooks
+mkdir -p .ai/harness/checks
+mkdir -p .ai/harness/handoff
 mkdir -p .ops/database
 mkdir -p .ops/secrets
 mkdir -p artifacts
 
 # ===== Initial Files =====
 touch docs/CHANGELOG.md
+touch docs/spec.md
 touch docs/brief.md
 touch docs/tech-stack.md
 touch docs/decisions.md
 
-touch docs/reference-configs/changelog-versioning.md
-touch docs/reference-configs/git-strategy.md
-touch docs/reference-configs/release-deploy.md
-touch docs/reference-configs/ai-workflows.md
-touch docs/reference-configs/coding-standards.md
-touch docs/reference-configs/development-protocol.md
-touch docs/reference-configs/workflow-orchestration.md
-cat > docs/reference-configs/spa-day-protocol.md <<'SPA_DAY_EOF'
-# Spa Day Protocol
-
-Periodic cleanup protocol to reduce context bloat and rule conflicts.
-
-## 1. Rule Consolidation
-- Merge overlapping rules in `docs/reference-configs/`.
-- Remove contradictory instructions and keep one canonical rule per topic.
-
-## 2. CLAUDE/AGENTS Routing Freshness
-- Verify all routed paths still exist.
-- Remove stale references from CLAUDE.md/AGENTS.md indexes.
-
-## 3. Lessons Graduation
-- Promote repeated lessons from `tasks/lessons.md` into durable rules.
-- Archive one-off or obsolete lessons.
-
-## 4. Research Pruning
-- Remove already-implemented investigation items from `tasks/research.md`.
-- Keep only unresolved findings and open questions.
-
-## 5. Docs Reality Check
-- Sync `docs/architecture.md` and `docs/tech-stack.md` with current codebase.
-- Flag drift for immediate correction.
-
-## 6. Contract Hygiene
-- Move fulfilled contracts from `tasks/contracts/` into an archive folder if needed.
-- Keep active contracts only for in-flight tasks.
-SPA_DAY_EOF
+touch docs/reference-configs/harness-overview.md
+touch docs/reference-configs/sprint-contracts.md
+touch docs/reference-configs/evaluator-rubric.md
+touch docs/reference-configs/handoff-protocol.md
 
 cat > docs/PROGRESS.md << 'PROGRESS_EOF'
 # Project Milestones
@@ -430,6 +449,13 @@ cat > docs/PROGRESS.md << 'PROGRESS_EOF'
 
 - Record releases, migrations, and major checkpoints here.
 PROGRESS_EOF
+
+cat > docs/spec.md << 'SPEC_EOF'
+# Product Spec
+
+> **Status**: Draft
+> **Owner**: Planner
+SPEC_EOF
 
 cat > tasks/todo.md << 'TASK_TODO_EOF'
 # Task Execution Checklist (Primary)
@@ -485,6 +511,16 @@ cat > tasks/research.md << 'TASK_RESEARCH_EOF'
 ### What to Change
 ### Open Questions
 TASK_RESEARCH_EOF
+
+cat > .ai/harness/checks/latest.json << 'CHECKS_EOF'
+{}
+CHECKS_EOF
+
+cat > .ai/harness/handoff/current.md << 'HANDOFF_EOF'
+# Harness Handoff
+
+> **Reason**: scaffold
+HANDOFF_EOF
 
 write_templates
 install_workflow_helpers
@@ -546,47 +582,10 @@ bun test --watch      # Watch mode
 ```
 TESTS_README_EOF
 
-cat > docs/reference-configs/changelog-versioning.md << 'REF_CHANGELOG_EOF'
-# Changelog & Versioning Reference
-
-Use this file for detailed release-note and semantic-versioning rules.
-REF_CHANGELOG_EOF
-
-cat > docs/reference-configs/git-strategy.md << 'REF_GIT_EOF'
-# Git Strategy Reference
-
-Use this file for branch model and commit convention details.
-REF_GIT_EOF
-
-cat > docs/reference-configs/release-deploy.md << 'REF_RELEASE_EOF'
-# Release & Deployment Reference
-
-Use this file for release pipeline and deployment trigger details.
-REF_RELEASE_EOF
-
-cat > docs/reference-configs/ai-workflows.md << 'REF_AIWF_EOF'
-# AI Workflows Reference
-
-Use this file for extended AI workflow templates, tasks-first session handoff, and milestone-only progress guidance.
-REF_AIWF_EOF
-
-cat > docs/reference-configs/coding-standards.md << 'REF_CODING_STANDARDS_EOF'
-# Coding Standards Reference
-
-Use this file for detailed coding constraints and refactor thresholds.
-REF_CODING_STANDARDS_EOF
-
-cat > docs/reference-configs/development-protocol.md << 'REF_DEV_PROTOCOL_EOF'
-# Development Protocol Reference
-
-Use this file for detailed feature/bug flow playbooks, repo-local task sync rules, and final response requirements.
-REF_DEV_PROTOCOL_EOF
-
-cat > docs/reference-configs/workflow-orchestration.md << 'REF_WORKFLOW_ORCH_EOF'
-# Workflow Orchestration Reference
-
-Use this file for advanced plan/execution orchestration patterns.
-REF_WORKFLOW_ORCH_EOF
+cp "$ASSETS_TEMPLATES_DIR/../reference-configs/harness-overview.md" docs/reference-configs/harness-overview.md 2>/dev/null || true
+cp "$ASSETS_TEMPLATES_DIR/../reference-configs/sprint-contracts.md" docs/reference-configs/sprint-contracts.md 2>/dev/null || true
+cp "$ASSETS_TEMPLATES_DIR/../reference-configs/evaluator-rubric.md" docs/reference-configs/evaluator-rubric.md 2>/dev/null || true
+cp "$ASSETS_TEMPLATES_DIR/../reference-configs/handoff-protocol.md" docs/reference-configs/handoff-protocol.md 2>/dev/null || true
 
 cat > scripts/regenerate.sh << 'REGENERATE_EOF'
 #!/bin/bash

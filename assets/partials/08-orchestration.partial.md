@@ -2,7 +2,7 @@
 
 ### 1. Research Before Planning
 - Deeply read relevant code paths and persist findings to `tasks/research.md`.
-- Capture hidden contracts, edge cases, and integration risks before proposing changes.
+- Capture hidden contracts, edge cases, and integration risks before updating `docs/spec.md` or proposing execution.
 
 ### 2. Annotation Cycle
 - Iterate plan updates directly in `plans/plan-*.md` via inline notes.
@@ -12,7 +12,8 @@
 
 ### 3. Plan Node Default
 - Enter plan mode for non-trivial tasks.
-- If no active plan exists, run `bash scripts/ensure-task-workflow.sh --slug <slug> --title <title>`.
+- If no stable product truth exists, run `bash scripts/new-spec.sh`.
+- If no active plan exists, run `bash scripts/new-sprint.sh --slug <slug> --title <title>`.
 - Re-plan when execution drifts.
 
 ### 4. Subagent Strategy
@@ -26,8 +27,9 @@
 - No task completion without test/build evidence.
 
 ### 6b. Contract Verification
-- Define per-task contract files in `tasks/contracts/`.
+- Define per-sprint contract files in `tasks/contracts/`.
 - Verify contract exit criteria before claiming completion.
+- Require a matching evaluator review before any done/completed response.
 - Use `scripts/verify-contract.sh --contract tasks/contracts/{slug}.contract.md --strict`.
 
 ### 7. Balanced Elegance
@@ -36,9 +38,5 @@
 ### 8. Autonomous Bug Fixing
 - Start fixing when logs/tests provide sufficient evidence.
 
-### 9. Spa Day
-- Periodically consolidate conflicting rules and stale references.
-- Follow `docs/reference-configs/spa-day-protocol.md` for cleanup cadence.
-
 Detailed patterns:
-- `docs/reference-configs/workflow-orchestration.md`
+- `docs/reference-configs/harness-overview.md`

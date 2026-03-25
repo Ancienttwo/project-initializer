@@ -19,8 +19,9 @@
 ### 5. Detailed Standards (On Demand)
 
 Load these only when needed:
-- `docs/reference-configs/coding-standards.md`
-- `docs/reference-configs/development-protocol.md`
-- `docs/reference-configs/workflow-orchestration.md`
+- `docs/reference-configs/harness-overview.md`
+- `docs/reference-configs/sprint-contracts.md`
+- `docs/reference-configs/evaluator-rubric.md`
+- `docs/reference-configs/handoff-protocol.md`
 
 ---

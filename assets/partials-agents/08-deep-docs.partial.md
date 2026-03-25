@@ -1,21 +1,22 @@
 ## Deep Docs Index
 
 ### Always Read First
+- `docs/spec.md`: stable product truth
 - `tasks/todo.md`: primary execution checklist and evidence log
-- `tasks/lessons.md`: self-improvement rules from corrections
+- `.ai/harness/handoff/current.md`: resumable session state
 
 ### Load On Demand
 - `tasks/research.md`: deep codebase analysis and hidden contracts
 - `plans/plan-*.md`: active timestamped plans, with the latest non-archived file treated as current
+- `tasks/contracts/`: active sprint done definitions
+- `tasks/reviews/`: evaluator verdicts
+- `.ai/harness/checks/latest.json`: structured verification evidence
 - `plans/archive/`: archived plans and outcomes
 - `tasks/archive/`: archived todo snapshots
-- `docs/reference-configs/coding-standards.md`: coding constraints
-- `docs/reference-configs/development-protocol.md`: delivery protocol
-- `docs/reference-configs/git-strategy.md`: branching and commits
-- `docs/reference-configs/changelog-versioning.md`: release notes policy
-- `docs/reference-configs/release-deploy.md`: deployment flow
-- `docs/reference-configs/workflow-orchestration.md`: orchestration playbook
-- `docs/reference-configs/spa-day-protocol.md`: periodic cleanup protocol
+- `docs/reference-configs/harness-overview.md`: orchestration playbook
+- `docs/reference-configs/sprint-contracts.md`: contract rules
+- `docs/reference-configs/evaluator-rubric.md`: review thresholds
+- `docs/reference-configs/handoff-protocol.md`: handoff expectations
 - `docs/PROGRESS.md`: milestone ledger and archived decisions
 - `docs/decisions.md`: architecture decisions and trade-offs
 - `docs/tech-stack.md`: dependency and runtime constraints

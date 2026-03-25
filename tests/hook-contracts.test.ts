@@ -69,7 +69,7 @@ describe("Hook contracts", () => {
     expect(script).toContain("done");
     expect(script).toContain("完成");
     expect(script).toContain("scripts/verify-contract.sh");
-    expect(script).toContain("SpaDay");
+    expect(script).toContain("HarnessMaintenance");
     expect(script).toContain("has_changes_glob");
     expect(script).not.toContain("📋");
     expect(script).not.toContain("🧠");
@@ -112,7 +112,7 @@ describe("Hook contracts", () => {
     expect(settings).toContain("pre-edit-guard.sh");
     expect(settings).toContain("post-edit-guard.sh");
     expect(settings).toContain("trace-event.sh");
-    expect(settings).toContain("skill-factory-session-end.sh");
+    expect(settings).toContain("finalize-handoff.sh");
     expect(settings).toContain("post-bash.sh");
     expect(settings).toContain("context-pressure-hook.sh");
     expect(settings).not.toContain("task-handoff.sh");

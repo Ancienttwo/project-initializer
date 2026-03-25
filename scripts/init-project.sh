@@ -102,6 +102,18 @@ ensure_gitignore_entry() {
 install_workflow_templates() {
     mkdir -p .claude/templates
 
+    if [ -d "$ASSETS_TEMPLATES_DIR" ] && [ -f "$ASSETS_TEMPLATES_DIR/spec.template.md" ]; then
+        cp "$ASSETS_TEMPLATES_DIR/spec.template.md" .claude/templates/spec.template.md
+    else
+        cat > .claude/templates/spec.template.md << 'EOF'
+# Product Spec: {{PROJECT_NAME}}
+
+> **Status**: Draft
+> **Last Updated**: {{TIMESTAMP}}
+> **Owner**: Planner
+EOF
+    fi
+
     if [ -d "$ASSETS_TEMPLATES_DIR" ] && [ -f "$ASSETS_TEMPLATES_DIR/research.template.md" ]; then
         cp "$ASSETS_TEMPLATES_DIR/research.template.md" .claude/templates/research.template.md
     else
@@ -215,6 +227,21 @@ exit_criteria:
 - What to verify visually:
 EOF
     fi
+
+    if [ -d "$ASSETS_TEMPLATES_DIR" ] && [ -f "$ASSETS_TEMPLATES_DIR/review.template.md" ]; then
+        cp "$ASSETS_TEMPLATES_DIR/review.template.md" .claude/templates/review.template.md
+    else
+        cat > .claude/templates/review.template.md << 'EOF'
+# Sprint Review: {{TASK_SLUG}}
+
+> **Status**: Pending
+> **Plan**: {{PLAN_FILE}}
+> **Contract**: {{CONTRACT_FILE}}
+> **Checks File**: {{CHECKS_FILE}}
+> **Last Updated**: {{TIMESTAMP}}
+> **Recommendation**: fail
+EOF
+    fi
 }
 
 install_workflow_helpers() {
@@ -222,14 +249,35 @@ install_workflow_helpers() {
 
     if [ -d "$ASSETS_TEMPLATES_DIR/helpers" ]; then
         cp "$ASSETS_TEMPLATES_DIR/helpers/"*.sh scripts/ 2>/dev/null || true
-        chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh 2>/dev/null || true
+        chmod +x scripts/new-plan.sh scripts/new-spec.sh scripts/new-sprint.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/prepare-handoff.sh scripts/verify-contract.sh scripts/verify-sprint.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh 2>/dev/null || true
         return
     fi
+
+    cat > scripts/new-spec.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: new-spec.sh"
+exit 1
+EOF
+
+    cat > scripts/new-sprint.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: new-sprint.sh"
+exit 1
+EOF
 
     cat > scripts/new-plan.sh << 'EOF'
 #!/bin/bash
 set -euo pipefail
 echo "Missing helper template: new-plan.sh"
+exit 1
+EOF
+
+    cat > scripts/prepare-handoff.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: prepare-handoff.sh"
 exit 1
 EOF
 
@@ -254,6 +302,13 @@ echo "Missing helper template: verify-contract.sh"
 exit 1
 EOF
 
+    cat > scripts/verify-sprint.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+echo "Missing helper template: verify-sprint.sh"
+exit 1
+EOF
+
     cat > scripts/check-task-sync.sh << 'EOF'
 #!/bin/bash
 set -euo pipefail
@@ -275,7 +330,7 @@ echo "Missing helper template: check-task-workflow.sh"
 exit 1
 EOF
 
-    chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh
+    chmod +x scripts/new-spec.sh scripts/new-sprint.sh scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/prepare-handoff.sh scripts/verify-contract.sh scripts/verify-sprint.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh
 }
 
 install_skill_factory_assets() {
@@ -486,9 +541,12 @@ create_structure() {
     mkdir -p docs/reference-configs
     mkdir -p tasks/archive
     mkdir -p tasks/contracts
+    mkdir -p tasks/reviews
     mkdir -p plans/archive
     mkdir -p .claude/hooks
     mkdir -p .claude/templates
+    mkdir -p .ai/harness/checks
+    mkdir -p .ai/harness/handoff
     mkdir -p .ops
     mkdir -p artifacts
 
@@ -524,6 +582,18 @@ All notable changes to this project will be documented in this file.
 
 ---
 *Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)*
+EOF
+
+    cat > docs/spec.md << EOF
+# Product Spec: ${PROJECT_NAME}
+
+> **Status**: Draft
+> **Last Updated**: ${NOW}
+> **Owner**: Planner
+
+## Product Outcome
+
+Describe the stable user or operator outcome this repo should deliver.
 EOF
 
     cat > tasks/todo.md << EOF
@@ -564,6 +634,17 @@ EOF
 EOF
 
     install_workflow_templates
+
+    cat > .ai/harness/checks/latest.json << 'EOF'
+{}
+EOF
+
+    cat > .ai/harness/handoff/current.md << EOF
+# Harness Handoff
+
+> **Generated**: ${NOW}
+> **Reason**: scaffold
+EOF
 
     if [ -f ".claude/templates/research.template.md" ]; then
         sed \

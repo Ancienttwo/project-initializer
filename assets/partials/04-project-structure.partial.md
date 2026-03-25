@@ -18,4 +18,6 @@
 - {{RUNTIME_MODE}} by default for file mutations.
 - Primary worktree warns by default; enforce via `.claude/.require-worktree`.
 - Commit explicitly after green checks; no automatic checkpoint hook in the shared preset.
-- Keep execution contracts in `tasks/todo.md` and `tasks/lessons.md`.
+- Keep stable product truth in `docs/spec.md`.
+- Keep sprint done definitions in `tasks/contracts/` and `tasks/reviews/`.
+- Keep resumable state in `.ai/harness/handoff/current.md`.

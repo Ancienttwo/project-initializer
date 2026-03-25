@@ -18,8 +18,13 @@ export interface RuntimeProfile {
   codexPolicy: string;
 }
 
-export interface InitializerQuestionPackV1 {
-  version: "initializer-question-pack.v1";
+export interface ProfileChoice {
+  label: string;
+  description: string;
+}
+
+export interface InitializerQuestionPackV2 {
+  version: "initializer-question-pack.v2";
   goal: string;
   decisionPoints: DecisionPoint[];
   planTiers: {
@@ -29,19 +34,25 @@ export interface InitializerQuestionPackV1 {
   inferredDefaults: {
     packageManagerPriority: string[];
     runtimeProfile: string;
+    orchestrationProfile: string;
+    evaluationProfile: string;
+    handoffProfile: string;
   };
   runtimeProfiles: Record<string, RuntimeProfile>;
+  orchestrationProfiles: Record<string, ProfileChoice>;
+  evaluationProfiles: Record<string, ProfileChoice>;
+  handoffProfiles: Record<string, ProfileChoice>;
 }
 
-const PACK_PATH = join(import.meta.dir, "..", "assets", "initializer-question-pack.v1.json");
+const PACK_PATH = join(import.meta.dir, "..", "assets", "initializer-question-pack.v2.json");
 
-export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionPackV1 {
+export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionPackV2 {
   if (!existsSync(path)) {
     throw new Error(`initializer-question-pack not found: ${path}`);
   }
 
-  const parsed = JSON.parse(readFileSync(path, "utf-8")) as InitializerQuestionPackV1;
-  if (parsed.version !== "initializer-question-pack.v1") {
+  const parsed = JSON.parse(readFileSync(path, "utf-8")) as InitializerQuestionPackV2;
+  if (parsed.version !== "initializer-question-pack.v2") {
     throw new Error(`Unsupported question pack version: ${parsed.version}`);
   }
 
@@ -50,7 +61,7 @@ export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionP
 
 export function inferPreferredPackageManager(
   planType: string,
-  pack: InitializerQuestionPackV1 = loadQuestionPack()
+  pack: InitializerQuestionPackV2 = loadQuestionPack()
 ): string {
   const resolved = resolvePlanType(planType);
   const tier = getPlanTier(resolved);
@@ -71,7 +82,7 @@ export function inferPreferredPackageManager(
 }
 
 export function getDecisionPointsByBatch(
-  pack: InitializerQuestionPackV1 = loadQuestionPack()
+  pack: InitializerQuestionPackV2 = loadQuestionPack()
 ): Record<number, DecisionPoint[]> {
   return pack.decisionPoints.reduce<Record<number, DecisionPoint[]>>((acc, decision) => {
     if (!acc[decision.batch]) acc[decision.batch] = [];
