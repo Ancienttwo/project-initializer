@@ -19,3 +19,7 @@
 ### What to Preserve
 ### What to Change
 ### Open Questions
+
+## Handoff Notes
+### Evidence to Carry Forward
+### Risks to Re-check

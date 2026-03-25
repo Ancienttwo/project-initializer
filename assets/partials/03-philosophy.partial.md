@@ -1,12 +1,13 @@
 ### 7. Development Protocol
 
-> **Core Philosophy**: Code is toilet paper when contracts change; rewrite over patch.
+> **Core Philosophy**: Code is toilet paper when contracts change; durable truth belongs in repo-local artifacts, not chat memory.
 
 #### The Layered Truth
 
-- **IMMUTABLE LAYER**: `specs/`, `contracts/`, `tests/`
+- **PRODUCT TRUTH**: `docs/spec.md`
+- **EXECUTION TRUTH**: `plans/`
+- **DONE TRUTH**: `tasks/contracts/`, `tasks/reviews/`, `.ai/harness/checks/latest.json`
 - **MUTABLE LAYER**: `src/`
-- Source of truth lives in the immutable layer.
 
 #### Response Protocol (Concise)
 
@@ -24,7 +25,7 @@ BUG_FIX_FLOW:
 ```
 
 Detailed playbooks:
-- `docs/reference-configs/ai-workflows.md`
-- `docs/reference-configs/development-protocol.md`
+- `docs/reference-configs/harness-overview.md`
+- `docs/reference-configs/sprint-contracts.md`
 
 ---

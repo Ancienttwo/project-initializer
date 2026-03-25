@@ -3,7 +3,7 @@
 
 > **Last Updated**: {{DATE}}
 > Use this file for milestone checkpoints only.
-> Active execution belongs in `tasks/todo.md`, `tasks/lessons.md`, and `tasks/research.md`.
+> Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.
 
 ## Milestones
 

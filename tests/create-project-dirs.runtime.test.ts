@@ -7,7 +7,7 @@ import { spawnSync } from "child_process";
 const ROOT = join(import.meta.dir, "..");
 
 describe("create-project-dirs runtime smoke", () => {
-  test("should scaffold contracts/template/spa-day artifacts", () => {
+  test("should scaffold 3.0 harness artifacts", () => {
     const cwd = mkdtempSync(join(tmpdir(), "create-project-dirs-"));
     try {
       const res = spawnSync("bash", [join(ROOT, "scripts/create-project-dirs.sh")], {
@@ -26,7 +26,14 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, "docs/reference-configs/evaluator-rubric.md"))).toBe(true);
       expect(existsSync(join(cwd, "docs/reference-configs/sprint-contracts.md"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/verify-contract.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "docs/spec.md"))).toBe(true);
+      expect(existsSync(join(cwd, "tasks/reviews"))).toBe(true);
+      expect(existsSync(join(cwd, ".ai/harness/checks/latest.json"))).toBe(true);
+      expect(existsSync(join(cwd, ".ai/harness/handoff/current.md"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/new-spec.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/new-sprint.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/prepare-handoff.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/verify-sprint.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-sync.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/ensure-task-workflow.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-workflow.sh"))).toBe(true);
@@ -46,7 +53,7 @@ describe("create-project-dirs runtime smoke", () => {
       const settingsTemplate = readFileSync(join(ROOT, "assets/hooks/settings.template.json"), "utf-8");
       expect(settings).toBe(settingsTemplate);
       expect(settings).toContain("trace-event.sh");
-      expect(settings).not.toContain("task-handoff.sh");
+      expect(settings).toContain("finalize-handoff.sh");
 
       const progress = readFileSync(join(cwd, "docs/PROGRESS.md"), "utf-8");
       expect(progress).toContain("milestone checkpoints only");

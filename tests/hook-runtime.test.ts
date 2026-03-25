@@ -673,7 +673,9 @@ describe("Hook runtime behavior", () => {
     try {
       initGitRepo(cwd);
       installHooks(cwd);
+      mkdirSync(join(cwd, "docs"), { recursive: true });
       mkdirSync(join(cwd, "plans"), { recursive: true });
+      writeFileSync(join(cwd, "docs/spec.md"), "# Product Spec\n");
 
       writeFileSync(
         join(cwd, "plans/plan-20260304-1300-demo.md"),
@@ -748,6 +750,8 @@ describe("Hook runtime behavior", () => {
     try {
       initGitRepo(cwd);
       installHooks(cwd);
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      writeFileSync(join(cwd, "docs/spec.md"), "# Product Spec\n");
 
       const res = runHook("prompt-guard.sh", cwd, {
         stdin: JSON.stringify({ user_message: "开始实现" }),
@@ -793,6 +797,8 @@ describe("Hook runtime behavior", () => {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       mkdirSync(join(cwd, "tasks"), { recursive: true });
       mkdirSync(join(cwd, "tasks/contracts"), { recursive: true });
+      mkdirSync(join(cwd, "tasks/reviews"), { recursive: true });
+      mkdirSync(join(cwd, ".ai/harness/checks"), { recursive: true });
       mkdirSync(join(cwd, "scripts"), { recursive: true });
 
       writeFileSync(
@@ -804,6 +810,11 @@ describe("Hook runtime behavior", () => {
         "# Task Execution Checklist (Primary)\n\n> **Source Plan**: plans/plan-20260304-1410-demo.md\n"
       );
       writeFileSync(join(cwd, "tasks/contracts/demo.contract.md"), "# contract\n");
+      writeFileSync(
+        join(cwd, "tasks/reviews/demo.review.md"),
+        "# Sprint Review: demo\n\n> **Recommendation**: pass\n"
+      );
+      writeFileSync(join(cwd, ".ai/harness/checks/latest.json"), "{}\n");
       writeFileSync(
         join(cwd, "scripts/verify-contract.sh"),
         "#!/bin/bash\nset -euo pipefail\necho \"[verify] ok\"\n"

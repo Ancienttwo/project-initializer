@@ -1,6 +1,6 @@
-# Task Contract: {{TASK_SLUG}}
+# Sprint Contract: {{TASK_SLUG}}
 
-> **Status**: Pending
+> **Status**: Active
 > **Plan**: {{PLAN_FILE}}
 > **Owner**: {{OWNER}}
 > **Last Updated**: {{TIMESTAMP}}
@@ -19,6 +19,7 @@ Describe the exact outcome this task must deliver.
 
 ```yaml
 allowed_paths:
+  - docs/spec.md
   - plans/
   - tasks/todo.md
   - tasks/contracts/{{TASK_SLUG}}.contract.md
@@ -32,14 +33,18 @@ allowed_paths:
 ```yaml
 exit_criteria:
   files_exist:
-    - src/modules/{{TASK_SLUG}}/index.ts
+    - docs/spec.md
+  artifacts_exist:
+    - .ai/harness/checks/latest.json
   tests_pass:
     - path: tests/unit/{{TASK_SLUG}}.test.ts
   commands_succeed:
     - bun run typecheck
-  files_contain:
-    - path: src/modules/{{TASK_SLUG}}/index.ts
-      pattern: "export"
+  qa_scores:
+    - dimension: functionality
+      min: 7
+  manual_checks:
+    - "Evaluator review file recommends pass"
 ```
 
 ## Acceptance Notes (Human Review)

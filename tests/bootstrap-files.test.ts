@@ -144,7 +144,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(settings).toContain("pre-edit-guard.sh");
     expect(settings).toContain("post-edit-guard.sh");
     expect(settings).toContain("prompt-guard.sh");
-    expect(settings).toContain("skill-factory-session-end.sh");
+    expect(settings).toContain("finalize-handoff.sh");
     expect(settings).toContain("post-bash.sh");
     expect(settings).toContain("trace-event.sh");
     expect(settings).toContain("context-pressure-hook.sh");
