@@ -20,7 +20,7 @@
     },
     {
       "version": "3.0.0",
-      "description": "Added read-only Claude auto memory intake, AutoDream-style memory diff signals, and SessionStart hook support"
+      "description": "Upgraded generated repos to a shared long-running harness with spec, sprint review, handoff, structured checks, and read-only Claude auto memory intake signals"
     }
   ],
   "generatedProjectStamp": {
