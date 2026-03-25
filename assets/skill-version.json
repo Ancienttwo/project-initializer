@@ -1,6 +1,6 @@
 {
-  "version": "2.4.0",
-  "templateVersion": "2.6.0",
+  "version": "3.0.0",
+  "templateVersion": "3.0.0",
   "compatibility": {
     "minClaudeCodeVersion": "1.0.0",
     "minBunVersion": "1.0.0"
@@ -17,6 +17,10 @@
     {
       "version": "2.4.0",
       "description": "Promoted cross-agent task-sync contracts, skill eval assets, and milestone-only progress tracking"
+    },
+    {
+      "version": "3.0.0",
+      "description": "Upgraded generated repos from tasks-first scaffolds to a shared long-running harness with spec, sprint review, handoff, and structured checks"
     }
   ],
   "generatedProjectStamp": {
