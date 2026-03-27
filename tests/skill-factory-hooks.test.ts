@@ -69,13 +69,30 @@ describe("Skill Factory hooks", () => {
   test("three similar sessions create a pending workflow proposal", () => {
     const { cwd, home } = setupProject("sf-proposal");
     try {
+      const projectDir = join(home, ".claude/projects/sf-proposal");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(join(memoryDir, "bug-fix.md"), "# Bug fix\n\n- Reproduce auth bugs before patching\n");
+      const startup = runInRepo(
+        cwd,
+        home,
+        ".claude/hooks/memory-intake.sh",
+        [],
+        JSON.stringify({
+          hook_event_name: "SessionStart",
+          source: "startup",
+          transcript_path: join(projectDir, "transcript.jsonl"),
+        })
+      );
+      expect(startup.status).toBe(0);
+
       for (let i = 0; i < 3; i += 1) {
         const prompt = runInRepo(
           cwd,
           home,
           ".claude/hooks/prompt-guard.sh",
           [],
-          JSON.stringify({ user_message: "implement a bug fix for auth" })
+          JSON.stringify({ prompt: "implement a bug fix for auth" })
         );
         expect(prompt.status).toBe(0);
 
@@ -93,9 +110,51 @@ describe("Skill Factory hooks", () => {
           proposal.status === "pending"
       );
       expect(workflow).toBeDefined();
+      expect(workflow.reason).toContain("evidence score");
+      expect(workflow.reason).toContain("Auto memory corroborates");
+      expect(workflow.source_patterns.evidence_score).toBeGreaterThanOrEqual(3);
+      expect(workflow.source_patterns.memory_corroboration_count).toBeGreaterThan(0);
 
       const state = JSON.parse(readFileSync(join(cwd, ".claude/.skill-factory-state.json"), "utf-8"));
       expect(state.patterns.workflow["bug-fix"].count).toBeGreaterThanOrEqual(3);
+      expect(state.memory.corroborations["bug-fix"].count).toBeGreaterThan(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("memory themes alone do not create proposals without repo-local repetition", () => {
+    const { cwd, home } = setupProject("sf-memory-only");
+    try {
+      const projectDir = join(home, ".claude/projects/sf-memory-only");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(
+        join(memoryDir, "MEMORY.md"),
+        ["# Memory", "", "## Testing conventions", "- Use shared fixtures", "- Name test files with .test.ts"].join("\n")
+      );
+
+      const startup = runInRepo(
+        cwd,
+        home,
+        ".claude/hooks/memory-intake.sh",
+        [],
+        JSON.stringify({
+          hook_event_name: "SessionStart",
+          source: "startup",
+          transcript_path: join(projectDir, "transcript.jsonl"),
+        })
+      );
+      expect(startup.status).toBe(0);
+
+      const check = runInRepo(cwd, home, "scripts/skill-factory-check.sh");
+      expect(check.status).toBe(0);
+      expect(check.stdout).toContain("Memory themes: testing-conventions");
+      expect(check.stdout).toContain("Memory corroborations: none");
+
+      const proposals = JSON.parse(readFileSync(join(home, ".claude/.skill-proposals.json"), "utf-8"));
+      expect(proposals.proposals).toEqual([]);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
       rmSync(home, { recursive: true, force: true });
@@ -160,6 +219,10 @@ describe("Skill Factory hooks", () => {
       );
       expect(marker.skill_slug).toBe("bug-fix-workflow");
       expect(marker.skill_type).toBe("workflow");
+      const meta = JSON.parse(
+        readFileSync(join(home, ".claude/skills/bug-fix-workflow/.factory/meta.json"), "utf-8")
+      );
+      expect(meta.source_pattern_key).toBe("bug-fix");
       const openaiYaml = readFileSync(
         join(home, ".claude/skills/bug-fix-workflow/agents/openai.yaml"),
         "utf-8"
@@ -196,6 +259,7 @@ describe("Skill Factory hooks", () => {
       const checkBefore = runInRepo(cwd, home, "scripts/skill-factory-check.sh");
       expect(checkBefore.status).toBe(0);
       expect(checkBefore.stdout).toContain("Optimization hints: none");
+      expect(checkBefore.stdout).toContain("Skill stats: bug-fix-workflow activity=3 feedback=0 readiness=LOW");
 
       for (let i = 0; i < 3; i += 1) {
         const feedback = runInRepo(cwd, home, "scripts/skill-factory-check.sh", [
@@ -222,6 +286,66 @@ describe("Skill Factory hooks", () => {
       const checkAfter = runInRepo(cwd, home, "scripts/skill-factory-check.sh");
       expect(checkAfter.status).toBe(0);
       expect(checkAfter.stdout).toContain("bug-fix-workflow:3");
+      expect(checkAfter.stdout).toContain("Workflow readiness: bug-fix count=0 corrections=3 evidence=6 readiness=HIGH");
+      expect(checkAfter.stdout).toContain("Skill stats: bug-fix-workflow activity=3 feedback=3 readiness=HIGH");
+
+      const state = JSON.parse(readFileSync(join(cwd, ".claude/.skill-factory-state.json"), "utf-8"));
+      expect(state.pattern_feedback.workflow["bug-fix"].correction_count).toBe(3);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("create script warns on malformed rubric input but still creates the skill", () => {
+    const { cwd, home } = setupProject("sf-rubric-warning");
+    try {
+      const proposalsPath = join(home, ".claude/.skill-proposals.json");
+      writeFileSync(
+        proposalsPath,
+        JSON.stringify(
+          {
+            proposals: [
+              {
+                id: "workflow-feature-1",
+                type: "workflow",
+                key: "feature",
+                title: "Create a workflow skill for feature",
+                repo_root: cwd,
+                reason: "Detected repeated feature sessions.",
+                status: "pending",
+                skill_slug: "feature-workflow",
+                source_patterns: { count: 3, evidence_score: 3 },
+                created_at: 1710000000,
+              },
+            ],
+          },
+          null,
+          2
+        )
+      );
+
+      const create = runInRepo(cwd, home, "scripts/skill-factory-create.sh", [
+        "--proposal",
+        "workflow-feature-1",
+        "--title",
+        "Feature Workflow",
+        "--goal",
+        "Capture the repeated feature workflow used in this project.",
+        "--outputs",
+        "- Updated code\n- Verification notes",
+        "--boundaries",
+        "- Preserve the repo contract",
+        "--test-prompt",
+        "",
+        "--question",
+        '{"id":"q1"}',
+      ]);
+
+      expect(create.status).toBe(0);
+      expect(create.stderr).toContain("rubric testPrompts contains a blank prompt");
+      expect(create.stderr).toContain("rubric question is missing one of");
+      expect(existsSync(join(home, ".claude/skills/feature-workflow/SKILL.md"))).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
       rmSync(home, { recursive: true, force: true });

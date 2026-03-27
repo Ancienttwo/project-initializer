@@ -412,6 +412,96 @@ describe("Workflow helper scripts", () => {
     }
   });
 
+  test("verify-contract should ignore allowed_paths metadata before exit criteria", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-allowed-paths");
+    try {
+      mkdirSync(join(cwd, "scripts"), { recursive: true });
+      mkdirSync(join(cwd, "src"), { recursive: true });
+      copyHelpers(cwd);
+
+      writeFileSync(join(cwd, "src/index.ts"), "export const value = 1;\n");
+      writeFileSync(
+        join(cwd, "task.contract.md"),
+        [
+          "# Task Contract: allowed-paths",
+          "",
+          "> **Status**: Pending",
+          "> **Review File**: `tasks/reviews/allowed-paths.review.md`",
+          "",
+          "## Allowed Paths",
+          "",
+          "```yaml",
+          "allowed_paths:",
+          "  - src/",
+          "  - tests/",
+          "```",
+          "",
+          "## Exit Criteria",
+          "",
+          "```yaml",
+          "exit_criteria:",
+          "  files_exist:",
+          "    - src/index.ts",
+          "  commands_succeed:",
+          "    - test -f src/index.ts",
+          "```",
+          "",
+        ].join("\n")
+      );
+
+      const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
+      expect(res.status).toBe(0);
+      expect(readFileSync(join(cwd, "task.contract.md"), "utf-8")).toContain("> **Status**: Fulfilled");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("prepare-handoff should write harness handoff using workflow-state helpers", () => {
+    const cwd = tmpWorkspace("helper-prepare-handoff");
+    try {
+      mkdirSync(join(cwd, ".claude"), { recursive: true });
+      mkdirSync(join(cwd, ".ai/hooks/lib"), { recursive: true });
+      mkdirSync(join(cwd, "plans"), { recursive: true });
+      mkdirSync(join(cwd, "tasks/contracts"), { recursive: true });
+      mkdirSync(join(cwd, "tasks"), { recursive: true });
+      copyHelpers(cwd);
+
+      copyFileSync(
+        join(ROOT, "assets/hooks/lib/workflow-state.sh"),
+        join(cwd, ".ai/hooks/lib/workflow-state.sh")
+      );
+
+      writeFileSync(
+        join(cwd, "plans/plan-20260327-2200-alpha.md"),
+        [
+          "# Plan: alpha",
+          "",
+          "> **Status**: Executing",
+          "",
+          "## Task Breakdown",
+          "- [ ] Finish handoff",
+        ].join("\n")
+      );
+      writeFileSync(join(cwd, ".claude/.active-plan"), "plans/plan-20260327-2200-alpha.md");
+      writeFileSync(join(cwd, "tasks/contracts/alpha.contract.md"), "# Task Contract: alpha\n");
+      writeFileSync(join(cwd, "tasks/todo.md"), "# Task Execution Checklist (Primary)\n\n- [ ] Finish handoff\n");
+
+      const res = run("bash", ["scripts/prepare-handoff.sh", "manual-checkpoint"], cwd);
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("Updated .ai/harness/handoff/current.md");
+
+      const handoff = readFileSync(join(cwd, ".ai/harness/handoff/current.md"), "utf-8");
+      expect(handoff).toContain("**Reason**: manual-checkpoint");
+      expect(handoff).toContain("Plan: plans/plan-20260327-2200-alpha.md");
+      expect(handoff).toContain("Contract: tasks/contracts/alpha.contract.md");
+      expect(handoff).toContain("Checks: .ai/harness/checks/latest.json");
+      expect(handoff).toContain("Next recommended action: Finish handoff");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   test("ensure-task-workflow should create a draft plan when none exists", () => {
     const cwd = tmpWorkspace("helper-ensure-workflow");
     try {
@@ -430,6 +520,8 @@ describe("Workflow helper scripts", () => {
       const todo = readFileSync(join(cwd, "tasks/todo.md"), "utf-8");
       expect(todo).toContain("**Source Plan**: (none)");
       expect(todo).toContain("**Status**: Idle");
+      expect(existsSync(join(cwd, ".claude/templates/spec.template.md"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/templates/review.template.md"))).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -449,6 +541,8 @@ describe("Workflow helper scripts", () => {
       copyFileSync(join(TEMPLATE_DIR, "plan.template.md"), join(cwd, ".claude/templates/plan.template.md"));
       copyFileSync(join(TEMPLATE_DIR, "research.template.md"), join(cwd, ".claude/templates/research.template.md"));
       copyFileSync(join(TEMPLATE_DIR, "contract.template.md"), join(cwd, ".claude/templates/contract.template.md"));
+      copyFileSync(join(TEMPLATE_DIR, "spec.template.md"), join(cwd, ".claude/templates/spec.template.md"));
+      copyFileSync(join(TEMPLATE_DIR, "review.template.md"), join(cwd, ".claude/templates/review.template.md"));
 
       writeFileSync(join(cwd, "tasks/todo.md"), "# Legacy Todo\n\n- [ ] old item\n");
       writeFileSync(join(cwd, "tasks/lessons.md"), "# Lessons\n");

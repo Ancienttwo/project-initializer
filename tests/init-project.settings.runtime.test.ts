@@ -30,6 +30,7 @@ describe("init-project settings runtime", () => {
       const settings = readFileSync(join(cwd, ".claude/settings.json"), "utf-8");
       const template = readFileSync(join(ROOT, "assets/hooks/settings.template.json"), "utf-8");
       expect(settings).toBe(template);
+      expect(settings).toContain("memory-intake.sh");
       expect(settings).toContain("trace-event.sh");
     } finally {
       rmSync(cwd, { recursive: true, force: true });

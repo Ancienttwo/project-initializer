@@ -109,20 +109,22 @@ hook_get_file_path() {
   local arg="${1:-}"
   local parsed=""
 
-  parsed="$(hook_json_get '.tool_input.file_path' '')"
-  if [[ -n "$parsed" ]]; then
-    printf '%s' "$parsed"
-    return
-  fi
+  for path in '.file_path' '.tool_input.file_path' '.trigger_file_path' '.parent_file_path'; do
+    parsed="$(hook_json_get "$path" '')"
+    if [[ -n "$parsed" ]]; then
+      printf '%s' "$parsed"
+      return
+    fi
+
+    parsed="$(hook_parse_json_arg "$arg" "$path")"
+    if [[ -n "$parsed" ]]; then
+      printf '%s' "$parsed"
+      return
+    fi
+  done
 
   if [[ -n "${CLAUDE_FILE_PATH:-}" ]]; then
     printf '%s' "$CLAUDE_FILE_PATH"
-    return
-  fi
-
-  parsed="$(hook_parse_json_arg "$arg" '.tool_input.file_path')"
-  if [[ -n "$parsed" ]]; then
-    printf '%s' "$parsed"
     return
   fi
 
@@ -133,24 +135,140 @@ hook_get_prompt() {
   local arg="${1:-}"
   local parsed=""
 
-  parsed="$(hook_json_get '.user_message' '')"
-  if [[ -n "$parsed" ]]; then
-    printf '%s' "$parsed"
-    return
-  fi
-
   if [[ -n "${PROMPT:-}" ]]; then
     printf '%s' "$PROMPT"
     return
   fi
 
-  parsed="$(hook_parse_json_arg "$arg" '.user_message')"
+  for path in '.prompt' '.user_message'; do
+    parsed="$(hook_json_get "$path" '')"
+    if [[ -n "$parsed" ]]; then
+      printf '%s' "$parsed"
+      return
+    fi
+
+    parsed="$(hook_parse_json_arg "$arg" "$path")"
+    if [[ -n "$parsed" ]]; then
+      printf '%s' "$parsed"
+      return
+    fi
+  done
+
+  printf '%s' "$arg"
+}
+
+hook_get_session_id() {
+  local arg="${1:-}"
+  local parsed=""
+
+  parsed="$(hook_json_get '.session_id' '')"
   if [[ -n "$parsed" ]]; then
     printf '%s' "$parsed"
     return
   fi
 
-  printf '%s' "$arg"
+  parsed="$(hook_parse_json_arg "$arg" '.session_id')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  printf '%s' "${CLAUDE_SESSION_ID:-${CODEX_SESSION_ID:-}}"
+}
+
+hook_get_transcript_path() {
+  local arg="${1:-}"
+  local parsed=""
+
+  parsed="$(hook_json_get '.transcript_path' '')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  parsed="$(hook_parse_json_arg "$arg" '.transcript_path')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  printf '%s' "${CLAUDE_TRANSCRIPT_PATH:-}"
+}
+
+hook_get_cwd() {
+  local arg="${1:-}"
+  local parsed=""
+
+  parsed="$(hook_json_get '.cwd' '')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  parsed="$(hook_parse_json_arg "$arg" '.cwd')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  printf '%s' "${HOOK_REPO_ROOT:-$(pwd)}"
+}
+
+hook_get_session_source() {
+  local arg="${1:-}"
+  local parsed=""
+
+  parsed="$(hook_json_get '.source' '')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  parsed="$(hook_parse_json_arg "$arg" '.source')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  printf '%s' "${CLAUDE_SESSION_SOURCE:-}"
+}
+
+hook_get_memory_type() {
+  local arg="${1:-}"
+  local parsed=""
+
+  parsed="$(hook_json_get '.memory_type' '')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  parsed="$(hook_parse_json_arg "$arg" '.memory_type')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  printf '%s' "${CLAUDE_MEMORY_TYPE:-}"
+}
+
+hook_get_load_reason() {
+  local arg="${1:-}"
+  local parsed=""
+
+  parsed="$(hook_json_get '.load_reason' '')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  parsed="$(hook_parse_json_arg "$arg" '.load_reason')"
+  if [[ -n "$parsed" ]]; then
+    printf '%s' "$parsed"
+    return
+  fi
+
+  printf '%s' "${CLAUDE_LOAD_REASON:-}"
 }
 
 hook_get_write_payload() {

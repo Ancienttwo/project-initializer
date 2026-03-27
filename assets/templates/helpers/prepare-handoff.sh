@@ -7,7 +7,7 @@ cd "$SCRIPT_DIR/.."
 if [[ -f ".ai/hooks/lib/workflow-state.sh" ]]; then
   # shellcheck source=/dev/null
   . ".ai/hooks/lib/workflow-state.sh"
-  workflow_write_handoff "${1:-manual}" 
+  workflow_write_handoff "${1:-manual}"
   echo "Updated $(workflow_handoff_file)"
   exit 0
 fi

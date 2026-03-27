@@ -34,6 +34,7 @@ describe("Bootstrap Script Contracts", () => {
 
   test("create-project-dirs should create tasks primary files", () => {
     const content = read("scripts/create-project-dirs.sh");
+    const sharedLib = read("scripts/lib/project-init-lib.sh");
 
     expect(content).toContain("mkdir -p tasks");
     expect(content).toContain("mkdir -p tasks/archive");
@@ -43,31 +44,25 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("cat > tasks/lessons.md");
     expect(content).toContain("cat > tasks/research.md");
     expect(content).not.toContain("docs/TODO.md");
-    expect(content).toContain("scripts/new-plan.sh");
-    expect(content).toContain("scripts/plan-to-todo.sh");
-    expect(content).toContain("scripts/archive-workflow.sh");
-    expect(content).toContain("scripts/verify-contract.sh");
-    expect(content).toContain("scripts/check-task-sync.sh");
-    expect(content).toContain("scripts/ensure-task-workflow.sh");
-    expect(content).toContain("scripts/check-task-workflow.sh");
-    expect(content).toContain("scripts/skill-factory-create.sh");
-    expect(content).toContain("scripts/skill-factory-check.sh");
-    expect(content).toContain("check:task-sync");
-    expect(content).toContain("check:task-workflow");
-    expect(content).toContain("contract.template.md");
-    expect(content).toContain("harness-overview.md");
-    expect(content).toContain("new-spec.sh");
-    expect(content).toContain("new-sprint.sh");
-    expect(content).toContain("prepare-handoff.sh");
-    expect(content).toContain("verify-sprint.sh");
-    expect(content).toContain("docs/spec.md");
-    expect(content).toContain("tasks/reviews");
-    expect(content).toContain(".ai/harness/checks");
-    expect(content).toContain(".ai/harness/handoff");
+    expect(sharedLib).toContain("new-plan.sh");
+    expect(sharedLib).toContain("plan-to-todo.sh");
+    expect(sharedLib).toContain("archive-workflow.sh");
+    expect(sharedLib).toContain("verify-contract.sh");
+    expect(sharedLib).toContain("check-task-sync.sh");
+    expect(sharedLib).toContain("ensure-task-workflow.sh");
+    expect(sharedLib).toContain("check-task-workflow.sh");
+    expect(sharedLib).toContain("skill-factory-create.sh");
+    expect(sharedLib).toContain("skill-factory-check.sh");
+    expect(sharedLib).toContain("check:task-sync");
+    expect(sharedLib).toContain("check:task-workflow");
+    expect(sharedLib).toContain("contract.template.md");
+    expect(content).toContain("spa-day-protocol.md");
     expect(content).toContain('cp "$ASSETS_HOOKS_DIR/settings.template.json" .claude/settings.json');
     expect(content).toContain("mkdir -p .ai/hooks");
     expect(content).toContain("settings.template.json");
-    expect(content).toContain(".skill-factory-state.json");
+    expect(sharedLib).toContain(".skill-factory-state.json");
+    expect(sharedLib).toContain(".memory-context.json");
+    expect(sharedLib).toContain(".memory-snapshot.json");
     expect(content).toContain("install_skill_factory_files");
     expect(content).toContain("Project Milestones");
     expect(content).toContain("milestone checkpoints only");
@@ -79,6 +74,7 @@ describe("Bootstrap Script Contracts", () => {
 
   test("init-project should scaffold tasks primary workflow", () => {
     const content = read("scripts/init-project.sh");
+    const sharedLib = read("scripts/lib/project-init-lib.sh");
 
     expect(content).toContain("mkdir -p tasks");
     expect(content).toContain("mkdir -p tasks/archive");
@@ -88,30 +84,25 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("cat > tasks/lessons.md");
     expect(content).toContain("tasks/research.md");
     expect(content).not.toContain("docs/TODO.md");
-    expect(content).toContain("install_workflow_helpers");
-    expect(content).toContain("install_workflow_templates");
-    expect(content).toContain("contract.template.md");
-    expect(content).toContain("verify-contract.sh");
-    expect(content).toContain("check-task-sync.sh");
-    expect(content).toContain("ensure-task-workflow.sh");
-    expect(content).toContain("check-task-workflow.sh");
-    expect(content).toContain("install_skill_factory_assets");
-    expect(content).toContain("scripts/skill-factory-create.sh");
-    expect(content).toContain("scripts/skill-factory-check.sh");
-    expect(content).toContain("check:task-sync");
-    expect(content).toContain("check:task-workflow");
-    expect(content).toContain("new-spec.sh");
-    expect(content).toContain("new-sprint.sh");
-    expect(content).toContain("prepare-handoff.sh");
-    expect(content).toContain("verify-sprint.sh");
-    expect(content).toContain("docs/spec.md");
-    expect(content).toContain("tasks/reviews");
-    expect(content).toContain(".ai/harness/checks");
-    expect(content).toContain(".ai/harness/handoff");
+    expect(content).toContain("pi_install_helpers");
+    expect(content).toContain("pi_install_templates");
+    expect(sharedLib).toContain("contract.template.md");
+    expect(sharedLib).toContain("verify-contract.sh");
+    expect(sharedLib).toContain("check-task-sync.sh");
+    expect(sharedLib).toContain("ensure-task-workflow.sh");
+    expect(sharedLib).toContain("check-task-workflow.sh");
+    expect(content).toContain("pi_install_skill_factory");
+    expect(sharedLib).toContain("skill-factory-create.sh");
+    expect(sharedLib).toContain("skill-factory-check.sh");
+    expect(sharedLib).toContain("check:task-sync");
+    expect(sharedLib).toContain("check:task-workflow");
+    expect(content).toContain("spa-day-protocol.md");
     expect(content).toContain('cp "$ASSETS_HOOKS_DIR/settings.template.json" .claude/settings.json');
     expect(content).toContain("settings.template.json");
     expect(content).toContain("mkdir -p .ai/hooks");
-    expect(content).toContain(".skill-factory-state.json");
+    expect(sharedLib).toContain(".skill-factory-state.json");
+    expect(sharedLib).toContain(".memory-context.json");
+    expect(sharedLib).toContain(".memory-snapshot.json");
     expect(content).toContain("Project Milestones");
     expect(content).toContain("milestone checkpoints only");
     expect(content).toContain("**Source Plan**: (none)");
@@ -149,6 +140,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(hookCommands).toContain("run-hook.sh");
     expect(settings).toContain(".ai/hooks/run-hook.sh");
     expect(settings).toContain("worktree-guard.sh");
+    expect(settings).toContain("memory-intake.sh");
     expect(settings).toContain("pre-edit-guard.sh");
     expect(settings).toContain("post-edit-guard.sh");
     expect(settings).toContain("prompt-guard.sh");

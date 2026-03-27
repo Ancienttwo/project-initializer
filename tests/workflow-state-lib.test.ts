@@ -23,5 +23,17 @@ describe("workflow-state shared library", () => {
     expect(content).toContain("has_research_for_new_plan()");
     expect(content).toContain("validate_plan_transition()");
     expect(content).toContain("contract_references_path()");
+    expect(content).toContain("next_task=\"$(");
+    expect(content).toContain("grep -E '^[[:space:]]*-[[:space:]]\\[[[:space:]]\\][[:space:]]+' tasks/todo.md 2>/dev/null || true");
+  });
+
+  test("verify-sprint helper should use the same review pass pattern as workflow-state", () => {
+    const helper = readFileSync(
+      join(ROOT, "assets", "templates", "helpers", "verify-sprint.sh"),
+      "utf-8"
+    );
+
+    expect(helper).toContain("^> \\*\\*Recommendation\\*\\*:[[:space:]]*pass");
+    expect(helper).not.toContain("^\\> \\*\\*Recommendation\\*\\*:[[:space:]]*pass");
   });
 });

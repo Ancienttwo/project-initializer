@@ -20,6 +20,6 @@ This repo uses a shared long-running harness. The durable workflow lives in repo
 ## Session Boundaries
 
 - Exploration and planning are allowed before a contract exists.
-- Implementation requires: `docs/spec.md`, an approved plan, and an active sprint contract.
-- Claiming completion requires: contract verification evidence plus a passing review artifact.
-- Stopping a session should refresh `.ai/harness/handoff/current.md`.
+- Implementation should prefer `docs/spec.md`, an approved plan, and an active sprint contract.
+- Claiming completion should include contract verification evidence plus a passing review artifact.
+- Stopping a session should refresh `.ai/harness/handoff/current.md` for easier resume.

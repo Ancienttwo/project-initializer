@@ -40,3 +40,16 @@ Core rules (canonical source: see Workflow Orchestration section below):
 - `docs/reference-configs/sprint-contracts.md`
 - `docs/reference-configs/evaluator-rubric.md`
 - `docs/reference-configs/handoff-protocol.md`
+- `docs/reference-configs/changelog-versioning.md`
+- `docs/reference-configs/git-strategy.md`
+- `docs/reference-configs/release-deploy.md`
+
+{{#IF FACTOR_FACTORY_ENABLED}}
+### Factor Research Protocol
+
+- `tasks/factors/registry.json` is the authoritative factor inventory for Plan G projects.
+- Use `bash scripts/factor-lab-new.sh --name <slug>` to create a candidate workspace.
+- Use `bash scripts/factor-lab-promote.sh --name <slug>` only after `hypothesis.md` and `backtest-summary.md` exist.
+- Use `bash scripts/factor-lab-reject.sh --name <slug> --reason "<reason>"` to reject a candidate with an auditable reason.
+- Use `bash scripts/factor-lab-check.sh` to validate registry state, candidate completeness, and promoted directory drift.
+{{/IF}}

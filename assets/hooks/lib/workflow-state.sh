@@ -521,7 +521,6 @@ workflow_contract_allows_path() {
 
   return 1
 }
-
 workflow_write_handoff() {
   local reason="${1:-session-stop}"
   local handoff_file active_plan active_contract active_review checks_file next_task changed_files diff_stat spec_file
@@ -536,17 +535,24 @@ workflow_write_handoff() {
   mkdir -p "$(dirname "$handoff_file")"
 
   next_task="$(
-    grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null \
+    {
+      grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null || true
+    } \
       | head -1 \
       | sed -E 's/^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+//'
   )"
   next_task="${next_task:-(none)}"
 
-  changed_files="$(git diff --name-only HEAD 2>/dev/null | head -10)"
-  changed_files="${changed_files:-(none)}"
+  if is_git_repo; then
+    changed_files="$( (git diff --name-only HEAD 2>/dev/null || true) | head -10 )"
+    changed_files="${changed_files:-(none)}"
 
-  diff_stat="$(git diff --shortstat HEAD 2>/dev/null | tr -d '\n')"
-  diff_stat="${diff_stat:-no uncommitted diff against HEAD}"
+    diff_stat="$( (git diff --shortstat HEAD 2>/dev/null || true) | tr -d '\n' )"
+    diff_stat="${diff_stat:-no uncommitted diff against HEAD}"
+  else
+    changed_files="(none)"
+    diff_stat="git repository not detected"
+  fi
 
   cat > "$handoff_file" <<EOF_HANDOFF
 # Harness Handoff

@@ -21,6 +21,7 @@ describe("Hook recursive copy", () => {
       expect(res.status).toBe(0);
 
       expect(existsSync(join(repo, ".claude/hooks/lib/workflow-state.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/hooks/lib/memory-state.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/lib/session-state.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/lib/skill-factory.sh"))).toBe(true);
     } finally {

@@ -215,10 +215,25 @@ previous_status="${previous_status:-Pending}"
 
 yaml_block="$(
   awk '
-    BEGIN { in_block = 0; printed = 0 }
-    /^```yaml[[:space:]]*$/ && printed == 0 { in_block = 1; next }
-    /^```[[:space:]]*$/ && in_block == 1 { printed = 1; in_block = 0; exit }
-    in_block == 1 { print }
+    BEGIN { in_block = 0; block = ""; found = 0 }
+    /^```yaml[[:space:]]*$/ {
+      in_block = 1
+      block = ""
+      next
+    }
+    /^```[[:space:]]*$/ && in_block == 1 {
+      if (block ~ /(^|[[:space:]])exit_criteria:/) {
+        printf "%s", block
+        found = 1
+        exit
+      }
+      in_block = 0
+      block = ""
+      next
+    }
+    in_block == 1 {
+      block = block $0 ORS
+    }
   ' "$contract_file"
 )"
 

@@ -1,9 +1,10 @@
 #!/bin/bash
-# Migrate an existing project to project-initializer workflow conventions.
-# - Project hooks source of truth: .claude/settings.json
-# - Hook scripts synced from assets/hooks
-# - docs/TODO.md removed (tasks/todo.md is canonical)
-# - 6-phase workflow files and helpers installed
+# Migrate an existing project to the 3.0 project-initializer harness model.
+# - Shared hook source of truth: .ai/hooks/
+# - Claude adapter: .claude/settings.json
+# - Stable product truth: docs/spec.md
+# - Active-plan source of truth: plans/
+# - Sprint artifacts: tasks/contracts/, tasks/reviews/, .ai/harness/*
 #
 # Usage:
 #   bash scripts/migrate-project-template.sh --repo /path/to/repo --dry-run
@@ -13,10 +14,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PI_LIB_DIR="$SCRIPT_DIR/lib"
+if [[ -f "$PI_LIB_DIR/project-init-lib.sh" ]]; then
+  # shellcheck source=/dev/null
+  . "$PI_LIB_DIR/project-init-lib.sh"
+fi
 HOOK_ASSETS_DIR="$SKILL_ROOT/assets/hooks"
 TEMPLATE_ASSETS_DIR="$SKILL_ROOT/assets/templates"
 HELPER_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/helpers"
 SKILL_FACTORY_ASSETS_DIR="$SKILL_ROOT/assets/skill-factory"
+FACTOR_FACTORY_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/factor-factory"
 JQ_BIN="${PROJECT_INITIALIZER_JQ_BIN:-jq}"
 
 MODE="dry-run"
@@ -129,25 +136,6 @@ fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2) + "\n");
 NODE_EOF
 }
 
-resolve_js_runtime() {
-  if command -v node >/dev/null 2>&1; then
-    printf 'node'
-    return 0
-  fi
-
-  if command -v bun >/dev/null 2>&1; then
-    printf 'bun'
-    return 0
-  fi
-
-  if [[ -x "${HOME}/.bun/bin/bun" ]]; then
-    printf '%s' "${HOME}/.bun/bin/bun"
-    return 0
-  fi
-
-  return 1
-}
-
 run_or_echo() {
   local cmd="$1"
   if [[ "$MODE" == "apply" ]]; then
@@ -166,64 +154,16 @@ backup_if_exists() {
 
 ensure_runtime_gitignore_block() {
   local file_path="$1"
-  local begin_marker="# BEGIN: claude-runtime-temp (managed by project-initializer)"
-  local end_marker="# END: claude-runtime-temp"
-
-  local block
-  block=$(cat <<'BLOCK_EOF'
-# BEGIN: claude-runtime-temp (managed by project-initializer)
-.claude/settings.local.json
-.claude/.atomic_pending
-.claude/.session-id
-.claude/.tool-call-count
-.claude/.session-handoff.md
-.claude/.task-state.json
-.claude/.task-handoff.md
-.claude/.skill-factory-state.json
-.claude/.skill-factory-session.json
-.claude/.skill-factory-session-marker.json
-.claude/.skill-factory-user/
-.claude/.context-pressure/
+  local extra_entries
+  extra_entries=$(cat <<'EOF_EXTRA'
 .claude/.active-plan
 .claude/.plan-state/
-.claude/*.tmp
-.claude/*.bak
-.claude/*.bak.*
-.claude/*.backup-*
-# END: claude-runtime-temp
-BLOCK_EOF
+EOF_EXTRA
 )
-
-  if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] ensure managed runtime block in $file_path"
-    return
+  if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
+    extra_entries="${extra_entries}"$'\n'"$(pi_factor_factory_gitignore_entries)"
   fi
-
-  mkdir -p "$(dirname "$file_path")"
-  if [[ ! -f "$file_path" ]]; then
-    touch "$file_path"
-  fi
-
-  if ! grep -Fq "$begin_marker" "$file_path"; then
-    printf "\n%s\n" "$block" >> "$file_path"
-    return
-  fi
-
-  local tmp_file
-  tmp_file="$(mktemp)"
-  awk -v begin="$begin_marker" -v end="$end_marker" -v repl="$block" '
-    $0 == begin {
-      print repl
-      skipping = 1
-      next
-    }
-    skipping && $0 == end {
-      skipping = 0
-      next
-    }
-    !skipping { print }
-  ' "$file_path" > "$tmp_file"
-  mv "$tmp_file" "$file_path"
+  pi_ensure_gitignore_block "$file_path" "" "$extra_entries" "$MODE"
 }
 
 ensure_gitignore_entry() {
@@ -242,39 +182,13 @@ ensure_gitignore_entry() {
 
 install_templates() {
   local repo="$1"
-  local templates_dir="$repo/.claude/templates"
-
-  run_or_echo "mkdir -p \"$templates_dir\""
-
-  if [[ -f "$TEMPLATE_ASSETS_DIR/research.template.md" ]]; then
-    run_or_echo "cp \"$TEMPLATE_ASSETS_DIR/research.template.md\" \"$templates_dir/research.template.md\""
-  fi
-  if [[ -f "$TEMPLATE_ASSETS_DIR/plan.template.md" ]]; then
-    run_or_echo "cp \"$TEMPLATE_ASSETS_DIR/plan.template.md\" \"$templates_dir/plan.template.md\""
-  fi
-  if [[ -f "$TEMPLATE_ASSETS_DIR/contract.template.md" ]]; then
-    run_or_echo "cp \"$TEMPLATE_ASSETS_DIR/contract.template.md\" \"$templates_dir/contract.template.md\""
-  fi
+  pi_install_templates "$repo" "$TEMPLATE_ASSETS_DIR" "$MODE"
 }
 
 install_helpers() {
   local repo="$1"
-  local scripts_dir="$repo/scripts"
-
-  run_or_echo "mkdir -p \"$scripts_dir\""
-
   if [[ -d "$HELPER_ASSETS_DIR" ]]; then
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/new-plan.sh\" \"$scripts_dir/new-plan.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/plan-to-todo.sh\" \"$scripts_dir/plan-to-todo.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/archive-workflow.sh\" \"$scripts_dir/archive-workflow.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/verify-contract.sh\" \"$scripts_dir/verify-contract.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/check-task-sync.sh\" \"$scripts_dir/check-task-sync.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/ensure-task-workflow.sh\" \"$scripts_dir/ensure-task-workflow.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/check-task-workflow.sh\" \"$scripts_dir/check-task-workflow.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/switch-plan.sh\" \"$scripts_dir/switch-plan.sh\""
-    if [[ "$MODE" == "apply" ]]; then
-      chmod +x "$scripts_dir/new-plan.sh" "$scripts_dir/plan-to-todo.sh" "$scripts_dir/archive-workflow.sh" "$scripts_dir/verify-contract.sh" "$scripts_dir/check-task-sync.sh" "$scripts_dir/ensure-task-workflow.sh" "$scripts_dir/check-task-workflow.sh" "$scripts_dir/switch-plan.sh" || true
-    fi
+    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
   fi
@@ -282,25 +196,7 @@ install_helpers() {
 
 install_skill_factory_files() {
   local repo="$1"
-  local scripts_dir="$repo/scripts"
-  local skill_factory_dir="$repo/.claude/skill-factory"
-
-  run_or_echo "mkdir -p \"$scripts_dir\" \"$skill_factory_dir\""
-
-  if [[ -d "$SKILL_FACTORY_ASSETS_DIR" ]]; then
-    run_or_echo "cp -R \"$SKILL_FACTORY_ASSETS_DIR\"/. \"$skill_factory_dir/\""
-  fi
-
-  if [[ -f "$SKILL_ROOT/scripts/skill-factory-create.sh" ]]; then
-    run_or_echo "cp \"$SKILL_ROOT/scripts/skill-factory-create.sh\" \"$scripts_dir/skill-factory-create.sh\""
-  fi
-  if [[ -f "$SKILL_ROOT/scripts/skill-factory-check.sh" ]]; then
-    run_or_echo "cp \"$SKILL_ROOT/scripts/skill-factory-check.sh\" \"$scripts_dir/skill-factory-check.sh\""
-  fi
-
-  if [[ "$MODE" == "apply" ]]; then
-    chmod +x "$scripts_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-check.sh" 2>/dev/null || true
-  fi
+  pi_install_skill_factory "$repo" "$SKILL_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
 }
 
 ensure_task_sync_package_script() {
@@ -316,39 +212,49 @@ ensure_task_sync_package_script() {
     return
   fi
 
-  if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] inject task workflow scripts into $package_file"
-    return
-  fi
-
-  js_runtime="$(resolve_js_runtime || true)"
-  if [[ -n "$js_runtime" ]]; then
-    "$js_runtime" -e '
-const fs = require("fs");
-const file = process.argv[1];
-const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-pkg.private ??= true;
-pkg.scripts ??= {};
-pkg.scripts["check:task-sync"] = "bash scripts/check-task-sync.sh";
-pkg.scripts["check:task-workflow"] = "bash scripts/check-task-workflow.sh --strict";
-fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
-' "$package_file"
+  pi_ensure_task_sync "$repo" "0" "$MODE"
+  if [[ "$MODE" == "apply" ]]; then
     log "Injected task workflow scripts into $package_file"
-    return
   fi
-
-  log "Warning: no JavaScript runtime found. Could not inject task workflow scripts into $package_file"
 }
 
 create_task_files_if_missing() {
   local repo="$1"
+  local project_name
+  local timestamp
+
+  project_name="$(basename "$repo")"
+  timestamp="$(date '+%Y-%m-%d %H:%M')"
 
   if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] ensure tasks/todo.md, tasks/lessons.md, docs/PROGRESS.md exist with tasks-first guidance"
+    echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, and harness files exist with 3.0 guidance"
     return
   fi
 
-  mkdir -p "$repo/tasks" "$repo/docs"
+  mkdir -p \
+    "$repo/tasks" \
+    "$repo/tasks/contracts" \
+    "$repo/tasks/reviews" \
+    "$repo/docs" \
+    "$repo/.ai/harness/checks" \
+    "$repo/.ai/harness/handoff"
+
+  if [[ ! -f "$repo/docs/spec.md" ]]; then
+    if [[ -f "$repo/.claude/templates/spec.template.md" ]]; then
+      sed \
+        -e "s/{{PROJECT_NAME}}/${project_name}/g" \
+        -e "s/{{TIMESTAMP}}/${timestamp}/g" \
+        "$repo/.claude/templates/spec.template.md" > "$repo/docs/spec.md"
+    else
+      cat > "$repo/docs/spec.md" <<EOF_SPEC
+# Product Spec: ${project_name}
+
+> **Status**: Draft
+> **Last Updated**: ${timestamp}
+> **Owner**: Planner
+EOF_SPEC
+    fi
+  fi
 
   if [[ ! -f "$repo/tasks/todo.md" ]]; then
     cat > "$repo/tasks/todo.md" <<'TODO_EOF'
@@ -385,6 +291,18 @@ TODO_EOF
 LESSONS_EOF
   fi
 
+  if [[ ! -f "$repo/.ai/harness/checks/latest.json" ]]; then
+    printf "{}\n" > "$repo/.ai/harness/checks/latest.json"
+  fi
+
+  if [[ ! -f "$repo/.ai/harness/handoff/current.md" ]]; then
+    cat > "$repo/.ai/harness/handoff/current.md" <<'HANDOFF_EOF'
+# Harness Handoff
+
+> **Reason**: migration
+HANDOFF_EOF
+  fi
+
   if [[ ! -f "$repo/docs/PROGRESS.md" ]]; then
     cat > "$repo/docs/PROGRESS.md" <<'PROGRESS_EOF'
 # Project Milestones
@@ -416,6 +334,22 @@ PROGRESS_EOF
 
 - This file was normalized during migration. Re-add historical milestones if needed.
 PROGRESS_EOF
+  fi
+}
+
+install_reference_configs() {
+  local repo="$1"
+  local ref_dir="$repo/docs/reference-configs"
+  local ref_assets_dir="$SKILL_ROOT/assets/reference-configs"
+
+  run_or_echo "mkdir -p \"$ref_dir\""
+
+  if [[ -d "$ref_assets_dir" ]]; then
+    while IFS= read -r ref_file; do
+      local file_name
+      file_name="$(basename "$ref_file")"
+      run_or_echo "cp \"$ref_file\" \"$ref_dir/$file_name\""
+    done < <(find "$ref_assets_dir" -maxdepth 1 -type f -name '*.md' | sort)
   fi
 }
 
@@ -632,11 +566,18 @@ migrate_workflow() {
   run_or_echo "mkdir -p \"$repo/plans/archive\""
   run_or_echo "mkdir -p \"$repo/tasks/archive\""
   run_or_echo "mkdir -p \"$repo/tasks/contracts\""
+  run_or_echo "mkdir -p \"$repo/tasks/reviews\""
   run_or_echo "mkdir -p \"$repo/docs/reference-configs\""
+  run_or_echo "mkdir -p \"$repo/.ai/harness/checks\""
+  run_or_echo "mkdir -p \"$repo/.ai/harness/handoff\""
 
   install_templates "$repo"
   install_helpers "$repo"
   install_skill_factory_files "$repo"
+  if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
+    pi_install_factor_factory "$repo" "$FACTOR_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
+  fi
+  install_reference_configs "$repo"
   create_research_file_if_missing "$repo"
   create_task_files_if_missing "$repo"
   ensure_task_sync_package_script "$repo"
@@ -665,18 +606,16 @@ migrate_workflow() {
   ensure_gitignore_entry "$repo_gitignore" ".DS_Store"
   ensure_runtime_gitignore_block "$repo_gitignore"
 
+  local ref_assets_dir="$SKILL_ROOT/assets/reference-configs"
   local spa_protocol_repo="$repo/docs/reference-configs/spa-day-protocol.md"
-  local spa_protocol_asset="$SKILL_ROOT/assets/reference-configs/spa-day-protocol.md"
-  if [[ -f "$spa_protocol_asset" ]]; then
-    run_or_echo "cp \"$spa_protocol_asset\" \"$spa_protocol_repo\""
+  if [[ -d "$ref_assets_dir" ]]; then
+    run_or_echo "cp \"$ref_assets_dir\"/*.md \"$repo/docs/reference-configs/\""
   elif [[ "$MODE" == "apply" && ! -f "$spa_protocol_repo" ]]; then
     cat > "$spa_protocol_repo" <<'SPA_DAY_EOF'
 # Spa Day Protocol
 
 Periodic cleanup protocol to reduce context bloat and rule conflicts.
 SPA_DAY_EOF
-  else
-    echo "[dry-run] ensure spa-day protocol at \"$spa_protocol_repo\""
   fi
 }
 
@@ -689,7 +628,8 @@ print_report() {
   echo "- Project hooks synced from: $HOOK_ASSETS_DIR"
   echo "- Team hook config target: .claude/settings.json"
   echo "- Legacy docs/TODO.md: removed when present"
-  echo "- Workflow migration: plans/archive + tasks/archive + research + helpers + plan pointer + task-sync contract"
+  echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/harness/*"
+  echo "- Helper scripts: new-spec/new-sprint/new-plan/plan-to-todo/prepare-handoff/verify-sprint"
   echo "- Runtime temporary ignore block synced to .gitignore"
 }
 

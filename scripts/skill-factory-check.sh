@@ -63,19 +63,67 @@ if [[ -n "$RECORD_FEEDBACK" ]]; then
   exit 0
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
+if ! sf_require_jq; then
   echo "jq is required to inspect Skill Factory state." >&2
   exit 1
 fi
 
 repo_root="${HOOK_REPO_ROOT:-$REPO_ROOT}"
-pending_count="$(jq -r --arg repo_root "$repo_root" '[ (.proposals // [])[] | select(.repo_root == $repo_root and .status == "pending") ] | length' "$SF_PROPOSALS_FILE" 2>/dev/null || echo 0)"
-workflow_keys="$(jq -r '.patterns.workflow | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
-knowledge_keys="$(jq -r '.patterns.knowledge | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
-hint_summary="$(jq -r '(.optimization_hints // []) | map(select((.feedback_count // 0) >= 1) | "\(.slug):\(.feedback_count)") | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+pending_count="$(sf_jq -r --arg repo_root "$repo_root" '[ (.proposals // [])[] | select(.repo_root == $repo_root and .status == "pending") ] | length' "$SF_PROPOSALS_FILE" 2>/dev/null || echo 0)"
+workflow_keys="$(sf_jq -r '.patterns.workflow | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+knowledge_keys="$(sf_jq -r '.patterns.knowledge | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+memory_keys="$(sf_jq -r '.memory.themes | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+memory_corroborations="$(sf_jq -r '(.memory.corroborations // {}) | to_entries | map("\(.key):\(.value.count // 0)") | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+hint_summary="$(sf_jq -r '(.optimization_hints // []) | map(select((.feedback_count // 0) >= 1) | "\(.slug):\(.feedback_count)") | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
 
 echo "[SkillFactory] State file: $SF_STATE_FILE"
 echo "[SkillFactory] Pending proposals: ${pending_count}"
 echo "[SkillFactory] Workflow patterns: ${workflow_keys:-none}"
 echo "[SkillFactory] Knowledge patterns: ${knowledge_keys:-none}"
+echo "[SkillFactory] Memory themes: ${memory_keys:-none}"
+echo "[SkillFactory] Memory corroborations: ${memory_corroborations:-none}"
 echo "[SkillFactory] Optimization hints: ${hint_summary:-none}"
+
+while IFS= read -r workflow_key; do
+  [[ -z "$workflow_key" ]] && continue
+  evidence_line="$(sf_compute_evidence_score "$workflow_key")"
+  pattern_count="${evidence_line%%$'\t'*}"
+  correction_count="${evidence_line#*$'\t'}"
+  correction_count="${correction_count%%$'\t'*}"
+  evidence_score="${evidence_line##*$'\t'}"
+  readiness="$(sf_workflow_readiness_label "$evidence_score")"
+  echo "[SkillFactory] Workflow readiness: ${workflow_key} count=${pattern_count} corrections=${correction_count} evidence=${evidence_score} readiness=${readiness}"
+done < <(
+  sf_jq -r '
+    [
+      (.patterns.workflow | keys[]?),
+      (.pattern_feedback.workflow | keys[]?)
+    ]
+    | unique
+    | .[]
+  ' "$SF_STATE_FILE" 2>/dev/null || true
+)
+
+if [[ -d "$SF_SKILLS_DIR" ]]; then
+  while IFS= read -r meta_file; do
+    skill_dir="$(dirname "$meta_file")"
+    skill_slug="$(sf_jq -r '.skill_slug // empty' "$meta_file" 2>/dev/null || true)"
+    [[ -z "$skill_slug" ]] && continue
+    history_count=0
+    feedback_count=0
+    if [[ -f "$skill_dir/history.jsonl" ]]; then
+      history_count="$(wc -l < "$skill_dir/history.jsonl" | tr -d ' ')"
+    fi
+    if [[ -f "$skill_dir/feedback.jsonl" ]]; then
+      feedback_count="$(wc -l < "$skill_dir/feedback.jsonl" | tr -d ' ')"
+    fi
+    source_pattern_key="$(sf_jq -r '.source_pattern_key // empty' "$meta_file" 2>/dev/null || true)"
+    readiness="LOW"
+    if [[ -n "$source_pattern_key" ]]; then
+      evidence_line="$(sf_compute_evidence_score "$source_pattern_key")"
+      evidence_score="${evidence_line##*$'\t'}"
+      readiness="$(sf_workflow_readiness_label "$evidence_score")"
+    fi
+    echo "[SkillFactory] Skill stats: ${skill_slug} activity=${history_count} feedback=${feedback_count} readiness=${readiness}"
+  done < <(find "$SF_SKILLS_DIR" -path '*/.factory/meta.json' -type f | sort)
+fi

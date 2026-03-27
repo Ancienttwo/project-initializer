@@ -115,6 +115,7 @@
       "stack": "FastAPI + Vite Frontend",
       "tier": "preset",
       "cloudflareNative": true,
+      "factorFactory": true,
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",

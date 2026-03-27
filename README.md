@@ -2,7 +2,7 @@
 
 Project scaffolding skill for Claude/Codex workflows.
 
-## Current Model (3.0)
+## Current Model (3.0.x)
 
 - Question flow uses **9 grouped decision points** with harness defaults inferred first.
 - Plan menu is tiered:
@@ -15,6 +15,7 @@ Project scaffolding skill for Claude/Codex workflows.
   - `assets/initializer-question-pack.v2.json`
 - Generated repos default to the repo-local harness flow:
   - `docs/spec.md -> plans/ -> tasks/contracts/ -> tasks/reviews/ -> .ai/harness/*`
+- Claude auto memory can be observed by generated hooks in read-only mode to enrich Skill Factory signal quality.
 
 ## Quick Usage
 
@@ -38,6 +39,7 @@ bun run benchmark:skills --eval repair-agents-task-sync
 - Skill spec: `SKILL.md`
 - Plan mapping: `assets/plan-map.json`
 - Question-pack: `assets/initializer-question-pack.v2.json`
+- Shared hooks: `assets/hooks/`
 - Template assembler: `scripts/assemble-template.ts`
 - Question inference helper: `scripts/initializer-question-pack.ts`
 - Scaffolding scripts:

@@ -90,7 +90,7 @@ if [[ -z "$PROPOSAL_ID" || -z "$TITLE" || -z "$GOAL" || -z "$OUTPUTS" || -z "$BO
   exit 1
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
+if ! sf_require_jq; then
   echo "jq is required for Skill Factory creation." >&2
   exit 1
 fi
@@ -100,16 +100,17 @@ if [[ ! -f "$SF_PROPOSALS_FILE" ]]; then
   exit 1
 fi
 
-proposal_json="$(jq -c --arg id "$PROPOSAL_ID" '(.proposals // [])[] | select(.id == $id)' "$SF_PROPOSALS_FILE")"
+proposal_json="$(sf_jq -c --arg id "$PROPOSAL_ID" '(.proposals // [])[] | select(.id == $id)' "$SF_PROPOSALS_FILE")"
 if [[ -z "$proposal_json" ]]; then
   echo "Proposal not found: $PROPOSAL_ID" >&2
   exit 1
 fi
 
-proposal_type="$(printf '%s' "$proposal_json" | jq -r '.type')"
-proposal_slug="$(printf '%s' "$proposal_json" | jq -r '.skill_slug')"
-proposal_reason="$(printf '%s' "$proposal_json" | jq -r '.reason')"
-source_patterns="$(printf '%s' "$proposal_json" | jq -c '.source_patterns // {}')"
+proposal_type="$(printf '%s' "$proposal_json" | sf_jq -r '.type')"
+proposal_slug="$(printf '%s' "$proposal_json" | sf_jq -r '.skill_slug')"
+proposal_reason="$(printf '%s' "$proposal_json" | sf_jq -r '.reason')"
+proposal_key="$(printf '%s' "$proposal_json" | sf_jq -r '.key // empty')"
+source_patterns="$(printf '%s' "$proposal_json" | sf_jq -c '.source_patterns // {}')"
 
 if [[ -n "$TYPE" && "$TYPE" != "$proposal_type" ]]; then
   echo "Proposal type mismatch: expected $proposal_type, got $TYPE" >&2
@@ -196,7 +197,7 @@ rendered_skill="${rendered_skill//'{{WORKFLOW_STEPS}}'/$workflow_steps}"
 rendered_skill="${rendered_skill//'{{OUTPUTS}}'/$OUTPUTS}"
 rendered_skill="${rendered_skill//'{{EXIT_CONDITIONS}}'/$exit_conditions}"
 rendered_skill="${rendered_skill//'{{BOUNDARIES}}'/$BOUNDARIES}"
-rendered_skill="${rendered_skill//'{{SOURCE_PATTERNS}}'/$(printf '%s' "$source_patterns" | jq '.')}"
+rendered_skill="${rendered_skill//'{{SOURCE_PATTERNS}}'/$(printf '%s' "$source_patterns" | sf_jq '.')}"
 rendered_skill="${rendered_skill//'{{RULES}}'/$rules_block}"
 rendered_skill="${rendered_skill//'{{DO_LIST}}'/$do_block}"
 rendered_skill="${rendered_skill//'{{AVOID_LIST}}'/$avoid_block}"
@@ -206,28 +207,54 @@ write_openai_yaml
 questions_json='[]'
 if [[ ${#QUESTIONS[@]} -gt 0 ]]; then
   for q in "${QUESTIONS[@]}"; do
-    questions_json="$(printf '%s' "$questions_json" | jq --argjson q "$q" '. + [$q]')"
+    questions_json="$(printf '%s' "$questions_json" | sf_jq --argjson q "$q" '. + [$q]')"
   done
 else
-  questions_json="$(jq '.questions' "$ASSET_DIR/rubric.template.json")"
+  questions_json="$(sf_jq '.questions' "$ASSET_DIR/rubric.template.json")"
 fi
 
 test_prompts_json='[]'
 if [[ ${#TEST_PROMPTS[@]} -gt 0 ]]; then
   for prompt in "${TEST_PROMPTS[@]}"; do
-    test_prompts_json="$(printf '%s' "$test_prompts_json" | jq --arg prompt "$prompt" '. + [$prompt]')"
+    test_prompts_json="$(printf '%s' "$test_prompts_json" | sf_jq --arg prompt "$prompt" '. + [$prompt]')"
   done
 else
-  test_prompts_json="$(jq '.testPrompts' "$ASSET_DIR/rubric.template.json")"
+  test_prompts_json="$(sf_jq '.testPrompts' "$ASSET_DIR/rubric.template.json")"
 fi
 
-jq -nc \
+rubric_warnings="$(sf_jq -rn --argjson questions "$questions_json" --argjson testPrompts "$test_prompts_json" '
+  [
+    (if (($testPrompts | length) == 0) then "rubric testPrompts is empty" else empty end),
+    (if any($testPrompts[]?; (. | type) != "string" or (. | gsub("\\s+"; "")) == "") then "rubric testPrompts contains a blank prompt" else empty end),
+    (if (($questions | length) == 0) then "rubric questions is empty" else empty end),
+    (
+      $questions[]
+      | select(
+          (.id? | type != "string") or
+          (.name? | type != "string") or
+          (.question? | type != "string") or
+          (.pass? | type != "string") or
+          (.fail? | type != "string")
+        )
+      | "rubric question is missing one of: id, name, question, pass, fail"
+    )
+  ] | unique | .[]
+')"
+if [[ -n "$rubric_warnings" ]]; then
+  while IFS= read -r warning; do
+    [[ -z "$warning" ]] && continue
+    echo "[SkillFactory] Warning: $warning" >&2
+  done <<< "$rubric_warnings"
+fi
+
+sf_jq -nc \
   --arg type "$TYPE" \
   --arg title "$TITLE" \
   --arg slug "$proposal_slug" \
   --arg source_project "$SOURCE_PROJECT" \
   --arg proposal_id "$PROPOSAL_ID" \
   --arg created_at "$(date +%s)" \
+  --arg source_pattern_key "$proposal_key" \
   --argjson source_patterns "$source_patterns" \
   '{
     type: $type,
@@ -235,18 +262,19 @@ jq -nc \
     skill_slug: $slug,
     source_project: $source_project,
     proposal_id: $proposal_id,
+    source_pattern_key: $source_pattern_key,
     source_patterns: $source_patterns,
     created_at: ($created_at | tonumber)
   }' > "$factory_dir/meta.json"
 
-jq -nc \
+sf_jq -nc \
   --argjson questions "$questions_json" \
   --argjson test_prompts "$test_prompts_json" \
   '{questions:$questions, testPrompts:$test_prompts}' > "$factory_dir/rubric.json"
 
 touch "$factory_dir/history.jsonl" "$factory_dir/feedback.jsonl"
 
-jq --arg id "$PROPOSAL_ID" '
+sf_jq --arg id "$PROPOSAL_ID" '
   .proposals = ((.proposals // []) | map(if .id == $id then .status = "accepted" else . end))
 ' "$SF_PROPOSALS_FILE" > "$SF_PROPOSALS_FILE.tmp" && mv "$SF_PROPOSALS_FILE.tmp" "$SF_PROPOSALS_FILE"
 

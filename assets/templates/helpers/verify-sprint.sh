@@ -23,7 +23,7 @@ if [[ -z "$review_file" || ! -f "$review_file" ]]; then
   exit 1
 fi
 
-grep -Eq '^\> \*\*Recommendation\*\*:[[:space:]]*pass([[:space:]]*)$' "$review_file" || {
+grep -Eq '^> \*\*Recommendation\*\*:[[:space:]]*pass([[:space:]]*)$' "$review_file" || {
   echo "Sprint review does not recommend pass" >&2
   exit 1
 }

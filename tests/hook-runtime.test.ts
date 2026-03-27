@@ -466,6 +466,172 @@ describe("Hook runtime behavior", () => {
     }
   });
 
+  test("memory-intake: no memory directory is a clean noop", () => {
+    const cwd = tmpWorkspace("memory-intake-noop");
+    const home = tmpWorkspace("memory-home-noop");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+
+      const res = runHook("memory-intake.sh", cwd, {
+        env: { HOME: home },
+        stdin: JSON.stringify({
+          hook_event_name: "SessionStart",
+          source: "startup",
+          transcript_path: join(home, ".claude/projects/demo/transcript.jsonl"),
+        }),
+      });
+
+      expect(res.status).toBe(0);
+      expect(existsSync(join(cwd, ".claude/.memory-context.json"))).toBe(false);
+      expect(existsSync(join(cwd, ".claude/.memory-snapshot.json"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("memory-intake: reads auto memory and writes runtime cache files", () => {
+    const cwd = tmpWorkspace("memory-intake-cache");
+    const home = tmpWorkspace("memory-home-cache");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+
+      const projectDir = join(home, ".claude/projects/demo-project");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(
+        join(memoryDir, "MEMORY.md"),
+        ["# Memory", "", "## Bug fix", "- Prefer reproducing auth failures first"].join("\n")
+      );
+      writeFileSync(
+        join(memoryDir, "testing-conventions.md"),
+        ["# Testing conventions", "", "- Use shared fixtures"].join("\n")
+      );
+
+      const res = runHook("memory-intake.sh", cwd, {
+        env: { HOME: home },
+        stdin: JSON.stringify({
+          hook_event_name: "SessionStart",
+          source: "startup",
+          transcript_path: join(projectDir, "transcript.jsonl"),
+        }),
+      });
+
+      expect(res.status).toBe(0);
+      expect(existsSync(join(cwd, ".claude/.memory-context.json"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/.memory-snapshot.json"))).toBe(true);
+
+      const context = JSON.parse(readFileSync(join(cwd, ".claude/.memory-context.json"), "utf-8"));
+      expect(context.memory_dir).toBe(memoryDir);
+      expect(context.themes.some((theme: { slug: string }) => theme.slug === "bug-fix")).toBe(true);
+      expect(context.themes.some((theme: { slug: string }) => theme.slug === "testing-conventions")).toBe(true);
+
+      const state = JSON.parse(readFileSync(join(cwd, ".claude/.skill-factory-state.json"), "utf-8"));
+      expect(state.memory.last_snapshot_hash).toBe(context.snapshot_hash);
+      expect(state.memory.themes["bug-fix"].label).toContain("Bug fix");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("memory-intake: detects changed memory between sessions", () => {
+    const cwd = tmpWorkspace("memory-intake-delta");
+    const home = tmpWorkspace("memory-home-delta");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+
+      const projectDir = join(home, ".claude/projects/demo-project");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(join(memoryDir, "MEMORY.md"), "# Memory\n\n## Bug fix\n- First note\n");
+
+      const hookInput = JSON.stringify({
+        hook_event_name: "SessionStart",
+        source: "startup",
+        transcript_path: join(projectDir, "transcript.jsonl"),
+      });
+
+      expect(runHook("memory-intake.sh", cwd, { env: { HOME: home }, stdin: hookInput }).status).toBe(0);
+
+      writeFileSync(join(memoryDir, "MEMORY.md"), "# Memory\n\n## Bug fix\n- First note\n- Second note\n");
+
+      const res = runHook("memory-intake.sh", cwd, {
+        env: { HOME: home },
+        stdin: hookInput,
+      });
+
+      expect(res.status).toBe(0);
+      const context = JSON.parse(readFileSync(join(cwd, ".claude/.memory-context.json"), "utf-8"));
+      expect(context.delta.detected).toBe(true);
+      expect(context.delta.type).toBe("updated");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("memory-intake: tags large cross-file memory cleanup as autodream-like", () => {
+    const cwd = tmpWorkspace("memory-intake-autodream");
+    const home = tmpWorkspace("memory-home-autodream");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+
+      const projectDir = join(home, ".claude/projects/demo-project");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(
+        join(memoryDir, "MEMORY.md"),
+        [
+          "# Memory",
+          "",
+          "## Bug fix",
+          "- Session one note",
+          "- Session two note",
+          "- Session three note",
+          "- Session four note",
+          "- Session five note",
+          "- Session six note",
+        ].join("\n")
+      );
+      writeFileSync(join(memoryDir, "debugging.md"), "# Debugging\n\n- Old stack trace\n- Old environment note\n");
+      writeFileSync(join(memoryDir, "patterns.md"), "# Patterns\n\n- Legacy convention\n");
+
+      const hookInput = JSON.stringify({
+        hook_event_name: "SessionStart",
+        source: "startup",
+        transcript_path: join(projectDir, "transcript.jsonl"),
+      });
+
+      expect(runHook("memory-intake.sh", cwd, { env: { HOME: home }, stdin: hookInput }).status).toBe(0);
+
+      writeFileSync(
+        join(memoryDir, "MEMORY.md"),
+        ["# Memory", "", "## Bug fix", "- Consolidated auth fix workflow"].join("\n")
+      );
+      rmSync(join(memoryDir, "debugging.md"));
+      writeFileSync(join(memoryDir, "patterns.md"), "# Patterns\n\n- Consolidated workflow\n- Shared fixtures only\n");
+      writeFileSync(join(memoryDir, "testing-conventions.md"), "# Testing conventions\n\n- Use shared fixtures\n");
+
+      const res = runHook("memory-intake.sh", cwd, {
+        env: { HOME: home },
+        stdin: hookInput,
+      });
+
+      expect(res.status).toBe(0);
+      const context = JSON.parse(readFileSync(join(cwd, ".claude/.memory-context.json"), "utf-8"));
+      expect(context.delta.type).toBe("autodream-like");
+      expect(context.delta.removed_files).toBeGreaterThanOrEqual(1);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   test("prompt-guard: research and annotation warnings on non-implement prompts", () => {
     const cwd = tmpWorkspace("prompt-guard-annotation");
     try {
@@ -545,6 +711,37 @@ describe("Hook runtime behavior", () => {
       expect(res.stdout).toContain("[ResearchGate] WARNING");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("prompt-guard: supports Claude Code prompt field and injects relevant memory summary", () => {
+    const cwd = tmpWorkspace("prompt-guard-memory");
+    const home = tmpWorkspace("prompt-memory-home");
+    try {
+      initGitRepo(cwd);
+      installHooks(cwd);
+      const projectDir = join(home, ".claude/projects/demo-project");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(join(memoryDir, "bug-fix.md"), "# Bug fix\n\n- Reproduce before patching\n");
+
+      const startupInput = JSON.stringify({
+        hook_event_name: "SessionStart",
+        source: "startup",
+        transcript_path: join(projectDir, "transcript.jsonl"),
+      });
+      expect(runHook("memory-intake.sh", cwd, { env: { HOME: home }, stdin: startupInput }).status).toBe(0);
+
+      const res = runHook("prompt-guard.sh", cwd, {
+        env: { HOME: home },
+        stdin: JSON.stringify({ prompt: "please analyze the bug fix workflow first" }),
+      });
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("[Memory] Theme: Bug Fix");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
     }
   });
 

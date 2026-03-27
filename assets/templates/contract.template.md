@@ -20,12 +20,12 @@ Describe the exact outcome this task must deliver.
 ```yaml
 allowed_paths:
   - docs/spec.md
-  - plans/plan-*.md
+  - plans/
+  - tasks/todo.md
   - tasks/contracts/{{TASK_SLUG}}.contract.md
   - tasks/reviews/{{TASK_SLUG}}.review.md
-  - tasks/todo.md
-  - src/**
-  - tests/**
+  - src/
+  - tests/
 ```
 
 ## Exit Criteria (Machine Verifiable)
