@@ -154,9 +154,35 @@
         "Uses AGENTS.md Skill Factory protocol to group lessons by theme.",
         "Runs bash scripts/skill-factory-check.sh to inspect current state.",
         "After the third session, both workflow and knowledge proposals reach pending status.",
+        "Adds evidence-aware proposal context including evidence score or correction count when reporting workflow proposal state.",
         "Does not auto-create skills — proposals require explicit human promotion via skill-factory-create.sh.",
         "Does not treat ordinary post-edit activity as optimization feedback.",
         "Uses bash scripts/skill-factory-check.sh --record-feedback <slug> --signal <label> when explicit feedback is needed."
+      ]
+    },
+    {
+      "id": 6,
+      "slug": "initialize-plan-g-project",
+      "prompt": "Initialize a new AI quantitative trading project (Plan G) with factor research scaffolding, factor-lab scripts, and Plan G workflow guidance in the generated automation docs.",
+      "expected_output": "A Plan G initialization path that exposes factor research scaffolding, includes tasks/factors/registry.json plus factor-lab commands, and keeps the rest of the tasks-first workflow intact.",
+      "files": [
+        "evals/fixtures/new-project-empty"
+      ],
+      "graders": {
+        "files_exist": [
+          "final-response.md"
+        ],
+        "files_contain": [
+          { "path": "final-response.md", "pattern": "tasks/factors" },
+          { "path": "final-response.md", "pattern": "registry\\.json" },
+          { "path": "final-response.md", "pattern": "factor-lab" }
+        ]
+      },
+      "expectations": [
+        "Selects Plan G or explicitly identifies the AI quantitative trading preset.",
+        "Mentions the factor registry as the source of truth for factor lifecycle state.",
+        "Includes the factor-lab new/promote/reject/check commands in the generated workflow discussion.",
+        "Preserves the standard tasks-first workflow alongside factor research scaffolding."
       ]
     }
   ]

@@ -10,261 +10,35 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PI_LIB_DIR="$SCRIPT_DIR/lib"
+if [[ -f "$PI_LIB_DIR/project-init-lib.sh" ]]; then
+  # shellcheck source=/dev/null
+  . "$PI_LIB_DIR/project-init-lib.sh"
+fi
 ASSETS_TEMPLATES_DIR="$SCRIPT_DIR/../assets/templates"
 ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
 ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
+ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
 
 write_runtime_gitignore_block() {
-  local gitignore_file=".gitignore"
-  local begin_marker="# BEGIN: claude-runtime-temp (managed by project-initializer)"
-  local end_marker="# END: claude-runtime-temp"
-
-  local block
-  block=$(cat <<'BLOCK_EOF'
-# BEGIN: claude-runtime-temp (managed by project-initializer)
-.claude/settings.local.json
-.claude/.atomic_pending
-.claude/.session-id
-.claude/.tool-call-count
-.claude/.session-handoff.md
-.claude/.task-state.json
-.claude/.task-handoff.md
-.claude/.skill-factory-state.json
-.claude/.skill-factory-session.json
-.claude/.skill-factory-session-marker.json
-.claude/.skill-factory-user/
-.claude/.context-pressure/
-.claude/*.tmp
-.claude/*.bak
-.claude/*.bak.*
-.claude/*.backup-*
-# END: claude-runtime-temp
-BLOCK_EOF
-)
-
-  if [ ! -f "$gitignore_file" ]; then
-    cat > "$gitignore_file" <<'GITIGNORE_EOF'
-# Dependencies
-node_modules/
-
-# Build artifacts
-artifacts/
-coverage/
-*.tar.gz
-*.tgz
-
-# Environment
-.env
-.env.*
-!.env.example
-
-# OS metadata
-.DS_Store
-GITIGNORE_EOF
+  local extra_entries=""
+  if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
+    extra_entries="$(pi_factor_factory_gitignore_entries)"
   fi
-
-  if ! grep -Fq "$begin_marker" "$gitignore_file"; then
-    printf "\n%s\n" "$block" >> "$gitignore_file"
-    return
-  fi
-
-  local tmp_file
-  tmp_file="$(mktemp)"
-  awk -v begin="$begin_marker" -v end="$end_marker" -v repl="$block" '
-    $0 == begin {
-      print repl
-      skipping = 1
-      next
-    }
-    skipping && $0 == end {
-      skipping = 0
-      next
-    }
-    !skipping { print }
-  ' "$gitignore_file" > "$tmp_file"
-  mv "$tmp_file" "$gitignore_file"
+  pi_ensure_gitignore_block ".gitignore" "$PI_DEFAULT_GITIGNORE_CONTENT" "$extra_entries" "apply"
 }
 
 write_templates() {
-  mkdir -p .claude/templates
-
-  cat > .claude/templates/research.template.md <<'RESEARCH_TEMPLATE_EOF'
-# {{PROJECT_NAME}} — Research Notes
-
-> **Last Updated**: {{DATE}}
-> **Scope**: (what area of the codebase was researched)
-> **Usage**: Store deep codebase findings and hidden contracts here, not in chat-only summaries.
-
-## Codebase Map
-| File | Purpose | Key Exports |
-|------|---------|-------------|
-
-## Architecture Observations
-### Patterns & Conventions
-### Implicit Contracts
-### Edge Cases & Intricacies
-
-## Technical Debt / Risks
-
-## Research Conclusions
-### What to Preserve
-### What to Change
-### Open Questions
-RESEARCH_TEMPLATE_EOF
-
-  cat > .claude/templates/plan.template.md <<'PLAN_TEMPLATE_EOF'
-# Plan: {{TITLE}}
-
-> **Status**: Draft
-> **Created**: {{TIMESTAMP}}
-> **Slug**: {{SLUG}}
-> **Research**: See `tasks/research.md`
-
-## Approach
-### Strategy
-### Trade-offs
-| Option | Pros | Cons | Decision |
-|--------|------|------|----------|
-
-## Detailed Design
-### File Changes
-| File | Action | Description |
-|------|--------|-------------|
-
-### Code Snippets
-### Data Flow
-
-## Risk Assessment
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-
-## Task Contracts
-- Contract file: `tasks/contracts/{{SLUG}}.contract.md`
-- Template: `.claude/templates/contract.template.md`
-- Verification command: `bash scripts/verify-contract.sh --contract tasks/contracts/{{SLUG}}.contract.md --strict`
-- Active plan rule: the latest non-archived `plans/plan-*.md` file is the current plan
-
-## Annotations
-<!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
-
-## Task Breakdown
-- [ ] ...
-PLAN_TEMPLATE_EOF
-
-  cat > .claude/templates/contract.template.md <<'CONTRACT_TEMPLATE_EOF'
-# Task Contract: {{TASK_SLUG}}
-
-> **Status**: Pending
-> **Plan**: {{PLAN_FILE}}
-> **Owner**: {{OWNER}}
-> **Last Updated**: {{TIMESTAMP}}
-
-## Goal
-
-Describe the exact outcome this task must deliver.
-
-## Exit Criteria (Machine Verifiable)
-
-```yaml
-exit_criteria:
-  files_exist:
-    - src/modules/{{TASK_SLUG}}/index.ts
-  tests_pass:
-    - path: tests/unit/{{TASK_SLUG}}.test.ts
-  commands_succeed:
-    - bun run typecheck
-  files_contain:
-    - path: src/modules/{{TASK_SLUG}}/index.ts
-      pattern: "export"
-```
-
-## Acceptance Notes (Human Review)
-
-- Functional behavior:
-- Edge cases:
-- Regression risks:
-
-## Optional Visual Checks
-
-- Screenshot path (optional):
-- What to verify visually:
-CONTRACT_TEMPLATE_EOF
+  pi_install_templates "$PWD" "$ASSETS_TEMPLATES_DIR" "apply"
 }
 
 install_workflow_helpers() {
-  mkdir -p scripts
-
-  if [[ -d "$ASSETS_TEMPLATES_DIR/helpers" ]]; then
-    cp "$ASSETS_TEMPLATES_DIR/helpers/"*.sh scripts/ 2>/dev/null || true
-    chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh 2>/dev/null || true
-    return
-  fi
-
-  cat > scripts/new-plan.sh <<'NEW_PLAN_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: new-plan.sh"
-exit 1
-NEW_PLAN_STUB_EOF
-
-  cat > scripts/plan-to-todo.sh <<'PLAN_TO_TODO_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: plan-to-todo.sh"
-exit 1
-PLAN_TO_TODO_STUB_EOF
-
-  cat > scripts/archive-workflow.sh <<'ARCHIVE_WORKFLOW_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: archive-workflow.sh"
-exit 1
-ARCHIVE_WORKFLOW_STUB_EOF
-
-  cat > scripts/verify-contract.sh <<'VERIFY_CONTRACT_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: verify-contract.sh"
-exit 1
-VERIFY_CONTRACT_STUB_EOF
-
-  cat > scripts/check-task-sync.sh <<'CHECK_TASK_SYNC_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: check-task-sync.sh"
-exit 1
-CHECK_TASK_SYNC_STUB_EOF
-
-  cat > scripts/ensure-task-workflow.sh <<'ENSURE_TASK_WORKFLOW_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: ensure-task-workflow.sh"
-exit 1
-ENSURE_TASK_WORKFLOW_STUB_EOF
-
-  cat > scripts/check-task-workflow.sh <<'CHECK_TASK_WORKFLOW_STUB_EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: check-task-workflow.sh"
-exit 1
-CHECK_TASK_WORKFLOW_STUB_EOF
-
-  chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh
+  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply"
 }
 
 install_skill_factory_files() {
-  mkdir -p .claude/skill-factory scripts .ai/hooks .claude/hooks
-
-  if [[ -d "$ASSETS_SKILL_FACTORY_DIR" ]]; then
-    cp -R "$ASSETS_SKILL_FACTORY_DIR"/. .claude/skill-factory/
-  fi
-
-  if [[ -f "$SCRIPT_DIR/skill-factory-create.sh" ]]; then
-    cp "$SCRIPT_DIR/skill-factory-create.sh" scripts/skill-factory-create.sh
-  fi
-  if [[ -f "$SCRIPT_DIR/skill-factory-check.sh" ]]; then
-    cp "$SCRIPT_DIR/skill-factory-check.sh" scripts/skill-factory-check.sh
-  fi
+  pi_install_skill_factory "$PWD" "$ASSETS_SKILL_FACTORY_DIR" "$SCRIPT_DIR" "apply"
+  mkdir -p .ai/hooks .claude/hooks
 
   if [[ -d "$ASSETS_HOOKS_DIR" ]]; then
     find "$ASSETS_HOOKS_DIR" -mindepth 1 -maxdepth 1 \( -type f -name '*.sh' -o -type d -name 'lib' \) | while read -r asset; do
@@ -306,44 +80,10 @@ EOF_HOOK_SHIM
 
   find .ai/hooks -type f -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
   find .claude/hooks -type f -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
-  chmod +x scripts/skill-factory-create.sh scripts/skill-factory-check.sh 2>/dev/null || true
 }
 
 ensure_task_sync_package_script() {
-  local package_file="package.json"
-  local project_name
-  project_name="$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
-  project_name="${project_name:-project}"
-
-  if [[ ! -f "$package_file" ]]; then
-    cat > "$package_file" <<EOF_PACKAGE
-{
-  "name": "$project_name",
-  "private": true,
-  "scripts": {
-    "check:task-sync": "bash scripts/check-task-sync.sh",
-    "check:task-workflow": "bash scripts/check-task-workflow.sh --strict"
-  }
-}
-EOF_PACKAGE
-    return
-  fi
-
-  if command -v node >/dev/null 2>&1; then
-    node -e '
-const fs = require("fs");
-const file = process.argv[1];
-const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-pkg.private ??= true;
-pkg.scripts ??= {};
-pkg.scripts["check:task-sync"] = "bash scripts/check-task-sync.sh";
-pkg.scripts["check:task-workflow"] = "bash scripts/check-task-workflow.sh --strict";
-fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
-' "$package_file"
-    return
-  fi
-
-  echo "[warn] node not found; unable to inject task workflow scripts into package.json" >&2
+  pi_ensure_task_sync "$PWD" "1" "apply"
 }
 
 # ===== IMMUTABLE LAYER (资产层) =====
@@ -489,6 +229,9 @@ TASK_RESEARCH_EOF
 write_templates
 install_workflow_helpers
 install_skill_factory_files
+if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
+  pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"
+fi
 ensure_task_sync_package_script
 write_runtime_gitignore_block
 

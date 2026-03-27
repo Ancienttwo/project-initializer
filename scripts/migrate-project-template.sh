@@ -13,10 +13,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PI_LIB_DIR="$SCRIPT_DIR/lib"
+if [[ -f "$PI_LIB_DIR/project-init-lib.sh" ]]; then
+  # shellcheck source=/dev/null
+  . "$PI_LIB_DIR/project-init-lib.sh"
+fi
 HOOK_ASSETS_DIR="$SKILL_ROOT/assets/hooks"
 TEMPLATE_ASSETS_DIR="$SKILL_ROOT/assets/templates"
 HELPER_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/helpers"
 SKILL_FACTORY_ASSETS_DIR="$SKILL_ROOT/assets/skill-factory"
+FACTOR_FACTORY_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/factor-factory"
 JQ_BIN="${PROJECT_INITIALIZER_JQ_BIN:-jq}"
 
 MODE="dry-run"
@@ -129,25 +135,6 @@ fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2) + "\n");
 NODE_EOF
 }
 
-resolve_js_runtime() {
-  if command -v node >/dev/null 2>&1; then
-    printf 'node'
-    return 0
-  fi
-
-  if command -v bun >/dev/null 2>&1; then
-    printf 'bun'
-    return 0
-  fi
-
-  if [[ -x "${HOME}/.bun/bin/bun" ]]; then
-    printf '%s' "${HOME}/.bun/bin/bun"
-    return 0
-  fi
-
-  return 1
-}
-
 run_or_echo() {
   local cmd="$1"
   if [[ "$MODE" == "apply" ]]; then
@@ -166,64 +153,16 @@ backup_if_exists() {
 
 ensure_runtime_gitignore_block() {
   local file_path="$1"
-  local begin_marker="# BEGIN: claude-runtime-temp (managed by project-initializer)"
-  local end_marker="# END: claude-runtime-temp"
-
-  local block
-  block=$(cat <<'BLOCK_EOF'
-# BEGIN: claude-runtime-temp (managed by project-initializer)
-.claude/settings.local.json
-.claude/.atomic_pending
-.claude/.session-id
-.claude/.tool-call-count
-.claude/.session-handoff.md
-.claude/.task-state.json
-.claude/.task-handoff.md
-.claude/.skill-factory-state.json
-.claude/.skill-factory-session.json
-.claude/.skill-factory-session-marker.json
-.claude/.skill-factory-user/
-.claude/.context-pressure/
+  local extra_entries
+  extra_entries=$(cat <<'EOF_EXTRA'
 .claude/.active-plan
 .claude/.plan-state/
-.claude/*.tmp
-.claude/*.bak
-.claude/*.bak.*
-.claude/*.backup-*
-# END: claude-runtime-temp
-BLOCK_EOF
+EOF_EXTRA
 )
-
-  if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] ensure managed runtime block in $file_path"
-    return
+  if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
+    extra_entries="${extra_entries}"$'\n'"$(pi_factor_factory_gitignore_entries)"
   fi
-
-  mkdir -p "$(dirname "$file_path")"
-  if [[ ! -f "$file_path" ]]; then
-    touch "$file_path"
-  fi
-
-  if ! grep -Fq "$begin_marker" "$file_path"; then
-    printf "\n%s\n" "$block" >> "$file_path"
-    return
-  fi
-
-  local tmp_file
-  tmp_file="$(mktemp)"
-  awk -v begin="$begin_marker" -v end="$end_marker" -v repl="$block" '
-    $0 == begin {
-      print repl
-      skipping = 1
-      next
-    }
-    skipping && $0 == end {
-      skipping = 0
-      next
-    }
-    !skipping { print }
-  ' "$file_path" > "$tmp_file"
-  mv "$tmp_file" "$file_path"
+  pi_ensure_gitignore_block "$file_path" "" "$extra_entries" "$MODE"
 }
 
 ensure_gitignore_entry() {
@@ -242,39 +181,13 @@ ensure_gitignore_entry() {
 
 install_templates() {
   local repo="$1"
-  local templates_dir="$repo/.claude/templates"
-
-  run_or_echo "mkdir -p \"$templates_dir\""
-
-  if [[ -f "$TEMPLATE_ASSETS_DIR/research.template.md" ]]; then
-    run_or_echo "cp \"$TEMPLATE_ASSETS_DIR/research.template.md\" \"$templates_dir/research.template.md\""
-  fi
-  if [[ -f "$TEMPLATE_ASSETS_DIR/plan.template.md" ]]; then
-    run_or_echo "cp \"$TEMPLATE_ASSETS_DIR/plan.template.md\" \"$templates_dir/plan.template.md\""
-  fi
-  if [[ -f "$TEMPLATE_ASSETS_DIR/contract.template.md" ]]; then
-    run_or_echo "cp \"$TEMPLATE_ASSETS_DIR/contract.template.md\" \"$templates_dir/contract.template.md\""
-  fi
+  pi_install_templates "$repo" "$TEMPLATE_ASSETS_DIR" "$MODE"
 }
 
 install_helpers() {
   local repo="$1"
-  local scripts_dir="$repo/scripts"
-
-  run_or_echo "mkdir -p \"$scripts_dir\""
-
   if [[ -d "$HELPER_ASSETS_DIR" ]]; then
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/new-plan.sh\" \"$scripts_dir/new-plan.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/plan-to-todo.sh\" \"$scripts_dir/plan-to-todo.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/archive-workflow.sh\" \"$scripts_dir/archive-workflow.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/verify-contract.sh\" \"$scripts_dir/verify-contract.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/check-task-sync.sh\" \"$scripts_dir/check-task-sync.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/ensure-task-workflow.sh\" \"$scripts_dir/ensure-task-workflow.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/check-task-workflow.sh\" \"$scripts_dir/check-task-workflow.sh\""
-    run_or_echo "cp \"$HELPER_ASSETS_DIR/switch-plan.sh\" \"$scripts_dir/switch-plan.sh\""
-    if [[ "$MODE" == "apply" ]]; then
-      chmod +x "$scripts_dir/new-plan.sh" "$scripts_dir/plan-to-todo.sh" "$scripts_dir/archive-workflow.sh" "$scripts_dir/verify-contract.sh" "$scripts_dir/check-task-sync.sh" "$scripts_dir/ensure-task-workflow.sh" "$scripts_dir/check-task-workflow.sh" "$scripts_dir/switch-plan.sh" || true
-    fi
+    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-plan.sh plan-to-todo.sh archive-workflow.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
   fi
@@ -282,25 +195,7 @@ install_helpers() {
 
 install_skill_factory_files() {
   local repo="$1"
-  local scripts_dir="$repo/scripts"
-  local skill_factory_dir="$repo/.claude/skill-factory"
-
-  run_or_echo "mkdir -p \"$scripts_dir\" \"$skill_factory_dir\""
-
-  if [[ -d "$SKILL_FACTORY_ASSETS_DIR" ]]; then
-    run_or_echo "cp -R \"$SKILL_FACTORY_ASSETS_DIR\"/. \"$skill_factory_dir/\""
-  fi
-
-  if [[ -f "$SKILL_ROOT/scripts/skill-factory-create.sh" ]]; then
-    run_or_echo "cp \"$SKILL_ROOT/scripts/skill-factory-create.sh\" \"$scripts_dir/skill-factory-create.sh\""
-  fi
-  if [[ -f "$SKILL_ROOT/scripts/skill-factory-check.sh" ]]; then
-    run_or_echo "cp \"$SKILL_ROOT/scripts/skill-factory-check.sh\" \"$scripts_dir/skill-factory-check.sh\""
-  fi
-
-  if [[ "$MODE" == "apply" ]]; then
-    chmod +x "$scripts_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-check.sh" 2>/dev/null || true
-  fi
+  pi_install_skill_factory "$repo" "$SKILL_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
 }
 
 ensure_task_sync_package_script() {
@@ -316,28 +211,10 @@ ensure_task_sync_package_script() {
     return
   fi
 
-  if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] inject task workflow scripts into $package_file"
-    return
-  fi
-
-  js_runtime="$(resolve_js_runtime || true)"
-  if [[ -n "$js_runtime" ]]; then
-    "$js_runtime" -e '
-const fs = require("fs");
-const file = process.argv[1];
-const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-pkg.private ??= true;
-pkg.scripts ??= {};
-pkg.scripts["check:task-sync"] = "bash scripts/check-task-sync.sh";
-pkg.scripts["check:task-workflow"] = "bash scripts/check-task-workflow.sh --strict";
-fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
-' "$package_file"
+  pi_ensure_task_sync "$repo" "0" "$MODE"
+  if [[ "$MODE" == "apply" ]]; then
     log "Injected task workflow scripts into $package_file"
-    return
   fi
-
-  log "Warning: no JavaScript runtime found. Could not inject task workflow scripts into $package_file"
 }
 
 create_task_files_if_missing() {
@@ -637,6 +514,9 @@ migrate_workflow() {
   install_templates "$repo"
   install_helpers "$repo"
   install_skill_factory_files "$repo"
+  if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
+    pi_install_factor_factory "$repo" "$FACTOR_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
+  fi
   create_research_file_if_missing "$repo"
   create_task_files_if_missing "$repo"
   ensure_task_sync_package_script "$repo"

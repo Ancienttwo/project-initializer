@@ -40,6 +40,7 @@ describe("Migration script contract", () => {
 
   test("should migrate workflow files and runtime ignore block", () => {
     const script = read("scripts/migrate-project-template.sh");
+    const sharedLib = read("scripts/lib/project-init-lib.sh");
     expect(script).toContain("plans/archive");
     expect(script).toContain("tasks/archive");
     expect(script).toContain("tasks/research.md");
@@ -52,11 +53,12 @@ describe("Migration script contract", () => {
     expect(script).toContain("check-task-sync.sh");
     expect(script).toContain("ensure-task-workflow.sh");
     expect(script).toContain("check-task-workflow.sh");
-    expect(script).toContain("check:task-sync");
-    expect(script).toContain("check:task-workflow");
+    expect(script).toContain("pi_ensure_task_sync");
+    expect(sharedLib).toContain("check:task-sync");
+    expect(sharedLib).toContain("check:task-workflow");
     expect(script).toContain("tasks/contracts");
     expect(script).toContain("spa-day-protocol.md");
-    expect(script).toContain("claude-runtime-temp");
+    expect(sharedLib).toContain("claude-runtime-temp");
   });
 
   test("should apply migration and create workflow artifacts with single-source plan workflow", () => {

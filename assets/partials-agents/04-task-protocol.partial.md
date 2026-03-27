@@ -37,6 +37,12 @@ RULES:
   - Check pending Skill Factory proposals with `bash scripts/skill-factory-check.sh`
   - Use docs/PROGRESS.md for milestones only, not active execution logs
   - Archive completed/abandoned plans and todos with metadata
+{{#IF FACTOR_FACTORY_ENABLED}}
+  - Treat `tasks/factors/registry.json` as the source of truth for factor lifecycle state
+  - Create factor candidates with `bash scripts/factor-lab-new.sh --name <slug>`
+  - Promote factors only after hypothesis and backtest summary artifacts exist
+  - Run `bash scripts/factor-lab-check.sh` before claiming factor-lab work is complete
+{{/IF}}
 
 ACTIVE_PLAN:
   - plans/ is the single source of truth for the current active plan

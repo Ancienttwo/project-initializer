@@ -36,6 +36,7 @@ export interface PlanConfig {
   name: string;
   stack: string;
   cloudflareNative: boolean;
+  factorFactory?: boolean;
   tier?: "core" | "preset" | "custom";
   defaultLsp?: string;
   defaultTemplateVariables?: Record<string, string>;
@@ -420,6 +421,14 @@ function readRelativeTextFile(relativePath: string): string {
   return readFileSync(absolutePath, "utf-8").trim();
 }
 
+export function isFactorFactoryEnabled(
+  planType: string,
+  planMap: PlanMap = loadPlanMap()
+): boolean {
+  const resolvedPlan = resolvePlanType(planType, planMap);
+  return planMap.plans[resolvedPlan].factorFactory === true;
+}
+
 /**
  * Build default template variables for a plan.
  */
@@ -449,6 +458,7 @@ export function getDefaultTemplateVariables(
     PLAN_NAME: planConfig.name,
     PLAN_STACK: planConfig.stack,
     PLAN_TIER: planConfig.tier ?? "core",
+    FACTOR_FACTORY_ENABLED: planConfig.factorFactory ? "true" : "false",
     ...planDefaults,
   };
 }
@@ -475,7 +485,11 @@ export function getPartials(target: TemplateTarget = "claude"): PartialInfo[] {
     .map((f) => {
       const order = parseInt(f.substring(0, 2), 10);
       const name = f.replace(".partial.md", "");
-      const conditional = name.includes("cloudflare") ? "CLOUDFLARE_NATIVE" : undefined;
+      const conditional = name.includes("cloudflare")
+        ? "CLOUDFLARE_NATIVE"
+        : name.includes("factor-factory")
+          ? "FACTOR_FACTORY_ENABLED"
+          : undefined;
 
       return {
         name,
@@ -656,8 +670,10 @@ export function assembleTemplate(options: AssemblyOptions): string {
 
   // Determine conditions
   const includeCloudflare = shouldIncludeCloudflare(resolvedPlanType, cloudflareNative);
+  const includeFactorFactory = isFactorFactoryEnabled(resolvedPlanType, planMap);
   const conditions: Record<string, boolean> = {
     CLOUDFLARE_NATIVE: includeCloudflare,
+    FACTOR_FACTORY_ENABLED: includeFactorFactory,
   };
 
   // Concatenate partials

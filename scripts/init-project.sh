@@ -17,10 +17,16 @@ PROJECT_NAME="${1:-my-project}"
 STACK="${2:-vite-tanstack}"
 PKG_MANAGER="${3:-bun}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PI_LIB_DIR="$SCRIPT_DIR/lib"
+if [[ -f "$PI_LIB_DIR/project-init-lib.sh" ]]; then
+    # shellcheck source=/dev/null
+    . "$PI_LIB_DIR/project-init-lib.sh"
+fi
 ASSETS_REF_DIR="$SCRIPT_DIR/../assets/reference-configs"
 ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
 ASSETS_TEMPLATES_DIR="$SCRIPT_DIR/../assets/templates"
 ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
+ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
 
 echo -e "${BLUE}=== Project Initializer ===${NC}"
 echo -e "Project: ${GREEN}$PROJECT_NAME${NC}"
@@ -39,56 +45,11 @@ install_hook_settings_template() {
 
 ensure_runtime_gitignore_block() {
     local file_path="$1"
-    local begin_marker="# BEGIN: claude-runtime-temp (managed by project-initializer)"
-    local end_marker="# END: claude-runtime-temp"
-
-    local block
-    block=$(cat <<'BLOCK_EOF'
-# BEGIN: claude-runtime-temp (managed by project-initializer)
-.claude/settings.local.json
-.claude/.atomic_pending
-.claude/.session-id
-.claude/.tool-call-count
-.claude/.session-handoff.md
-.claude/.task-state.json
-.claude/.task-handoff.md
-.claude/.skill-factory-state.json
-.claude/.skill-factory-session.json
-.claude/.skill-factory-session-marker.json
-.claude/.skill-factory-user/
-.claude/.context-pressure/
-.claude/*.tmp
-.claude/*.bak
-.claude/*.bak.*
-.claude/*.backup-*
-# END: claude-runtime-temp
-BLOCK_EOF
-)
-
-    if [ ! -f "$file_path" ]; then
-        touch "$file_path"
+    local extra_entries=""
+    if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-$STACK}"; then
+        extra_entries="$(pi_factor_factory_gitignore_entries)"
     fi
-
-    if ! grep -Fq "$begin_marker" "$file_path"; then
-        printf "\n%s\n" "$block" >> "$file_path"
-        return
-    fi
-
-    local tmp_file
-    tmp_file="$(mktemp)"
-    awk -v begin="$begin_marker" -v end="$end_marker" -v repl="$block" '
-      $0 == begin {
-        print repl
-        skipping = 1
-        next
-      }
-      skipping && $0 == end {
-        skipping = 0
-        next
-      }
-      !skipping { print }
-    ' "$file_path" > "$tmp_file"
-    mv "$tmp_file" "$file_path"
+    pi_ensure_gitignore_block "$file_path" "" "$extra_entries" "apply"
 }
 
 ensure_gitignore_entry() {
@@ -97,202 +58,6 @@ ensure_gitignore_entry() {
     if ! grep -Fxq "$entry" "$file_path"; then
         printf "%s\n" "$entry" >> "$file_path"
     fi
-}
-
-install_workflow_templates() {
-    mkdir -p .claude/templates
-
-    if [ -d "$ASSETS_TEMPLATES_DIR" ] && [ -f "$ASSETS_TEMPLATES_DIR/research.template.md" ]; then
-        cp "$ASSETS_TEMPLATES_DIR/research.template.md" .claude/templates/research.template.md
-    else
-        cat > .claude/templates/research.template.md << 'EOF'
-# {{PROJECT_NAME}} — Research Notes
-
-> **Last Updated**: {{DATE}}
-> **Scope**: (what area of the codebase was researched)
-> **Usage**: Store deep codebase findings and hidden contracts here, not in chat-only summaries.
-
-## Codebase Map
-| File | Purpose | Key Exports |
-|------|---------|-------------|
-
-## Architecture Observations
-### Patterns & Conventions
-### Implicit Contracts
-### Edge Cases & Intricacies
-
-## Technical Debt / Risks
-
-## Research Conclusions
-### What to Preserve
-### What to Change
-### Open Questions
-EOF
-    fi
-
-    if [ -d "$ASSETS_TEMPLATES_DIR" ] && [ -f "$ASSETS_TEMPLATES_DIR/plan.template.md" ]; then
-        cp "$ASSETS_TEMPLATES_DIR/plan.template.md" .claude/templates/plan.template.md
-    else
-        cat > .claude/templates/plan.template.md << 'EOF'
-# Plan: {{TITLE}}
-
-> **Status**: Draft
-> **Created**: {{TIMESTAMP}}
-> **Slug**: {{SLUG}}
-> **Research**: See `tasks/research.md`
-
-## Approach
-### Strategy
-### Trade-offs
-| Option | Pros | Cons | Decision |
-|--------|------|------|----------|
-
-## Detailed Design
-### File Changes
-| File | Action | Description |
-|------|--------|-------------|
-
-### Code Snippets
-### Data Flow
-
-## Risk Assessment
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-
-## Task Contracts
-- Contract file: `tasks/contracts/{{SLUG}}.contract.md`
-- Template: `.claude/templates/contract.template.md`
-- Verification command: `bash scripts/verify-contract.sh --contract tasks/contracts/{{SLUG}}.contract.md --strict`
-- Active plan rule: the latest non-archived `plans/plan-*.md` file is the current plan
-
-## Annotations
-<!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
-
-## Task Breakdown
-- [ ] ...
-EOF
-    fi
-
-    if [ -d "$ASSETS_TEMPLATES_DIR" ] && [ -f "$ASSETS_TEMPLATES_DIR/contract.template.md" ]; then
-        cp "$ASSETS_TEMPLATES_DIR/contract.template.md" .claude/templates/contract.template.md
-    else
-        cat > .claude/templates/contract.template.md << 'EOF'
-# Task Contract: {{TASK_SLUG}}
-
-> **Status**: Pending
-> **Plan**: {{PLAN_FILE}}
-> **Owner**: {{OWNER}}
-> **Last Updated**: {{TIMESTAMP}}
-
-## Goal
-
-Describe the exact outcome this task must deliver.
-
-## Exit Criteria (Machine Verifiable)
-
-```yaml
-exit_criteria:
-  files_exist:
-    - src/modules/{{TASK_SLUG}}/index.ts
-  tests_pass:
-    - path: tests/unit/{{TASK_SLUG}}.test.ts
-  commands_succeed:
-    - bun run typecheck
-  files_contain:
-    - path: src/modules/{{TASK_SLUG}}/index.ts
-      pattern: "export"
-```
-
-## Acceptance Notes (Human Review)
-
-- Functional behavior:
-- Edge cases:
-- Regression risks:
-
-## Optional Visual Checks
-
-- Screenshot path (optional):
-- What to verify visually:
-EOF
-    fi
-}
-
-install_workflow_helpers() {
-    mkdir -p scripts
-
-    if [ -d "$ASSETS_TEMPLATES_DIR/helpers" ]; then
-        cp "$ASSETS_TEMPLATES_DIR/helpers/"*.sh scripts/ 2>/dev/null || true
-        chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh 2>/dev/null || true
-        return
-    fi
-
-    cat > scripts/new-plan.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: new-plan.sh"
-exit 1
-EOF
-
-    cat > scripts/plan-to-todo.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: plan-to-todo.sh"
-exit 1
-EOF
-
-    cat > scripts/archive-workflow.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: archive-workflow.sh"
-exit 1
-EOF
-
-    cat > scripts/verify-contract.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: verify-contract.sh"
-exit 1
-EOF
-
-    cat > scripts/check-task-sync.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: check-task-sync.sh"
-exit 1
-EOF
-
-    cat > scripts/ensure-task-workflow.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: ensure-task-workflow.sh"
-exit 1
-EOF
-
-    cat > scripts/check-task-workflow.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-echo "Missing helper template: check-task-workflow.sh"
-exit 1
-EOF
-
-    chmod +x scripts/new-plan.sh scripts/plan-to-todo.sh scripts/archive-workflow.sh scripts/verify-contract.sh scripts/check-task-sync.sh scripts/ensure-task-workflow.sh scripts/check-task-workflow.sh
-}
-
-install_skill_factory_assets() {
-    mkdir -p .claude/skill-factory scripts
-
-    if [ -d "$ASSETS_SKILL_FACTORY_DIR" ]; then
-        cp -R "$ASSETS_SKILL_FACTORY_DIR"/. .claude/skill-factory/
-    fi
-
-    if [ -f "$SCRIPT_DIR/skill-factory-create.sh" ]; then
-        cp "$SCRIPT_DIR/skill-factory-create.sh" scripts/skill-factory-create.sh
-    fi
-    if [ -f "$SCRIPT_DIR/skill-factory-check.sh" ]; then
-        cp "$SCRIPT_DIR/skill-factory-check.sh" scripts/skill-factory-check.sh
-    fi
-
-    chmod +x scripts/skill-factory-create.sh scripts/skill-factory-check.sh 2>/dev/null || true
 }
 
 install_hook_assets() {
@@ -349,27 +114,9 @@ EOF_HOOK_SHIM
 }
 
 ensure_task_sync_package_script() {
-    local package_file="package.json"
-
-    if [ ! -f "$package_file" ]; then
-        return
-    fi
-
-    if command_exists node; then
-        node -e '
-const fs = require("fs");
-const file = process.argv[1];
-const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-pkg.private ??= true;
-pkg.scripts ??= {};
-pkg.scripts["check:task-sync"] = "bash scripts/check-task-sync.sh";
-pkg.scripts["check:task-workflow"] = "bash scripts/check-task-workflow.sh --strict";
-fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
-' "$package_file"
-        return
-    fi
-
-    echo -e "${YELLOW}Warning: node not found. Could not inject task workflow scripts into package.json.${NC}"
+    pi_ensure_task_sync "$PWD" "0" "apply" || {
+        echo -e "${YELLOW}Warning: task workflow script injection failed for package.json.${NC}"
+    }
 }
 
 # Check package manager
@@ -563,7 +310,7 @@ EOF
 *Updated: ${TODAY}*
 EOF
 
-    install_workflow_templates
+    pi_install_templates "$PWD" "$ASSETS_TEMPLATES_DIR" "apply"
 
     if [ -f ".claude/templates/research.template.md" ]; then
         sed \
@@ -596,8 +343,11 @@ EOF
 EOF
     fi
 
-    install_workflow_helpers
-    install_skill_factory_assets
+    pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply"
+    pi_install_skill_factory "$PWD" "$ASSETS_SKILL_FACTORY_DIR" "$SCRIPT_DIR" "apply"
+    if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-$STACK}"; then
+        pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"
+    fi
     ensure_task_sync_package_script
 
     install_hook_settings_template

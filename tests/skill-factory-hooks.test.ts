@@ -93,6 +93,8 @@ describe("Skill Factory hooks", () => {
           proposal.status === "pending"
       );
       expect(workflow).toBeDefined();
+      expect(workflow.reason).toContain("evidence score");
+      expect(workflow.source_patterns.evidence_score).toBeGreaterThanOrEqual(3);
 
       const state = JSON.parse(readFileSync(join(cwd, ".claude/.skill-factory-state.json"), "utf-8"));
       expect(state.patterns.workflow["bug-fix"].count).toBeGreaterThanOrEqual(3);
@@ -160,6 +162,10 @@ describe("Skill Factory hooks", () => {
       );
       expect(marker.skill_slug).toBe("bug-fix-workflow");
       expect(marker.skill_type).toBe("workflow");
+      const meta = JSON.parse(
+        readFileSync(join(home, ".claude/skills/bug-fix-workflow/.factory/meta.json"), "utf-8")
+      );
+      expect(meta.source_pattern_key).toBe("bug-fix");
       const openaiYaml = readFileSync(
         join(home, ".claude/skills/bug-fix-workflow/agents/openai.yaml"),
         "utf-8"
@@ -196,6 +202,7 @@ describe("Skill Factory hooks", () => {
       const checkBefore = runInRepo(cwd, home, "scripts/skill-factory-check.sh");
       expect(checkBefore.status).toBe(0);
       expect(checkBefore.stdout).toContain("Optimization hints: none");
+      expect(checkBefore.stdout).toContain("Skill stats: bug-fix-workflow activity=3 feedback=0 readiness=LOW");
 
       for (let i = 0; i < 3; i += 1) {
         const feedback = runInRepo(cwd, home, "scripts/skill-factory-check.sh", [
@@ -222,6 +229,66 @@ describe("Skill Factory hooks", () => {
       const checkAfter = runInRepo(cwd, home, "scripts/skill-factory-check.sh");
       expect(checkAfter.status).toBe(0);
       expect(checkAfter.stdout).toContain("bug-fix-workflow:3");
+      expect(checkAfter.stdout).toContain("Workflow readiness: bug-fix count=0 corrections=3 evidence=6 readiness=HIGH");
+      expect(checkAfter.stdout).toContain("Skill stats: bug-fix-workflow activity=3 feedback=3 readiness=HIGH");
+
+      const state = JSON.parse(readFileSync(join(cwd, ".claude/.skill-factory-state.json"), "utf-8"));
+      expect(state.pattern_feedback.workflow["bug-fix"].correction_count).toBe(3);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("create script warns on malformed rubric input but still creates the skill", () => {
+    const { cwd, home } = setupProject("sf-rubric-warning");
+    try {
+      const proposalsPath = join(home, ".claude/.skill-proposals.json");
+      writeFileSync(
+        proposalsPath,
+        JSON.stringify(
+          {
+            proposals: [
+              {
+                id: "workflow-feature-1",
+                type: "workflow",
+                key: "feature",
+                title: "Create a workflow skill for feature",
+                repo_root: cwd,
+                reason: "Detected repeated feature sessions.",
+                status: "pending",
+                skill_slug: "feature-workflow",
+                source_patterns: { count: 3, evidence_score: 3 },
+                created_at: 1710000000,
+              },
+            ],
+          },
+          null,
+          2
+        )
+      );
+
+      const create = runInRepo(cwd, home, "scripts/skill-factory-create.sh", [
+        "--proposal",
+        "workflow-feature-1",
+        "--title",
+        "Feature Workflow",
+        "--goal",
+        "Capture the repeated feature workflow used in this project.",
+        "--outputs",
+        "- Updated code\n- Verification notes",
+        "--boundaries",
+        "- Preserve the repo contract",
+        "--test-prompt",
+        "",
+        "--question",
+        '{"id":"q1"}',
+      ]);
+
+      expect(create.status).toBe(0);
+      expect(create.stderr).toContain("rubric testPrompts contains a blank prompt");
+      expect(create.stderr).toContain("rubric question is missing one of");
+      expect(existsSync(join(home, ".claude/skills/feature-workflow/SKILL.md"))).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
       rmSync(home, { recursive: true, force: true });

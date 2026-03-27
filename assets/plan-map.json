@@ -85,6 +85,7 @@
       "stack": "FastAPI + Vite Frontend",
       "tier": "preset",
       "cloudflareNative": true,
+      "factorFactory": true,
       "defaultLsp": "pyright-lsp",
       "defaultTemplateVariables": {
         "TECH_STACK_TABLE": "| Frontend | Vite + React |\\n| Backend | FastAPI + Python |\\n| Data | TimescaleDB / InfluxDB |\\n| AI | Claude / OpenAI |"
