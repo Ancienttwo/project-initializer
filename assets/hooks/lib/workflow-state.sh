@@ -435,3 +435,96 @@ contract_references_path() {
 
   return 1
 }
+
+workflow_contract_slug() {
+  local active_plan slug
+  active_plan="$(get_active_plan || true)"
+  [[ -n "$active_plan" ]] || return 1
+
+  slug="$(basename "$active_plan" | sed -E 's/^plan-[0-9]{8}-[0-9]{4}-//; s/\.md$//')"
+  [[ -n "$slug" ]] || return 1
+  printf '%s' "$slug"
+}
+
+workflow_active_contract() {
+  local active_plan contract_file
+  active_plan="$(get_active_plan || true)"
+  [[ -n "$active_plan" ]] || return 1
+
+  contract_file="$(derive_contract_path "$active_plan" || true)"
+  [[ -n "$contract_file" ]] || return 1
+  printf '%s' "$contract_file"
+}
+
+workflow_active_review() {
+  local slug
+  slug="$(workflow_contract_slug || true)"
+  [[ -n "$slug" ]] || return 1
+  printf 'tasks/reviews/%s.review.md' "$slug"
+}
+
+workflow_checks_file() {
+  printf '.ai/harness/checks/latest.json'
+}
+
+workflow_handoff_file() {
+  printf '.ai/harness/handoff/current.md'
+}
+
+workflow_write_handoff() {
+  local reason="${1:-session-stop}"
+  local handoff_file active_plan active_contract active_review checks_file next_task changed_files diff_stat spec_file
+
+  handoff_file="$(workflow_handoff_file)"
+  checks_file="$(workflow_checks_file)"
+  spec_file="docs/spec.md"
+  active_plan="$(get_active_plan || true)"
+  active_contract="$(workflow_active_contract || true)"
+  active_review="$(workflow_active_review || true)"
+
+  mkdir -p "$(dirname "$handoff_file")"
+
+  next_task="$(
+    grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null \
+      | head -1 \
+      | sed -E 's/^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+//'
+  )"
+  next_task="${next_task:-(none)}"
+
+  if is_git_repo; then
+    changed_files="$( (git diff --name-only HEAD 2>/dev/null || true) | head -10 )"
+    changed_files="${changed_files:-(none)}"
+
+    diff_stat="$( (git diff --shortstat HEAD 2>/dev/null || true) | tr -d '\n' )"
+    diff_stat="${diff_stat:-no uncommitted diff against HEAD}"
+  else
+    changed_files="(none)"
+    diff_stat="git repository not detected"
+  fi
+
+  cat > "$handoff_file" <<EOF_HANDOFF
+# Harness Handoff
+
+> **Generated**: $(date '+%Y-%m-%d %H:%M:%S')
+> **Reason**: ${reason}
+
+## Active Artifacts
+
+- Spec: ${spec_file}
+- Plan: ${active_plan:-(none)}
+- Contract: ${active_contract:-(none)}
+- Review: ${active_review:-(none)}
+- Checks: ${checks_file}
+
+## Current Status
+
+- Next recommended action: ${next_task}
+- Working tree: ${diff_stat}
+
+## Changed Files
+
+\`\`\`
+${changed_files}
+\`\`\`
+EOF_HANDOFF
+}

@@ -35,6 +35,42 @@ get_active_plan() {
 ensure_templates() {
   mkdir -p .claude/templates
 
+  if [[ ! -f ".claude/templates/spec.template.md" ]]; then
+    cat > .claude/templates/spec.template.md <<'SPEC_TEMPLATE_EOF'
+# Product Spec: {{PROJECT_NAME}}
+
+> **Status**: Draft
+> **Last Updated**: {{TIMESTAMP}}
+> **Owner**: Planner
+
+## Product Outcome
+
+Describe the stable user or operator outcome this repo should deliver.
+
+## Success Criteria
+
+- Primary workflow:
+- Quality bar:
+- Out of scope:
+
+## Constraints
+
+- Technical:
+- Compliance:
+- Delivery:
+
+## Acceptance Scenarios
+
+- Given
+  When
+  Then
+
+## Open Questions
+
+- ...
+SPEC_TEMPLATE_EOF
+  fi
+
   if [[ ! -f ".claude/templates/research.template.md" ]]; then
     cat > .claude/templates/research.template.md <<'RESEARCH_TEMPLATE_EOF'
 # {{PROJECT_NAME}} — Research Notes
@@ -109,10 +145,28 @@ PLAN_TEMPLATE_EOF
 > **Plan**: {{PLAN_FILE}}
 > **Owner**: {{OWNER}}
 > **Last Updated**: {{TIMESTAMP}}
+> **Review File**: `tasks/reviews/{{TASK_SLUG}}.review.md`
 
 ## Goal
 
 Describe the exact outcome this task must deliver.
+
+## Scope
+
+- In scope:
+- Out of scope:
+
+## Allowed Paths
+
+```yaml
+allowed_paths:
+  - plans/
+  - tasks/todo.md
+  - tasks/contracts/{{TASK_SLUG}}.contract.md
+  - tasks/reviews/{{TASK_SLUG}}.review.md
+  - src/
+  - tests/
+```
 
 ## Exit Criteria (Machine Verifiable)
 
@@ -135,11 +189,46 @@ exit_criteria:
 - Edge cases:
 - Regression risks:
 
-## Optional Visual Checks
+## Rollback Point
 
-- Screenshot path (optional):
-- What to verify visually:
+- Commit / checkpoint:
+- Revert strategy:
 CONTRACT_TEMPLATE_EOF
+  fi
+
+  if [[ ! -f ".claude/templates/review.template.md" ]]; then
+    cat > .claude/templates/review.template.md <<'REVIEW_TEMPLATE_EOF'
+# Sprint Review: {{TASK_SLUG}}
+
+> **Status**: Pending
+> **Plan**: {{PLAN_FILE}}
+> **Contract**: {{CONTRACT_FILE}}
+> **Checks File**: {{CHECKS_FILE}}
+> **Last Updated**: {{TIMESTAMP}}
+> **Recommendation**: fail
+
+## Scorecard
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Functionality | 0/10 | |
+| Product depth | 0/10 | |
+| Design quality | 0/10 | |
+| Code quality | 0/10 | |
+
+## Failing Items
+
+- ...
+
+## Retest Steps
+
+- Re-run:
+- Re-check:
+
+## Summary
+
+- ...
+REVIEW_TEMPLATE_EOF
   fi
 }
 

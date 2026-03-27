@@ -49,6 +49,7 @@ describe("Migration script contract", () => {
     expect(script).toContain("new-plan.sh");
     expect(script).toContain("plan-to-todo.sh");
     expect(script).toContain("archive-workflow.sh");
+    expect(script).toContain("prepare-handoff.sh");
     expect(script).toContain("verify-contract.sh");
     expect(script).toContain("check-task-sync.sh");
     expect(script).toContain("ensure-task-workflow.sh");
@@ -90,11 +91,14 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "plans/archive"))).toBe(true);
       expect(existsSync(join(repo, "tasks/archive"))).toBe(true);
       expect(existsSync(join(repo, ".claude/templates/research.template.md"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/templates/spec.template.md"))).toBe(true);
       expect(existsSync(join(repo, ".claude/templates/plan.template.md"))).toBe(true);
       expect(existsSync(join(repo, ".claude/templates/contract.template.md"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/templates/review.template.md"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-plan.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/plan-to-todo.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/archive-workflow.sh"))).toBe(true);
+      expect(existsSync(join(repo, "scripts/prepare-handoff.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/verify-contract.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/check-task-sync.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/ensure-task-workflow.sh"))).toBe(true);
@@ -109,6 +113,10 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "tasks/lessons.md"))).toBe(true);
       expect(existsSync(join(repo, "tasks/contracts"))).toBe(true);
       expect(existsSync(join(repo, "docs/reference-configs/spa-day-protocol.md"))).toBe(true);
+      expect(existsSync(join(repo, "docs/reference-configs/handoff-protocol.md"))).toBe(true);
+      expect(existsSync(join(repo, "docs/reference-configs/harness-overview.md"))).toBe(true);
+      expect(existsSync(join(repo, "docs/reference-configs/evaluator-rubric.md"))).toBe(true);
+      expect(existsSync(join(repo, "docs/reference-configs/sprint-contracts.md"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/lib/skill-factory.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/skill-factory/rubric.template.json"))).toBe(true);
 

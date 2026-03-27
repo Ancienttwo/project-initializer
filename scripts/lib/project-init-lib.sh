@@ -65,6 +65,40 @@ PI_TEMPLATE_RESEARCH=$(cat <<'EOF_TEMPLATE_RESEARCH'
 ### Open Questions
 EOF_TEMPLATE_RESEARCH
 )
+PI_TEMPLATE_SPEC=$(cat <<'EOF_TEMPLATE_SPEC'
+# Product Spec: {{PROJECT_NAME}}
+
+> **Status**: Draft
+> **Last Updated**: {{TIMESTAMP}}
+> **Owner**: Planner
+
+## Product Outcome
+
+Describe the stable user or operator outcome this repo should deliver.
+
+## Success Criteria
+
+- Primary workflow:
+- Quality bar:
+- Out of scope:
+
+## Constraints
+
+- Technical:
+- Compliance:
+- Delivery:
+
+## Acceptance Scenarios
+
+- Given
+  When
+  Then
+
+## Open Questions
+
+- ...
+EOF_TEMPLATE_SPEC
+)
 PI_TEMPLATE_PLAN=$(cat <<'EOF_TEMPLATE_PLAN'
 # Plan: {{TITLE}}
 
@@ -111,10 +145,28 @@ PI_TEMPLATE_CONTRACT=$(cat <<'EOF_TEMPLATE_CONTRACT'
 > **Plan**: {{PLAN_FILE}}
 > **Owner**: {{OWNER}}
 > **Last Updated**: {{TIMESTAMP}}
+> **Review File**: `tasks/reviews/{{TASK_SLUG}}.review.md`
 
 ## Goal
 
 Describe the exact outcome this task must deliver.
+
+## Scope
+
+- In scope:
+- Out of scope:
+
+## Allowed Paths
+
+```yaml
+allowed_paths:
+  - plans/
+  - tasks/todo.md
+  - tasks/contracts/{{TASK_SLUG}}.contract.md
+  - tasks/reviews/{{TASK_SLUG}}.review.md
+  - src/
+  - tests/
+```
 
 ## Exit Criteria (Machine Verifiable)
 
@@ -137,11 +189,44 @@ exit_criteria:
 - Edge cases:
 - Regression risks:
 
-## Optional Visual Checks
+## Rollback Point
 
-- Screenshot path (optional):
-- What to verify visually:
+- Commit / checkpoint:
+- Revert strategy:
 EOF_TEMPLATE_CONTRACT
+)
+PI_TEMPLATE_REVIEW=$(cat <<'EOF_TEMPLATE_REVIEW'
+# Sprint Review: {{TASK_SLUG}}
+
+> **Status**: Pending
+> **Plan**: {{PLAN_FILE}}
+> **Contract**: {{CONTRACT_FILE}}
+> **Checks File**: {{CHECKS_FILE}}
+> **Last Updated**: {{TIMESTAMP}}
+> **Recommendation**: fail
+
+## Scorecard
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Functionality | 0/10 | |
+| Product depth | 0/10 | |
+| Design quality | 0/10 | |
+| Code quality | 0/10 | |
+
+## Failing Items
+
+- ...
+
+## Retest Steps
+
+- Re-run:
+- Re-check:
+
+## Summary
+
+- ...
+EOF_TEMPLATE_REVIEW
 )
 
 pi_write_file_if_apply() {
@@ -258,6 +343,12 @@ pi_install_templates() {
     printf '%s\n' "$PI_TEMPLATE_RESEARCH" > "$output_dir/research.template.md"
   fi
 
+  if [[ -f "$templates_dir/spec.template.md" ]]; then
+    cp "$templates_dir/spec.template.md" "$output_dir/spec.template.md"
+  else
+    printf '%s\n' "$PI_TEMPLATE_SPEC" > "$output_dir/spec.template.md"
+  fi
+
   if [[ -f "$templates_dir/plan.template.md" ]]; then
     cp "$templates_dir/plan.template.md" "$output_dir/plan.template.md"
   else
@@ -269,13 +360,19 @@ pi_install_templates() {
   else
     printf '%s\n' "$PI_TEMPLATE_CONTRACT" > "$output_dir/contract.template.md"
   fi
+
+  if [[ -f "$templates_dir/review.template.md" ]]; then
+    cp "$templates_dir/review.template.md" "$output_dir/review.template.md"
+  else
+    printf '%s\n' "$PI_TEMPLATE_REVIEW" > "$output_dir/review.template.md"
+  fi
 }
 
 pi_install_helpers() {
   local target_dir="$1"
   local helpers_dir="$2"
   local mode="${3:-apply}"
-  local helper_names="${4:-new-plan.sh plan-to-todo.sh archive-workflow.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh}"
+  local helper_names="${4:-new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh}"
   local scripts_dir="$target_dir/scripts"
   local helper_name
 
@@ -292,7 +389,7 @@ pi_install_helpers() {
         cp "$helpers_dir/$helper_name" "$scripts_dir/$helper_name"
       fi
     done
-    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
+    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
     return 0
   fi
 

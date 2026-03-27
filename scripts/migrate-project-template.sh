@@ -187,7 +187,7 @@ install_templates() {
 install_helpers() {
   local repo="$1"
   if [[ -d "$HELPER_ASSETS_DIR" ]]; then
-    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-plan.sh plan-to-todo.sh archive-workflow.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
+    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
   fi
@@ -545,10 +545,10 @@ migrate_workflow() {
   ensure_gitignore_entry "$repo_gitignore" ".DS_Store"
   ensure_runtime_gitignore_block "$repo_gitignore"
 
+  local ref_assets_dir="$SKILL_ROOT/assets/reference-configs"
   local spa_protocol_repo="$repo/docs/reference-configs/spa-day-protocol.md"
-  local spa_protocol_asset="$SKILL_ROOT/assets/reference-configs/spa-day-protocol.md"
-  if [[ -f "$spa_protocol_asset" ]]; then
-    run_or_echo "cp \"$spa_protocol_asset\" \"$spa_protocol_repo\""
+  if [[ -d "$ref_assets_dir" ]]; then
+    run_or_echo "cp \"$ref_assets_dir\"/*.md \"$repo/docs/reference-configs/\""
   elif [[ "$MODE" == "apply" && ! -f "$spa_protocol_repo" ]]; then
     cat > "$spa_protocol_repo" <<'SPA_DAY_EOF'
 # Spa Day Protocol

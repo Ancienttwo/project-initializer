@@ -93,10 +93,28 @@ render_contract_file() {
 > **Plan**: {{PLAN_FILE}}
 > **Owner**: {{OWNER}}
 > **Last Updated**: {{TIMESTAMP}}
+> **Review File**: `tasks/reviews/{{TASK_SLUG}}.review.md`
 
 ## Goal
 
 Describe the exact outcome this task must deliver.
+
+## Scope
+
+- In scope:
+- Out of scope:
+
+## Allowed Paths
+
+```yaml
+allowed_paths:
+  - plans/
+  - tasks/todo.md
+  - tasks/contracts/{{TASK_SLUG}}.contract.md
+  - tasks/reviews/{{TASK_SLUG}}.review.md
+  - src/
+  - tests/
+```
 
 ## Exit Criteria (Machine Verifiable)
 
@@ -119,10 +137,10 @@ exit_criteria:
 - Edge cases:
 - Regression risks:
 
-## Optional Visual Checks
+## Rollback Point
 
-- Screenshot path (optional):
-- What to verify visually:
+- Commit / checkpoint:
+- Revert strategy:
 CONTRACT_TEMPLATE_EOF
   fi
 

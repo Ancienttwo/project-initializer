@@ -17,6 +17,7 @@ if [[ -f "$PI_LIB_DIR/project-init-lib.sh" ]]; then
 fi
 ASSETS_TEMPLATES_DIR="$SCRIPT_DIR/../assets/templates"
 ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
+ASSETS_REF_DIR="$SCRIPT_DIR/../assets/reference-configs"
 ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
 ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
 
@@ -125,35 +126,6 @@ touch docs/reference-configs/ai-workflows.md
 touch docs/reference-configs/coding-standards.md
 touch docs/reference-configs/development-protocol.md
 touch docs/reference-configs/workflow-orchestration.md
-cat > docs/reference-configs/spa-day-protocol.md <<'SPA_DAY_EOF'
-# Spa Day Protocol
-
-Periodic cleanup protocol to reduce context bloat and rule conflicts.
-
-## 1. Rule Consolidation
-- Merge overlapping rules in `docs/reference-configs/`.
-- Remove contradictory instructions and keep one canonical rule per topic.
-
-## 2. CLAUDE/AGENTS Routing Freshness
-- Verify all routed paths still exist.
-- Remove stale references from CLAUDE.md/AGENTS.md indexes.
-
-## 3. Lessons Graduation
-- Promote repeated lessons from `tasks/lessons.md` into durable rules.
-- Archive one-off or obsolete lessons.
-
-## 4. Research Pruning
-- Remove already-implemented investigation items from `tasks/research.md`.
-- Keep only unresolved findings and open questions.
-
-## 5. Docs Reality Check
-- Sync `docs/architecture.md` and `docs/tech-stack.md` with current codebase.
-- Flag drift for immediate correction.
-
-## 6. Contract Hygiene
-- Move fulfilled contracts from `tasks/contracts/` into an archive folder if needed.
-- Keep active contracts only for in-flight tasks.
-SPA_DAY_EOF
 
 cat > docs/PROGRESS.md << 'PROGRESS_EOF'
 # Project Milestones
@@ -289,47 +261,57 @@ bun test --watch      # Watch mode
 ```
 TESTS_README_EOF
 
-cat > docs/reference-configs/changelog-versioning.md << 'REF_CHANGELOG_EOF'
+if [[ -d "$ASSETS_REF_DIR" ]]; then
+  cp "$ASSETS_REF_DIR"/*.md docs/reference-configs/
+else
+  cat > docs/reference-configs/changelog-versioning.md << 'REF_CHANGELOG_EOF'
 # Changelog & Versioning Reference
 
 Use this file for detailed release-note and semantic-versioning rules.
 REF_CHANGELOG_EOF
 
-cat > docs/reference-configs/git-strategy.md << 'REF_GIT_EOF'
+  cat > docs/reference-configs/git-strategy.md << 'REF_GIT_EOF'
 # Git Strategy Reference
 
 Use this file for branch model and commit convention details.
 REF_GIT_EOF
 
-cat > docs/reference-configs/release-deploy.md << 'REF_RELEASE_EOF'
+  cat > docs/reference-configs/release-deploy.md << 'REF_RELEASE_EOF'
 # Release & Deployment Reference
 
 Use this file for release pipeline and deployment trigger details.
 REF_RELEASE_EOF
 
-cat > docs/reference-configs/ai-workflows.md << 'REF_AIWF_EOF'
+  cat > docs/reference-configs/ai-workflows.md << 'REF_AIWF_EOF'
 # AI Workflows Reference
 
 Use this file for extended AI workflow templates, tasks-first session handoff, and milestone-only progress guidance.
 REF_AIWF_EOF
 
-cat > docs/reference-configs/coding-standards.md << 'REF_CODING_STANDARDS_EOF'
+  cat > docs/reference-configs/coding-standards.md << 'REF_CODING_STANDARDS_EOF'
 # Coding Standards Reference
 
 Use this file for detailed coding constraints and refactor thresholds.
 REF_CODING_STANDARDS_EOF
 
-cat > docs/reference-configs/development-protocol.md << 'REF_DEV_PROTOCOL_EOF'
+  cat > docs/reference-configs/development-protocol.md << 'REF_DEV_PROTOCOL_EOF'
 # Development Protocol Reference
 
 Use this file for detailed feature/bug flow playbooks, repo-local task sync rules, and final response requirements.
 REF_DEV_PROTOCOL_EOF
 
-cat > docs/reference-configs/workflow-orchestration.md << 'REF_WORKFLOW_ORCH_EOF'
+  cat > docs/reference-configs/workflow-orchestration.md << 'REF_WORKFLOW_ORCH_EOF'
 # Workflow Orchestration Reference
 
 Use this file for advanced plan/execution orchestration patterns.
 REF_WORKFLOW_ORCH_EOF
+
+  cat > docs/reference-configs/spa-day-protocol.md << 'SPA_DAY_EOF'
+# Spa Day Protocol
+
+Periodic cleanup protocol to reduce context bloat and rule conflicts.
+SPA_DAY_EOF
+fi
 
 cat > scripts/regenerate.sh << 'REGENERATE_EOF'
 #!/bin/bash

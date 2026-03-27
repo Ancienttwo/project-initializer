@@ -18,8 +18,15 @@ describe("create-project-dirs runtime smoke", () => {
 
       expect(existsSync(join(cwd, "tasks/contracts"))).toBe(true);
       expect(existsSync(join(cwd, ".claude/templates/contract.template.md"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/templates/spec.template.md"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/templates/review.template.md"))).toBe(true);
       expect(existsSync(join(cwd, "docs/reference-configs/spa-day-protocol.md"))).toBe(true);
+      expect(existsSync(join(cwd, "docs/reference-configs/handoff-protocol.md"))).toBe(true);
+      expect(existsSync(join(cwd, "docs/reference-configs/harness-overview.md"))).toBe(true);
+      expect(existsSync(join(cwd, "docs/reference-configs/evaluator-rubric.md"))).toBe(true);
+      expect(existsSync(join(cwd, "docs/reference-configs/sprint-contracts.md"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/verify-contract.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/prepare-handoff.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-sync.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/ensure-task-workflow.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-workflow.sh"))).toBe(true);
