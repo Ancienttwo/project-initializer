@@ -72,12 +72,16 @@ repo_root="${HOOK_REPO_ROOT:-$REPO_ROOT}"
 pending_count="$(sf_jq -r --arg repo_root "$repo_root" '[ (.proposals // [])[] | select(.repo_root == $repo_root and .status == "pending") ] | length' "$SF_PROPOSALS_FILE" 2>/dev/null || echo 0)"
 workflow_keys="$(sf_jq -r '.patterns.workflow | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
 knowledge_keys="$(sf_jq -r '.patterns.knowledge | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+memory_keys="$(sf_jq -r '.memory.themes | keys | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
+memory_corroborations="$(sf_jq -r '(.memory.corroborations // {}) | to_entries | map("\(.key):\(.value.count // 0)") | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
 hint_summary="$(sf_jq -r '(.optimization_hints // []) | map(select((.feedback_count // 0) >= 1) | "\(.slug):\(.feedback_count)") | join(", ")' "$SF_STATE_FILE" 2>/dev/null || true)"
 
 echo "[SkillFactory] State file: $SF_STATE_FILE"
 echo "[SkillFactory] Pending proposals: ${pending_count}"
 echo "[SkillFactory] Workflow patterns: ${workflow_keys:-none}"
 echo "[SkillFactory] Knowledge patterns: ${knowledge_keys:-none}"
+echo "[SkillFactory] Memory themes: ${memory_keys:-none}"
+echo "[SkillFactory] Memory corroborations: ${memory_corroborations:-none}"
 echo "[SkillFactory] Optimization hints: ${hint_summary:-none}"
 
 while IFS= read -r workflow_key; do

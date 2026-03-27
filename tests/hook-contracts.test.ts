@@ -11,6 +11,7 @@ function read(relPath: string): string {
 describe("Hook contracts", () => {
   test("shared hook input parser should exist", () => {
     expect(existsSync(join(ROOT, "assets/hooks/hook-input.sh"))).toBe(true);
+    expect(existsSync(join(ROOT, "assets/hooks/lib/memory-state.sh"))).toBe(true);
     expect(existsSync(join(ROOT, "assets/hooks/lib/workflow-state.sh"))).toBe(true);
     expect(existsSync(join(ROOT, "assets/hooks/lib/session-state.sh"))).toBe(true);
     expect(existsSync(join(ROOT, "assets/hooks/lib/skill-factory.sh"))).toBe(true);
@@ -21,6 +22,15 @@ describe("Hook contracts", () => {
     expect(script).toContain("HOOK_REPO_ROOT");
     expect(script).toContain("HookRunner");
     expect(script).toContain(".ai/hooks");
+  });
+
+  test("hook input parser should support current Claude Code prompt and memory fields", () => {
+    const script = read("assets/hooks/hook-input.sh");
+    expect(script).toContain(".prompt");
+    expect(script).toContain(".session_id");
+    expect(script).toContain(".transcript_path");
+    expect(script).toContain(".memory_type");
+    expect(script).toContain(".load_reason");
   });
 
   test("pre-code-change should protect contracts/specs/tests paths", () => {
@@ -107,6 +117,7 @@ describe("Hook contracts", () => {
 
   test("settings template should not inject TOOL_INPUT/PROMPT argv blobs", () => {
     const settings = read("assets/hooks/settings.template.json");
+    expect(settings).toContain("memory-intake.sh");
     expect(settings).toContain("run-hook.sh");
     expect(settings).toContain(".ai/hooks/run-hook.sh");
     expect(settings).toContain("pre-edit-guard.sh");

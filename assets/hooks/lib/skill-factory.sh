@@ -20,6 +20,8 @@ fi
 SF_STATE_FILE=".claude/.skill-factory-state.json"
 SF_SESSION_FILE=".claude/.skill-factory-session.json"
 SF_SESSION_MARKER_FILE=".claude/.skill-factory-session-marker.json"
+SF_MEMORY_CONTEXT_FILE=".claude/.memory-context.json"
+SF_MEMORY_SNAPSHOT_FILE=".claude/.memory-snapshot.json"
 SF_GLOBAL_HOME="${CLAUDE_SKILL_FACTORY_HOME:-${HOME}/.claude}"
 if ! mkdir -p "$SF_GLOBAL_HOME" 2>/dev/null; then
   SF_GLOBAL_HOME=".claude/.skill-factory-user"
@@ -85,6 +87,13 @@ sf_ensure_state() {
   "pattern_feedback": {
     "workflow": {}
   },
+  "memory": {
+    "last_scan_at": 0,
+    "last_snapshot_hash": "",
+    "recent_deltas": [],
+    "themes": {},
+    "corroborations": {}
+  },
   "optimization_hints": [],
   "dismissed": []
 }
@@ -97,6 +106,7 @@ EOF_STATE
       | .sessions = (.sessions // {recent: []})
       | .patterns = (.patterns // {workflow: {}, knowledge: {}})
       | .pattern_feedback = (.pattern_feedback // {workflow: {}})
+      | .memory = (.memory // {last_scan_at: 0, last_snapshot_hash: "", recent_deltas: [], themes: {}, corroborations: {}})
       | .optimization_hints = (.optimization_hints // [])
       | .dismissed = (.dismissed // [])
     ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
@@ -113,6 +123,173 @@ EOF_PROPOSALS
 
 sf_normalize_slug() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+sf_text_matches_slug() {
+  local text="$1"
+  local slug="$2"
+  local normalized spaced part matched=0
+
+  normalized="$(printf '%s' "$text" | tr '[:upper:]' '[:lower:]')"
+  spaced="${slug//-/ }"
+
+  if [[ -n "$slug" && "$normalized" == *"$slug"* ]]; then
+    return 0
+  fi
+
+  if [[ -n "$spaced" && "$normalized" == *"$spaced"* ]]; then
+    return 0
+  fi
+
+  IFS='-' read -r -a slug_parts <<< "$slug"
+  for part in "${slug_parts[@]}"; do
+    [[ ${#part} -lt 4 ]] && continue
+    if [[ "$normalized" == *"$part"* ]]; then
+      matched=1
+      break
+    fi
+  done
+
+  [[ "$matched" -eq 1 ]]
+}
+
+sf_recompute_memory_corroborations() {
+  if ! sf_require_jq; then
+    return 0
+  fi
+
+  sf_jq '
+    . as $state
+    | .memory.corroborations = (
+        reduce ($state.memory.themes | keys[]?) as $key ({};
+          .[$key] = {
+            memory_count: ($state.memory.themes[$key].count // 0),
+            workflow_count: ($state.patterns.workflow[$key].count // 0),
+            knowledge_count: ($state.patterns.knowledge[$key].count // 0),
+            count: (($state.patterns.workflow[$key].count // 0) + ($state.patterns.knowledge[$key].count // 0)),
+            label: ($state.memory.themes[$key].label // $key),
+            last_seen: ($state.memory.themes[$key].last_seen // 0)
+          }
+        )
+        | with_entries(select((.value.memory_count // 0) > 0 and ((.value.workflow_count // 0) > 0 or (.value.knowledge_count // 0) > 0)))
+      )
+  ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
+}
+
+sf_record_memory_context() {
+  local context_json="$1"
+
+  sf_ensure_state
+  if ! sf_require_jq || [[ -z "$context_json" ]]; then
+    return 0
+  fi
+
+  sf_jq \
+    --argjson ctx "$context_json" \
+    '
+      .memory.last_scan_at = ($ctx.scanned_at // 0)
+      | .memory.last_snapshot_hash = ($ctx.snapshot_hash // "")
+      | .memory.themes = (
+          reduce ($ctx.themes // [])[] as $theme ({};
+            .[($theme.slug // "")] = {
+              label: ($theme.label // ($theme.slug // "")),
+              count: ($theme.count // 1),
+              files: ($theme.files // []),
+              last_seen: ($ctx.scanned_at // 0)
+            }
+          )
+          | with_entries(select(.key != ""))
+        )
+      | .memory.recent_deltas = (
+          (.memory.recent_deltas // [])
+          + (
+            if (($ctx.delta.detected // false) == true or ($ctx.delta.type // "") == "autodream-like") then
+              [{
+                ts: ($ctx.scanned_at // 0),
+                type: ($ctx.delta.type // "updated"),
+                summary: ($ctx.delta.summary // ""),
+                changed_files: ($ctx.delta.changed_files // 0),
+                removed_files: ($ctx.delta.removed_files // 0),
+                line_delta: ($ctx.delta.line_delta // 0)
+              }]
+            else
+              []
+            end
+          )
+        )
+      | .memory.recent_deltas |= (.[-10:])
+    ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
+
+  sf_recompute_memory_corroborations
+}
+
+sf_memory_corroboration_count() {
+  local key="$1"
+
+  if ! sf_require_jq; then
+    printf '0'
+    return 0
+  fi
+
+  sf_jq -r --arg key "$key" '.memory.corroborations[$key].count // 0' "$SF_STATE_FILE" 2>/dev/null || printf '0'
+}
+
+sf_memory_label() {
+  local key="$1"
+
+  if ! sf_require_jq; then
+    printf '%s' "$key"
+    return 0
+  fi
+
+  sf_jq -r --arg key "$key" '.memory.themes[$key].label // .memory.corroborations[$key].label // $key' "$SF_STATE_FILE" 2>/dev/null || printf '%s' "$key"
+}
+
+sf_recent_memory_delta_type() {
+  if ! sf_require_jq; then
+    return 0
+  fi
+
+  sf_jq -r '.memory.recent_deltas[-1].type // ""' "$SF_STATE_FILE" 2>/dev/null || true
+}
+
+sf_memory_prompt_context() {
+  local prompt_text="$1"
+  local plan_slug="${2:-}"
+  local max_items="${3:-3}"
+  local recent_delta_type emitted=0
+
+  sf_ensure_state
+  if ! sf_require_jq; then
+    return 0
+  fi
+
+  recent_delta_type="$(sf_recent_memory_delta_type)"
+
+  while IFS=$'\t' read -r slug label count; do
+    [[ -z "$slug" ]] && continue
+    if ! sf_text_matches_slug "$prompt_text" "$slug" && ! sf_text_matches_slug "$plan_slug" "$slug"; then
+      continue
+    fi
+
+    if [[ "$emitted" -eq 0 && "$recent_delta_type" == "autodream-like" ]]; then
+      echo "[Memory] Auto memory was consolidated since the last session."
+    fi
+
+    echo "[Memory] Theme: ${label} (auto memory hits ${count})"
+    emitted=$((emitted + 1))
+    if [[ "$emitted" -ge "$max_items" ]]; then
+      break
+    fi
+  done < <(
+    sf_jq -r '
+      (.memory.themes // {})
+      | to_entries
+      | sort_by(-(.value.count // 0), .key)
+      | .[]
+      | "\(.key)\t\(.value.label // .key)\t\(.value.count // 1)"
+    ' "$SF_STATE_FILE" 2>/dev/null || true
+  )
 }
 
 sf_detect_intent_category() {
@@ -547,34 +724,48 @@ sf_workflow_readiness_label() {
 sf_evaluate_workflow_proposal() {
   local intent_category="$1"
   local repo_root="$2"
-  local evidence_line pattern_count correction_count evidence_score
+  local evidence_line pattern_count correction_count evidence_score memory_corroboration memory_label reason_json
 
   evidence_line="$(sf_compute_evidence_score "$intent_category")"
   pattern_count="${evidence_line%%$'\t'*}"
   correction_count="${evidence_line#*$'\t'}"
   correction_count="${correction_count%%$'\t'*}"
   evidence_score="${evidence_line##*$'\t'}"
+  memory_corroboration="$(sf_memory_corroboration_count "$intent_category")"
+  memory_label="$(sf_memory_label "$intent_category")"
 
   if (( pattern_count < SF_WORKFLOW_THRESHOLD )); then
     return 0
   fi
+
+  reason_json="$(
+    sf_jq -nc \
+      --arg key "$intent_category" \
+      --argjson count "$pattern_count" \
+      --argjson correction_count "$correction_count" \
+      --argjson evidence_score "$evidence_score" \
+      --arg readiness "$(sf_workflow_readiness_label "$evidence_score")" \
+      --argjson memory_corroboration "$memory_corroboration" \
+      --arg memory_label "$memory_label" \
+      '{
+        key: $key,
+        count: $count,
+        correction_count: $correction_count,
+        evidence_score: $evidence_score,
+        readiness: $readiness,
+        memory_corroboration_count: $memory_corroboration,
+        memory_label: $memory_label
+      }'
+  )"
 
   sf_create_proposal \
     "workflow" \
     "$intent_category" \
     "Create a workflow skill for ${intent_category}" \
     "$repo_root" \
-    "Detected ${pattern_count} similar ${intent_category} sessions with ${correction_count} explicit correction signals (evidence score ${evidence_score})." \
+    "Detected ${pattern_count} similar ${intent_category} sessions with ${correction_count} explicit correction signals (evidence score ${evidence_score}).$(if [[ "$memory_corroboration" -gt 0 ]]; then printf ' Auto memory corroborates this pattern through %s related signals for theme %s.' "$memory_corroboration" "$memory_label"; fi)" \
     "$(sf_normalize_slug "${intent_category}-workflow")" \
-    "$(sf_jq -nc --arg key "$intent_category" --argjson count "$pattern_count" --argjson correction_count "$correction_count" --argjson evidence_score "$evidence_score" --arg readiness "$(sf_workflow_readiness_label "$evidence_score")" '
-      {
-        key: $key,
-        count: $count,
-        correction_count: $correction_count,
-        evidence_score: $evidence_score,
-        readiness: $readiness
-      }
-    ')"
+    "$reason_json"
 }
 
 sf_has_pending_proposal() {
@@ -662,6 +853,7 @@ sf_summarize_session() {
   sf_append_recent_session "$session_json"
   sf_update_workflow_pattern "$intent_category" "$plan_slug"
   sf_replace_knowledge_patterns "$lessons_payload"
+  sf_recompute_memory_corroborations
 
   if [[ "$intent_category" != "explore" && "$intent_category" != "knowledge" ]]; then
     sf_evaluate_workflow_proposal "$intent_category" "$repo_root"
@@ -680,21 +872,32 @@ sf_detect_patterns() {
   lessons_keys="$(sf_jq -r '.patterns.knowledge | keys[]?' "$SF_STATE_FILE" 2>/dev/null || true)"
 
   while IFS= read -r theme; do
-    local count slug
+    local count slug memory_corroboration memory_label source_patterns
     [[ -z "$theme" ]] && continue
     count="$(sf_jq -r --arg theme "$theme" '.patterns.knowledge[$theme].count // 0' "$SF_STATE_FILE")"
     if [[ "$count" -lt "$SF_KNOWLEDGE_THRESHOLD" ]]; then
       continue
     fi
     slug="$(sf_normalize_slug "${theme}-knowledge")"
+    memory_corroboration="$(sf_memory_corroboration_count "$theme")"
+    memory_label="$(sf_memory_label "$theme")"
+    source_patterns="$(
+      sf_jq -c --arg theme "$theme" --argjson memory_corroboration "$memory_corroboration" --arg memory_label "$memory_label" '
+        (.patterns.knowledge[$theme] // {})
+        + {
+          memory_corroboration_count: $memory_corroboration,
+          memory_label: $memory_label
+        }
+      ' "$SF_STATE_FILE"
+    )"
     sf_create_proposal \
       "knowledge" \
       "$theme" \
       "Create a knowledge skill for ${theme}" \
       "$repo_root" \
-      "Detected ${count} repeated lessons for theme '${theme}'." \
+      "Detected ${count} repeated lessons for theme '${theme}'.$(if [[ "$memory_corroboration" -gt 0 ]]; then printf ' Auto memory corroborates this theme through %s related signals for %s.' "$memory_corroboration" "$memory_label"; fi)" \
       "$slug" \
-      "$(sf_jq -c --arg theme "$theme" '.patterns.knowledge[$theme]' "$SF_STATE_FILE")"
+      "$source_patterns"
   done <<< "$lessons_keys"
 }
 

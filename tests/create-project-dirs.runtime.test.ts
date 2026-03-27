@@ -34,8 +34,12 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, "scripts/skill-factory-check.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".ai/hooks/run-hook.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".ai/hooks/lib/skill-factory.sh"))).toBe(true);
+      expect(existsSync(join(cwd, ".ai/hooks/lib/memory-state.sh"))).toBe(true);
+      expect(existsSync(join(cwd, ".ai/hooks/memory-intake.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".claude/hooks/run-hook.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".claude/hooks/lib/skill-factory.sh"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/hooks/lib/memory-state.sh"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/hooks/memory-intake.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".claude/skill-factory/rubric.template.json"))).toBe(true);
 
       const settings = readFileSync(join(cwd, ".claude/settings.json"), "utf-8");

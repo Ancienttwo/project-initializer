@@ -107,6 +107,8 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "scripts/skill-factory-check.sh"))).toBe(true);
       expect(existsSync(join(repo, ".ai/hooks/run-hook.sh"))).toBe(true);
       expect(existsSync(join(repo, ".ai/hooks/lib/skill-factory.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/hooks/lib/memory-state.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/hooks/memory-intake.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/run-hook.sh"))).toBe(true);
       expect(existsSync(join(repo, "tasks/research.md"))).toBe(true);
       expect(existsSync(join(repo, "tasks/todo.md"))).toBe(true);
@@ -118,6 +120,8 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "docs/reference-configs/evaluator-rubric.md"))).toBe(true);
       expect(existsSync(join(repo, "docs/reference-configs/sprint-contracts.md"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/lib/skill-factory.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/hooks/lib/memory-state.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/hooks/memory-intake.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/skill-factory/rubric.template.json"))).toBe(true);
 
       expect(existsSync(join(repo, "docs/TODO.md"))).toBe(false);

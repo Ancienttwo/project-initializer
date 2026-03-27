@@ -179,4 +179,8 @@ if [[ -f "$SCRIPT_DIR/lib/skill-factory.sh" ]]; then
   sf_collect_signal "$PROMPT_TEXT" "$implement_intent" "$done_intent" || true
   sf_check_proposals || true
   sf_check_optimization || true
+  memory_context="$(sf_memory_prompt_context "$PROMPT_TEXT" "$(workflow_plan_slug || true)" 3 || true)"
+  if [[ -n "$memory_context" ]]; then
+    printf '%s\n' "$memory_context"
+  fi
 fi

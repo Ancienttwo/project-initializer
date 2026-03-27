@@ -61,6 +61,8 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("mkdir -p .ai/hooks");
     expect(content).toContain("settings.template.json");
     expect(sharedLib).toContain(".skill-factory-state.json");
+    expect(sharedLib).toContain(".memory-context.json");
+    expect(sharedLib).toContain(".memory-snapshot.json");
     expect(content).toContain("install_skill_factory_files");
     expect(content).toContain("Project Milestones");
     expect(content).toContain("milestone checkpoints only");
@@ -99,6 +101,8 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("settings.template.json");
     expect(content).toContain("mkdir -p .ai/hooks");
     expect(sharedLib).toContain(".skill-factory-state.json");
+    expect(sharedLib).toContain(".memory-context.json");
+    expect(sharedLib).toContain(".memory-snapshot.json");
     expect(content).toContain("Project Milestones");
     expect(content).toContain("milestone checkpoints only");
     expect(content).toContain("**Source Plan**: (none)");
@@ -136,6 +140,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(hookCommands).toContain("run-hook.sh");
     expect(settings).toContain(".ai/hooks/run-hook.sh");
     expect(settings).toContain("worktree-guard.sh");
+    expect(settings).toContain("memory-intake.sh");
     expect(settings).toContain("pre-edit-guard.sh");
     expect(settings).toContain("post-edit-guard.sh");
     expect(settings).toContain("prompt-guard.sh");

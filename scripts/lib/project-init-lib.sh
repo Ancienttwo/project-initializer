@@ -33,6 +33,8 @@ PI_DEFAULT_RUNTIME_ENTRIES=$(cat <<'EOF_RUNTIME'
 .claude/.skill-factory-state.json
 .claude/.skill-factory-session.json
 .claude/.skill-factory-session-marker.json
+.claude/.memory-context.json
+.claude/.memory-snapshot.json
 .claude/.skill-factory-user/
 .claude/.context-pressure/
 .claude/*.tmp

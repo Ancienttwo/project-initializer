@@ -69,13 +69,30 @@ describe("Skill Factory hooks", () => {
   test("three similar sessions create a pending workflow proposal", () => {
     const { cwd, home } = setupProject("sf-proposal");
     try {
+      const projectDir = join(home, ".claude/projects/sf-proposal");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(join(memoryDir, "bug-fix.md"), "# Bug fix\n\n- Reproduce auth bugs before patching\n");
+      const startup = runInRepo(
+        cwd,
+        home,
+        ".claude/hooks/memory-intake.sh",
+        [],
+        JSON.stringify({
+          hook_event_name: "SessionStart",
+          source: "startup",
+          transcript_path: join(projectDir, "transcript.jsonl"),
+        })
+      );
+      expect(startup.status).toBe(0);
+
       for (let i = 0; i < 3; i += 1) {
         const prompt = runInRepo(
           cwd,
           home,
           ".claude/hooks/prompt-guard.sh",
           [],
-          JSON.stringify({ user_message: "implement a bug fix for auth" })
+          JSON.stringify({ prompt: "implement a bug fix for auth" })
         );
         expect(prompt.status).toBe(0);
 
@@ -94,10 +111,50 @@ describe("Skill Factory hooks", () => {
       );
       expect(workflow).toBeDefined();
       expect(workflow.reason).toContain("evidence score");
+      expect(workflow.reason).toContain("Auto memory corroborates");
       expect(workflow.source_patterns.evidence_score).toBeGreaterThanOrEqual(3);
+      expect(workflow.source_patterns.memory_corroboration_count).toBeGreaterThan(0);
 
       const state = JSON.parse(readFileSync(join(cwd, ".claude/.skill-factory-state.json"), "utf-8"));
       expect(state.patterns.workflow["bug-fix"].count).toBeGreaterThanOrEqual(3);
+      expect(state.memory.corroborations["bug-fix"].count).toBeGreaterThan(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("memory themes alone do not create proposals without repo-local repetition", () => {
+    const { cwd, home } = setupProject("sf-memory-only");
+    try {
+      const projectDir = join(home, ".claude/projects/sf-memory-only");
+      const memoryDir = join(projectDir, "memory");
+      mkdirSync(memoryDir, { recursive: true });
+      writeFileSync(
+        join(memoryDir, "MEMORY.md"),
+        ["# Memory", "", "## Testing conventions", "- Use shared fixtures", "- Name test files with .test.ts"].join("\n")
+      );
+
+      const startup = runInRepo(
+        cwd,
+        home,
+        ".claude/hooks/memory-intake.sh",
+        [],
+        JSON.stringify({
+          hook_event_name: "SessionStart",
+          source: "startup",
+          transcript_path: join(projectDir, "transcript.jsonl"),
+        })
+      );
+      expect(startup.status).toBe(0);
+
+      const check = runInRepo(cwd, home, "scripts/skill-factory-check.sh");
+      expect(check.status).toBe(0);
+      expect(check.stdout).toContain("Memory themes: testing-conventions");
+      expect(check.stdout).toContain("Memory corroborations: none");
+
+      const proposals = JSON.parse(readFileSync(join(home, ".claude/.skill-proposals.json"), "utf-8"));
+      expect(proposals.proposals).toEqual([]);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
       rmSync(home, { recursive: true, force: true });
