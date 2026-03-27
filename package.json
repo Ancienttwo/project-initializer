@@ -6,9 +6,12 @@
   "scripts": {
     "benchmark:skills": "bun scripts/run-skill-evals.ts",
     "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "check:task-sync": "bash scripts/check-task-sync.sh",
+    "check:task-workflow": "bash scripts/check-task-workflow.sh --strict"
   },
   "devDependencies": {
     "@types/bun": "latest"
-  }
+  },
+  "private": true
 }

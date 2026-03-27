@@ -165,6 +165,66 @@ describe("Migration script contract", () => {
     }
   });
 
+  test("should support self-migration when skill factory scripts already live in target scripts directory", () => {
+    const repo = mkdtempSync(join(tmpdir(), "migration-self-"));
+    try {
+      mkdirSync(join(repo, "scripts"), { recursive: true });
+      mkdirSync(join(repo, "assets/skill-factory"), { recursive: true });
+      writeFileSync(join(repo, "scripts/skill-factory-create.sh"), "#!/bin/bash\necho create\n");
+      writeFileSync(join(repo, "scripts/skill-factory-check.sh"), "#!/bin/bash\necho check\n");
+
+      const res = spawnSync(
+        "bash",
+        [
+          "-lc",
+          [
+            "source scripts/lib/project-init-lib.sh",
+            `pi_install_skill_factory "${repo}" "${join(repo, "assets/skill-factory")}" "${join(repo, "scripts")}" "apply"`,
+          ].join("\n"),
+        ],
+        { cwd: ROOT, encoding: "utf-8" }
+      );
+
+      expect(res.status).toBe(0);
+      expect(readFileSync(join(repo, "scripts/skill-factory-create.sh"), "utf-8")).toContain("echo create");
+      expect(readFileSync(join(repo, "scripts/skill-factory-check.sh"), "utf-8")).toContain("echo check");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("should reapply migration when .gitignore already contains a managed runtime block", () => {
+    const repo = mkdtempSync(join(tmpdir(), "migration-gitignore-"));
+    try {
+      mkdirSync(join(repo, ".claude"), { recursive: true });
+      writeFileSync(join(repo, "package.json"), JSON.stringify({ name: "demo", scripts: {} }, null, 2));
+      writeFileSync(
+        join(repo, ".gitignore"),
+        [
+          "# base",
+          "# BEGIN: claude-runtime-temp (managed by project-initializer)",
+          ".claude/settings.local.json",
+          "# END: claude-runtime-temp",
+        ].join("\n") + "\n"
+      );
+
+      const res = spawnSync(
+        "bash",
+        ["scripts/migrate-project-template.sh", "--repo", repo, "--apply"],
+        { cwd: ROOT, encoding: "utf-8" }
+      );
+
+      expect(res.status).toBe(0);
+      const gitignore = readFileSync(join(repo, ".gitignore"), "utf-8");
+      expect(gitignore).toContain("# BEGIN: claude-runtime-temp (managed by project-initializer)");
+      expect(gitignore).toContain(".claude/.task-state.json");
+      expect(gitignore).toContain(".claude/.memory-context.json");
+      expect(gitignore).toContain("# END: claude-runtime-temp");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   test("should preserve custom settings hooks while appending missing defaults", () => {
     const repo = mkdtempSync(join(tmpdir(), "migration-merge-"));
     try {

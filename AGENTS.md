@@ -1,0 +1,28 @@
+# project-initializer AGENTS.md
+
+This repository self-hosts the `project-initializer` contract. Claude and Codex should follow the same repo-local workflow surface.
+
+## Canonical Workflow Files
+
+- `tasks/todo.md` for the current execution checklist and verification notes
+- `tasks/lessons.md` for correction-derived rules
+- `tasks/research.md` for deep repo knowledge
+- `plans/` for timestamped plans, with `plans/archive/` for history
+- `docs/PROGRESS.md` for milestone-only updates
+
+## Operating Rules
+
+- Sync `tasks/` whenever substantive repo changes are made.
+- Treat `.ai/hooks/` as the shared hook implementation and `.claude/hooks/` as shims only.
+- Keep `CLAUDE.md` and `AGENTS.md` short; put detailed guidance in `docs/reference-configs/`.
+- When changing `scripts/migrate-project-template.sh` or `scripts/lib/project-init-lib.sh`, verify self-migration of this repo still works.
+- Do not treat generated hook adapters or backup files as product deliverables.
+
+## Required Checks
+
+```bash
+bun test
+bash scripts/check-task-sync.sh
+bash scripts/check-task-workflow.sh --strict
+bash scripts/migrate-project-template.sh --repo . --dry-run
+```

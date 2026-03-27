@@ -2,6 +2,11 @@
 
 Project scaffolding skill for Claude/Codex workflows.
 
+This repository now dogfoods its own tasks-first contract. It is both:
+
+- the source repo for the `project-initializer` skill
+- a self-hosted example of the repo-local workflow it generates for other projects
+
 ## Current Model (3.0.x)
 
 - Question flow uses **9 grouped decision points** with harness defaults inferred first.
@@ -17,11 +22,22 @@ Project scaffolding skill for Claude/Codex workflows.
   - `docs/spec.md -> plans/ -> tasks/contracts/ -> tasks/reviews/ -> .ai/harness/*`
 - Claude auto memory can be observed by generated hooks in read-only mode to enrich Skill Factory signal quality.
 
+## Repo Workflow
+
+- Root routing docs: `CLAUDE.md`, `AGENTS.md`
+- Shared hook layer: `.ai/hooks/`
+- Claude adapter layer: `.claude/settings.json` and `.claude/hooks/`
+- Active execution surface: `tasks/`
+- Plan source of truth: `plans/`
+- Milestone log only: `docs/PROGRESS.md`
+
 ## Quick Usage
 
 ```bash
-# minimal setup flow
-/project-init --quick
+# self-check this repository's workflow contract
+bash scripts/check-task-sync.sh
+bash scripts/check-task-workflow.sh --strict
+bash scripts/migrate-project-template.sh --repo . --dry-run
 
 # explicit template assembly
 bun scripts/assemble-template.ts --plan C --name "MyProject"
@@ -37,6 +53,7 @@ bun run benchmark:skills --eval repair-agents-task-sync
 ## Key Files
 
 - Skill spec: `SKILL.md`
+- Root routing docs: `CLAUDE.md`, `AGENTS.md`
 - Plan mapping: `assets/plan-map.json`
 - Question-pack: `assets/initializer-question-pack.v2.json`
 - Shared hooks: `assets/hooks/`
@@ -63,5 +80,8 @@ Configured in `assets/initializer-question-pack.v2.json` and consumed by `script
 
 ```bash
 bun test
+bash scripts/check-task-sync.sh
+bash scripts/check-task-workflow.sh --strict
+bash scripts/migrate-project-template.sh --repo . --dry-run
 bun run benchmark:skills --dry-run
 ```

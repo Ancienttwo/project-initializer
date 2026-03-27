@@ -249,9 +249,18 @@ pi_copy_file_if_apply() {
   local mode="${1:-apply}"
   local src="$2"
   local dest="$3"
+  local src_abs=""
+  local dest_abs=""
 
   if [[ "$mode" != "apply" ]]; then
     echo "[dry-run] cp \"$src\" \"$dest\""
+    return 0
+  fi
+
+  src_abs="$(cd "$(dirname "$src")" && pwd)/$(basename "$src")"
+  dest_abs="$(cd "$(dirname "$dest")" && pwd)/$(basename "$dest")"
+
+  if [[ "$src_abs" == "$dest_abs" ]]; then
     return 0
   fi
 
@@ -310,19 +319,27 @@ pi_ensure_gitignore_block() {
   fi
 
   local tmp_file
+  local block_written=0
   tmp_file="$(mktemp)"
-  awk -v begin="$PI_RUNTIME_BLOCK_BEGIN" -v end="$PI_RUNTIME_BLOCK_END" -v repl="$block" '
-    $0 == begin {
-      print repl
-      skipping = 1
-      next
-    }
-    skipping && $0 == end {
-      skipping = 0
-      next
-    }
-    !skipping { print }
-  ' "$file_path" > "$tmp_file"
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$PI_RUNTIME_BLOCK_BEGIN" ]]; then
+      if [[ "$block_written" -eq 0 ]]; then
+        printf '%s\n' "$block" >> "$tmp_file"
+        block_written=1
+      fi
+
+      while IFS= read -r inner_line || [[ -n "$inner_line" ]]; do
+        if [[ "$inner_line" == "$PI_RUNTIME_BLOCK_END" ]]; then
+          break
+        fi
+      done
+      continue
+    fi
+
+    printf '%s\n' "$line" >> "$tmp_file"
+  done < "$file_path"
+
   mv "$tmp_file" "$file_path"
 }
 
@@ -426,10 +443,10 @@ pi_install_skill_factory() {
   fi
 
   if [[ -f "$scripts_source_dir/skill-factory-create.sh" ]]; then
-    cp "$scripts_source_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-create.sh"
+    pi_copy_file_if_apply "$mode" "$scripts_source_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-create.sh"
   fi
   if [[ -f "$scripts_source_dir/skill-factory-check.sh" ]]; then
-    cp "$scripts_source_dir/skill-factory-check.sh" "$scripts_dir/skill-factory-check.sh"
+    pi_copy_file_if_apply "$mode" "$scripts_source_dir/skill-factory-check.sh" "$scripts_dir/skill-factory-check.sh"
   fi
 
   pi_ensure_executable_if_apply "$mode" "$scripts_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-check.sh"

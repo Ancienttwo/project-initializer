@@ -25,13 +25,28 @@ bun.lockb
 .claude/.session-id
 .claude/.tool-call-count
 .claude/.session-handoff.md
+.claude/.task-state.json
+.claude/.task-handoff.md
 .claude/.skill-factory-state.json
 .claude/.skill-factory-session.json
 .claude/.skill-factory-session-marker.json
+.claude/.memory-context.json
+.claude/.memory-snapshot.json
 .claude/.skill-factory-user/
 .claude/.context-pressure/
 .claude/*.tmp
 .claude/*.bak
 .claude/*.bak.*
 .claude/*.backup-*
+.claude/.active-plan
+.claude/.plan-state/
 # END: claude-runtime-temp
+# Project-specific
+artifacts/
+*.tar.gz
+*.tgz
+# Environment
+.env
+.env.*
+!.env.example
+# OS metadata

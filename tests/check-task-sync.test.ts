@@ -55,6 +55,18 @@ describe("check-task-sync helper", () => {
     }
   });
 
+  test("fails when only an untracked source file is added", () => {
+    const cwd = setupRepo();
+    try {
+      writeFileSync(join(cwd, "src", "new-file.ts"), "export const created = true;\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("without tasks/ synchronization");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   test("passes when code changes include tasks/todo.md updates", () => {
     const cwd = setupRepo();
     try {
@@ -62,6 +74,20 @@ describe("check-task-sync helper", () => {
       writeFileSync(join(cwd, "tasks", "todo.md"), "# Task Execution Checklist (Primary)\n- [x] updated\n");
       const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
       expect(res.status).toBe(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("passes when untracked repo changes include an untracked tasks file", () => {
+    const cwd = setupRepo();
+    try {
+      mkdirSync(join(cwd, "tasks", "contracts"), { recursive: true });
+      writeFileSync(join(cwd, "src", "new-file.ts"), "export const created = true;\n");
+      writeFileSync(join(cwd, "tasks", "contracts", "new-file.contract.md"), "# Task Contract\n");
+      const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("synchronized tasks/ updates");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -1,0 +1,121 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+usage() {
+  cat <<'USAGE_EOF'
+Usage: scripts/new-plan.sh --slug <slug> [--title <title>]
+USAGE_EOF
+}
+
+normalize_slug() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g'
+}
+
+escape_sed_replacement() {
+  printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+slug=""
+title=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --slug)
+      [[ -n "${2:-}" ]] || { echo "Error: --slug requires a value" >&2; usage; exit 1; }
+      slug="$2"
+      shift 2
+      ;;
+    --title)
+      [[ -n "${2:-}" ]] || { echo "Error: --title requires a value" >&2; usage; exit 1; }
+      title="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$slug" ]]; then
+  echo "--slug is required" >&2
+  usage
+  exit 1
+fi
+
+slug="$(normalize_slug "$slug")"
+if [[ -z "$slug" ]]; then
+  echo "Slug is empty after normalization" >&2
+  exit 1
+fi
+
+if [[ -z "$title" ]]; then
+  title="$slug"
+fi
+
+timestamp="$(date +%Y%m%d-%H%M)"
+mkdir -p plans plans/archive .claude/templates
+
+template_file=".claude/templates/plan.template.md"
+if [[ ! -f "$template_file" ]]; then
+  cat > "$template_file" <<'PLAN_TEMPLATE_EOF'
+# Plan: {{TITLE}}
+
+> **Status**: Draft
+> **Created**: {{TIMESTAMP}}
+> **Research**: See `tasks/research.md`
+
+## Approach
+### Strategy
+### Trade-offs
+| Option | Pros | Cons | Decision |
+|--------|------|------|----------|
+
+## Detailed Design
+### File Changes
+| File | Action | Description |
+|------|--------|-------------|
+
+### Code Snippets
+### Data Flow
+
+## Risk Assessment
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+
+## Annotations
+<!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
+
+## Task Breakdown
+- [ ] ...
+PLAN_TEMPLATE_EOF
+fi
+
+base_name="plan-${timestamp}-${slug}.md"
+plan_file="plans/${base_name}"
+counter=2
+while [[ -f "$plan_file" ]]; do
+  plan_file="plans/plan-${timestamp}-${slug}-v${counter}.md"
+  counter=$((counter + 1))
+done
+
+slug_esc="$(escape_sed_replacement "$slug")"
+title_esc="$(escape_sed_replacement "$title")"
+timestamp_esc="$(escape_sed_replacement "$timestamp")"
+
+sed \
+  -e "s/{{SLUG}}/${slug_esc}/g" \
+  -e "s/{{TITLE}}/${title_esc}/g" \
+  -e "s/{{TIMESTAMP}}/${timestamp_esc}/g" \
+  -e "s|{{PLAN_FILE}}|${plan_file}|g" \
+  "$template_file" > "$plan_file"
+
+echo "Created plan: $plan_file"

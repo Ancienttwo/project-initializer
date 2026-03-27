@@ -32,6 +32,26 @@ describe("Bootstrap Script Contracts", () => {
     expect(metadata).toContain("default_prompt:");
   });
 
+  test("repo root should include Claude and Codex routing docs", () => {
+    expect(existsSync(join(ROOT, "CLAUDE.md"))).toBe(true);
+    expect(existsSync(join(ROOT, "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(ROOT, ".claude/settings.json"))).toBe(true);
+
+    const claude = read("CLAUDE.md");
+    const agents = read("AGENTS.md");
+
+    expect(claude).toContain("tasks/todo.md");
+    expect(claude).toContain(".ai/hooks/");
+    expect(agents).toContain("tasks/todo.md");
+    expect(agents).toContain("check-task-workflow.sh --strict");
+  });
+
+  test("repo package should expose workflow verification scripts", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.scripts["check:task-sync"]).toBe("bash scripts/check-task-sync.sh");
+    expect(pkg.scripts["check:task-workflow"]).toBe("bash scripts/check-task-workflow.sh --strict");
+  });
+
   test("create-project-dirs should create tasks primary files", () => {
     const content = read("scripts/create-project-dirs.sh");
     const sharedLib = read("scripts/lib/project-init-lib.sh");

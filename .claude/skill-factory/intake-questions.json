@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "requiredFields": [
+    "title",
+    "goal",
+    "outputs",
+    "boundaries",
+    "testPrompts",
+    "questions"
+  ],
+  "workflowPrompts": [
+    "What repeatable workflow is this skill capturing?",
+    "What inputs should the skill expect?",
+    "What outputs or deliverables should it produce?",
+    "What exit conditions prove the workflow is complete?"
+  ],
+  "knowledgePrompts": [
+    "What project convention or correction pattern is this skill preserving?",
+    "What should the agent do?",
+    "What should the agent avoid?",
+    "What examples or anti-patterns should be included?"
+  ]
+}
