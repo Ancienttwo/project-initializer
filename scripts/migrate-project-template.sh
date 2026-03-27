@@ -1,9 +1,10 @@
 #!/bin/bash
-# Migrate an existing project to project-initializer workflow conventions.
-# - Project hooks source of truth: .claude/settings.json
-# - Hook scripts synced from assets/hooks
-# - docs/TODO.md removed (tasks/todo.md is canonical)
-# - 6-phase workflow files and helpers installed
+# Migrate an existing project to the 3.0 project-initializer harness model.
+# - Shared hook source of truth: .ai/hooks/
+# - Claude adapter: .claude/settings.json
+# - Stable product truth: docs/spec.md
+# - Active-plan source of truth: plans/
+# - Sprint artifacts: tasks/contracts/, tasks/reviews/, .ai/harness/*
 #
 # Usage:
 #   bash scripts/migrate-project-template.sh --repo /path/to/repo --dry-run
@@ -187,7 +188,7 @@ install_templates() {
 install_helpers() {
   local repo="$1"
   if [[ -d "$HELPER_ASSETS_DIR" ]]; then
-    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
+    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
   fi
@@ -219,13 +220,41 @@ ensure_task_sync_package_script() {
 
 create_task_files_if_missing() {
   local repo="$1"
+  local project_name
+  local timestamp
+
+  project_name="$(basename "$repo")"
+  timestamp="$(date '+%Y-%m-%d %H:%M')"
 
   if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] ensure tasks/todo.md, tasks/lessons.md, docs/PROGRESS.md exist with tasks-first guidance"
+    echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, and harness files exist with 3.0 guidance"
     return
   fi
 
-  mkdir -p "$repo/tasks" "$repo/docs"
+  mkdir -p \
+    "$repo/tasks" \
+    "$repo/tasks/contracts" \
+    "$repo/tasks/reviews" \
+    "$repo/docs" \
+    "$repo/.ai/harness/checks" \
+    "$repo/.ai/harness/handoff"
+
+  if [[ ! -f "$repo/docs/spec.md" ]]; then
+    if [[ -f "$repo/.claude/templates/spec.template.md" ]]; then
+      sed \
+        -e "s/{{PROJECT_NAME}}/${project_name}/g" \
+        -e "s/{{TIMESTAMP}}/${timestamp}/g" \
+        "$repo/.claude/templates/spec.template.md" > "$repo/docs/spec.md"
+    else
+      cat > "$repo/docs/spec.md" <<EOF_SPEC
+# Product Spec: ${project_name}
+
+> **Status**: Draft
+> **Last Updated**: ${timestamp}
+> **Owner**: Planner
+EOF_SPEC
+    fi
+  fi
 
   if [[ ! -f "$repo/tasks/todo.md" ]]; then
     cat > "$repo/tasks/todo.md" <<'TODO_EOF'
@@ -262,6 +291,18 @@ TODO_EOF
 LESSONS_EOF
   fi
 
+  if [[ ! -f "$repo/.ai/harness/checks/latest.json" ]]; then
+    printf "{}\n" > "$repo/.ai/harness/checks/latest.json"
+  fi
+
+  if [[ ! -f "$repo/.ai/harness/handoff/current.md" ]]; then
+    cat > "$repo/.ai/harness/handoff/current.md" <<'HANDOFF_EOF'
+# Harness Handoff
+
+> **Reason**: migration
+HANDOFF_EOF
+  fi
+
   if [[ ! -f "$repo/docs/PROGRESS.md" ]]; then
     cat > "$repo/docs/PROGRESS.md" <<'PROGRESS_EOF'
 # Project Milestones
@@ -293,6 +334,22 @@ PROGRESS_EOF
 
 - This file was normalized during migration. Re-add historical milestones if needed.
 PROGRESS_EOF
+  fi
+}
+
+install_reference_configs() {
+  local repo="$1"
+  local ref_dir="$repo/docs/reference-configs"
+  local ref_assets_dir="$SKILL_ROOT/assets/reference-configs"
+
+  run_or_echo "mkdir -p \"$ref_dir\""
+
+  if [[ -d "$ref_assets_dir" ]]; then
+    while IFS= read -r ref_file; do
+      local file_name
+      file_name="$(basename "$ref_file")"
+      run_or_echo "cp \"$ref_file\" \"$ref_dir/$file_name\""
+    done < <(find "$ref_assets_dir" -maxdepth 1 -type f -name '*.md' | sort)
   fi
 }
 
@@ -509,7 +566,10 @@ migrate_workflow() {
   run_or_echo "mkdir -p \"$repo/plans/archive\""
   run_or_echo "mkdir -p \"$repo/tasks/archive\""
   run_or_echo "mkdir -p \"$repo/tasks/contracts\""
+  run_or_echo "mkdir -p \"$repo/tasks/reviews\""
   run_or_echo "mkdir -p \"$repo/docs/reference-configs\""
+  run_or_echo "mkdir -p \"$repo/.ai/harness/checks\""
+  run_or_echo "mkdir -p \"$repo/.ai/harness/handoff\""
 
   install_templates "$repo"
   install_helpers "$repo"
@@ -517,6 +577,7 @@ migrate_workflow() {
   if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
     pi_install_factor_factory "$repo" "$FACTOR_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
   fi
+  install_reference_configs "$repo"
   create_research_file_if_missing "$repo"
   create_task_files_if_missing "$repo"
   ensure_task_sync_package_script "$repo"
@@ -555,8 +616,6 @@ migrate_workflow() {
 
 Periodic cleanup protocol to reduce context bloat and rule conflicts.
 SPA_DAY_EOF
-  else
-    echo "[dry-run] ensure spa-day protocol at \"$spa_protocol_repo\""
   fi
 }
 
@@ -569,7 +628,8 @@ print_report() {
   echo "- Project hooks synced from: $HOOK_ASSETS_DIR"
   echo "- Team hook config target: .claude/settings.json"
   echo "- Legacy docs/TODO.md: removed when present"
-  echo "- Workflow migration: plans/archive + tasks/archive + research + helpers + plan pointer + task-sync contract"
+  echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/harness/*"
+  echo "- Helper scripts: new-spec/new-sprint/new-plan/plan-to-todo/prepare-handoff/verify-sprint"
   echo "- Runtime temporary ignore block synced to .gitignore"
 }
 

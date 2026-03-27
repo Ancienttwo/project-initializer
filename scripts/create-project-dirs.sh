@@ -34,7 +34,7 @@ write_templates() {
 }
 
 install_workflow_helpers() {
-  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply"
+  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
 }
 
 install_skill_factory_files() {
@@ -105,10 +105,13 @@ mkdir -p docs/archives
 mkdir -p docs/reference-configs
 mkdir -p tasks/archive
 mkdir -p tasks/contracts
+mkdir -p tasks/reviews
 mkdir -p plans/archive
 mkdir -p scripts
 mkdir -p .claude/hooks
 mkdir -p .ai/hooks
+mkdir -p .ai/harness/checks
+mkdir -p .ai/harness/handoff
 mkdir -p .ops/database
 mkdir -p .ops/secrets
 mkdir -p artifacts
@@ -208,6 +211,23 @@ ensure_task_sync_package_script
 write_runtime_gitignore_block
 
 cp "$ASSETS_HOOKS_DIR/settings.template.json" .claude/settings.json
+
+cat > docs/spec.md << 'DOCS_SPEC_EOF'
+# Product Spec
+
+> **Status**: Draft
+> **Owner**: Planner
+DOCS_SPEC_EOF
+
+cat > .ai/harness/checks/latest.json << 'HARNESS_CHECKS_EOF'
+{}
+HARNESS_CHECKS_EOF
+
+cat > .ai/harness/handoff/current.md << 'HARNESS_HANDOFF_EOF'
+# Harness Handoff
+
+> **Reason**: bootstrap
+HARNESS_HANDOFF_EOF
 
 cat > specs/overview.md << 'SPECS_OVERVIEW_EOF'
 # Project Specifications

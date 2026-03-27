@@ -29,7 +29,7 @@ Start by deciding which of these five workflows matches the user request:
 1. **Initialize a new project**
    - Use when the user wants a new React, TypeScript, Node, Remix, Expo, monorepo, or adjacent project scaffold.
 2. **Migrate an existing repo**
-   - Use when the user already has a repository and wants to adopt the latest AI workflow, hooks, templates, or tasks-first contract.
+   - Use when the user already has a repository and wants to adopt the latest AI workflow, hooks, templates, or harness contract.
 3. **Audit an AI workflow**
    - Use when the repo exists and the user wants a review of `AGENTS.md`, `CLAUDE.md`, hooks, harness artifacts, or repo-local workflow enforcement.
 4. **Repair task-sync or contract drift**
@@ -76,8 +76,8 @@ For a new project:
 3. Assemble concise `CLAUDE.md` and `AGENTS.md`.
 4. Generate repo-local harness files and helper scripts.
 5. Install shared hooks into `.ai/hooks/` from `assets/hooks/`, create `.claude/hooks/` compatibility shims that delegate to `.ai/hooks/`, and write `.claude/settings.json` with hook commands referencing `.ai/hooks/run-hook.sh`. Load `references/hooks-guide.md` for the hook architecture.
-6. Generate reference configs and stack docs.
-7. Make sure the repo includes repo-local task sync enforcement.
+6. Generate reference configs, stack docs, and the default harness artifacts under `.ai/harness/`.
+7. Make sure the repo includes repo-local task sync and workflow integrity enforcement.
 
 Load on demand:
 
@@ -118,7 +118,8 @@ For migration requests:
 2. Identify drift from the current harness contract.
 3. Use `scripts/migrate-project-template.sh` when the user wants repo-wide migration.
 4. Preserve user-owned content where possible; prefer additive migration over destructive replacement unless the user asks to reset.
-5. If the repo has hooks but lacks repo-local task enforcement, treat that as incomplete migration.
+5. Treat legacy `docs/plan.md` pointers as drift; the migrated repo should rely on `plans/` only.
+6. If the repo has hooks but lacks repo-local task enforcement or harness artifacts, treat that as incomplete migration.
 
 Read `references/migration-guide.md` before changing migration behavior.
 
@@ -232,9 +233,10 @@ When you change this skill, validate the relevant layer:
 
 - template assembly tests for `CLAUDE.md` / `AGENTS.md`
 - bootstrap and migration tests for generated files
-- task-sync tests for repo-local contract enforcement
+- task-sync and task-workflow tests for repo-local contract enforcement
 - eval asset validation for `evals/evals.json`
 - version consistency checks against `package.json` and `assets/skill-version.json`
+- dry-run migration output against a legacy repo fixture and a current harness fixture
 - Skill Factory changes: hooks, `skill-factory-create/check`, guide, and tests stay aligned
 
 ## Troubleshooting

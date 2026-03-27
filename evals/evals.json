@@ -4,8 +4,8 @@
     {
       "id": 1,
       "slug": "initialize-new-project",
-      "prompt": "Initialize a new B2B internal tool with Vite, TanStack Router, tasks-first workflow files, and concise CLAUDE.md/AGENTS.md for both Claude and Codex.",
-      "expected_output": "A new-project plan or implementation path that selects the Vite/TanStack stack, generates tasks-first repo contracts, and keeps CLAUDE.md/AGENTS.md concise with routed reference docs.",
+      "prompt": "Initialize a new B2B internal tool with Vite, TanStack Router, docs/spec.md, harness workflow files, and concise CLAUDE.md/AGENTS.md for both Claude and Codex.",
+      "expected_output": "A new-project plan or implementation path that selects the Vite/TanStack stack, generates repo-local harness contracts, and keeps CLAUDE.md/AGENTS.md concise with routed reference docs.",
       "files": [
         "evals/fixtures/new-project-empty"
       ],
@@ -17,6 +17,9 @@
           { "path": "final-response.md", "pattern": "tasks/todo\\.md" },
           { "path": "final-response.md", "pattern": "tasks/lessons\\.md" },
           { "path": "final-response.md", "pattern": "tasks/research\\.md" },
+          { "path": "final-response.md", "pattern": "docs/spec\\.md" },
+          { "path": "final-response.md", "pattern": "tasks/reviews/" },
+          { "path": "final-response.md", "pattern": "\\.ai/harness" },
           { "path": "final-response.md", "pattern": "AGENTS\\.md" }
         ]
       },
@@ -27,7 +30,7 @@
       },
       "expectations": [
         "Chooses a plausible core plan and explains the stack choice.",
-        "Includes tasks/todo.md, tasks/lessons.md, tasks/research.md, and tasks/contracts/ in the generated workflow.",
+        "Includes docs/spec.md, tasks/todo.md, tasks/lessons.md, tasks/research.md, tasks/contracts/, tasks/reviews/, and .ai/harness/ in the generated workflow.",
         "Treats docs/PROGRESS.md as milestone-only instead of the active execution log."
       ]
     },
@@ -64,8 +67,8 @@
     {
       "id": 3,
       "slug": "migrate-legacy-repo",
-      "prompt": "Migrate this older Claude Code repo to the current tasks-first contract. It still uses docs/TODO.md and writes active session notes into docs/PROGRESS.md.",
-      "expected_output": "A migration plan or implementation path that removes docs/TODO.md, installs tasks-first workflow files and helper scripts, and moves PROGRESS.md to milestone-only usage.",
+      "prompt": "Migrate this older Claude Code repo to the current 3.0 harness contract. It still uses docs/TODO.md and writes active session notes into docs/PROGRESS.md.",
+      "expected_output": "A migration plan or implementation path that removes docs/TODO.md, installs the harness workflow files and helper scripts, and moves PROGRESS.md to milestone-only usage.",
       "files": [
         "evals/fixtures/migrate-legacy"
       ],
@@ -77,6 +80,9 @@
           { "path": "final-response.md", "pattern": "tasks/todo\\.md" },
           { "path": "final-response.md", "pattern": "docs/TODO\\.md" },
           { "path": "final-response.md", "pattern": "scripts/check-task-sync\\.sh" },
+          { "path": "final-response.md", "pattern": "docs/spec\\.md" },
+          { "path": "final-response.md", "pattern": "tasks/reviews/" },
+          { "path": "final-response.md", "pattern": "\\.ai/harness/" },
           { "path": "final-response.md", "pattern": "\\.ai/" }
         ]
       },
@@ -87,6 +93,7 @@
       },
       "expectations": [
         "Replaces docs/TODO.md with tasks/todo.md as the primary task contract.",
+        "Installs docs/spec.md, tasks/reviews/, and .ai/harness/ as first-class harness artifacts.",
         "Removes docs/plan.md compatibility pointers in favor of plans/ as the active-plan source of truth.",
         "Adds repo-local task-sync enforcement such as scripts/check-task-sync.sh.",
         "Updates migration guidance and scripts rather than only editing prose.",
@@ -121,6 +128,7 @@
         "Checks both Claude-specific hooks and cross-agent repo-local contracts.",
         "Flags docs/PROGRESS.md misuse if it is acting as an execution log.",
         "Flags duplicated active-plan state outside plans/ as workflow drift.",
+        "Flags missing docs/spec.md, tasks/reviews/, or .ai/harness/ as incomplete 3.0 migration.",
         "Mentions migration or template updates when current files are out of sync with the skill.",
         "Calls out when a repo only has .claude hook wiring but lacks the shared .ai/ automation layer."
       ]

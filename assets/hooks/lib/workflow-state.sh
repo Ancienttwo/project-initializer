@@ -535,7 +535,9 @@ workflow_write_handoff() {
   mkdir -p "$(dirname "$handoff_file")"
 
   next_task="$(
-    grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null \
+    {
+      grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null || true
+    } \
       | head -1 \
       | sed -E 's/^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+//'
   )"
