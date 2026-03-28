@@ -43,6 +43,8 @@ export interface PlanConfig {
     orchestration: string;
     evaluation: string;
     handoff: string;
+    recovery: string;
+    state: string;
   };
   defaultTemplateVariables?: Record<string, string>;
 }
@@ -97,7 +99,7 @@ const PARTIALS_AGENTS_DIR = join(ASSETS_DIR, "partials-agents");
 const VERSIONS_FILE = join(ASSETS_DIR, "versions.json");
 const SKILL_VERSION_FILE = join(ASSETS_DIR, "skill-version.json");
 const PLAN_MAP_FILE = join(ASSETS_DIR, "plan-map.json");
-const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v2.json");
+const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v3.json");
 
 const TARGET_DIRS: Record<TemplateTarget, string> = {
   claude: PARTIALS_DIR,
@@ -110,6 +112,11 @@ const FALLBACK_TEMPLATE_VARIABLES: Record<string, string> = {
   INTERACTION_STYLE: "Technical, concise",
   RUNTIME_MODE: "Plan-only",
   RUNTIME_PROFILE: "Plan-only (recommended)",
+  ORCHESTRATION_PROFILE: "shared-long-running-harness",
+  EVALUATION_PROFILE: "browser-qa",
+  HANDOFF_PROFILE: "artifact-aware",
+  RECOVERY_PROFILE: "lesson-driven",
+  STATE_PROFILE: "file-backed",
   PROHIBITIONS:
     "- No `any` in production code\n" +
     "- No `console.log` in production code\n" +
@@ -465,6 +472,16 @@ export function getDefaultTemplateVariables(
     PLAN_STACK: planConfig.stack,
     PLAN_TIER: planConfig.tier ?? "core",
     FACTOR_FACTORY_ENABLED: planConfig.factorFactory ? "true" : "false",
+    ORCHESTRATION_PROFILE:
+      planConfig.defaultHarnessProfiles?.orchestration ?? FALLBACK_TEMPLATE_VARIABLES.ORCHESTRATION_PROFILE,
+    EVALUATION_PROFILE:
+      planConfig.defaultHarnessProfiles?.evaluation ?? FALLBACK_TEMPLATE_VARIABLES.EVALUATION_PROFILE,
+    HANDOFF_PROFILE:
+      planConfig.defaultHarnessProfiles?.handoff ?? FALLBACK_TEMPLATE_VARIABLES.HANDOFF_PROFILE,
+    RECOVERY_PROFILE:
+      planConfig.defaultHarnessProfiles?.recovery ?? FALLBACK_TEMPLATE_VARIABLES.RECOVERY_PROFILE,
+    STATE_PROFILE:
+      planConfig.defaultHarnessProfiles?.state ?? FALLBACK_TEMPLATE_VARIABLES.STATE_PROFILE,
     ...planDefaults,
   };
 }

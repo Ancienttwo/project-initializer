@@ -5,6 +5,8 @@ Use `tasks/research.md` for deep codebase understanding, `docs/spec.md` for stab
 ```yaml
 PLAN_LOOP:
   MODE: {{RUNTIME_PROFILE}}
+  RECOVERY: {{RECOVERY_PROFILE}}
+  STATE: {{STATE_PROFILE}}
   PHASES: research -> spec -> plan -> contract -> todo -> implement -> verify -> review -> handoff
   RESEARCH_FILE: tasks/research.md
   SPEC_FILE: docs/spec.md

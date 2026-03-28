@@ -188,7 +188,7 @@ install_templates() {
 install_helpers() {
   local repo="$1"
   if [[ -d "$HELPER_ASSETS_DIR" ]]; then
-    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
+    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
   fi
@@ -227,7 +227,7 @@ create_task_files_if_missing() {
   timestamp="$(date '+%Y-%m-%d %H:%M')"
 
   if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, and harness files exist with 3.0 guidance"
+    echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, and harness files exist with 3.1 guidance"
     return
   fi
 
@@ -629,7 +629,7 @@ print_report() {
   echo "- Team hook config target: .claude/settings.json"
   echo "- Legacy docs/TODO.md: removed when present"
   echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/harness/*"
-  echo "- Helper scripts: new-spec/new-sprint/new-plan/plan-to-todo/prepare-handoff/verify-sprint"
+  echo "- Helper scripts: new-spec/new-sprint/new-plan/plan-to-todo/prepare-handoff/summarize-failures/verify-sprint"
   echo "- Runtime temporary ignore block synced to .gitignore"
 }
 

@@ -20,11 +20,13 @@ file_path="$(hook_get_file_path "${1:-}")"
 exit_code="$(hook_get_exit_code "${1:-}")"
 duration_ms="$(hook_get_duration_ms "${1:-}")"
 session_key="$(session_state_resolve_key "$SESSION_ID_FILE")"
+run_id="$(hook_get_run_id "${1:-}")"
 
 tool_name="${tool_name:-unknown}"
 file_path="${file_path:-}"
 exit_code="${exit_code:-0}"
 duration_ms="${duration_ms:-0}"
+run_id="${run_id:-unknown}"
 
 # Rotate trace log when it exceeds MAX_TRACE_LINES
 MAX_TRACE_LINES=10000
@@ -38,7 +40,7 @@ if [[ -f "$TRACE_FILE" ]]; then
   fi
 fi
 
-printf '{"ts":"%s","event_type":"%s","tool_name":"%s","file_path":"%s","exit_code":%s,"duration_ms":%s,"session_key":"%s"}\n' \
+printf '{"ts":"%s","event_type":"%s","tool_name":"%s","file_path":"%s","exit_code":%s,"duration_ms":%s,"session_key":"%s","run_id":"%s"}\n' \
   "$(hook_json_escape "$(date '+%Y-%m-%dT%H:%M:%S%z')")" \
   "$(hook_json_escape "$event_type")" \
   "$(hook_json_escape "$tool_name")" \
@@ -46,4 +48,5 @@ printf '{"ts":"%s","event_type":"%s","tool_name":"%s","file_path":"%s","exit_cod
   "$exit_code" \
   "$duration_ms" \
   "$(hook_json_escape "$session_key")" \
+  "$(hook_json_escape "$run_id")" \
   >> "$TRACE_FILE"

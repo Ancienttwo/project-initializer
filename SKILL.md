@@ -197,7 +197,7 @@ Do not vendor the upstream `skill-creator` runner or viewer into this repo. Keep
 ### Assets
 
 - `assets/plan-map.json`
-- `assets/initializer-question-pack.v2.json`
+- `assets/initializer-question-pack.v3.json`
 - `assets/partials/`
 - `assets/partials-agents/`
 - `assets/reference-configs/`

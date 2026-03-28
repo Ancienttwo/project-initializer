@@ -89,6 +89,13 @@ hook_json_escape() {
   printf '%s' "$value"
 }
 
+hook_sanitize_token() {
+  local value="$1"
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  value="$(printf '%s' "$value" | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+  printf '%s' "${value:-unknown}"
+}
+
 hook_parse_json_arg() {
   local raw_arg="${1:-}"
   local path="$2"
@@ -349,17 +356,125 @@ hook_get_exit_code() {
   printf '%s' "${EXIT_CODE:-0}"
 }
 
+hook_get_run_id() {
+  local arg="${1:-}"
+  local parsed=""
+  local session_id=""
+  local session_source=""
+  local transcript_path=""
+
+  if [[ -n "${HOOK_RUN_ID:-}" ]]; then
+    printf '%s' "$HOOK_RUN_ID"
+    return
+  fi
+
+  for path in '.run_id' '.tool_input.run_id'; do
+    parsed="$(hook_json_get "$path" '')"
+    if [[ -n "$parsed" ]]; then
+      HOOK_RUN_ID="$parsed"
+      export HOOK_RUN_ID
+      printf '%s' "$parsed"
+      return
+    fi
+
+    parsed="$(hook_parse_json_arg "$arg" "$path")"
+    if [[ -n "$parsed" ]]; then
+      HOOK_RUN_ID="$parsed"
+      export HOOK_RUN_ID
+      printf '%s' "$parsed"
+      return
+    fi
+  done
+
+  if [[ -n "${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-}}" ]]; then
+    HOOK_RUN_ID="${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-}}"
+    export HOOK_RUN_ID
+    printf '%s' "$HOOK_RUN_ID"
+    return
+  fi
+
+  session_id="$(hook_get_session_id "$arg")"
+  if [[ -n "$session_id" ]]; then
+    session_source="$(hook_get_session_source "$arg")"
+    HOOK_RUN_ID="run-$(hook_sanitize_token "${session_source:-session}")-$(hook_sanitize_token "$session_id")"
+    export HOOK_RUN_ID
+    printf '%s' "$HOOK_RUN_ID"
+    return
+  fi
+
+  transcript_path="$(hook_get_transcript_path "$arg")"
+  if [[ -n "$transcript_path" ]]; then
+    HOOK_RUN_ID="run-transcript-$(hook_sanitize_token "$transcript_path")"
+    export HOOK_RUN_ID
+    printf '%s' "$HOOK_RUN_ID"
+    return
+  fi
+
+  HOOK_RUN_ID="run-$(date '+%Y%m%dT%H%M%S')-$$"
+  export HOOK_RUN_ID
+  printf '%s' "$HOOK_RUN_ID"
+}
+
+hook_failure_log_file() {
+  printf '.ai/harness/failures/latest.jsonl'
+}
+
+hook_append_failure_record() {
+  local guard="$1"
+  local action="$2"
+  local reason="$3"
+  local fix="$4"
+  local failure_class="$5"
+  local run_id="$6"
+  local log_file
+
+  log_file="$(hook_failure_log_file)"
+  mkdir -p "$(dirname "$log_file")"
+
+  printf '{"ts":"%s","guard":"%s","action":"%s","reason":"%s","fix":"%s","failure_class":"%s","run_id":"%s"}\n' \
+    "$(hook_json_escape "$(date '+%Y-%m-%dT%H:%M:%S%z')")" \
+    "$(hook_json_escape "$guard")" \
+    "$(hook_json_escape "$action")" \
+    "$(hook_json_escape "$reason")" \
+    "$(hook_json_escape "$fix")" \
+    "$(hook_json_escape "$failure_class")" \
+    "$(hook_json_escape "$run_id")" \
+    >> "$log_file"
+}
+
 hook_structured_error() {
   local guard="$1"
   local reason="$2"
   local fix="$3"
-  local action="${4:-block}"
+  local failure_class="${4:-state_violation}"
+  local action="${5:-block}"
+  local run_id=""
 
-  printf '{"guard":"%s","action":"%s","reason":"%s","fix":"%s"}\n' \
+  # Older guards passed the action token as arg 4 before failure_class existed.
+  # Keep translating those shimmed calls so generated hooks and self-hosted hooks
+  # preserve behavior while defaulting the missing failure_class sanely.
+  case "$failure_class" in
+    block|warn|advisory)
+      action="$failure_class"
+      failure_class="state_violation"
+      ;;
+    missing_artifact|state_violation|contract_failure|quality_gate)
+      ;;
+    *)
+      failure_class="state_violation"
+      ;;
+  esac
+
+  run_id="$(hook_get_run_id)"
+  hook_append_failure_record "$guard" "$action" "$reason" "$fix" "$failure_class" "$run_id"
+
+  printf '{"guard":"%s","action":"%s","reason":"%s","fix":"%s","failure_class":"%s","run_id":"%s"}\n' \
     "$(hook_json_escape "$guard")" \
     "$(hook_json_escape "$action")" \
     "$(hook_json_escape "$reason")" \
-    "$(hook_json_escape "$fix")"
+    "$(hook_json_escape "$fix")" \
+    "$(hook_json_escape "$failure_class")" \
+    "$(hook_json_escape "$run_id")"
 }
 
 # Cache stdin eagerly in the parent shell so multiple getters can reuse it.

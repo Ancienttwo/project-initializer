@@ -391,7 +391,7 @@ pi_install_helpers() {
   local target_dir="$1"
   local helpers_dir="$2"
   local mode="${3:-apply}"
-  local helper_names="${4:-new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh}"
+  local helper_names="${4:-new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh}"
   local scripts_dir="$target_dir/scripts"
   local helper_name
 
@@ -408,7 +408,7 @@ pi_install_helpers() {
         cp "$helpers_dir/$helper_name" "$scripts_dir/$helper_name"
       fi
     done
-    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
+    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/summarize-failures.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
     return 0
   fi
 

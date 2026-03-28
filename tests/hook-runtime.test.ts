@@ -129,6 +129,10 @@ describe("Hook runtime behavior", () => {
       const blockRes = runHook("worktree-guard.sh", cwd);
       expect(blockRes.status).toBe(1);
       expect(blockRes.stdout).toContain("Mutation blocked");
+      expect(blockRes.stdout).toContain('"failure_class":"state_violation"');
+      const failureLog = readFileSync(join(cwd, ".ai/harness/failures/latest.jsonl"), "utf-8");
+      expect(failureLog).toContain('"guard":"WorktreeGuard"');
+      expect(failureLog).toContain('"run_id":"run-');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -1079,6 +1083,7 @@ describe("Hook runtime behavior", () => {
       expect(trace).toContain('"tool_name":"Edit"');
       expect(trace).toContain('"file_path":"src/demo.ts"');
       expect(trace).toContain('"duration_ms":42');
+      expect(trace).toContain('"run_id":"run-');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

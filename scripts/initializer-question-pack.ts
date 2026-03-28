@@ -23,8 +23,8 @@ export interface ProfileChoice {
   description: string;
 }
 
-export interface InitializerQuestionPackV2 {
-  version: "initializer-question-pack.v2";
+interface InitializerQuestionPackBase {
+  version: "initializer-question-pack.v2" | "initializer-question-pack.v3";
   goal: string;
   decisionPoints: DecisionPoint[];
   planTiers: {
@@ -37,6 +37,8 @@ export interface InitializerQuestionPackV2 {
     orchestrationProfile: string;
     evaluationProfile: string;
     handoffProfile: string;
+    recoveryProfile?: string;
+    stateProfile?: string;
   };
   runtimeProfiles: Record<string, RuntimeProfile>;
   orchestrationProfiles: Record<string, ProfileChoice>;
@@ -44,15 +46,27 @@ export interface InitializerQuestionPackV2 {
   handoffProfiles: Record<string, ProfileChoice>;
 }
 
-const PACK_PATH = join(import.meta.dir, "..", "assets", "initializer-question-pack.v2.json");
+export interface InitializerQuestionPackV2 extends InitializerQuestionPackBase {
+  version: "initializer-question-pack.v2";
+}
 
-export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionPackV2 {
+export interface InitializerQuestionPackV3 extends InitializerQuestionPackBase {
+  version: "initializer-question-pack.v3";
+  recoveryProfiles: Record<string, ProfileChoice>;
+  stateProfiles: Record<string, ProfileChoice>;
+}
+
+export type InitializerQuestionPack = InitializerQuestionPackV2 | InitializerQuestionPackV3;
+
+const PACK_PATH = join(import.meta.dir, "..", "assets", "initializer-question-pack.v3.json");
+
+export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionPack {
   if (!existsSync(path)) {
     throw new Error(`initializer-question-pack not found: ${path}`);
   }
 
-  const parsed = JSON.parse(readFileSync(path, "utf-8")) as InitializerQuestionPackV2;
-  if (parsed.version !== "initializer-question-pack.v2") {
+  const parsed = JSON.parse(readFileSync(path, "utf-8")) as InitializerQuestionPack;
+  if (parsed.version !== "initializer-question-pack.v2" && parsed.version !== "initializer-question-pack.v3") {
     throw new Error(`Unsupported question pack version: ${parsed.version}`);
   }
 
@@ -61,7 +75,7 @@ export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionP
 
 export function inferPreferredPackageManager(
   planType: string,
-  pack: InitializerQuestionPackV2 = loadQuestionPack()
+  pack: InitializerQuestionPack = loadQuestionPack()
 ): string {
   const resolved = resolvePlanType(planType);
   const tier = getPlanTier(resolved);
@@ -82,7 +96,7 @@ export function inferPreferredPackageManager(
 }
 
 export function getDecisionPointsByBatch(
-  pack: InitializerQuestionPackV2 = loadQuestionPack()
+  pack: InitializerQuestionPack = loadQuestionPack()
 ): Record<number, DecisionPoint[]> {
   return pack.decisionPoints.reduce<Record<number, DecisionPoint[]>>((acc, decision) => {
     if (!acc[decision.batch]) acc[decision.batch] = [];

@@ -70,3 +70,14 @@ Optional hook assets:
 - Auto memory integration is read-only. Keep durable shared policy in `CLAUDE.md`, `.claude/rules/`, and repo-local workflow files.
 - `autoMemoryDirectory` is a user/local setting, not a shared project setting.
 - Skill Factory state is runtime-only. Ignore `.claude/.skill-factory-state.json` and related session marker files.
+
+## Failure Logging
+
+- Blocking hooks emit structured JSON with: `guard`, `action`, `reason`, `fix`, `failure_class`, `run_id`.
+- Failure classes are intentionally limited to:
+  - `missing_artifact`
+  - `state_violation`
+  - `contract_failure`
+  - `quality_gate`
+- Hook failures append JSONL records to `.ai/harness/failures/latest.jsonl`.
+- Use `bash scripts/summarize-failures.sh` to aggregate the latest failure log, or `--run-id <id>` to inspect a single run.

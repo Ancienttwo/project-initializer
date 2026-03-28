@@ -34,7 +34,8 @@ if [[ "$FILE_PATH" =~ ^plans/plan-.*\.md$ ]] && [[ -f "$FILE_PATH" || -n "$WRITE
       hook_structured_error \
         "PlanTransitionGuard" \
         "$transition_error" \
-        "Respect the Draft -> Annotating -> Approved flow and resolve required [NOTE]: annotations before changing status."
+        "Respect the Draft -> Annotating -> Approved flow and resolve required [NOTE]: annotations before changing status." \
+        "state_violation"
       exit 1
     fi
   fi

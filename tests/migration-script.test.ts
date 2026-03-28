@@ -57,6 +57,7 @@ describe("Migration script contract", () => {
     expect(script).toContain("archive-workflow.sh");
     expect(script).toContain("prepare-handoff.sh");
     expect(script).toContain("verify-contract.sh");
+    expect(script).toContain("summarize-failures.sh");
     expect(script).toContain("verify-sprint.sh");
     expect(script).toContain("check-task-sync.sh");
     expect(script).toContain("ensure-task-workflow.sh");
@@ -114,6 +115,7 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "scripts/archive-workflow.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/prepare-handoff.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/verify-contract.sh"))).toBe(true);
+      expect(existsSync(join(repo, "scripts/summarize-failures.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/verify-sprint.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/check-task-sync.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/ensure-task-workflow.sh"))).toBe(true);

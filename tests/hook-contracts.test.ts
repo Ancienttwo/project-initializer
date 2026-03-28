@@ -29,8 +29,11 @@ describe("Hook contracts", () => {
     expect(script).toContain(".prompt");
     expect(script).toContain(".session_id");
     expect(script).toContain(".transcript_path");
+    expect(script).toContain(".run_id");
     expect(script).toContain(".memory_type");
     expect(script).toContain(".load_reason");
+    expect(script).toContain('"failure_class"');
+    expect(script).toContain(".ai/harness/failures/latest.jsonl");
   });
 
   test("pre-code-change should protect contracts/specs/tests paths", () => {
@@ -136,6 +139,7 @@ describe("Hook contracts", () => {
     const script = read("assets/hooks/trace-event.sh");
     expect(script).toContain(".trace.jsonl");
     expect(script).toContain('"event_type"');
+    expect(script).toContain('"run_id"');
     expect(script).toContain("session_state_resolve_key");
   });
 });

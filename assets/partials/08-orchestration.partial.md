@@ -19,6 +19,8 @@
 ### 4. Subagent Strategy
 - Offload independent research tracks.
 - Keep one ownership boundary per subagent.
+- Recovery profile: `{{RECOVERY_PROFILE}}`.
+- State profile: `{{STATE_PROFILE}}`.
 
 ### 5. Self-Improvement Loop
 - Append correction-derived rules to `tasks/lessons.md`.

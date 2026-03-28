@@ -47,7 +47,8 @@ if is_plan_creation_intent; then
       hook_structured_error \
         "ResearchGate" \
         "Research is missing or older than the latest plan ($latest_plan)." \
-        "Update tasks/research.md with fresh findings before drafting a new plan."
+        "Update tasks/research.md with fresh findings before drafting a new plan." \
+        "missing_artifact"
       exit 1
     else
       echo "[ResearchGate] WARNING: tasks/research.md does not exist yet. Consider creating it with current findings before drafting the plan."
@@ -81,7 +82,8 @@ if [ "$implement_intent" -eq 1 ]; then
     hook_structured_error \
       "SpecGuard" \
       "Implementation requested without docs/spec.md." \
-      "Run bash scripts/new-spec.sh and capture stable product intent before implementing."
+      "Run bash scripts/new-spec.sh and capture stable product intent before implementing." \
+      "missing_artifact"
     exit 1
   fi
 
@@ -91,7 +93,8 @@ if [ "$implement_intent" -eq 1 ]; then
     hook_structured_error \
       "PlanStatusGuard" \
       "No active plan found in plans/." \
-      "Run bash scripts/ensure-task-workflow.sh --slug <slug> --title <title> before implementation."
+      "Run bash scripts/ensure-task-workflow.sh --slug <slug> --title <title> before implementation." \
+      "missing_artifact"
     exit 1
   fi
 
@@ -101,7 +104,8 @@ if [ "$implement_intent" -eq 1 ]; then
     hook_structured_error \
       "PlanStatusGuard" \
       "Plan status is $plan_status in $active_plan." \
-      "Complete the annotation cycle and move the plan to Approved before implementation."
+      "Complete the annotation cycle and move the plan to Approved before implementation." \
+      "state_violation"
     exit 1
   fi
 
@@ -112,7 +116,8 @@ if [ "$implement_intent" -eq 1 ]; then
       hook_structured_error \
         "ContractGuard" \
         "Implementation requested without an active sprint contract." \
-        "Run bash scripts/new-sprint.sh --slug <slug> --title <title> or create tasks/contracts/<slug>.contract.md first."
+        "Run bash scripts/new-sprint.sh --slug <slug> --title <title> or create tasks/contracts/<slug>.contract.md first." \
+        "missing_artifact"
       exit 1
     fi
 
@@ -124,7 +129,8 @@ if [ "$implement_intent" -eq 1 ]; then
       hook_structured_error \
         "TodoGuard" \
         "tasks/todo.md is not synchronized with $active_plan." \
-        "Run bash scripts/plan-to-todo.sh --plan $active_plan or bash scripts/switch-plan.sh --plan $active_plan"
+        "Run bash scripts/plan-to-todo.sh --plan $active_plan or bash scripts/switch-plan.sh --plan $active_plan" \
+        "state_violation"
       exit 1
     fi
   fi
@@ -137,7 +143,8 @@ if [ "$done_intent" -eq 1 ]; then
     hook_structured_error \
       "ContractGuard" \
       "Done intent detected without an active plan." \
-      "Finish the plan workflow and ensure plans/ contains the active plan before marking work done."
+      "Finish the plan workflow and ensure plans/ contains the active plan before marking work done." \
+      "state_violation"
     exit 1
   fi
 
@@ -147,7 +154,8 @@ if [ "$done_intent" -eq 1 ]; then
     hook_structured_error \
       "ContractGuard" \
       "Could not derive a contract path from $active_plan." \
-      "Rename the plan to plan-<timestamp>-<slug>.md so the matching contract can be resolved."
+      "Rename the plan to plan-<timestamp>-<slug>.md so the matching contract can be resolved." \
+      "missing_artifact"
     exit 1
   fi
 
@@ -156,7 +164,8 @@ if [ "$done_intent" -eq 1 ]; then
     hook_structured_error \
       "ContractGuard" \
       "Missing task contract $contract_file." \
-      "Create the contract or regenerate tasks from the active plan before marking work done."
+      "Create the contract or regenerate tasks from the active plan before marking work done." \
+      "missing_artifact"
     exit 1
   fi
 
@@ -166,7 +175,8 @@ if [ "$done_intent" -eq 1 ]; then
       hook_structured_error \
         "ContractGuard" \
         "Contract verification failed for $contract_file." \
-        "Resolve the failing exit criteria in the contract before marking work done."
+        "Resolve the failing exit criteria in the contract before marking work done." \
+        "contract_failure"
       exit 1
     fi
   else
@@ -179,7 +189,8 @@ if [ "$done_intent" -eq 1 ]; then
     hook_structured_error \
       "ReviewGuard" \
       "Done intent detected without a sprint review artifact." \
-      "Create tasks/reviews/<slug>.review.md and record an evaluator recommendation before marking work done."
+      "Create tasks/reviews/<slug>.review.md and record an evaluator recommendation before marking work done." \
+      "quality_gate"
     exit 1
   fi
 
@@ -188,7 +199,8 @@ if [ "$done_intent" -eq 1 ]; then
     hook_structured_error \
       "ReviewGuard" \
       "Sprint review is missing a passing recommendation." \
-      "Update the review with fresh evidence and a pass recommendation before marking work done."
+      "Update the review with fresh evidence and a pass recommendation before marking work done." \
+      "quality_gate"
     exit 1
   fi
 
@@ -198,7 +210,8 @@ if [ "$done_intent" -eq 1 ]; then
     hook_structured_error \
       "EvidenceGuard" \
       "Done intent detected without structured verification evidence." \
-      "Run the relevant checks so .ai/harness/checks/latest.json exists before marking work done."
+      "Run the relevant checks so .ai/harness/checks/latest.json exists before marking work done." \
+      "quality_gate"
     exit 1
   fi
 fi

@@ -127,6 +127,7 @@ describe("create-project-dirs scaffold parity", () => {
         "./scripts/regenerate.sh",
         "./scripts/skill-factory-check.sh",
         "./scripts/skill-factory-create.sh",
+        "./scripts/summarize-failures.sh",
         "./scripts/switch-plan.sh",
         "./scripts/verify-contract.sh",
         "./scripts/verify-sprint.sh",

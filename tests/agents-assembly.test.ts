@@ -36,6 +36,8 @@ describe("AGENTS Target Assembly", () => {
     expect(output).toContain("sync tasks/");
     expect(output).toContain("Default to **Plan-only**.");
     expect(output).toContain("Runtime profile: Plan-only (recommended).");
+    expect(output).toContain("Recovery profile: `lesson-driven`.");
+    expect(output).toContain("State profile: `file-backed`.");
     expect(output).toContain("Codex runtime expectation: `sandbox_mode=platform-default, approval_policy=on-failure`.");
     expect(output).toContain(".claude/.require-worktree");
     expect(output).toContain("single source of truth for the current active plan");
@@ -68,6 +70,8 @@ describe("AGENTS Target Assembly", () => {
     expect(agents.toLowerCase()).toContain("product truth");
     expect(claude.toLowerCase()).toContain("execution truth");
     expect(agents.toLowerCase()).toContain("single source of truth");
+    expect(claude).toContain("RECOVERY: lesson-driven");
+    expect(agents).toContain("Recovery profile: `lesson-driven`.");
   });
 
   test("should render cloudflare section for both targets when enabled by plan", () => {

@@ -7,7 +7,7 @@ import { spawnSync } from "child_process";
 const ROOT = join(import.meta.dir, "..");
 
 describe("create-project-dirs runtime smoke", () => {
-  test("should scaffold 3.0 harness artifacts", () => {
+  test("should scaffold 3.1 harness artifacts", () => {
     const cwd = mkdtempSync(join(tmpdir(), "create-project-dirs-"));
     try {
       const res = spawnSync("bash", [join(ROOT, "scripts/create-project-dirs.sh")], {
@@ -33,6 +33,7 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, "scripts/new-spec.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/new-sprint.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/prepare-handoff.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/summarize-failures.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/verify-sprint.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-sync.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/ensure-task-workflow.sh"))).toBe(true);

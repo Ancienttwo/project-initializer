@@ -34,7 +34,7 @@ write_templates() {
 }
 
 install_workflow_helpers() {
-  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
+  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
 }
 
 install_skill_factory_files() {

@@ -22,7 +22,8 @@ if [[ -n "$active_contract" && -f "$active_contract" ]]; then
     hook_structured_error \
       "ContractScopeGuard" \
       "$FILE_PATH is outside the allowed_paths declared in $active_contract." \
-      "Update the sprint contract allowed_paths or keep edits within the approved scope."
+      "Update the sprint contract allowed_paths or keep edits within the approved scope." \
+      "contract_failure"
     exit 1
   fi
 fi
@@ -46,7 +47,8 @@ if [[ "$FILE_PATH" =~ ^plans/plan-.*\.md$ ]] && [[ -f "$FILE_PATH" || -n "$WRITE
       hook_structured_error \
         "PlanTransitionGuard" \
         "$transition_error" \
-        "Respect the Draft -> Annotating -> Approved flow and resolve required [NOTE]: annotations before changing status."
+        "Respect the Draft -> Annotating -> Approved flow and resolve required [NOTE]: annotations before changing status." \
+        "state_violation"
       exit 1
     fi
   fi

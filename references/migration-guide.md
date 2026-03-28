@@ -24,7 +24,7 @@ This guide upgrades existing repositories to current project-initializer convent
 - Runtime mode is configurable via template variables:
   - `{{RUNTIME_MODE}}`
   - `{{RUNTIME_PROFILE}}`
-- Question pack is now kept under `assets/initializer-question-pack.v2.json`.
+- Question pack is now kept under `assets/initializer-question-pack.v3.json` (with `v2` retained for compatibility reads).
 - Plan G/H default package manager is `uv`.
 
 ## Automated Migration
@@ -46,7 +46,7 @@ bash scripts/migrate-project-template.sh --repo /path/to/project --apply
 5. Removes legacy `docs/TODO.md` if present and removes `docs/plan.md` when migrating a repo that still carries the old plan pointer.
 6. Ensures `docs/spec.md`, `tasks/todo.md`, `tasks/lessons.md`, `tasks/research.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/*` exist.
 7. Installs workflow helpers including `new-spec.sh`, `new-sprint.sh`, `prepare-handoff.sh`, `verify-sprint.sh`, `check-task-sync.sh`, `ensure-task-workflow.sh`, and `check-task-workflow.sh`.
-8. Copies the 3.0 harness reference configs into `docs/reference-configs/`.
+8. Copies the current shared harness reference configs into `docs/reference-configs/`.
 9. Injects `check:task-sync` and `check:task-workflow` into `package.json` when present.
 10. Prints a migration report.
 11. Keeps Claude hook references valid while moving the shared source of truth to `.ai/hooks/`.
@@ -63,7 +63,7 @@ bash scripts/migrate-project-template.sh --repo /path/to/project --apply
 7. Run `bash scripts/prepare-handoff.sh migration` if the migration changed the active task state.
 8. Run `bash scripts/verify-sprint.sh` when the repo already has an active sprint review flow.
 9. Commit migration in one isolated change-set.
-10. If your old docs referenced `governance/` contracts or skill-audit scripts, remove those references and use `assets/initializer-question-pack.v2.json` as the Q&A source of truth.
+10. If your old docs referenced `governance/` contracts or skill-audit scripts, remove those references and use `assets/initializer-question-pack.v3.json` as the Q&A source of truth.
 
 ## Rollback
 

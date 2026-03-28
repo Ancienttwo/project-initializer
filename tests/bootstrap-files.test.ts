@@ -68,6 +68,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(sharedLib).toContain("plan-to-todo.sh");
     expect(sharedLib).toContain("archive-workflow.sh");
     expect(sharedLib).toContain("verify-contract.sh");
+    expect(sharedLib).toContain("summarize-failures.sh");
     expect(sharedLib).toContain("check-task-sync.sh");
     expect(sharedLib).toContain("ensure-task-workflow.sh");
     expect(sharedLib).toContain("check-task-workflow.sh");
@@ -108,6 +109,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("pi_install_templates");
     expect(sharedLib).toContain("contract.template.md");
     expect(sharedLib).toContain("verify-contract.sh");
+    expect(sharedLib).toContain("summarize-failures.sh");
     expect(sharedLib).toContain("check-task-sync.sh");
     expect(sharedLib).toContain("ensure-task-workflow.sh");
     expect(sharedLib).toContain("check-task-workflow.sh");

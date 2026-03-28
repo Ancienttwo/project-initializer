@@ -2,6 +2,8 @@
 
 - Default to **{{RUNTIME_MODE}}**.
 - Runtime profile: {{RUNTIME_PROFILE}}.
+- Recovery profile: `{{RECOVERY_PROFILE}}`.
+- State profile: `{{STATE_PROFILE}}`.
 - Claude runtime expectation: `{{CLAUDE_POLICY}}`.
 - Codex runtime expectation: `{{CODEX_POLICY}}`.
 - Do not implement until the user explicitly asks to implement.

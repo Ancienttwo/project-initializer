@@ -53,6 +53,15 @@ resolve_bun_bin() {
   return 1
 }
 
+resolve_run_id() {
+  if [[ -n "${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-}}}" ]]; then
+    printf '%s' "${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-}}}"
+    return
+  fi
+
+  printf 'run-%s-%s' "$(date '+%Y%m%dT%H%M%S')" "$$"
+}
+
 read_contract_status() {
   local file="$1"
   awk '/^\> \*\*Status\*\*:/ {sub(/^.*\> \*\*Status\*\*: */, ""); gsub(/\r/, ""); print; exit}' "$file" | xargs
@@ -137,8 +146,10 @@ write_report() {
   {
     echo "{"
     printf '  "contract": "%s",\n' "$(json_escape "$contract_file")"
+    printf '  "run_id": "%s",\n' "$(json_escape "$run_id")"
     printf '  "previous_status": "%s",\n' "$(json_escape "$previous_status")"
     printf '  "next_status": "%s",\n' "$(json_escape "$next_status")"
+    printf '  "failure_class": "%s",\n' "$(json_escape "$failure_class")"
     printf '  "quiet": %s,\n' "$([[ "$quiet" -eq 1 ]] && echo true || echo false)"
     printf '  "strict": %s,\n' "$([[ "$strict" -eq 1 ]] && echo true || echo false)"
     printf '  "total": %s,\n' "$total"
@@ -164,6 +175,8 @@ contract_file=""
 strict=0
 quiet=0
 report_file=""
+run_id="$(resolve_run_id)"
+failure_class=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -242,6 +255,7 @@ if [[ -z "$yaml_block" ]]; then
   update_contract_status "$contract_file" "$next_status"
   total=0
   failed=0
+  failure_class="missing_artifact"
   RESULT_KINDS=()
   RESULT_TARGETS=()
   RESULT_PASSED=()
@@ -450,6 +464,7 @@ if [[ "$total" -eq 0 ]]; then
   next_status="Pending"
 elif [[ "$failed" -gt 0 ]]; then
   next_status="Partial"
+  failure_class="contract_failure"
 fi
 
 update_contract_status "$contract_file" "$next_status"

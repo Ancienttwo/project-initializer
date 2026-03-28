@@ -226,6 +226,7 @@ workflow_sync_task_state_from_todo() {
   local todo_file="${1:-tasks/todo.md}"
   local state_file="${2:-.claude/.task-state.json}"
   local source_plan="${3:-}"
+  local run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-}}}"
   local timestamp
   local tmp_state
   local total=0
@@ -239,12 +240,16 @@ workflow_sync_task_state_from_todo() {
 
   mkdir -p "$(dirname "$state_file")"
   timestamp="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  if [[ -z "$run_id" ]]; then
+    run_id="run-$(date '+%Y%m%dT%H%M%S')-$$"
+  fi
 
   {
     echo "{"
     printf '  "done_tasks": 0,\n'
     printf '  "total_tasks": 0,\n'
     printf '  "source_plan": "%s",\n' "$(workflow_json_escape "${source_plan:-}")"
+    printf '  "run_id": "%s",\n' "$(workflow_json_escape "$run_id")"
     printf '  "updated_at": "%s",\n' "$(workflow_json_escape "$timestamp")"
     echo '  "tasks": ['
 

@@ -7,17 +7,19 @@ This repository now dogfoods its own tasks-first contract. It is both:
 - the source repo for the `project-initializer` skill
 - a self-hosted example of the repo-local workflow it generates for other projects
 
-## Current Model (3.0.x)
+## Current Model (3.1.x)
 
-- Question flow uses **9 grouped decision points** with harness defaults inferred first.
+- Question flow uses **10 grouped decision points** with harness defaults inferred first.
 - Plan menu is tiered:
   - **Core Plans (A-F)** first.
   - **Custom Presets (G-K)** only when needed.
 - Runtime mode is configurable with template vars:
   - `{{RUNTIME_MODE}}`
   - `{{RUNTIME_PROFILE}}`
+  - `{{RECOVERY_PROFILE}}`
+  - `{{STATE_PROFILE}}`
 - Question-pack source of truth is in:
-  - `assets/initializer-question-pack.v2.json`
+  - `assets/initializer-question-pack.v3.json`
 - Generated repos default to the repo-local harness flow:
   - `docs/spec.md -> plans/ -> tasks/contracts/ -> tasks/reviews/ -> .ai/harness/*`
 - Claude auto memory can be observed by generated hooks in read-only mode to enrich Skill Factory signal quality.
@@ -55,7 +57,7 @@ bun run benchmark:skills --eval repair-agents-task-sync
 - Skill spec: `SKILL.md`
 - Root routing docs: `CLAUDE.md`, `AGENTS.md`
 - Plan mapping: `assets/plan-map.json`
-- Question-pack: `assets/initializer-question-pack.v2.json`
+- Question-pack: `assets/initializer-question-pack.v3.json`
 - Shared hooks: `assets/hooks/`
 - Template assembler: `scripts/assemble-template.ts`
 - Question inference helper: `scripts/initializer-question-pack.ts`
@@ -74,7 +76,7 @@ bun run benchmark:skills --eval repair-agents-task-sync
 - `Plan + Permissionless`
 - `Standard (ask before each action)`
 
-Configured in `assets/initializer-question-pack.v2.json` and consumed by `scripts/initializer-question-pack.ts`.
+Configured in `assets/initializer-question-pack.v3.json` and consumed by `scripts/initializer-question-pack.ts`.
 
 ## Verification
 

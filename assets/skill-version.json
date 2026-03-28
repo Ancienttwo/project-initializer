@@ -1,6 +1,6 @@
 {
-  "version": "3.0.0",
-  "templateVersion": "3.0.0",
+  "version": "3.1.0",
+  "templateVersion": "3.1.0",
   "compatibility": {
     "minClaudeCodeVersion": "1.0.0",
     "minBunVersion": "1.0.0"
@@ -21,6 +21,10 @@
     {
       "version": "3.0.0",
       "description": "Upgraded generated repos to a shared long-running harness with spec, sprint review, handoff, structured checks, and read-only Claude auto memory intake signals"
+    },
+    {
+      "version": "3.1.0",
+      "description": "Added run_id-linked verification, 5-dimensional harness profiles, and structured failure_class logging with summary tooling"
     }
   ],
   "generatedProjectStamp": {

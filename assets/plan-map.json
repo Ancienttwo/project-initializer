@@ -24,7 +24,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -40,7 +42,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "jdtls-lsp",
       "defaultTemplateVariables": {
@@ -55,7 +59,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -71,7 +77,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -87,7 +95,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -102,7 +112,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -119,7 +131,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "pyright-lsp",
       "defaultTemplateVariables": {
@@ -134,7 +148,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "rust-analyzer-lsp",
       "defaultTemplateVariables": {
@@ -149,7 +165,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -164,7 +182,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
@@ -179,7 +199,9 @@
       "defaultHarnessProfiles": {
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
-        "handoff": "artifact-aware"
+        "handoff": "artifact-aware",
+        "recovery": "lesson-driven",
+        "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
       "defaultTemplateVariables": {
