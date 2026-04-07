@@ -226,6 +226,7 @@ workflow_sync_task_state_from_todo() {
   local todo_file="${1:-tasks/todo.md}"
   local state_file="${2:-.claude/.task-state.json}"
   local source_plan="${3:-}"
+  local run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-}}}"
   local timestamp
   local tmp_state
   local total=0
@@ -239,12 +240,16 @@ workflow_sync_task_state_from_todo() {
 
   mkdir -p "$(dirname "$state_file")"
   timestamp="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  if [[ -z "$run_id" ]]; then
+    run_id="run-$(date '+%Y%m%dT%H%M%S')-$$"
+  fi
 
   {
     echo "{"
     printf '  "done_tasks": 0,\n'
     printf '  "total_tasks": 0,\n'
     printf '  "source_plan": "%s",\n' "$(workflow_json_escape "${source_plan:-}")"
+    printf '  "run_id": "%s",\n' "$(workflow_json_escape "$run_id")"
     printf '  "updated_at": "%s",\n' "$(workflow_json_escape "$timestamp")"
     echo '  "tasks": ['
 
@@ -440,7 +445,6 @@ workflow_contract_slug() {
   local active_plan slug
   active_plan="$(get_active_plan || true)"
   [[ -n "$active_plan" ]] || return 1
-
   slug="$(basename "$active_plan" | sed -E 's/^plan-[0-9]{8}-[0-9]{4}-//; s/\.md$//')"
   [[ -n "$slug" ]] || return 1
   printf '%s' "$slug"
@@ -450,7 +454,6 @@ workflow_active_contract() {
   local active_plan contract_file
   active_plan="$(get_active_plan || true)"
   [[ -n "$active_plan" ]] || return 1
-
   contract_file="$(derive_contract_path "$active_plan" || true)"
   [[ -n "$contract_file" ]] || return 1
   printf '%s' "$contract_file"
@@ -471,6 +474,58 @@ workflow_handoff_file() {
   printf '.ai/harness/handoff/current.md'
 }
 
+workflow_review_recommends_pass() {
+  local review_file="${1:-}"
+  [[ -n "$review_file" && -f "$review_file" ]] || return 1
+  grep -Eq '^> \*\*Recommendation\*\*:[[:space:]]*pass[[:space:]]*$' "$review_file"
+}
+
+workflow_contract_allows_path() {
+  local contract_file="$1"
+  local file_path="$2"
+  local yaml_block section trimmed item pattern
+
+  [[ -f "$contract_file" ]] || return 1
+  [[ "$file_path" == "$contract_file" ]] && return 0
+
+  yaml_block="$(
+    awk '
+      BEGIN { in_block = 0; printed = 0 }
+      /^```yaml[[:space:]]*$/ && printed == 0 { in_block = 1; next }
+      /^```[[:space:]]*$/ && in_block == 1 { printed = 1; in_block = 0; exit }
+      in_block == 1 { print }
+    ' "$contract_file"
+  )"
+
+  section=""
+  while IFS= read -r line; do
+    trimmed="$(printf '%s' "$line" | sed -E 's/[[:space:]]+$//; s/^[[:space:]]+//')"
+    [[ -z "$trimmed" ]] && continue
+
+    case "$trimmed" in
+      allowed_paths:)
+        section="allowed_paths"
+        continue
+        ;;
+      exit_criteria:|files_exist:|tests_pass:|commands_succeed:|files_contain:|artifacts_exist:|qa_scores:|manual_checks:)
+        section=""
+        continue
+        ;;
+    esac
+
+    if [[ "$section" == "allowed_paths" && "$trimmed" =~ ^-[[:space:]]*(.+)$ ]]; then
+      item="$(workflow_strip_quotes "${BASH_REMATCH[1]}")"
+      pattern="$item"
+      if [[ "$pattern" == */ ]]; then
+        [[ "$file_path" == "$pattern"* ]] && return 0
+      elif [[ "$file_path" == $pattern ]]; then
+        return 0
+      fi
+    fi
+  done <<< "$yaml_block"
+
+  return 1
+}
 workflow_write_handoff() {
   local reason="${1:-session-stop}"
   local handoff_file active_plan active_contract active_review checks_file next_task changed_files diff_stat spec_file
@@ -485,7 +540,9 @@ workflow_write_handoff() {
   mkdir -p "$(dirname "$handoff_file")"
 
   next_task="$(
-    grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null \
+    {
+      grep -E '^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+' tasks/todo.md 2>/dev/null || true
+    } \
       | head -1 \
       | sed -E 's/^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]+//'
   )"

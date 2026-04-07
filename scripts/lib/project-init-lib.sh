@@ -343,6 +343,93 @@ pi_ensure_gitignore_block() {
   mv "$tmp_file" "$file_path"
 }
 
+pi_resolve_json_runtime() {
+  if command -v node >/dev/null 2>&1; then
+    printf 'node'
+    return 0
+  fi
+
+  if command -v bun >/dev/null 2>&1; then
+    printf 'bun'
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3'
+    return 0
+  fi
+
+  return 1
+}
+
+pi_workflow_contract_query_lines() {
+  local contract_file="$1"
+  local selector="$2"
+  local runtime
+
+  if [[ ! -f "$contract_file" ]]; then
+    return 1
+  fi
+
+  runtime="$(pi_resolve_json_runtime || true)"
+  if [[ -z "$runtime" ]]; then
+    echo "[warn] no runtime available to read workflow contract: $contract_file" >&2
+    return 1
+  fi
+
+  case "$runtime" in
+    python3)
+      "$runtime" - "$contract_file" "$selector" <<'PY_EOF'
+import json
+import sys
+
+path, selector = sys.argv[1], sys.argv[2]
+value = json.load(open(path, "r", encoding="utf-8"))
+for part in selector.split("."):
+    value = value.get(part) if isinstance(value, dict) else None
+if isinstance(value, list):
+    for item in value:
+        print(item)
+elif value is not None:
+    print(value)
+PY_EOF
+      ;;
+    *)
+      "$runtime" -e '
+const fs = require("fs");
+const [, filePath, selector] = process.argv;
+const parts = selector.split(".");
+let value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+for (const part of parts) {
+  value = value && typeof value === "object" ? value[part] : undefined;
+}
+if (Array.isArray(value)) {
+  for (const item of value) {
+    console.log(item);
+  }
+} else if (value !== undefined && value !== null) {
+  console.log(value);
+}
+' "$contract_file" "$selector"
+      ;;
+  esac
+}
+
+pi_install_workflow_contract() {
+  local target_dir="$1"
+  local contract_asset="$2"
+  local mode="${3:-apply}"
+  local output_path="$target_dir/.ai/harness/workflow-contract.json"
+
+  if [[ "$mode" != "apply" ]]; then
+    echo "[dry-run] install workflow contract into $output_path"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$output_path")"
+  cp "$contract_asset" "$output_path"
+}
+
 pi_install_templates() {
   local target_dir="$1"
   local templates_dir="$2"
@@ -408,7 +495,7 @@ pi_install_helpers() {
         cp "$helpers_dir/$helper_name" "$scripts_dir/$helper_name"
       fi
     done
-    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/summarize-failures.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
+    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-spec.sh "$scripts_dir"/new-sprint.sh "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/summarize-failures.sh "$scripts_dir"/verify-sprint.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
     return 0
   fi
 

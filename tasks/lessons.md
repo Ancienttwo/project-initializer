@@ -11,8 +11,8 @@
 - Where to apply next time:
 
 ## Entries
-- Date: 2026-03-28
-- Triggered by correction: self-host migration failed during repository bootstrap
-- Mistake pattern: installer logic assumed source and destination were always different files, and gitignore replacement assumed multiline `awk -v` substitutions were safe
-- Prevention rule: migration helpers must be idempotent when run against the skill's own repository, including self-copy checks and managed block rewrites
-- Where to apply next time: bootstrap helpers, migration scripts, and any future repo-self-hosting workflows
+- Date: 2026-04-08
+- Triggered by correction: workflow helper inventories and required-path checks had started drifting across multiple shell scripts
+- Mistake pattern: repeating contract-critical lists in more than one place
+- Prevention rule: promote helper/file/dir inventories into `assets/workflow-contract.v1.json`, then make scripts and tests consume that contract
+- Where to apply next time: any new repo-local workflow artifact, helper script, or migration rule

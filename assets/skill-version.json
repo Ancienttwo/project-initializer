@@ -1,6 +1,6 @@
 {
-  "version": "3.1.0",
-  "templateVersion": "3.1.0",
+  "version": "3.2.0",
+  "templateVersion": "3.2.0",
   "compatibility": {
     "minClaudeCodeVersion": "1.0.0",
     "minBunVersion": "1.0.0"
@@ -25,6 +25,10 @@
     {
       "version": "3.1.0",
       "description": "Added run_id-linked verification, 5-dimensional harness profiles, and structured failure_class logging with summary tooling"
+    },
+    {
+      "version": "3.2.0",
+      "description": "Introduced a versioned workflow contract manifest, inspection-first routing, and first-class legacy workflow-doc migration"
     }
   ],
   "generatedProjectStamp": {

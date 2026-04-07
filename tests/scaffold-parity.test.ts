@@ -37,6 +37,7 @@ describe("create-project-dirs scaffold parity", () => {
       expect(collectFiles(cwd)).toEqual([
         "./.ai/harness/checks/latest.json",
         "./.ai/harness/handoff/current.md",
+        "./.ai/harness/workflow-contract.json",
         "./.ai/hooks/anti-simplification.sh",
         "./.ai/hooks/atomic-commit.sh",
         "./.ai/hooks/atomic-pending.sh",

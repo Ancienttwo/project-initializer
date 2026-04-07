@@ -15,6 +15,19 @@ FILE_PATH="$(hook_get_file_path "${1:-}")"
 WRITE_PAYLOAD="$(hook_get_write_payload "${1:-}")"
 [[ -z "$FILE_PATH" ]] && exit 0
 
+active_contract="$(workflow_active_contract || true)"
+if [[ -n "$active_contract" && -f "$active_contract" ]]; then
+  if ! workflow_contract_allows_path "$active_contract" "$FILE_PATH"; then
+    echo "[ContractScopeGuard] $FILE_PATH is outside the active sprint contract: $active_contract"
+    hook_structured_error \
+      "ContractScopeGuard" \
+      "$FILE_PATH is outside the allowed_paths declared in $active_contract." \
+      "Update the sprint contract allowed_paths or keep edits within the approved scope." \
+      "contract_failure"
+    exit 1
+  fi
+fi
+
 if [[ "$FILE_PATH" =~ ^plans/plan-.*\.md$ ]] && [[ -f "$FILE_PATH" || -n "$WRITE_PAYLOAD" ]]; then
   current_status=""
   if [[ -f "$FILE_PATH" ]]; then

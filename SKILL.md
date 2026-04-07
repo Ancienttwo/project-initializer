@@ -1,92 +1,98 @@
 ---
 name: project-initializer
-description: Use when initializing, migrating, auditing, or repairing AI-assisted project scaffolding such as CLAUDE.md, AGENTS.md, tasks/, hooks, and repo-local contracts. Not for runtime debugging or generic non-AI setup.
+description: Use when initializing, migrating, auditing, or repairing AI-assisted project scaffolding such as CLAUDE.md, AGENTS.md, tasks/, hooks, and repo-local contracts. Route through repo inspection first, then run initialize, migrate, audit, repair, or skill-factory workflows. Not for runtime debugging or generic non-AI setup.
 ---
 
 # Project Initializer
 
-Build or modernize a repository so it works as an AI-assisted coding project with:
+`project-initializer` is now a thin router over a versioned workflow engine.
 
-- stack-aware initialization
-- concise `CLAUDE.md` / `AGENTS.md` routing files
-- repo-local `spec -> plan -> contract -> review -> handoff` artifacts
-- shared `.ai/hooks/` automation
-- migration helpers for older repos
-- reference configs and workflow scripts
+The skill should not carry the whole workflow contract in prose. It should:
 
-Treat this skill as a router. Keep `SKILL.md` focused on when to use the skill and which path to follow. Load detailed references only when needed.
+1. inspect the repository
+2. classify the workflow state
+3. choose the correct path
+4. rely on the repo contract, migration scripts, and tests for enforcement
+
+## When to use
+
+- initialize a new repo with Claude/Codex-compatible workflow scaffolding
+- migrate an older repo to the current tasks-first harness
+- audit drift between prompts, hooks, scripts, and repo-local contract files
+- repair broken task-sync, workflow-contract, or handoff surfaces
+- enable or debug Skill Factory flows
 
 ## When not to use
 
-- Do not use this skill for runtime bug debugging inside an already healthy AI workflow.
-- Do not use this skill for generic app scaffolding that does not involve AI-agent routing, hooks, or repo-local harness contracts.
-- Do not use this skill when the user only wants product behavior changes unrelated to repo workflow setup.
+- runtime bug debugging inside an already healthy AI workflow
+- generic project scaffolding unrelated to AI routing or repo-local workflow contracts
+- ordinary product feature work
 
-## Choose the right path
+## Router Protocol
 
-Start by deciding which of these five workflows matches the user request:
+Always start with structured inspection, not prompt guessing.
 
-1. **Initialize a new project**
-   - Use when the user wants a new React, TypeScript, Node, Remix, Expo, monorepo, or adjacent project scaffold.
-2. **Migrate an existing repo**
-   - Use when the user already has a repository and wants to adopt the latest AI workflow, hooks, templates, or harness contract.
-3. **Audit an AI workflow**
-   - Use when the repo exists and the user wants a review of `AGENTS.md`, `CLAUDE.md`, hooks, harness artifacts, or repo-local workflow enforcement.
-4. **Repair task-sync or contract drift**
-   - Use when the user says Codex or Claude is not updating `tasks/*`, `PROGRESS.md` is being misused, or the repo contract has drifted.
-5. **Enable or configure Skill Factory**
-   - Use when the user wants built-in skill proposal/feedback flows, user-level skill generation, or autoresearch-ready skill sidecars inside generated projects.
-   - Read `references/skill-factory-guide.md` before configuring or debugging Skill Factory behavior.
+### Step 1. Inspect first
 
-## Capture intent before generating
+Run:
 
-Extract as much as possible from the conversation first, then fill the gaps:
+- `bun scripts/inspect-project-state.ts --repo <path> --format text`
+  - fallback: `node --experimental-strip-types scripts/inspect-project-state.ts --repo <path> --format text`
 
-- project type and stack
-- whether the repo is new or existing
-- whether the user needs generation, migration, or audit
-- target agents: Claude, Codex, or both
-- acceptance criteria for the scaffold or migration
+Read the result fields:
 
-When the repo already exists, inspect it before asking questions. Determine whether the problem is:
+- `mode`
+- `legacy_contract_version`
+- `drift_signals`
+- `required_decisions`
+- `safe_defaults`
 
-- missing files
-- stale templates
-- hook-only enforcement without repo-local contract
-- outdated `AGENTS.md` / `CLAUDE.md` guidance
-- migration drift between generated files and current conventions
+### Step 2. Choose one path
 
-## Core operating rules
+1. **Initialize**
+   - use when the repo has no meaningful tasks-first workflow yet
+2. **Migrate**
+   - use when the repo has legacy workflow docs, missing contract manifest, or stale harness artifacts
+3. **Audit**
+   - use when the repo mostly works but the user wants drift analysis and enforcement review
+4. **Repair**
+   - use when the repo has a current contract surface but broken task-sync, hooks, or handoff behavior
+5. **Skill Factory**
+   - use when the user wants built-in skill proposal, feedback capture, or generated skill sidecars
+   - read `references/skill-factory-guide.md` before changing this path
 
-- Prefer repo-local artifacts over agent-specific hooks.
-- Keep shared hook logic in `.ai/hooks/`; treat `.claude/settings.json` as the Claude adapter.
-- Generate `docs/spec.md`, `tasks/todo.md`, `tasks/lessons.md`, `tasks/research.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/` as the default workflow surface.
-- Treat `plans/` as the single source of truth for the active plan.
-- Treat `docs/PROGRESS.md` as milestone-only, not as the day-to-day execution log.
-- Make Claude hooks an enhancement layer, not the sole source of enforcement.
-- Keep `CLAUDE.md` and `AGENTS.md` concise; route detail into `docs/reference-configs/*`.
-- Keep stack-specific details in assets and references, not duplicated in the main skill body.
+### Step 3. Prefer engine actions over prompt-only fixes
 
-## New project workflow
+Default order:
 
-For a new project:
+1. migrate legacy docs if needed
+2. install or refresh workflow contract artifacts
+3. sync hooks, helpers, and templates
+4. verify the repo-local contract
 
-1. Infer defaults from the plan map and question pack.
-2. Confirm only the decisions that materially affect the generated project.
-3. Assemble concise `CLAUDE.md` and `AGENTS.md`.
-4. Generate repo-local harness files and helper scripts.
-5. Install shared hooks into `.ai/hooks/` from `assets/hooks/`, create `.claude/hooks/` compatibility shims that delegate to `.ai/hooks/`, and write `.claude/settings.json` with hook commands referencing `.ai/hooks/run-hook.sh`. Load `references/hooks-guide.md` for the hook architecture.
-6. Generate reference configs, stack docs, and the default harness artifacts under `.ai/harness/`.
-7. Make sure the repo includes repo-local task sync and workflow integrity enforcement.
+Do not treat hooks as the primary source of truth. The repo contract lives in repo files.
 
-Load on demand:
+## Core Engine Surfaces
 
-- stack selection and defaults: `references/tech-stacks.md`
-- architecture variants: `references/arch/*.md`
-- hook presets: `references/hooks-guide.md`
-- plugin decisions: `references/plugins-core.md`
+The single machine-readable contract source is:
 
-### Plan index
+- `assets/workflow-contract.v1.json`
+
+The installed runtime copy inside a repo is:
+
+- `.ai/harness/workflow-contract.json`
+
+The main engine entrypoints are:
+
+- `scripts/inspect-project-state.ts`
+- `scripts/migrate-workflow-docs.ts`
+- `scripts/migrate-project-template.sh`
+- `scripts/check-task-workflow.sh`
+- `scripts/create-project-dirs.sh`
+
+## Plan Index
+
+The router should still respect the canonical plan catalog in `assets/plan-map.json`:
 
 Core Plans (A-F):
 - Plan A: Remix
@@ -103,145 +109,87 @@ Custom Presets (G-K):
 - Plan J: AI coding agent / TUI
 - Plan K: Fully custom configuration
 
-## Existing repo migration workflow
+## Migration Rules
 
-For migration requests:
+For legacy repos, migrate old document surfaces before refreshing templates.
 
-1. Inspect current repo structure, especially:
-   - `CLAUDE.md`
-   - `AGENTS.md`
-   - `.claude/settings.json`
-   - `.ai/hooks/`
-   - `docs/PROGRESS.md`
-   - `tasks/`
-   - helper scripts under `scripts/`
-2. Identify drift from the current harness contract.
-3. Use `scripts/migrate-project-template.sh` when the user wants repo-wide migration.
-4. Preserve user-owned content where possible; prefer additive migration over destructive replacement unless the user asks to reset.
-5. Treat legacy `docs/plan.md` pointers as drift; the migrated repo should rely on `plans/` only.
-6. If the repo has hooks but lacks repo-local task enforcement or harness artifacts, treat that as incomplete migration.
+Legacy paths include:
 
-Read `references/migration-guide.md` before changing migration behavior.
+- `docs/plan.md`
+- `docs/TODO.md`
+- `docs/PROGRESS.md`
+- `docs/contract.md`
+- `docs/review.md`
+- `docs/handoff.md`
+- `HANDOFF.md`
 
-## Audit and repair workflow
+Use:
 
-For audits or contract repairs:
+- `bun scripts/migrate-workflow-docs.ts --repo <path> --dry-run`
+- `bun scripts/migrate-workflow-docs.ts --repo <path> --apply`
 
-1. Compare current repo behavior against the generated contract.
-2. Check whether both Codex and Claude can follow the same `tasks/` workflow.
-3. Flag these issues first:
-   - `docs/PROGRESS.md` used as active task log
-   - final response contract missing task-file disclosure
-   - task-sync enforced only through hooks
-   - `AGENTS.md` mentions `tasks/*` but does not require syncing them
-   - active-plan state duplicated outside `plans/`
-4. Recommend repo-local enforcement first, then hook enhancements second.
+Migration defaults:
 
-If the user wants implementation, update templates, scripts, migration paths, and tests together.
+- preserve user-authored content
+- archive uncertain legacy content instead of guessing
+- normalize `docs/PROGRESS.md` to milestone-only usage
+- move active execution context into `tasks/todo.md` and `tasks/research.md`
 
-## Outputs this skill owns
+## Repo-Local Contract
 
-The skill can generate or maintain:
+Preserve these semantics:
+
+- `plans/` is the active plan source of truth
+- `tasks/todo.md` is the active execution checklist
+- `tasks/lessons.md` stores correction-derived rules
+- `tasks/research.md` stores deep repo findings and hidden contracts
+- `tasks/contracts/` and `tasks/reviews/` are completion gates
+- `docs/PROGRESS.md` is milestone-only
+- `.ai/hooks/` is the shared hook source of truth
+- `.claude/hooks/` is a compatibility shim layer
+
+## Output Ownership
+
+This skill may create or update:
 
 - `CLAUDE.md`
 - `AGENTS.md`
 - `.ai/hooks/*`
-- `.claude/hooks/*` (compatibility shims delegating to `.ai/hooks/`)
-- `.claude/settings.json` (hook adapter referencing `.ai/hooks/run-hook.sh`)
-- `docs/brief.md`
+- `.claude/hooks/*`
+- `.claude/settings.json`
+- `.claude/templates/*`
 - `docs/spec.md`
-- `docs/tech-stack.md`
-- `docs/decisions.md`
-- `docs/architecture.md`
 - `docs/PROGRESS.md`
+- `docs/reference-configs/*.md`
 - `tasks/todo.md`
 - `tasks/lessons.md`
 - `tasks/research.md`
 - `tasks/contracts/*`
 - `tasks/reviews/*`
 - `.ai/harness/*`
-- `docs/reference-configs/*.md`
-- workflow helpers under `scripts/`
-- skill factory helpers under `scripts/skill-factory-*.sh`
+- helper scripts under `scripts/`
 
-Conditional outputs remain plan-specific:
+## Verification
 
-- `docs/packages.md` for monorepos
-- `docs/guides/metro-esm-gotchas.md` for Expo
-- Cloudflare deployment notes for cloudflare-native plans
+When changing the engine, migration path, contract manifest, or self-hosted workflow, run:
 
-## Evaluation and iteration
+```bash
+bun test
+bash scripts/check-task-sync.sh
+bash scripts/check-task-workflow.sh --strict
+bash scripts/migrate-project-template.sh --repo . --dry-run
+```
 
-This skill is expected to be benchmarked and iterated like a product, not just edited by feel.
+For migration-focused work, also inspect and dry-run legacy doc migration explicitly:
 
-Use `evals/evals.json` as the canonical prompt set for:
+```bash
+bun scripts/inspect-project-state.ts --repo . --format text
+bun scripts/migrate-workflow-docs.ts --repo . --dry-run
+```
 
-- new project initialization
-- AGENTS/CLAUDE regeneration
-- old repo migration to harness-style contracts
-- audit and repair of AI workflow drift
+## Iteration Notes
 
-Benchmark conventions, iteration directories, and review flow live in:
-
-- `references/evaluation-playbook.md`
-
-Use the local runner for lightweight repo-owned benchmark passes:
-
-- `bun run benchmark:skills --dry-run`
-- `bun run benchmark:skills --eval repair-agents-task-sync`
-
-Do not vendor the upstream `skill-creator` runner or viewer into this repo. Keep this repo ready to work with external evaluation workflows while owning only the minimal local orchestration needed for iteration.
-
-## Bundled resources
-
-### Assets
-
-- `assets/plan-map.json`
-- `assets/initializer-question-pack.v3.json`
-- `assets/partials/`
-- `assets/partials-agents/`
-- `assets/reference-configs/`
-- `assets/templates/`
-- `assets/hooks/`
-
-### References
-
-- `references/tech-stacks.md`
-- `references/best-practices.md`
-- `references/hooks-guide.md`
-- `references/migration-guide.md`
-- `references/plugins-core.md`
-- `references/evaluation-playbook.md`
-- `references/skill-factory-guide.md`
-- `references/arch/*.md`
-
-### Scripts
-
-- `scripts/assemble-template.ts`
-- `scripts/init-project.sh`
-- `scripts/create-project-dirs.sh`
-- `scripts/migrate-project-template.sh`
-- `scripts/setup-plugins.sh`
-- `scripts/switch-plan.sh`
-- `scripts/check-versions.ts`
-- `scripts/check-skill-version.ts`
-- `scripts/run-skill-hook.ts`
-
-## Validation checklist
-
-When you change this skill, validate the relevant layer:
-
-- template assembly tests for `CLAUDE.md` / `AGENTS.md`
-- bootstrap and migration tests for generated files
-- task-sync and task-workflow tests for repo-local contract enforcement
-- eval asset validation for `evals/evals.json`
-- version consistency checks against `package.json` and `assets/skill-version.json`
-- dry-run migration output against a legacy repo fixture and a current harness fixture
-- Skill Factory changes: hooks, `skill-factory-create/check`, guide, and tests stay aligned
-
-## Troubleshooting
-
-- Unsure which plan to use: start with core plans A-F.
-- Unsure whether to prefer hooks or repo artifacts: prefer repo artifacts.
-- Unsure whether to update `docs/PROGRESS.md`: only update it for milestones.
-- Unsure whether to add more detail to `CLAUDE.md` / `AGENTS.md`: move detail into `docs/reference-configs/*`.
+- Keep this file short; detailed policy belongs in `docs/reference-configs/`
+- Keep stack-specific detail in assets and references, not in this skill body
+- If the router changes, update `evals/evals.json`
+- If the contract changes, update templates, migration, checks, and tests together

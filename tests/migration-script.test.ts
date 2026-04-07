@@ -32,15 +32,19 @@ describe("Migration script contract", () => {
     expect(script).toContain("migrate_workflow");
   });
 
-  test("should remove legacy docs/TODO.md", () => {
+  test("should route legacy docs through the dedicated migrator", () => {
     const script = read("scripts/migrate-project-template.sh");
-    expect(script).toContain("docs/TODO.md");
-    expect(script).toContain("rm -f");
+    const migrator = read("scripts/migrate-workflow-docs.ts");
+    expect(script).toContain("migrate-workflow-docs.ts");
+    expect(migrator).toContain("docs/TODO.md");
+    expect(migrator).toContain("docs/plan.md");
+    expect(migrator).toContain("docs/PROGRESS.md");
   });
 
   test("should migrate workflow files and runtime ignore block", () => {
     const script = read("scripts/migrate-project-template.sh");
     const sharedLib = read("scripts/lib/project-init-lib.sh");
+    const workflowContract = read("assets/workflow-contract.v1.json");
     expect(script).toContain("docs/spec.md");
     expect(script).toContain("plans/archive");
     expect(script).toContain("tasks/archive");
@@ -50,18 +54,19 @@ describe("Migration script contract", () => {
     expect(script).toContain("tasks/reviews");
     expect(script).toContain(".ai/harness/checks/latest.json");
     expect(script).toContain(".ai/harness/handoff/current.md");
-    expect(script).toContain("new-spec.sh");
-    expect(script).toContain("new-sprint.sh");
-    expect(script).toContain("new-plan.sh");
-    expect(script).toContain("plan-to-todo.sh");
-    expect(script).toContain("archive-workflow.sh");
-    expect(script).toContain("prepare-handoff.sh");
-    expect(script).toContain("verify-contract.sh");
-    expect(script).toContain("summarize-failures.sh");
-    expect(script).toContain("verify-sprint.sh");
-    expect(script).toContain("check-task-sync.sh");
-    expect(script).toContain("ensure-task-workflow.sh");
-    expect(script).toContain("check-task-workflow.sh");
+    expect(script).toContain(".ai/harness/workflow-contract.json");
+    expect(workflowContract).toContain("new-spec.sh");
+    expect(workflowContract).toContain("new-sprint.sh");
+    expect(workflowContract).toContain("new-plan.sh");
+    expect(workflowContract).toContain("plan-to-todo.sh");
+    expect(workflowContract).toContain("archive-workflow.sh");
+    expect(workflowContract).toContain("prepare-handoff.sh");
+    expect(workflowContract).toContain("verify-contract.sh");
+    expect(workflowContract).toContain("summarize-failures.sh");
+    expect(workflowContract).toContain("verify-sprint.sh");
+    expect(workflowContract).toContain("check-task-sync.sh");
+    expect(workflowContract).toContain("ensure-task-workflow.sh");
+    expect(workflowContract).toContain("check-task-workflow.sh");
     expect(script).toContain("pi_ensure_task_sync");
     expect(sharedLib).toContain("check:task-sync");
     expect(sharedLib).toContain("check:task-workflow");
@@ -69,6 +74,7 @@ describe("Migration script contract", () => {
     expect(script).toContain("spa-day-protocol.md");
     expect(sharedLib).toContain("claude-runtime-temp");
     expect(script).toContain("docs/reference-configs");
+    expect(read("assets/workflow-contract.v1.json")).toContain('"runtimeManifest": ".ai/harness/workflow-contract.json"');
   });
 
   test("should apply migration and create workflow artifacts with single-source plan workflow", () => {
@@ -87,8 +93,8 @@ describe("Migration script contract", () => {
         JSON.stringify({ hooks: { PostToolUse: [{ matcher: "Bash", hooks: [] }] } }, null, 2)
       );
 
-      writeFileSync(join(repo, "plans/plan-20260304-0900-alpha.md"), "# Plan alpha\n");
-      writeFileSync(join(repo, "plans/plan-20260304-1000-beta.md"), "# Plan beta\n");
+      writeFileSync(join(repo, "plans/plan-20260304-0900-alpha.md"), "# Plan alpha\n\n> **Status**: Draft\n");
+      writeFileSync(join(repo, "plans/plan-20260304-1000-beta.md"), "# Plan beta\n\n> **Status**: Draft\n");
 
       const res = spawnSync(
         "bash",
@@ -108,6 +114,7 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "tasks/reviews"))).toBe(true);
       expect(existsSync(join(repo, ".ai/harness/checks/latest.json"))).toBe(true);
       expect(existsSync(join(repo, ".ai/harness/handoff/current.md"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/harness/workflow-contract.json"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-spec.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-sprint.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-plan.sh"))).toBe(true);
@@ -143,6 +150,10 @@ describe("Migration script contract", () => {
 
       expect(existsSync(join(repo, "docs/TODO.md"))).toBe(false);
       expect(existsSync(join(repo, "docs/plan.md"))).toBe(false);
+      expect(existsSync(join(repo, "docs/TODO.md.migrated.bak"))).toBe(true);
+      expect(existsSync(join(repo, "docs/plan.md.migrated.bak"))).toBe(true);
+      expect(existsSync(join(repo, "tasks/archive/legacy-docs-TODO.md"))).toBe(true);
+      expect(existsSync(join(repo, "plans/archive/legacy-docs-plan.md"))).toBe(true);
 
       const progress = readFileSync(join(repo, "docs/PROGRESS.md"), "utf-8");
       expect(progress).toContain("milestone checkpoints only");
@@ -155,6 +166,8 @@ describe("Migration script contract", () => {
 
       const handoff = readFileSync(join(repo, ".ai/harness/handoff/current.md"), "utf-8");
       expect(handoff).toContain("# Harness Handoff");
+      const workflowContract = JSON.parse(readFileSync(join(repo, ".ai/harness/workflow-contract.json"), "utf-8"));
+      expect(workflowContract.helpers.scripts).toContain("switch-plan.sh");
 
       const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf-8"));
       expect(pkg.scripts["check:task-sync"]).toBe("bash scripts/check-task-sync.sh");

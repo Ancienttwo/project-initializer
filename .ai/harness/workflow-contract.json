@@ -1,0 +1,93 @@
+{
+  "version": "1.0.0",
+  "contractId": "tasks-first-harness-v1",
+  "compatibility": {
+    "agents": ["claude", "codex"],
+    "repoLocalFirst": true
+  },
+  "helpers": {
+    "scripts": [
+      "new-spec.sh",
+      "new-sprint.sh",
+      "new-plan.sh",
+      "plan-to-todo.sh",
+      "archive-workflow.sh",
+      "prepare-handoff.sh",
+      "verify-contract.sh",
+      "summarize-failures.sh",
+      "verify-sprint.sh",
+      "check-task-sync.sh",
+      "ensure-task-workflow.sh",
+      "check-task-workflow.sh",
+      "switch-plan.sh"
+    ]
+  },
+  "artifacts": {
+    "runtimeManifest": ".ai/harness/workflow-contract.json",
+    "requiredDirectories": [
+      "plans",
+      "plans/archive",
+      "tasks",
+      "tasks/archive",
+      "tasks/contracts",
+      "tasks/reviews",
+      ".claude/templates",
+      ".ai/harness",
+      ".ai/harness/checks",
+      ".ai/harness/handoff",
+      "docs/reference-configs"
+    ],
+    "requiredFiles": [
+      "docs/spec.md",
+      ".claude/templates/spec.template.md",
+      ".claude/templates/plan.template.md",
+      ".claude/templates/research.template.md",
+      ".claude/templates/contract.template.md",
+      ".claude/templates/review.template.md",
+      "scripts/new-spec.sh",
+      "scripts/new-sprint.sh",
+      "scripts/new-plan.sh",
+      "scripts/plan-to-todo.sh",
+      "scripts/archive-workflow.sh",
+      "scripts/prepare-handoff.sh",
+      "scripts/verify-contract.sh",
+      "scripts/summarize-failures.sh",
+      "scripts/verify-sprint.sh",
+      "scripts/check-task-sync.sh",
+      "scripts/ensure-task-workflow.sh",
+      "scripts/check-task-workflow.sh",
+      "scripts/switch-plan.sh",
+      "tasks/todo.md",
+      "tasks/lessons.md",
+      "tasks/research.md",
+      "docs/PROGRESS.md",
+      ".ai/harness/checks/latest.json",
+      ".ai/harness/handoff/current.md",
+      ".ai/harness/workflow-contract.json"
+    ]
+  },
+  "documents": {
+    "spec": "docs/spec.md",
+    "planDirectory": "plans",
+    "progressLedger": "docs/PROGRESS.md",
+    "taskChecklist": "tasks/todo.md",
+    "researchNotes": "tasks/research.md",
+    "lessonsLog": "tasks/lessons.md"
+  },
+  "migrations": {
+    "legacyVersions": [
+      "pre-tasks-first",
+      "tasks-first-without-contract-manifest",
+      "current-v1"
+    ],
+    "legacyPaths": [
+      "docs/plan.md",
+      "docs/TODO.md",
+      "docs/PROGRESS.md",
+      "docs/contract.md",
+      "docs/review.md",
+      "docs/handoff.md",
+      "HANDOFF.md"
+    ]
+  }
+}

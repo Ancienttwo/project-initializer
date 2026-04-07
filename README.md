@@ -7,12 +7,16 @@ This repository now dogfoods its own tasks-first contract. It is both:
 - the source repo for the `project-initializer` skill
 - a self-hosted example of the repo-local workflow it generates for other projects
 
-## Current Model (3.1.x)
+## Current Model (3.2.x)
 
 - Question flow uses **10 grouped decision points** with harness defaults inferred first.
 - Plan menu is tiered:
   - **Core Plans (A-F)** first.
   - **Custom Presets (G-K)** only when needed.
+- Skill routing is inspection-first:
+  - `scripts/inspect-project-state.ts`
+  - `scripts/migrate-workflow-docs.ts`
+  - `assets/workflow-contract.v1.json`
 - Runtime mode is configurable with template vars:
   - `{{RUNTIME_MODE}}`
   - `{{RUNTIME_PROFILE}}`
@@ -22,6 +26,8 @@ This repository now dogfoods its own tasks-first contract. It is both:
   - `assets/initializer-question-pack.v3.json`
 - Generated repos default to the repo-local harness flow:
   - `docs/spec.md -> plans/ -> tasks/contracts/ -> tasks/reviews/ -> .ai/harness/*`
+- Generated and self-hosted repos install:
+  - `.ai/harness/workflow-contract.json`
 - Claude auto memory can be observed by generated hooks in read-only mode to enrich Skill Factory signal quality.
 
 ## Repo Workflow
@@ -48,6 +54,10 @@ bun scripts/assemble-template.ts --target agents --plan C --name "MyProject"
 # local benchmark skeleton
 bun run benchmark:skills --dry-run
 
+# inspect and dry-run legacy workflow migration
+bun scripts/inspect-project-state.ts --repo . --format text
+bun scripts/migrate-workflow-docs.ts --repo . --dry-run
+
 # run one eval across both Claude and Codex
 bun run benchmark:skills --eval repair-agents-task-sync
 ```
@@ -59,8 +69,11 @@ bun run benchmark:skills --eval repair-agents-task-sync
 - Plan mapping: `assets/plan-map.json`
 - Question-pack: `assets/initializer-question-pack.v3.json`
 - Shared hooks: `assets/hooks/`
+- Workflow contract: `assets/workflow-contract.v1.json`
 - Template assembler: `scripts/assemble-template.ts`
 - Question inference helper: `scripts/initializer-question-pack.ts`
+- State inspector: `scripts/inspect-project-state.ts`
+- Legacy-doc migrator: `scripts/migrate-workflow-docs.ts`
 - Scaffolding scripts:
   - `scripts/init-project.sh`
   - `scripts/create-project-dirs.sh`

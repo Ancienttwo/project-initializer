@@ -77,6 +77,16 @@ if [ "$implement_intent" -eq 0 ]; then
 fi
 
 if [ "$implement_intent" -eq 1 ]; then
+  if [ ! -f "docs/spec.md" ]; then
+    echo "[SpecGuard] Missing docs/spec.md. Create stable product truth before implementation."
+    hook_structured_error \
+      "SpecGuard" \
+      "Implementation requested without docs/spec.md." \
+      "Run bash scripts/new-spec.sh and capture stable product intent before implementing." \
+      "missing_artifact"
+    exit 1
+  fi
+
   active_plan="$(get_active_plan || true)"
   if [ -z "$active_plan" ] || [ ! -f "$active_plan" ]; then
     echo "[PlanStatusGuard] No active plan found in plans/. Run: bash scripts/ensure-task-workflow.sh --slug <slug> --title <title>"
@@ -100,6 +110,17 @@ if [ "$implement_intent" -eq 1 ]; then
   fi
 
   if [ "$plan_status" = "Approved" ] || [ "$plan_status" = "Executing" ]; then
+    contract_file="$(workflow_active_contract || true)"
+    if [ -z "$contract_file" ] || [ ! -f "$contract_file" ]; then
+      echo "[ContractGuard] Missing active sprint contract for $active_plan"
+      hook_structured_error \
+        "ContractGuard" \
+        "Implementation requested without an active sprint contract." \
+        "Run bash scripts/new-sprint.sh --slug <slug> --title <title> or create tasks/contracts/<slug>.contract.md first." \
+        "missing_artifact"
+      exit 1
+    fi
+
     todo_source="$(get_todo_source_plan || true)"
     if [ "$todo_source" != "$active_plan" ]; then
       echo "[TodoGuard] Active plan is '$plan_status' in $active_plan but tasks/todo.md is not synchronized."
@@ -161,13 +182,45 @@ if [ "$done_intent" -eq 1 ]; then
   else
     echo "[ContractGuard] verify-contract.sh not found at scripts/verify-contract.sh (degraded mode: skipping strict verification)."
   fi
+
+  review_file="$(workflow_active_review || true)"
+  if [ -z "$review_file" ] || [ ! -f "$review_file" ]; then
+    echo "[ReviewGuard] Missing sprint review: ${review_file:-tasks/reviews/<slug>.review.md}"
+    hook_structured_error \
+      "ReviewGuard" \
+      "Done intent detected without a sprint review artifact." \
+      "Create tasks/reviews/<slug>.review.md and record an evaluator recommendation before marking work done." \
+      "quality_gate"
+    exit 1
+  fi
+
+  if ! workflow_review_recommends_pass "$review_file"; then
+    echo "[ReviewGuard] Sprint review does not recommend pass: $review_file"
+    hook_structured_error \
+      "ReviewGuard" \
+      "Sprint review is missing a passing recommendation." \
+      "Update the review with fresh evidence and a pass recommendation before marking work done." \
+      "quality_gate"
+    exit 1
+  fi
+
+  checks_file="$(workflow_checks_file)"
+  if [ ! -f "$checks_file" ]; then
+    echo "[EvidenceGuard] Missing structured checks file: $checks_file"
+    hook_structured_error \
+      "EvidenceGuard" \
+      "Done intent detected without structured verification evidence." \
+      "Run the relevant checks so .ai/harness/checks/latest.json exists before marking work done." \
+      "quality_gate"
+    exit 1
+  fi
 fi
 
 if is_spa_day_intent; then
-  if [ -f "docs/reference-configs/spa-day-protocol.md" ]; then
-    echo "[SpaDay] Follow docs/reference-configs/spa-day-protocol.md for consolidation."
+  if [ -f "docs/reference-configs/handoff-protocol.md" ]; then
+    echo "[HarnessMaintenance] Follow docs/reference-configs/handoff-protocol.md and sprint-contracts.md when consolidating workflow rules."
   else
-    echo "[SpaDay] spa-day protocol missing. Add docs/reference-configs/spa-day-protocol.md."
+    echo "[HarnessMaintenance] harness protocol docs missing. Add docs/reference-configs/handoff-protocol.md."
   fi
 fi
 

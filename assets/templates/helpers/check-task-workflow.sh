@@ -28,11 +28,77 @@ while [[ $# -gt 0 ]]; do
 done
 
 issues=0
+WORKFLOW_CONTRACT_PATH=".ai/harness/workflow-contract.json"
 
 report_issue() {
   local message="$1"
   echo "[workflow] $message"
   issues=$((issues + 1))
+}
+
+resolve_json_runtime() {
+  if command -v node >/dev/null 2>&1; then
+    printf 'node'
+    return 0
+  fi
+
+  if command -v bun >/dev/null 2>&1; then
+    printf 'bun'
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3'
+    return 0
+  fi
+
+  return 1
+}
+
+contract_query_lines() {
+  local selector="$1"
+  local runtime
+
+  runtime="$(resolve_json_runtime || true)"
+  if [[ -z "$runtime" || ! -f "$WORKFLOW_CONTRACT_PATH" ]]; then
+    return 1
+  fi
+
+  case "$runtime" in
+    python3)
+      "$runtime" - "$WORKFLOW_CONTRACT_PATH" "$selector" <<'PY_EOF'
+import json
+import sys
+
+path, selector = sys.argv[1], sys.argv[2]
+value = json.load(open(path, "r", encoding="utf-8"))
+for part in selector.split("."):
+    value = value.get(part) if isinstance(value, dict) else None
+if isinstance(value, list):
+    for item in value:
+        print(item)
+elif value is not None:
+    print(value)
+PY_EOF
+      ;;
+    *)
+      "$runtime" -e '
+const fs = require("fs");
+const [, filePath, selector] = process.argv;
+let value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+for (const part of selector.split(".")) {
+  value = value && typeof value === "object" ? value[part] : undefined;
+}
+if (Array.isArray(value)) {
+  for (const item of value) {
+    console.log(item);
+  }
+} else if (value !== undefined && value !== null) {
+  console.log(value);
+}
+' "$WORKFLOW_CONTRACT_PATH" "$selector"
+      ;;
+  esac
 }
 
 get_active_plan() {
@@ -90,38 +156,31 @@ check_required_dir() {
   fi
 }
 
-check_required_dir "plans"
-check_required_dir "plans/archive"
-check_required_dir "tasks"
-check_required_dir "tasks/archive"
-check_required_dir "tasks/contracts"
-check_required_dir "tasks/reviews"
-check_required_dir ".claude/templates"
-check_required_dir ".ai/harness"
+if [[ ! -f "$WORKFLOW_CONTRACT_PATH" ]]; then
+  report_issue "Missing workflow contract manifest: $WORKFLOW_CONTRACT_PATH"
+else
+  while IFS= read -r rel_dir; do
+    [[ -z "$rel_dir" ]] && continue
+    check_required_dir "$rel_dir"
+  done < <(contract_query_lines "artifacts.requiredDirectories" || true)
 
-check_required_file "docs/spec.md"
-check_required_file ".claude/templates/spec.template.md"
-check_required_file ".claude/templates/plan.template.md"
-check_required_file ".claude/templates/research.template.md"
-check_required_file ".claude/templates/contract.template.md"
-check_required_file ".claude/templates/review.template.md"
-check_required_file "scripts/new-spec.sh"
-check_required_file "scripts/new-sprint.sh"
-check_required_file "scripts/new-plan.sh"
-check_required_file "scripts/plan-to-todo.sh"
-check_required_file "scripts/archive-workflow.sh"
-check_required_file "scripts/prepare-handoff.sh"
-check_required_file "scripts/verify-contract.sh"
-check_required_file "scripts/verify-sprint.sh"
-check_required_file "scripts/check-task-sync.sh"
-check_required_file "scripts/ensure-task-workflow.sh"
-check_required_file "scripts/check-task-workflow.sh"
-check_required_file "tasks/todo.md"
-check_required_file "tasks/lessons.md"
-check_required_file "tasks/research.md"
-check_required_file "docs/PROGRESS.md"
-check_required_file ".ai/harness/checks/latest.json"
-check_required_file ".ai/harness/handoff/current.md"
+  while IFS= read -r rel_file; do
+    [[ -z "$rel_file" ]] && continue
+    check_required_file "$rel_file"
+  done < <(contract_query_lines "artifacts.requiredFiles" || true)
+fi
+
+if [[ -f "docs/plan.md" ]]; then
+  report_issue "Legacy docs/plan.md detected; migrate or archive it into plans/."
+fi
+
+if [[ -f "docs/TODO.md" ]]; then
+  report_issue "Legacy docs/TODO.md detected; migrate it into tasks/todo.md."
+fi
+
+if [[ -f "docs/PROGRESS.md" ]] && ! grep -Fq "milestone checkpoints only" "docs/PROGRESS.md"; then
+  report_issue "docs/PROGRESS.md is not normalized for milestone-only usage."
+fi
 
 todo_source="$(todo_source_plan || true)"
 if [[ -f "tasks/todo.md" ]]; then

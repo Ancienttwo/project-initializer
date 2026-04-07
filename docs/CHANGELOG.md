@@ -2,6 +2,15 @@
 
 All notable changes to this skill are documented here.
 
+## [3.2.0] - 2026-04-08
+
+### Changed
+
+- Added `assets/workflow-contract.v1.json` as the single machine-readable workflow contract and installed `.ai/harness/workflow-contract.json` in generated and self-hosted repos.
+- Introduced `scripts/inspect-project-state.ts` so routing starts from structured repo inspection instead of prompt-only branching.
+- Added `scripts/migrate-workflow-docs.ts` to preserve and migrate legacy `docs/plan.md`, `docs/TODO.md`, and execution-log style `docs/PROGRESS.md`.
+- Updated migration, scaffold, and workflow verification paths to consume the shared contract manifest and verify it after migration.
+
 ## [3.1.0] - 2026-03-29
 
 ### Changed

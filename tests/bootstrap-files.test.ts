@@ -55,11 +55,9 @@ describe("Bootstrap Script Contracts", () => {
   test("create-project-dirs should create tasks primary files", () => {
     const content = read("scripts/create-project-dirs.sh");
     const sharedLib = read("scripts/lib/project-init-lib.sh");
+    const contract = JSON.parse(read("assets/workflow-contract.v1.json"));
 
-    expect(content).toContain("mkdir -p tasks");
-    expect(content).toContain("mkdir -p tasks/archive");
-    expect(content).toContain("mkdir -p tasks/contracts");
-    expect(content).toContain("mkdir -p plans/archive");
+    expect(content).toContain("create_contract_directories");
     expect(content).toContain("cat > tasks/todo.md");
     expect(content).toContain("cat > tasks/lessons.md");
     expect(content).toContain("cat > tasks/research.md");
@@ -74,13 +72,17 @@ describe("Bootstrap Script Contracts", () => {
     expect(sharedLib).toContain("check-task-workflow.sh");
     expect(sharedLib).toContain("skill-factory-create.sh");
     expect(sharedLib).toContain("skill-factory-check.sh");
+    expect(sharedLib).toContain("pi_install_workflow_contract");
     expect(sharedLib).toContain("check:task-sync");
     expect(sharedLib).toContain("check:task-workflow");
     expect(sharedLib).toContain("contract.template.md");
     expect(content).toContain("spa-day-protocol.md");
+    expect(content).toContain("install_workflow_contract");
     expect(content).toContain('cp "$ASSETS_HOOKS_DIR/settings.template.json" .claude/settings.json');
     expect(content).toContain("mkdir -p .ai/hooks");
     expect(content).toContain("settings.template.json");
+    expect(contract.helpers.scripts).toContain("switch-plan.sh");
+    expect(contract.artifacts.requiredFiles).toContain(".ai/harness/workflow-contract.json");
     expect(sharedLib).toContain(".skill-factory-state.json");
     expect(sharedLib).toContain(".memory-context.json");
     expect(sharedLib).toContain(".memory-snapshot.json");
@@ -97,16 +99,14 @@ describe("Bootstrap Script Contracts", () => {
     const content = read("scripts/init-project.sh");
     const sharedLib = read("scripts/lib/project-init-lib.sh");
 
-    expect(content).toContain("mkdir -p tasks");
-    expect(content).toContain("mkdir -p tasks/archive");
-    expect(content).toContain("mkdir -p tasks/contracts");
-    expect(content).toContain("mkdir -p plans/archive");
+    expect(content).toContain("create_contract_directories");
     expect(content).toContain("cat > tasks/todo.md");
     expect(content).toContain("cat > tasks/lessons.md");
     expect(content).toContain("tasks/research.md");
     expect(content).not.toContain("docs/TODO.md");
     expect(content).toContain("pi_install_helpers");
     expect(content).toContain("pi_install_templates");
+    expect(content).toContain("install_workflow_contract");
     expect(sharedLib).toContain("contract.template.md");
     expect(sharedLib).toContain("verify-contract.sh");
     expect(sharedLib).toContain("summarize-failures.sh");
@@ -116,6 +116,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("pi_install_skill_factory");
     expect(sharedLib).toContain("skill-factory-create.sh");
     expect(sharedLib).toContain("skill-factory-check.sh");
+    expect(sharedLib).toContain("pi_workflow_contract_query_lines");
     expect(sharedLib).toContain("check:task-sync");
     expect(sharedLib).toContain("check:task-workflow");
     expect(content).toContain("spa-day-protocol.md");

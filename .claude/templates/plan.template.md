@@ -3,7 +3,10 @@
 > **Status**: Draft
 > **Created**: {{TIMESTAMP}}
 > **Slug**: {{SLUG}}
+> **Spec**: `docs/spec.md`
 > **Research**: See `tasks/research.md`
+> **Sprint Contract**: `tasks/contracts/{{SLUG}}.contract.md`
+> **Sprint Review**: `tasks/reviews/{{SLUG}}.review.md`
 
 ## Approach
 ### Strategy
@@ -25,9 +28,15 @@
 
 ## Task Contracts
 - Contract file: `tasks/contracts/{{SLUG}}.contract.md`
+- Review file: `tasks/reviews/{{SLUG}}.review.md`
 - Template: `.claude/templates/contract.template.md`
 - Verification command: `bash scripts/verify-contract.sh --contract tasks/contracts/{{SLUG}}.contract.md --strict`
 - Active plan rule: the latest non-archived `plans/plan-*.md` file is the current plan
+
+## Handoff
+
+- Checks file: `.ai/harness/checks/latest.json`
+- Session handoff: `.ai/harness/handoff/current.md`
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->

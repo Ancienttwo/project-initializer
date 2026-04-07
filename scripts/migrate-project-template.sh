@@ -24,10 +24,12 @@ TEMPLATE_ASSETS_DIR="$SKILL_ROOT/assets/templates"
 HELPER_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/helpers"
 SKILL_FACTORY_ASSETS_DIR="$SKILL_ROOT/assets/skill-factory"
 FACTOR_FACTORY_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/factor-factory"
+WORKFLOW_CONTRACT_ASSET="$SKILL_ROOT/assets/workflow-contract.v1.json"
 JQ_BIN="${PROJECT_INITIALIZER_JQ_BIN:-jq}"
 
 MODE="dry-run"
 TARGET_REPO=""
+INSPECT_OUTPUT=""
 
 usage() {
   cat <<'USAGE_EOF'
@@ -47,6 +49,24 @@ log() {
 
 has_jq() {
   command -v "$JQ_BIN" >/dev/null 2>&1
+}
+
+run_ts_script() {
+  local script_path="$1"
+  shift
+
+  if command -v bun >/dev/null 2>&1; then
+    bun "$script_path" "$@"
+    return $?
+  fi
+
+  if command -v node >/dev/null 2>&1; then
+    node --experimental-strip-types "$script_path" "$@"
+    return $?
+  fi
+
+  echo "[migrate] Missing bun/node runtime for TypeScript helper: $script_path" >&2
+  return 1
 }
 
 merge_hook_settings_json() {
@@ -188,7 +208,9 @@ install_templates() {
 install_helpers() {
   local repo="$1"
   if [[ -d "$HELPER_ASSETS_DIR" ]]; then
-    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
+    local helper_names
+    helper_names="$(pi_workflow_contract_query_lines "$WORKFLOW_CONTRACT_ASSET" "helpers.scripts" | xargs)"
+    pi_install_helpers "$repo" "$HELPER_ASSETS_DIR" "$MODE" "$helper_names"
   else
     log "Helper assets not found at $HELPER_ASSETS_DIR"
   fi
@@ -197,6 +219,11 @@ install_helpers() {
 install_skill_factory_files() {
   local repo="$1"
   pi_install_skill_factory "$repo" "$SKILL_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
+}
+
+install_workflow_contract() {
+  local repo="$1"
+  pi_install_workflow_contract "$repo" "$WORKFLOW_CONTRACT_ASSET" "$MODE"
 }
 
 ensure_task_sync_package_script() {
@@ -443,6 +470,19 @@ require_repo() {
   fi
 }
 
+inspect_project_state() {
+  local repo="$1"
+  local inspector="$SCRIPT_DIR/inspect-project-state.ts"
+
+  if [[ ! -f "$inspector" ]]; then
+    log "Project-state inspector missing: $inspector"
+    return 1
+  fi
+
+  INSPECT_OUTPUT="$(run_ts_script "$inspector" --repo "$repo" --format text)"
+  printf '%s\n' "$INSPECT_OUTPUT"
+}
+
 migrate_hooks() {
   local repo="$1"
   local project_claude_dir="$repo/.claude"
@@ -548,15 +588,17 @@ EOF_HOOK_SHIM
 
 migrate_docs() {
   local repo="$1"
-  local legacy_todo="$repo/docs/TODO.md"
+  local migrator="$SCRIPT_DIR/migrate-workflow-docs.ts"
 
-  if [[ -f "$legacy_todo" ]]; then
-    if [[ "$MODE" == "apply" ]]; then
-      rm -f "$legacy_todo"
-      log "Removed legacy docs/TODO.md"
-    else
-      echo "[dry-run] rm -f \"$legacy_todo\""
-    fi
+  if [[ ! -f "$migrator" ]]; then
+    log "Legacy-doc migrator missing: $migrator"
+    return 1
+  fi
+
+  if [[ "$MODE" == "apply" ]]; then
+    run_ts_script "$migrator" --repo "$repo" --apply
+  else
+    run_ts_script "$migrator" --repo "$repo" --dry-run
   fi
 }
 
@@ -573,6 +615,7 @@ migrate_workflow() {
 
   install_templates "$repo"
   install_helpers "$repo"
+  install_workflow_contract "$repo"
   install_skill_factory_files "$repo"
   if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
     pi_install_factor_factory "$repo" "$FACTOR_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
@@ -581,15 +624,6 @@ migrate_workflow() {
   create_research_file_if_missing "$repo"
   create_task_files_if_missing "$repo"
   ensure_task_sync_package_script "$repo"
-
-  if [[ -f "$repo/docs/plan.md" ]]; then
-    if [[ "$MODE" == "apply" ]]; then
-      rm -f "$repo/docs/plan.md"
-      log "Removed legacy docs/plan.md compatibility pointer"
-    else
-      echo "[dry-run] rm -f \"$repo/docs/plan.md\""
-    fi
-  fi
 
   local repo_gitignore="$repo/.gitignore"
   run_or_echo "touch \"$repo_gitignore\""
@@ -619,17 +653,39 @@ SPA_DAY_EOF
   fi
 }
 
+verify_migration_contract() {
+  local repo="$1"
+  local check_script="$repo/scripts/check-task-workflow.sh"
+
+  if [[ "$MODE" != "apply" ]]; then
+    echo "[dry-run] verify migrated workflow with bash \"$check_script\" --strict"
+    return 0
+  fi
+
+  if [[ ! -f "$check_script" ]]; then
+    log "Missing workflow check script after migration: $check_script"
+    return 1
+  fi
+
+  (cd "$repo" && bash "scripts/check-task-workflow.sh" --strict)
+}
+
 print_report() {
   local repo="$1"
   echo
   echo "=== Migration Report ==="
   echo "Mode: $MODE"
   echo "Repo: $repo"
+  if [[ -n "$INSPECT_OUTPUT" ]]; then
+    echo "--- Inspection ---"
+    printf '%s\n' "$INSPECT_OUTPUT"
+  fi
   echo "- Project hooks synced from: $HOOK_ASSETS_DIR"
   echo "- Team hook config target: .claude/settings.json"
-  echo "- Legacy docs/TODO.md: removed when present"
+  echo "- Legacy docs/TODO.md / docs/plan.md / docs/PROGRESS.md: migrated by scripts/migrate-workflow-docs.ts"
   echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/harness/*"
-  echo "- Helper scripts: new-spec/new-sprint/new-plan/plan-to-todo/prepare-handoff/summarize-failures/verify-sprint"
+  echo "- Workflow contract manifest installed at: .ai/harness/workflow-contract.json"
+  echo "- Helper scripts installed from workflow contract manifest"
   echo "- Runtime temporary ignore block synced to .gitignore"
 }
 
@@ -686,10 +742,12 @@ main() {
 
   run_skill_hook "pre-migrate" || exit 1
 
+  inspect_project_state "$TARGET_REPO" || exit 1
   migrate_hooks "$TARGET_REPO"
   migrate_docs "$TARGET_REPO"
   migrate_workflow "$TARGET_REPO"
   update_version_stamp "$TARGET_REPO"
+  verify_migration_contract "$TARGET_REPO" || exit 1
   print_report "$TARGET_REPO"
 
   run_skill_hook "post-migrate"

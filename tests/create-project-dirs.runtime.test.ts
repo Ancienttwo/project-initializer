@@ -30,6 +30,7 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, "tasks/reviews"))).toBe(true);
       expect(existsSync(join(cwd, ".ai/harness/checks/latest.json"))).toBe(true);
       expect(existsSync(join(cwd, ".ai/harness/handoff/current.md"))).toBe(true);
+      expect(existsSync(join(cwd, ".ai/harness/workflow-contract.json"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/new-spec.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/new-sprint.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/prepare-handoff.sh"))).toBe(true);
@@ -58,6 +59,8 @@ describe("create-project-dirs runtime smoke", () => {
 
       const progress = readFileSync(join(cwd, "docs/PROGRESS.md"), "utf-8");
       expect(progress).toContain("milestone checkpoints only");
+      const workflowContract = JSON.parse(readFileSync(join(cwd, ".ai/harness/workflow-contract.json"), "utf-8"));
+      expect(workflowContract.helpers.scripts).toContain("check-task-workflow.sh");
 
       const pkg = JSON.parse(readFileSync(join(cwd, "package.json"), "utf-8"));
       expect(pkg.scripts["check:task-sync"]).toBe("bash scripts/check-task-sync.sh");

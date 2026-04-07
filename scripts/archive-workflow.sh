@@ -163,6 +163,6 @@ rm -f ".claude/.plan-state/${plan_key}.task-state.json.bak"
 rm -f ".claude/.plan-state/${plan_key}.task-handoff.md.bak"
 
 echo "Archived plan to: $archive_plan_path"
-if [[ -f "docs/reference-configs/spa-day-protocol.md" ]]; then
-  echo "Next: run a periodic cleanup using docs/reference-configs/spa-day-protocol.md"
+if [[ -f "docs/reference-configs/handoff-protocol.md" ]]; then
+  echo "Next: refresh or prune long-running workflow rules using docs/reference-configs/handoff-protocol.md"
 fi

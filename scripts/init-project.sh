@@ -27,6 +27,7 @@ ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
 ASSETS_TEMPLATES_DIR="$SCRIPT_DIR/../assets/templates"
 ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
 ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
+ASSETS_WORKFLOW_CONTRACT="$SCRIPT_DIR/../assets/workflow-contract.v1.json"
 
 echo -e "${BLUE}=== Project Initializer ===${NC}"
 echo -e "Project: ${GREEN}$PROJECT_NAME${NC}"
@@ -111,6 +112,17 @@ EOF_HOOK_SHIM
     find .ai/hooks -type f -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
     find .claude/hooks -type f -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
     echo -e "${GREEN}Shared hooks installed to .ai/hooks/ with .claude/hooks compatibility shims${NC}"
+}
+
+install_workflow_contract() {
+    pi_install_workflow_contract "$PWD" "$ASSETS_WORKFLOW_CONTRACT" "apply"
+}
+
+create_contract_directories() {
+    while IFS= read -r rel_dir; do
+        [ -z "$rel_dir" ] && continue
+        mkdir -p "$rel_dir"
+    done < <(pi_workflow_contract_query_lines "$ASSETS_WORKFLOW_CONTRACT" "artifacts.requiredDirectories")
 }
 
 ensure_task_sync_package_script() {
@@ -231,13 +243,11 @@ create_structure() {
 
     mkdir -p docs/architecture
     mkdir -p docs/reference-configs
-    mkdir -p tasks/archive
-    mkdir -p tasks/contracts
-    mkdir -p plans/archive
     mkdir -p .claude/hooks
     mkdir -p .claude/templates
     mkdir -p .ops
     mkdir -p artifacts
+    create_contract_directories
 
     # Create documentation files
     cat > docs/PROGRESS.md << EOF
@@ -343,7 +353,10 @@ EOF
 EOF
     fi
 
-    pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply"
+    local helper_names
+    helper_names="$(pi_workflow_contract_query_lines "$ASSETS_WORKFLOW_CONTRACT" "helpers.scripts" | xargs)"
+    pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "$helper_names"
+    install_workflow_contract
     pi_install_skill_factory "$PWD" "$ASSETS_SKILL_FACTORY_DIR" "$SCRIPT_DIR" "apply"
     if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-$STACK}"; then
         pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"

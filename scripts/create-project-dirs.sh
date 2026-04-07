@@ -20,6 +20,7 @@ ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
 ASSETS_REF_DIR="$SCRIPT_DIR/../assets/reference-configs"
 ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
 ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
+ASSETS_WORKFLOW_CONTRACT="$SCRIPT_DIR/../assets/workflow-contract.v1.json"
 
 write_runtime_gitignore_block() {
   local extra_entries=""
@@ -34,7 +35,20 @@ write_templates() {
 }
 
 install_workflow_helpers() {
-  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "new-spec.sh new-sprint.sh new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh verify-sprint.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh switch-plan.sh"
+  local helper_names
+  helper_names="$(pi_workflow_contract_query_lines "$ASSETS_WORKFLOW_CONTRACT" "helpers.scripts" | xargs)"
+  pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "$helper_names"
+}
+
+install_workflow_contract() {
+  pi_install_workflow_contract "$PWD" "$ASSETS_WORKFLOW_CONTRACT" "apply"
+}
+
+create_contract_directories() {
+  while IFS= read -r rel_dir; do
+    [[ -z "$rel_dir" ]] && continue
+    mkdir -p "$rel_dir"
+  done < <(pi_workflow_contract_query_lines "$ASSETS_WORKFLOW_CONTRACT" "artifacts.requiredDirectories")
 }
 
 install_skill_factory_files() {
@@ -103,18 +117,13 @@ mkdir -p docs/api
 mkdir -p docs/guides
 mkdir -p docs/archives
 mkdir -p docs/reference-configs
-mkdir -p tasks/archive
-mkdir -p tasks/contracts
-mkdir -p tasks/reviews
-mkdir -p plans/archive
 mkdir -p scripts
 mkdir -p .claude/hooks
 mkdir -p .ai/hooks
-mkdir -p .ai/harness/checks
-mkdir -p .ai/harness/handoff
 mkdir -p .ops/database
 mkdir -p .ops/secrets
 mkdir -p artifacts
+create_contract_directories
 
 # ===== Initial Files =====
 touch docs/CHANGELOG.md
@@ -203,6 +212,7 @@ TASK_RESEARCH_EOF
 
 write_templates
 install_workflow_helpers
+install_workflow_contract
 install_skill_factory_files
 if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
   pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"

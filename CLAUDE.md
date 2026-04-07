@@ -11,6 +11,7 @@ This repository dogfoods the `project-initializer` workflow. Treat it as a Bun +
 
 - `tasks/research.md` for codebase findings and migration quirks
 - `plans/` for any active implementation plan
+- `.ai/harness/workflow-contract.json` for the installed repo-local workflow contract
 - `docs/reference-configs/ai-workflows.md`
 - `docs/reference-configs/development-protocol.md`
 - `docs/reference-configs/workflow-orchestration.md`
@@ -22,6 +23,7 @@ This repository dogfoods the `project-initializer` workflow. Treat it as a Bun +
 - When changing bootstrap or migration behavior, update the matching tests in `tests/`.
 - Prefer additive migration behavior over destructive replacement.
 - Preserve the distinction between milestone tracking in `docs/PROGRESS.md` and active work tracking in `tasks/`.
+- Keep `assets/workflow-contract.v1.json` and `.ai/harness/workflow-contract.json` aligned.
 
 ## Verification Defaults
 
@@ -31,5 +33,6 @@ Run these when touching scaffolding, migration, hooks, or workflow contracts:
 bun test
 bash scripts/check-task-sync.sh
 bash scripts/check-task-workflow.sh --strict
+bun scripts/inspect-project-state.ts --repo . --format text
 bash scripts/migrate-project-template.sh --repo . --dry-run
 ```

@@ -28,10 +28,12 @@ function run(cmd: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv) 
 function copyHelpers(cwd: string) {
   const scriptsDir = join(cwd, "scripts");
   mkdirSync(scriptsDir, { recursive: true });
+  mkdirSync(join(cwd, ".ai", "harness"), { recursive: true });
 
   for (const file of readdirSync(HELPER_DIR).filter((name) => name.endsWith(".sh"))) {
     copyFileSync(join(HELPER_DIR, file), join(scriptsDir, file));
   }
+  copyFileSync(join(ROOT, "assets/workflow-contract.v1.json"), join(cwd, ".ai/harness/workflow-contract.json"));
 
   expect(run("bash", ["-lc", "chmod +x scripts/*.sh"], cwd).status).toBe(0);
 }

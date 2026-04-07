@@ -25,7 +25,7 @@ run_skill_factory_activity() {
 }
 
 run_continuous_contract_verification() {
-  local active_plan contract_file
+  local active_plan contract_file checks_file
 
   [[ -f "scripts/verify-contract.sh" ]] || return 0
 
@@ -34,9 +34,11 @@ run_continuous_contract_verification() {
 
   contract_file="$(derive_contract_path "$active_plan" || true)"
   [[ -n "$contract_file" && -f "$contract_file" ]] || return 0
+  checks_file="$(workflow_checks_file)"
+  mkdir -p "$(dirname "$checks_file")"
 
   if contract_references_path "$contract_file" "$FILE_PATH"; then
-    bash "scripts/verify-contract.sh" --contract "$contract_file" --quiet || true
+    bash "scripts/verify-contract.sh" --contract "$contract_file" --quiet --report-file "$checks_file" || true
   fi
 }
 
@@ -188,5 +190,10 @@ ${changed_files}
 EOF_HANDOFF
 
 echo "[TaskHandoff] Task completion advanced (${done_tasks}/${total_tasks}). Wrote ${HANDOFF_FILE}."
+
+workflow_write_handoff "task-progress" || true
+if [[ -f "$(workflow_handoff_file)" ]]; then
+  echo "[HarnessHandoff] Refreshed $(workflow_handoff_file)."
+fi
 
 run_skill_factory_activity
