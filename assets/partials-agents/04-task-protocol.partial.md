@@ -30,19 +30,20 @@ RULES:
   - Process annotation notes before implementing
   - Extract approved plan tasks into tasks/todo.md
   - Define task contracts in tasks/contracts/{slug}.contract.md
-  - Define evaluator verdicts in tasks/reviews/{slug}.review.md
+  - Define evaluator verdicts and verification evidence in tasks/reviews/{slug}.review.md
   - Verify contracts before claiming completion
   - Require review pass before claiming completion
-  - Track progress with verification evidence in tasks/todo.md
+  - Keep tasks/todo.md limited to metadata plus the active execution checklist
   - Record correction-derived prevention rules in tasks/lessons.md
-  - Group repeated lessons by theme so Skill Factory can promote them into knowledge skills
+  - Distill repeated corrections into tasks/lessons.md instead of keeping them in tasks/todo.md
+  - Capture deep findings and hidden contracts in tasks/research.md
+  - Keep sprint-level verification notes, behavior diffs, and residual risks in tasks/reviews/{slug}.review.md
+  - Promote worthwhile follow-up work into a new plans/plan-{timestamp}-{slug}.md file
   - Treat `.ai/hooks/` as the shared automation entrypoint when repo scripts reference hook-backed workflow checks
   - Treat `.claude/settings.json` as the Claude-specific adapter, not the cross-agent source of truth
   - For Codex sessions, treat `bash scripts/check-task-sync.sh` and `bash scripts/check-task-workflow.sh --strict` as required repo-local checks
   - Before ending a session, refresh `.ai/harness/handoff/current.md` when the task state changed
-  - If you explicitly use a generated skill, mark it with `bash scripts/skill-factory-check.sh --mark-used <slug> --type <workflow|knowledge>`
-  - Check pending Skill Factory proposals with `bash scripts/skill-factory-check.sh`
-  - Use docs/PROGRESS.md for milestones only, not active execution logs
+  - Update docs/PROGRESS.md only when milestone state changes
   - Archive completed/abandoned plans and todos with metadata
 {{#IF FACTOR_FACTORY_ENABLED}}
   - Treat `tasks/factors/registry.json` as the source of truth for factor lifecycle state

@@ -14,6 +14,6 @@ describe("Hook dedup", () => {
     const content = readFileSync(join(ROOT, "assets/hooks/post-edit-guard.sh"), "utf-8");
     expect(content).toContain("[DocDrift]");
     expect(content).toContain("[TaskHandoff]");
-    expect(content).toContain("run_skill_factory_activity");
+    expect(content).not.toContain("run_skill_factory_activity");
   });
 });

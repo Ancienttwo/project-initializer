@@ -19,6 +19,8 @@ This repository self-hosts the `project-initializer` contract. Claude and Codex 
 - Treat `.ai/hooks/` as the shared hook implementation and `.claude/hooks/` as shims only.
 - Keep `assets/workflow-contract.v1.json` and `.ai/harness/workflow-contract.json` in sync.
 - Keep `CLAUDE.md` and `AGENTS.md` short; put detailed guidance in `docs/reference-configs/`.
+- Route complex planning/review/QA/release/browser-first flows to `gstack`, short implementation/debug/read-write checks to `Waza`, and knowledge sync/handoff retrieval to `gbrain`.
+- Use `docs/reference-configs/external-tooling.md` and `bash scripts/check-agent-tooling.sh --host both --check-updates` for advisory environment checks only.
 - When changing `scripts/migrate-project-template.sh` or `scripts/lib/project-init-lib.sh`, verify self-migration of this repo still works.
 - Do not treat generated hook adapters or backup files as product deliverables.
 

@@ -244,7 +244,7 @@ describe("Workflow helper scripts", () => {
       expect(resetTodo).toContain("**Status**: Idle");
       expect(resetTodo).toContain("## Execution");
       expect(resetTodo).toContain("- [ ] No active execution checklist");
-      expect(resetTodo).toContain("## Review Section");
+      expect(resetTodo).not.toContain("## Review Section");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

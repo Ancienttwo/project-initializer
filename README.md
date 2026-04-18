@@ -33,6 +33,7 @@ The command should end with `=== Migration Report ===` and summarize:
 - `Team hook config target: .claude/settings.json` to show the Claude adapter entry
 - `Workflow migration:` to show the repo-local harness surfaces it will create or refresh
 - `Helper scripts:` to show the operational toolchain you get after apply
+- `--- External Tooling ---` to show default gstack/Waza/gbrain routing plus advisory install/update hints
 
 ### Next two commands
 
@@ -77,9 +78,9 @@ Most common guards:
 - Plan source of truth: `plans/`
 - Milestone log only: `docs/PROGRESS.md`
 
-## Current Model (3.2.1)
+## Current Model (3.3.0)
 
-- Question flow uses **10 grouped decision points** with harness defaults inferred first.
+- Question flow uses **12 grouped decision points** with harness defaults inferred first.
 - Plan menu is tiered:
   - **Core Plans (A-F)** first.
   - **Custom Presets (G-K)** only when needed.
@@ -99,7 +100,18 @@ Most common guards:
 - Generated and self-hosted repos install:
   - `.ai/harness/workflow-contract.json`
   - `.ai/harness/policy.json`
-- Claude auto memory can be observed by generated hooks in read-only mode to enrich Skill Factory signal quality.
+- Generated and migrated repos default `external_tooling` to:
+  - `complex -> gstack`
+  - `simple -> Waza`
+  - `knowledge -> gbrain`
+- External tooling stays advisory-only:
+  - `bash scripts/check-agent-tooling.sh --host both --check-updates`
+  - no automatic global install, upgrade, daemon, sync, or MCP enablement
+- Manual distillation stays repo-local:
+  - repeated corrections -> `tasks/lessons.md`
+  - deep findings and hidden contracts -> `tasks/research.md`
+  - sprint verification evidence -> `tasks/reviews/*.review.md`
+  - milestone movement -> `docs/PROGRESS.md`
 
 ## Maintainer Reference
 
@@ -144,6 +156,7 @@ bun run benchmark:skills --eval repair-agents-task-sync
 - Question inference helper: `scripts/initializer-question-pack.ts`
 - State inspector: `scripts/inspect-project-state.ts`
 - Legacy-doc migrator: `scripts/migrate-workflow-docs.ts`
+- External tooling detector: `scripts/check-agent-tooling.sh`
 - Scaffolding scripts:
   - `scripts/init-project.sh`
   - `scripts/create-project-dirs.sh`
@@ -177,5 +190,6 @@ bash scripts/check-task-sync.sh
 bash scripts/check-task-workflow.sh --strict
 bun scripts/inspect-project-state.ts --repo . --format text
 bash scripts/migrate-project-template.sh --repo . --dry-run
+bash scripts/check-agent-tooling.sh --host both --check-updates
 bun run benchmark:skills --dry-run
 ```

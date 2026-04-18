@@ -25,7 +25,6 @@ fi
 ASSETS_REF_DIR="$SCRIPT_DIR/../assets/reference-configs"
 ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
 ASSETS_TEMPLATES_DIR="$SCRIPT_DIR/../assets/templates"
-ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
 ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
 ASSETS_WORKFLOW_CONTRACT="$SCRIPT_DIR/../assets/workflow-contract.v1.json"
 
@@ -263,19 +262,26 @@ create_structure() {
 # Project Milestones
 
 > Use this file for milestone checkpoints only.
-> Active execution belongs in \`tasks/todo.md\`, \`tasks/lessons.md\`, and \`tasks/research.md\`.
+> Active execution belongs in \`tasks/todo.md\`, \`tasks/contracts/\`, \`tasks/reviews/\`, and \`.ai/harness/handoff/current.md\`.
 
-## Milestones
+## Current Milestone
+
+- Name: Initial delivery
+- Status: In progress
+- Success state: Ship the first project milestone with passing sprint verification.
+
+## Completed Milestones
 
 - [x] Repository scaffolded
-- [ ] First feature milestone shipped
 
-## Notes
+## Next Milestone / Blockers
+
+- [ ] First feature milestone shipped
+- [ ] Record the blocker or dependency that gates the next milestone.
+
+## Milestone Notes
 
 - Record releases, migrations, and major checkpoints here.
-
----
-*Last updated: ${TODAY}*
 EOF
 
     cat > docs/CHANGELOG.md << 'EOF'
@@ -302,14 +308,6 @@ EOF
 
 ## Execution
 - [ ] No active execution checklist
-
-## Review Section
-- Verification evidence:
-- Behavior diff notes:
-- Risks / follow-ups:
-
----
-*Updated: ${TODAY}*
 EOF
 
     cat > tasks/lessons.md << EOF
@@ -324,9 +322,6 @@ EOF
 - Mistake pattern:
 - Prevention rule:
 - Where to apply next time:
-
----
-*Updated: ${TODAY}*
 EOF
 
     pi_install_templates "$PWD" "$ASSETS_TEMPLATES_DIR" "apply"
@@ -366,7 +361,6 @@ EOF
     helper_names="$(pi_workflow_contract_query_lines "$ASSETS_WORKFLOW_CONTRACT" "helpers.scripts" | xargs)"
     pi_install_helpers "$PWD" "$ASSETS_TEMPLATES_DIR/helpers" "apply" "$helper_names"
     install_workflow_contract
-    pi_install_skill_factory "$PWD" "$ASSETS_SKILL_FACTORY_DIR" "$SCRIPT_DIR" "apply"
     if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-$STACK}"; then
         pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"
     fi
@@ -422,6 +416,12 @@ EOF
 # Development Protocol Reference
 
 Use this file for detailed feature/bug flow playbooks, repo-local task sync rules, and final response requirements.
+EOF
+
+        cat > docs/reference-configs/external-tooling.md << 'EOF'
+# External Tooling Reference
+
+Use this file for external tool routing, install commands, update commands, and gbrain MCP guidance.
 EOF
 
         cat > docs/reference-configs/workflow-orchestration.md << 'EOF'
@@ -575,6 +575,8 @@ main() {
     echo "  3. Run: $PKG_MANAGER run dev"
     echo "  4. Run: bash scripts/new-plan.sh --slug first-feature"
     echo "  5. Capture research in tasks/research.md and iterate plan annotations"
+    echo ""
+    pi_print_external_tooling_report "$PWD" "apply" "$SCRIPT_DIR/check-agent-tooling.sh"
     echo ""
 }
 

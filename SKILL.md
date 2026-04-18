@@ -1,6 +1,6 @@
 ---
 name: project-initializer
-description: Use when initializing, migrating, auditing, or repairing AI-assisted project scaffolding such as CLAUDE.md, AGENTS.md, tasks/, hooks, and repo-local contracts. Route through repo inspection first, then run initialize, migrate, audit, repair, or skill-factory workflows. Not for runtime debugging or generic non-AI setup.
+description: Use when initializing, migrating, auditing, or repairing AI-assisted project scaffolding such as CLAUDE.md, AGENTS.md, tasks/, hooks, and repo-local contracts. Route through repo inspection first, then run initialize, migrate, audit, or repair workflows. Not for runtime debugging or generic non-AI setup.
 ---
 
 # Project Initializer
@@ -20,7 +20,6 @@ The skill should not carry the whole workflow contract in prose. It should:
 - migrate an older repo to the current tasks-first harness
 - audit drift between prompts, hooks, scripts, and repo-local contract files
 - repair broken task-sync, workflow-contract, or handoff surfaces
-- enable or debug Skill Factory flows
 
 ## When not to use
 
@@ -57,10 +56,6 @@ Read the result fields:
    - use when the repo mostly works but the user wants drift analysis and enforcement review
 4. **Repair**
    - use when the repo has a current contract surface but broken task-sync, hooks, or handoff behavior
-5. **Skill Factory**
-   - use when the user wants built-in skill proposal, feedback capture, or generated skill sidecars
-   - read `references/skill-factory-guide.md` before changing this path
-
 ### Step 3. Prefer engine actions over prompt-only fixes
 
 Default order:
@@ -68,7 +63,8 @@ Default order:
 1. migrate legacy docs if needed
 2. install or refresh workflow contract artifacts
 3. sync hooks, helpers, and templates
-4. verify the repo-local contract
+4. merge the guidance-only `external_tooling` profile into `.ai/harness/policy.json`
+5. verify the repo-local contract
 
 Do not treat hooks as the primary source of truth. The repo contract lives in repo files.
 
@@ -87,6 +83,7 @@ The main engine entrypoints are:
 - `scripts/inspect-project-state.ts`
 - `scripts/migrate-workflow-docs.ts`
 - `scripts/migrate-project-template.sh`
+- `scripts/check-agent-tooling.sh`
 - `scripts/check-task-workflow.sh`
 - `scripts/create-project-dirs.sh`
 
@@ -132,8 +129,13 @@ Migration defaults:
 
 - preserve user-authored content
 - archive uncertain legacy content instead of guessing
+- remove repo-local Skill Factory and auto-memory surfaces when present
 - normalize `docs/PROGRESS.md` to milestone-only usage
-- move active execution context into `tasks/todo.md` and `tasks/research.md`
+- keep `tasks/todo.md` limited to the active execution checklist
+- move hidden contracts and deep findings into `tasks/research.md`
+- distill repeated corrections into `tasks/lessons.md`
+- merge missing `external_tooling` defaults into `.ai/harness/policy.json` without overwriting explicit user values
+- keep gstack/Waza/gbrain detection advisory-only; do not auto-install, auto-upgrade, auto-sync, or auto-enable MCP
 
 ## Repo-Local Contract
 

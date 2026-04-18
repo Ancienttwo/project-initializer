@@ -5,11 +5,16 @@
 > Use this file for milestone checkpoints only.
 > Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.
 
-## Milestones
+## Current Milestone
+
+- Name: MVP delivery
+- Status: In progress
+- Success state: Ship the first milestone without reopening the active sprint checklist.
+
+## Completed Milestones
 
 - [x] Project scaffold ({{FRAMEWORK}})
 - [x] Documentation and AI routing files generated
-- [ ] MVP milestone shipped
 
 {{#IF HAS_ALGORITHM_MIGRATION}}
 ## Pending Migration Milestones
@@ -17,16 +22,11 @@
 - [ ] {{ALGORITHM_PACKAGES}}
 {{/IF}}
 
-## Planned Milestone Phases
+## Next Milestone / Blockers
 
-### Phase 1
-{{MVP_PHASE_TASKS}}
+- [ ] MVP milestone shipped
+- [ ] Record the blocker or dependency that gates the next milestone.
 
-### Phase 2
-{{PHASE_2_TASKS}}
+## Milestone Notes
 
-### Phase 3
-{{PHASE_3_TASKS}}
-
-### Phase 4
-{{PHASE_4_TASKS}}
+- Record releases, migrations, and major checkpoints here.

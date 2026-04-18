@@ -25,6 +25,7 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, "docs/reference-configs/harness-overview.md"))).toBe(true);
       expect(existsSync(join(cwd, "docs/reference-configs/hook-operations.md"))).toBe(true);
       expect(existsSync(join(cwd, "docs/reference-configs/evaluator-rubric.md"))).toBe(true);
+      expect(existsSync(join(cwd, "docs/reference-configs/external-tooling.md"))).toBe(true);
       expect(existsSync(join(cwd, "docs/reference-configs/sprint-contracts.md"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/verify-contract.sh"))).toBe(true);
       expect(existsSync(join(cwd, "docs/spec.md"))).toBe(true);
@@ -42,37 +43,52 @@ describe("create-project-dirs runtime smoke", () => {
       expect(existsSync(join(cwd, "scripts/prepare-handoff.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/summarize-failures.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/verify-sprint.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/check-agent-tooling.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-sync.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-context-files.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/ensure-task-workflow.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/check-task-workflow.sh"))).toBe(true);
       expect(existsSync(join(cwd, "scripts/maintenance-triage.sh"))).toBe(true);
-      expect(existsSync(join(cwd, "scripts/skill-factory-create.sh"))).toBe(true);
-      expect(existsSync(join(cwd, "scripts/skill-factory-check.sh"))).toBe(true);
+      expect(existsSync(join(cwd, "scripts/skill-factory-create.sh"))).toBe(false);
+      expect(existsSync(join(cwd, "scripts/skill-factory-check.sh"))).toBe(false);
       expect(existsSync(join(cwd, ".ai/hooks/run-hook.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".ai/hooks/finalize-handoff.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".ai/hooks/lib/skill-factory.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".ai/hooks/lib/memory-state.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".ai/hooks/memory-intake.sh"))).toBe(true);
+      expect(existsSync(join(cwd, ".ai/hooks/lib/skill-factory.sh"))).toBe(false);
+      expect(existsSync(join(cwd, ".ai/hooks/lib/memory-state.sh"))).toBe(false);
+      expect(existsSync(join(cwd, ".ai/hooks/memory-intake.sh"))).toBe(false);
       expect(existsSync(join(cwd, ".claude/hooks/run-hook.sh"))).toBe(true);
       expect(existsSync(join(cwd, ".claude/hooks/finalize-handoff.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".claude/hooks/lib/skill-factory.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".claude/hooks/lib/memory-state.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".claude/hooks/memory-intake.sh"))).toBe(true);
-      expect(existsSync(join(cwd, ".claude/skill-factory/rubric.template.json"))).toBe(true);
-      expect(existsSync(join(cwd, ".claude/skill-factory/registry.json"))).toBe(true);
+      expect(existsSync(join(cwd, ".claude/hooks/lib/skill-factory.sh"))).toBe(false);
+      expect(existsSync(join(cwd, ".claude/hooks/lib/memory-state.sh"))).toBe(false);
+      expect(existsSync(join(cwd, ".claude/hooks/memory-intake.sh"))).toBe(false);
+      expect(existsSync(join(cwd, ".claude/skill-factory/rubric.template.json"))).toBe(false);
+      expect(existsSync(join(cwd, ".claude/skill-factory/registry.json"))).toBe(false);
 
       const settings = readFileSync(join(cwd, ".claude/settings.json"), "utf-8");
       const settingsTemplate = readFileSync(join(ROOT, "assets/hooks/settings.template.json"), "utf-8");
       expect(settings).toBe(settingsTemplate);
       expect(settings).toContain("trace-event.sh");
       expect(settings).toContain("finalize-handoff.sh");
-      expect(settings).toContain("skill-factory-session-end.sh");
+      expect(settings).not.toContain("memory-intake.sh");
+      expect(settings).not.toContain("skill-factory-session-end.sh");
 
       const progress = readFileSync(join(cwd, "docs/PROGRESS.md"), "utf-8");
       expect(progress).toContain("milestone checkpoints only");
+      expect(progress).toContain("tasks/contracts/");
+      expect(progress).toContain("tasks/reviews/");
       const workflowContract = JSON.parse(readFileSync(join(cwd, ".ai/harness/workflow-contract.json"), "utf-8"));
+      expect(workflowContract.helpers.scripts).toContain("check-agent-tooling.sh");
       expect(workflowContract.helpers.scripts).toContain("check-task-workflow.sh");
+      expect(workflowContract.artifacts.requiredFiles).toContain("docs/reference-configs/external-tooling.md");
+      const policy = JSON.parse(readFileSync(join(cwd, ".ai/harness/policy.json"), "utf-8"));
+      expect(policy.external_tooling.routing).toEqual({
+        complex: "gstack",
+        simple: "waza",
+        knowledge: "gbrain",
+      });
+      expect(policy.external_tooling.hosts).toEqual(["claude-code", "codex"]);
+      expect(policy.external_tooling.mode).toBe("guidance-only");
+      expect(policy.external_tooling.gbrain.mcp).toBe("candidate-disabled");
 
       const pkg = JSON.parse(readFileSync(join(cwd, "package.json"), "utf-8"));
       expect(pkg.scripts["check:context-files"]).toBe("bash scripts/check-context-files.sh");

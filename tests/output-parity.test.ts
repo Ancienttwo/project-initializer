@@ -191,6 +191,7 @@ describe("Output Quality Gates", () => {
     });
 
     expect(output).toContain("docs/reference-configs/harness-overview.md");
+    expect(output).toContain("docs/reference-configs/external-tooling.md");
     expect(output).toContain("docs/reference-configs/sprint-contracts.md");
     expect(output).toContain("docs/reference-configs/evaluator-rubric.md");
     expect(output).toContain("docs/reference-configs/handoff-protocol.md");
@@ -216,14 +217,18 @@ describe("Output Quality Gates", () => {
     expect(claude).toContain("product truth");
     expect(agents).toContain("repo-local artifact files");
     expect(claude).toContain("tasks/contracts/");
+    expect(claude).toContain("Waza");
+    expect(claude).toContain("gbrain");
     expect(agents).toContain("tasks/reviews/");
     expect(claude).toContain("Self-Improvement Loop");
     expect(agents).toContain("Self-Improvement Loop");
-    expect(agents).toContain("skill-factory-check.sh");
+    expect(agents).toContain("gstack");
+    expect(agents).toContain("check-agent-tooling.sh --host both --check-updates");
     expect(agents).toContain("check-task-sync.sh");
     expect(agents).toContain("check-task-workflow.sh --strict");
     expect(agents).toContain("verify-contract.sh --contract <active-plan-contract> --strict");
     expect(agents).toContain(".ai/harness/checks/latest.json");
+    expect(agents).toContain("new plans/plan-{timestamp}-{slug}.md");
     expect(claude).toContain("latest non-archived `plans/plan-*.md` file");
     expect(agents).toContain("single source of truth for the current active plan");
     expect(claude.toLowerCase()).toContain("milestone");

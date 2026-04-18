@@ -64,8 +64,12 @@ function appendIfMissing(target: string, marker: string, block: string, mode: Mo
   return true;
 }
 
-function writeCanonicalTodo(target: string, mode: Mode) {
+function writeCanonicalTodo(target: string, mode: Mode, executionItems?: string[]) {
   if (existsSync(target)) return;
+  const taskLines =
+    executionItems && executionItems.length > 0
+      ? executionItems
+      : ["- [ ] No active execution checklist"];
   const content = [
     "# Task Execution Checklist (Primary)",
     "",
@@ -75,12 +79,7 @@ function writeCanonicalTodo(target: string, mode: Mode) {
     ">   bash scripts/plan-to-todo.sh --plan plans/plan-YYYYMMDD-HHMM-slug.md",
     "",
     "## Execution",
-    "- [ ] No active execution checklist",
-    "",
-    "## Review Section",
-    "- Verification evidence:",
-    "- Behavior diff notes:",
-    "- Risks / follow-ups:",
+    ...taskLines,
   ].join("\n");
   if (mode === "apply") {
     ensureDir(dirname(target), mode);
@@ -124,13 +123,24 @@ function normalizeProgress(progressPath: string, mode: Mode) {
     "# Project Milestones",
     "",
     "> Use this file for milestone checkpoints only.",
-    "> Active execution belongs in `tasks/todo.md`, `tasks/lessons.md`, and `tasks/research.md`.",
+    "> Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.",
     "",
-    "## Milestones",
+    "## Current Milestone",
+    "",
+    "- Name: Migration stabilization",
+    "- Status: In progress",
+    "- Success state: Reapply the harness and finish with a passing strict workflow check.",
+    "",
+    "## Completed Milestones",
     "",
     "- [ ] Preserve or restore milestone history here after migration review",
     "",
-    "## Notes",
+    "## Next Milestone / Blockers",
+    "",
+    "- [ ] Re-add the next ship target after reviewing archived milestone history",
+    "- [ ] Record the blocker or dependency that gates the next milestone.",
+    "",
+    "## Milestone Notes",
     "",
     "- This file was normalized during migration. Re-add historical milestones if needed.",
   ].join("\n");
@@ -201,21 +211,11 @@ export function migrate(repo: string, mode: Mode): MigrationSummary {
 
   if (existsSync(todoDoc)) {
     const content = readFileSync(todoDoc, "utf-8").trimEnd();
-    const marker = "<!-- project-initializer: legacy-docs-import docs/TODO.md -->";
-    const imported = appendIfMissing(
-      tasksTodo,
-      marker,
-      [
-        "## Legacy Imported Tasks",
-        "",
-        marker,
-        "",
-        "Imported from `docs/TODO.md` during workflow migration.",
-        "",
-        content,
-      ].join("\n"),
-      mode
-    );
+    const hadCanonicalTodo = existsSync(tasksTodo);
+
+    if (!hadCanonicalTodo) {
+      writeCanonicalTodo(tasksTodo, mode);
+    }
 
     if (mode === "apply" && !existsSync(legacyTodoArchive)) {
       writeFileSync(legacyTodoArchive, `${content}\n`);
@@ -224,19 +224,18 @@ export function migrate(repo: string, mode: Mode): MigrationSummary {
     summary.migrated.push({
       source: "docs/TODO.md",
       target: "tasks/todo.md",
-      action: imported ? "append" : "skip",
-      note: imported
-        ? "Imported legacy todo content into the canonical task checklist and archived the source."
-        : "Legacy todo content was already imported on a prior run.",
+      action: hadCanonicalTodo ? "skip" : "rewrite",
+      note: hadCanonicalTodo
+        ? "Archived the legacy todo without rewriting the existing canonical checklist."
+        : "Created the lean canonical execution checklist and archived the legacy todo for manual plan triage.",
     });
+    summary.manual_followups.push(
+      "Review tasks/archive/legacy-docs-TODO.md and promote any still-relevant work into a new plan instead of rehydrating it into tasks/todo.md."
+    );
   }
 
   if (existsSync(progressDoc) && !readFileSync(progressDoc, "utf-8").includes("milestone checkpoints only")) {
     const content = readFileSync(progressDoc, "utf-8").trimEnd();
-    const tasks = content
-      .split("\n")
-      .filter((line) => /^\s*-\s*\[[ xX]\]/.test(line))
-      .join("\n");
     const notesBlock = [
       "## Legacy Progress Import",
       "",
@@ -248,20 +247,6 @@ export function migrate(repo: string, mode: Mode): MigrationSummary {
     ].join("\n");
 
     appendIfMissing(tasksResearch, "<!-- project-initializer: legacy-docs-import docs/PROGRESS.md -->", notesBlock, mode);
-    if (tasks) {
-      appendIfMissing(
-        tasksTodo,
-        "<!-- project-initializer: legacy-progress-task-import -->",
-        [
-          "## Legacy Imported Progress Tasks",
-          "",
-          "<!-- project-initializer: legacy-progress-task-import -->",
-          "",
-          tasks,
-        ].join("\n"),
-        mode
-      );
-    }
 
     if (mode === "apply" && !existsSync(legacyProgressArchive)) {
       writeFileSync(legacyProgressArchive, `${content}\n`);
@@ -269,9 +254,9 @@ export function migrate(repo: string, mode: Mode): MigrationSummary {
     normalizeProgress(progressDoc, mode);
     summary.migrated.push({
       source: "docs/PROGRESS.md",
-      target: "tasks/research.md + tasks/todo.md + docs/PROGRESS.md",
+      target: "tasks/research.md + docs/PROGRESS.md",
       action: "rewrite",
-      note: "Moved legacy execution notes into tasks surfaces and normalized PROGRESS to milestone-only usage.",
+      note: "Moved legacy execution notes into research notes and normalized PROGRESS to milestone-only usage.",
     });
   }
 

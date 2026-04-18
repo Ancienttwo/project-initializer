@@ -18,7 +18,6 @@ fi
 ASSETS_TEMPLATES_DIR="$SCRIPT_DIR/../assets/templates"
 ASSETS_HOOKS_DIR="$SCRIPT_DIR/../assets/hooks"
 ASSETS_REF_DIR="$SCRIPT_DIR/../assets/reference-configs"
-ASSETS_SKILL_FACTORY_DIR="$SCRIPT_DIR/../assets/skill-factory"
 ASSETS_FACTOR_FACTORY_DIR="$ASSETS_TEMPLATES_DIR/factor-factory"
 ASSETS_WORKFLOW_CONTRACT="$SCRIPT_DIR/../assets/workflow-contract.v1.json"
 
@@ -51,8 +50,7 @@ create_contract_directories() {
   done < <(pi_workflow_contract_query_lines "$ASSETS_WORKFLOW_CONTRACT" "artifacts.requiredDirectories")
 }
 
-install_skill_factory_files() {
-  pi_install_skill_factory "$PWD" "$ASSETS_SKILL_FACTORY_DIR" "$SCRIPT_DIR" "apply"
+install_hook_assets() {
   mkdir -p .ai/hooks .claude/hooks
 
   if [[ -d "$ASSETS_HOOKS_DIR" ]]; then
@@ -142,20 +140,31 @@ touch docs/reference-configs/release-deploy.md
 touch docs/reference-configs/ai-workflows.md
 touch docs/reference-configs/coding-standards.md
 touch docs/reference-configs/development-protocol.md
+touch docs/reference-configs/external-tooling.md
 touch docs/reference-configs/workflow-orchestration.md
 
 cat > docs/PROGRESS.md << 'PROGRESS_EOF'
 # Project Milestones
 
 > Use this file for milestone checkpoints only.
-> Active execution belongs in `tasks/todo.md`, `tasks/lessons.md`, and `tasks/research.md`.
+> Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.
 
-## Milestones
+## Current Milestone
+
+- Name: Initial delivery
+- Status: In progress
+- Success state: Ship the first project milestone with passing sprint verification.
+
+## Completed Milestones
 
 - [x] Repository scaffolded
-- [ ] First feature milestone shipped
 
-## Notes
+## Next Milestone / Blockers
+
+- [ ] First feature milestone shipped
+- [ ] Record the blocker or dependency that gates the next milestone.
+
+## Milestone Notes
 
 - Record releases, migrations, and major checkpoints here.
 PROGRESS_EOF
@@ -170,11 +179,6 @@ cat > tasks/todo.md << 'TASK_TODO_EOF'
 
 ## Execution
 - [ ] No active execution checklist
-
-## Review Section
-- Verification evidence:
-- Behavior diff notes:
-- Risks / follow-ups:
 TASK_TODO_EOF
 
 cat > tasks/lessons.md << 'TASK_LESSONS_EOF'
@@ -218,7 +222,7 @@ TASK_RESEARCH_EOF
 write_templates
 install_workflow_helpers
 install_workflow_contract
-install_skill_factory_files
+install_hook_assets
 if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
   pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"
 fi
@@ -333,6 +337,12 @@ REF_CODING_STANDARDS_EOF
 
 Use this file for detailed feature/bug flow playbooks, repo-local task sync rules, and final response requirements.
 REF_DEV_PROTOCOL_EOF
+
+  cat > docs/reference-configs/external-tooling.md << 'REF_EXTERNAL_TOOLING_EOF'
+# External Tooling Reference
+
+Use this file for external tool routing, install commands, update commands, and gbrain MCP guidance.
+REF_EXTERNAL_TOOLING_EOF
 
   cat > docs/reference-configs/workflow-orchestration.md << 'REF_WORKFLOW_ORCH_EOF'
 # Workflow Orchestration Reference

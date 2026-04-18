@@ -320,16 +320,12 @@ fi
   echo "> **Status**: Executing"
   echo "> **Generated**: ${timestamp_human}"
   echo "> **Source Plan Slug**: ${slug}"
+  echo "> **Review File**: ${review_file}"
   echo "> **Parent Run ID**: ${parent_run_id}"
   echo "> **Supersedes**: ${previous_source_plan:-"(none)"}"
   echo
   echo "## Execution"
   cat "$tasks_tmp"
-  echo
-  echo "## Review Section"
-  echo "- Verification evidence:"
-  echo "- Behavior diff notes:"
-  echo "- Risks / follow-ups:"
 } > tasks/todo.md
 
 workflow_sync_task_state_from_todo "tasks/todo.md" ".claude/.task-state.json" "$plan_file"

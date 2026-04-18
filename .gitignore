@@ -27,12 +27,6 @@ bun.lockb
 .claude/.session-handoff.md
 .claude/.task-state.json
 .claude/.task-handoff.md
-.claude/.skill-factory-state.json
-.claude/.skill-factory-session.json
-.claude/.skill-factory-session-marker.json
-.claude/.memory-context.json
-.claude/.memory-snapshot.json
-.claude/.skill-factory-user/
 .claude/.context-pressure/
 .claude/*.tmp
 .claude/*.bak
@@ -40,8 +34,6 @@ bun.lockb
 .claude/*.backup-*
 .ai/harness/events.jsonl
 .ai/harness/runs/
-.claude/.active-plan
-.claude/.plan-state/
 # END: claude-runtime-temp
 # Project-specific
 artifacts/

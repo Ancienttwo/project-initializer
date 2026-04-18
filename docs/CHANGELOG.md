@@ -2,6 +2,14 @@
 
 All notable changes to this skill are documented here.
 
+## [3.3.0] - 2026-04-19
+
+### Changed
+
+- Removed repo-local Skill Factory and Claude auto-memory surfaces from the shared harness, migration path, and self-hosted repo.
+- Added `scripts/check-agent-tooling.sh` plus generated `docs/reference-configs/external-tooling.md` so init and migrate flows can report gstack, Waza, and gbrain advisory status safely.
+- Merged guidance-only `external_tooling` defaults into `.ai/harness/policy.json` during scaffold and migration without overwriting explicit repo overrides.
+
 ## [3.2.1] - 2026-04-19
 
 ### Fixed

@@ -16,14 +16,13 @@ Use `.ai/hooks/` as the shared implementation layer. Use hooks as Claude-specifi
 ## Hook Presets
 
 ### A) Balanced Shared Guardrails (recommended)
-- `SessionStart`: `memory-intake.sh` scans Claude auto memory in read-only mode and caches a compact signal summary.
 - Runtime profile: Plan-only (recommended), configurable to Permissionless/Standard.
 - `PreToolUse (Edit|Write)`: worktree guard (warn by default, opt-in hard block), pre-edit guard (TDD/BDD + asset-layer reminders).
 - `PostToolUse (Edit|Write)`: post-edit guard (doc drift + task handoff summary).
 - `PostToolUse (Bash)`: post-bash advisory reminders.
 - `PostToolUse (all tools)`: `trace-event.sh` structured JSONL trace + context-pressure session monitor.
 - `UserPromptSubmit`: prompt guard (plan sync + TDD/BDD reminders).
-- `Stop`: skill-factory session-end summarizer.
+- `Stop`: finalize-handoff summary refresh.
 - Automatic checkpoint commits are disabled in the shared default.
 
 ### B) Balanced + Release Guard
@@ -52,7 +51,6 @@ Use `.ai/hooks/` as the shared implementation layer. Use hooks as Claude-specifi
 | `assets/hooks/settings.template.json` | `.claude/settings.json` |
 
 Optional hook assets:
-- `assets/hooks/memory-intake.sh`
 - `assets/hooks/tdd-guard-hook.sh`
 - `assets/hooks/pre-code-change.sh`
 - `assets/hooks/anti-simplification.sh`
@@ -67,9 +65,8 @@ Optional hook assets:
 - Non-monorepo projects can remove package-related doc drift triggers.
 - Non-Expo projects can remove Metro config drift checks.
 - Non-Turborepo projects can remove `turbo.json` drift checks.
-- Auto memory integration is read-only. Keep durable shared policy in `CLAUDE.md`, `.claude/rules/`, and repo-local workflow files.
-- `autoMemoryDirectory` is a user/local setting, not a shared project setting.
-- Skill Factory state is runtime-only. Ignore `.claude/.skill-factory-state.json` and related session marker files.
+- Keep durable shared policy in `CLAUDE.md`, repo-local workflow files, and reference configs rather than hidden runtime caches.
+- Use `tasks/lessons.md` for repeated corrections and `tasks/research.md` for deep findings instead of hook-managed auto-memory.
 
 ## Failure Logging
 

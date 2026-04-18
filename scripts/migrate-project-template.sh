@@ -25,7 +25,6 @@ fi
 HOOK_ASSETS_DIR="$SKILL_ROOT/assets/hooks"
 TEMPLATE_ASSETS_DIR="$SKILL_ROOT/assets/templates"
 HELPER_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/helpers"
-SKILL_FACTORY_ASSETS_DIR="$SKILL_ROOT/assets/skill-factory"
 FACTOR_FACTORY_ASSETS_DIR="$TEMPLATE_ASSETS_DIR/factor-factory"
 WORKFLOW_CONTRACT_ASSET="$SKILL_ROOT/assets/workflow-contract.v1.json"
 JQ_BIN="${PROJECT_INITIALIZER_JQ_BIN:-jq}"
@@ -175,6 +174,90 @@ backup_if_exists() {
   fi
 }
 
+remove_path_if_exists() {
+  local path="$1"
+  if [[ "$MODE" != "apply" ]]; then
+    echo "[dry-run] remove \"$path\" if it exists"
+    return 0
+  fi
+
+  if [[ -e "$path" ]]; then
+    rm -rf "$path"
+  fi
+}
+
+prune_removed_hook_commands() {
+  local settings_file="$1"
+
+  if [[ "$MODE" != "apply" || ! -f "$settings_file" ]]; then
+    return 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    log "Skipping removed-hook pruning for $settings_file because node is unavailable"
+    return 0
+  fi
+
+  node - "$settings_file" <<'NODE_EOF'
+const fs = require("fs");
+const path = process.argv[2];
+const removedFragments = ["memory-intake.sh", "skill-factory-session-end.sh"];
+
+const settings = JSON.parse(fs.readFileSync(path, "utf8"));
+if (!settings.hooks || typeof settings.hooks !== "object") {
+  process.exit(0);
+}
+
+const nextHooks = {};
+for (const [eventName, blocks] of Object.entries(settings.hooks)) {
+  const keptBlocks = (Array.isArray(blocks) ? blocks : [])
+    .map((block) => {
+      const hooks = (Array.isArray(block.hooks) ? block.hooks : []).filter((hook) => {
+        const command = hook?.command ?? "";
+        return !removedFragments.some((fragment) => command.includes(fragment));
+      });
+      return hooks.length > 0 ? { ...block, hooks } : null;
+    })
+    .filter(Boolean);
+
+  if (keptBlocks.length > 0) {
+    nextHooks[eventName] = keptBlocks;
+  }
+}
+
+settings.hooks = nextHooks;
+fs.writeFileSync(path, JSON.stringify(settings, null, 2) + "\n");
+NODE_EOF
+}
+
+cleanup_removed_workflow_assets() {
+  local repo="$1"
+  local rel_path
+
+  while IFS= read -r rel_path; do
+    [[ -z "$rel_path" ]] && continue
+    remove_path_if_exists "$repo/$rel_path"
+  done <<'EOF_REMOVED'
+scripts/skill-factory-check.sh
+scripts/skill-factory-create.sh
+.ai/hooks/lib/memory-state.sh
+.ai/hooks/lib/skill-factory.sh
+.ai/hooks/memory-intake.sh
+.ai/hooks/skill-factory-session-end.sh
+.claude/hooks/lib/memory-state.sh
+.claude/hooks/lib/skill-factory.sh
+.claude/hooks/memory-intake.sh
+.claude/hooks/skill-factory-session-end.sh
+.claude/skill-factory
+.claude/.memory-context.json
+.claude/.memory-snapshot.json
+.claude/.skill-factory-state.json
+.claude/.skill-factory-session.json
+.claude/.skill-factory-session-marker.json
+.claude/.skill-factory-user
+EOF_REMOVED
+}
+
 ensure_runtime_gitignore_block() {
   local file_path="$1"
   local extra_entries
@@ -219,11 +302,6 @@ install_helpers() {
   fi
 }
 
-install_skill_factory_files() {
-  local repo="$1"
-  pi_install_skill_factory "$repo" "$SKILL_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
-}
-
 install_workflow_contract() {
   local repo="$1"
   pi_install_workflow_contract "$repo" "$WORKFLOW_CONTRACT_ASSET" "$MODE"
@@ -252,9 +330,13 @@ create_task_files_if_missing() {
   local repo="$1"
   local project_name
   local timestamp
+  local todo_file
+  local progress_file
 
   project_name="$(basename "$repo")"
   timestamp="$(date '+%Y-%m-%d %H:%M')"
+  todo_file="$repo/tasks/todo.md"
+  progress_file="$repo/docs/PROGRESS.md"
 
   if [[ "$MODE" != "apply" ]]; then
     echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, .ai/context/context-map.json, and .ai/harness/{checks/latest.json,policy.json,events.jsonl,handoff/current.md,failures/latest.jsonl,runs/.gitkeep} exist with 3.1 guidance"
@@ -289,8 +371,8 @@ EOF_SPEC
     fi
   fi
 
-  if [[ ! -f "$repo/tasks/todo.md" ]]; then
-    cat > "$repo/tasks/todo.md" <<'TODO_EOF'
+  if [[ ! -f "$todo_file" ]]; then
+    cat > "$todo_file" <<'TODO_EOF'
 # Task Execution Checklist (Primary)
 
 > **Source Plan**: (none)
@@ -300,11 +382,33 @@ EOF_SPEC
 
 ## Execution
 - [ ] No active execution checklist
+TODO_EOF
+  elif grep -Eq '^## (Review Section|Last Completed Work)$' "$todo_file"; then
+    local source_plan status execution_lines
+    backup_if_exists "$todo_file"
+    source_plan="$(awk -F': ' '/^\> \*\*Source Plan\*\*:/ {print $2; exit}' "$todo_file" | xargs)"
+    status="$(awk -F': ' '/^\> \*\*Status\*\*:/ {print $2; exit}' "$todo_file" | xargs)"
+    execution_lines="$(
+      awk '
+        BEGIN { in_section = 0 }
+        /^## Execution$/ { in_section = 1; next }
+        in_section && /^## / { exit }
+        in_section { print }
+      ' "$todo_file" | sed '/^[[:space:]]*$/d'
+    )"
+    if [[ -z "$execution_lines" ]]; then
+      execution_lines="- [ ] No active execution checklist"
+    fi
+    cat > "$todo_file" <<TODO_EOF
+# Task Execution Checklist (Primary)
 
-## Review Section
-- Verification evidence:
-- Behavior diff notes:
-- Risks / follow-ups:
+> **Source Plan**: ${source_plan:-"(none)"}
+> **Status**: ${status:-Idle}
+> Generate the next execution checklist from an approved plan with:
+>   bash scripts/plan-to-todo.sh --plan plans/plan-YYYYMMDD-HHMM-slug.md
+
+## Execution
+${execution_lines}
 TODO_EOF
   fi
 
@@ -326,34 +430,56 @@ LESSONS_EOF
 
   pi_ensure_harness_state_surface "$repo" "apply"
 
-  if [[ ! -f "$repo/docs/PROGRESS.md" ]]; then
-    cat > "$repo/docs/PROGRESS.md" <<'PROGRESS_EOF'
+  if [[ ! -f "$progress_file" ]]; then
+    cat > "$progress_file" <<'PROGRESS_EOF'
 # Project Milestones
 
 > Use this file for milestone checkpoints only.
-> Active execution belongs in `tasks/todo.md`, `tasks/lessons.md`, and `tasks/research.md`.
+> Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.
 
-## Milestones
+## Current Milestone
+
+- Name: Migration stabilization
+- Status: In progress
+- Success state: Reapply the harness and finish with a passing strict workflow check.
+
+## Completed Milestones
+
+- [ ] Preserve or restore prior milestones here after migration review
+
+## Next Milestone / Blockers
 
 - [ ] First migration milestone
+- [ ] Record the blocker or dependency that gates the next milestone.
 
-## Notes
+## Milestone Notes
 
 - Record releases, migrations, and major checkpoints here.
 PROGRESS_EOF
-  elif ! grep -Fq "Use this file for milestone checkpoints only." "$repo/docs/PROGRESS.md"; then
-    cp "$repo/docs/PROGRESS.md" "$repo/docs/PROGRESS.md.bak.$(date +%Y%m%d%H%M%S)"
-    cat > "$repo/docs/PROGRESS.md" <<'PROGRESS_EOF'
+  elif ! grep -Fq "## Current Milestone" "$progress_file"; then
+    backup_if_exists "$progress_file"
+    cat > "$progress_file" <<'PROGRESS_EOF'
 # Project Milestones
 
 > Use this file for milestone checkpoints only.
-> Active execution belongs in `tasks/todo.md`, `tasks/lessons.md`, and `tasks/research.md`.
+> Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.
 
-## Milestones
+## Current Milestone
+
+- Name: Migration stabilization
+- Status: In progress
+- Success state: Reapply the harness and finish with a passing strict workflow check.
+
+## Completed Milestones
 
 - [ ] Preserve or restore milestone history here after migration review
 
-## Notes
+## Next Milestone / Blockers
+
+- [ ] Re-add the next ship target after reviewing archived milestone history
+- [ ] Record the blocker or dependency that gates the next milestone.
+
+## Milestone Notes
 
 - This file was normalized during migration. Re-add historical milestones if needed.
 PROGRESS_EOF
@@ -506,6 +632,8 @@ migrate_hooks() {
     run_or_echo "cp -R \"$HOOK_ASSETS_DIR/lib\"/. \"$project_hooks_dir/lib/\""
   fi
 
+  cleanup_removed_workflow_assets "$repo"
+
   if [[ -f "$HOOK_ASSETS_DIR/hook-input.sh" ]]; then
     run_or_echo "cp \"$HOOK_ASSETS_DIR/hook-input.sh\" \"$project_hooks_dir/hook-input.sh\""
     if [[ "$MODE" == "apply" ]]; then
@@ -550,6 +678,7 @@ EOF_HOOK_SHIM
         backup_if_exists "$project_settings"
         merge_hook_settings_json "$project_settings" "$HOOK_ASSETS_DIR/settings.template.json" "$project_settings.tmp"
         mv "$project_settings.tmp" "$project_settings"
+        prune_removed_hook_commands "$project_settings"
         log "Merged hook template into .claude/settings.json"
       else
         log "Skipping automatic merge for .claude/settings.json because jq or node is unavailable; leaving existing file unchanged"
@@ -569,6 +698,7 @@ EOF_HOOK_SHIM
           backup_if_exists "$project_settings_local"
           merge_hook_settings_json "$project_settings" "$project_settings_local" "$project_settings.tmp"
           mv "$project_settings.tmp" "$project_settings"
+          prune_removed_hook_commands "$project_settings"
           "$JQ_BIN" 'del(.hooks)' "$project_settings_local" > "$project_settings_local.tmp"
           mv "$project_settings_local.tmp" "$project_settings_local"
           log "Moved hooks from settings.local.json into settings.json"
@@ -612,7 +742,6 @@ migrate_workflow() {
   install_templates "$repo"
   install_helpers "$repo"
   install_workflow_contract "$repo"
-  install_skill_factory_files "$repo"
   if pi_should_enable_factor_factory "${PROJECT_INITIALIZER_PLAN_TYPE:-}"; then
     pi_install_factor_factory "$repo" "$FACTOR_FACTORY_ASSETS_DIR" "$SKILL_ROOT/scripts" "$MODE"
   fi
@@ -682,7 +811,9 @@ print_report() {
   echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/context/context-map.json + .ai/harness/*"
   echo "- Workflow contract manifest installed at: .ai/harness/workflow-contract.json"
   echo "- Helper scripts: installed from workflow contract manifest, including context scans and maintenance triage"
+  echo "- Existing external_tooling overrides are preserved; missing defaults are merged into .ai/harness/policy.json"
   echo "- Runtime temporary ignore block synced to .gitignore"
+  pi_print_external_tooling_report "$repo" "$MODE" "$SCRIPT_DIR/check-agent-tooling.sh"
 }
 
 run_skill_hook() {

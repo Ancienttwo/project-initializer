@@ -28,6 +28,7 @@ fi
 
 has_non_task_change=0
 has_task_sync_change=0
+has_progress_change=0
 
 for file in "${changed_files[@]}"; do
   case "$file" in
@@ -38,6 +39,7 @@ for file in "${changed_files[@]}"; do
       has_task_sync_change=1
       ;;
     docs/PROGRESS.md)
+      has_progress_change=1
       ;;
     *)
       has_non_task_change=1
@@ -46,7 +48,13 @@ for file in "${changed_files[@]}"; do
 done
 
 if [[ "$has_non_task_change" -eq 0 ]]; then
-  echo "[task-sync] Only tasks/ or docs/PROGRESS.md changed."
+  if [[ "$has_task_sync_change" -eq 1 ]]; then
+    echo "[task-sync] Only tasks/ changed."
+  elif [[ "$has_progress_change" -eq 1 ]]; then
+    echo "[task-sync] Only contextual milestone updates changed."
+  else
+    echo "[task-sync] No substantive repo changes detected."
+  fi
   exit 0
 fi
 

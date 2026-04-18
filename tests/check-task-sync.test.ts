@@ -149,7 +149,7 @@ describe("check-task-sync helper", () => {
 
       const res = run(cwd, ["bash", "scripts/check-task-sync.sh"]);
       expect(res.status).toBe(0);
-      expect(res.stdout).toContain("Only tasks/ or docs/PROGRESS.md changed.");
+      expect(res.stdout).toContain("Only tasks/ changed.");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

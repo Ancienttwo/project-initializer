@@ -245,11 +245,6 @@ ensure_idle_todo() {
 
 ## Execution
 - [ ] No active execution checklist
-
-## Review Section
-- Verification evidence:
-- Behavior diff notes:
-- Risks / follow-ups:
 TODO_EOF
   fi
 }
@@ -312,13 +307,24 @@ RESEARCH_EOF
 # Project Milestones
 
 > Use this file for milestone checkpoints only.
-> Active execution belongs in `tasks/todo.md`, `tasks/lessons.md`, and `tasks/research.md`.
+> Active execution belongs in `tasks/todo.md`, `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/handoff/current.md`.
 
-## Milestones
+## Current Milestone
 
-- [ ] First milestone
+- Name: First milestone
+- Status: In progress
+- Success state: Ship the next agreed milestone without reopening the active sprint checklist.
 
-## Notes
+## Completed Milestones
+
+- [ ] Capture the previous milestone here once it ships
+
+## Next Milestone / Blockers
+
+- [ ] Define the next milestone ship target
+- [ ] Record the blocker or dependency that gates the next milestone.
+
+## Milestone Notes
 
 - Record releases, migrations, and major checkpoints here.
 PROGRESS_EOF
@@ -388,6 +394,22 @@ HANDOFF_EOF
     "handoff": "artifact-aware",
     "recovery": "hybrid",
     "state": "file-backed"
+  },
+  "external_tooling": {
+    "routing": {
+      "complex": "gstack",
+      "simple": "waza",
+      "knowledge": "gbrain"
+    },
+    "hosts": [
+      "claude-code",
+      "codex"
+    ],
+    "mode": "guidance-only",
+    "detection": "init-migrate",
+    "gbrain": {
+      "mcp": "candidate-disabled"
+    }
   },
   "enforcement": {
     "worktree_guard": "warn-by-default",

@@ -11,19 +11,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/lib/workflow-state.sh"
 
-run_skill_factory_activity() {
-  if [[ ! -f "$SCRIPT_DIR/lib/skill-factory.sh" ]]; then
-    return 0
-  fi
-
-  # shellcheck source=/dev/null
-  . "$SCRIPT_DIR/lib/skill-factory.sh"
-  sf_record_usage_activity "$FILE_PATH" || true
-  if [[ "$FILE_PATH" == "tasks/lessons.md" ]]; then
-    sf_read_new_lessons || true
-  fi
-}
-
 run_continuous_contract_verification() {
   local active_plan contract_file checks_file
 
@@ -91,7 +78,6 @@ fi
 run_continuous_contract_verification
 
 if [[ "$FILE_PATH" != "tasks/todo.md" ]] || [[ ! -f "tasks/todo.md" ]]; then
-  run_skill_factory_activity
   exit 0
 fi
 
@@ -111,7 +97,6 @@ done_tasks="${done_tasks:-0}"
 total_tasks="${total_tasks:-0}"
 
 if [[ "$done_tasks" -le "$prev_done" ]]; then
-  run_skill_factory_activity
   exit 0
 fi
 
@@ -195,5 +180,3 @@ workflow_write_handoff "task-progress" || true
 if [[ -f "$(workflow_handoff_file)" ]]; then
   echo "[HarnessHandoff] Refreshed $(workflow_handoff_file)."
 fi
-
-run_skill_factory_activity

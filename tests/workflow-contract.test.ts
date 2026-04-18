@@ -102,8 +102,7 @@ describe("state inspection and legacy doc migration", () => {
 
       const todo = readFileSync(join(repo, "tasks/todo.md"), "utf-8");
       expect(todo).toContain("**Source Plan**: (none)");
-      expect(todo).toContain("Legacy Imported Tasks");
-      expect(todo).toContain("port old checklist");
+      expect(todo).toContain("No active execution checklist");
 
       const research = readFileSync(join(repo, "tasks/research.md"), "utf-8");
       expect(research).toContain("Legacy Progress Import");

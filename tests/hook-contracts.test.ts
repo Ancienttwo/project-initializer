@@ -11,10 +11,10 @@ function read(relPath: string): string {
 describe("Hook contracts", () => {
   test("shared hook input parser should exist", () => {
     expect(existsSync(join(ROOT, "assets/hooks/hook-input.sh"))).toBe(true);
-    expect(existsSync(join(ROOT, "assets/hooks/lib/memory-state.sh"))).toBe(true);
     expect(existsSync(join(ROOT, "assets/hooks/lib/workflow-state.sh"))).toBe(true);
     expect(existsSync(join(ROOT, "assets/hooks/lib/session-state.sh"))).toBe(true);
-    expect(existsSync(join(ROOT, "assets/hooks/lib/skill-factory.sh"))).toBe(true);
+    expect(existsSync(join(ROOT, "assets/hooks/lib/memory-state.sh"))).toBe(false);
+    expect(existsSync(join(ROOT, "assets/hooks/lib/skill-factory.sh"))).toBe(false);
   });
 
   test("shared hook dispatcher should exist", () => {
@@ -120,7 +120,6 @@ describe("Hook contracts", () => {
 
   test("settings template should not inject TOOL_INPUT/PROMPT argv blobs", () => {
     const settings = read("assets/hooks/settings.template.json");
-    expect(settings).toContain("memory-intake.sh");
     expect(settings).toContain("run-hook.sh");
     expect(settings).toContain(".ai/hooks/run-hook.sh");
     expect(settings).toContain("pre-edit-guard.sh");
@@ -129,6 +128,8 @@ describe("Hook contracts", () => {
     expect(settings).toContain("finalize-handoff.sh");
     expect(settings).toContain("post-bash.sh");
     expect(settings).toContain("context-pressure-hook.sh");
+    expect(settings).not.toContain("memory-intake.sh");
+    expect(settings).not.toContain("skill-factory-session-end.sh");
     expect(settings).not.toContain("task-handoff.sh");
     expect(settings).not.toContain("atomic-commit.sh");
     expect(settings).not.toContain('"$TOOL_INPUT"');

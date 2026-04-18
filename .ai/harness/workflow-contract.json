@@ -17,6 +17,7 @@
       "summarize-failures.sh",
       "verify-sprint.sh",
       "check-task-sync.sh",
+      "check-agent-tooling.sh",
       "check-context-files.sh",
       "ensure-task-workflow.sh",
       "check-task-workflow.sh",
@@ -59,6 +60,7 @@
       "scripts/summarize-failures.sh",
       "scripts/verify-sprint.sh",
       "scripts/check-task-sync.sh",
+      "scripts/check-agent-tooling.sh",
       "scripts/check-context-files.sh",
       "scripts/ensure-task-workflow.sh",
       "scripts/check-task-workflow.sh",
@@ -75,7 +77,8 @@
       ".ai/harness/handoff/current.md",
       ".ai/harness/policy.json",
       ".ai/harness/runs/.gitkeep",
-      ".ai/harness/workflow-contract.json"
+      ".ai/harness/workflow-contract.json",
+      "docs/reference-configs/external-tooling.md"
     ]
   },
   "documents": {

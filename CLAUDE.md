@@ -22,6 +22,8 @@ This repository dogfoods the `project-initializer` workflow. Treat it as a Bun +
 
 - Keep this file concise; route detailed policy into `docs/reference-configs/`.
 - Treat `.ai/hooks/` as the shared automation layer and `.claude/settings.json` as the Claude adapter.
+- Route complex planning/review/QA/release/browser-first work to `gstack`, short implementation/debug/read-write checks to `Waza`, and knowledge sync/handoff retrieval to `gbrain`.
+- Use `docs/reference-configs/external-tooling.md` plus `bash scripts/check-agent-tooling.sh --host both --check-updates` for advisory install/update guidance.
 - When changing bootstrap or migration behavior, update the matching tests in `tests/`.
 - Prefer additive migration behavior over destructive replacement.
 - Preserve the distinction between milestone tracking in `docs/PROGRESS.md` and active work tracking in `tasks/`.

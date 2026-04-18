@@ -50,6 +50,7 @@ Core rules (canonical source: see Workflow Orchestration section below):
 - `docs/reference-configs/changelog-versioning.md`
 - `docs/reference-configs/git-strategy.md`
 - `docs/reference-configs/release-deploy.md`
+- `docs/reference-configs/external-tooling.md`
 
 {{#IF FACTOR_FACTORY_ENABLED}}
 ### Factor Research Protocol

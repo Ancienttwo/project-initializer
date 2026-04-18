@@ -145,11 +145,6 @@ cat > tasks/todo.md <<'TODO_EOF'
 
 ## Execution
 - [ ] No active execution checklist
-
-## Review Section
-- Verification evidence:
-- Behavior diff notes:
-- Risks / follow-ups:
 TODO_EOF
 
 # Clear active-plan marker if it pointed to the archived plan

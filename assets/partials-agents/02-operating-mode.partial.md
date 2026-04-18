@@ -24,9 +24,9 @@
 - Todo archive: `tasks/archive/`.
 - Shared automation layer: `.ai/hooks/`.
 - Claude adapter layer: `.claude/settings.json` calls `.ai/hooks/run-hook.sh`.
+- External tooling routing: complex planning/review/QA/release/browser-first -> `gstack`; short implementation/debug/read-write checks -> `Waza`; knowledge sync/handoff retrieval -> `gbrain`.
+- Advisory environment check: `bash scripts/check-agent-tooling.sh --host both --check-updates`.
 - After substantive repo changes, run `bash scripts/check-task-sync.sh` and `bash scripts/check-task-workflow.sh --strict`.
-- Skill Factory state: `.claude/.skill-factory-state.json`.
-- Run `bash scripts/skill-factory-check.sh` before ending a session when proposals or optimization hints matter.
 - Primary worktree warns by default; enforce via `.claude/.require-worktree`.
 
 ---

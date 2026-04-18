@@ -14,14 +14,15 @@ describe("Bootstrap Script Contracts", () => {
     expect(skill.split("\n").length).toBeLessThanOrEqual(500);
   });
 
-  test("Skill Factory route should point to the guide and generated skill contract", () => {
+  test("router should only advertise initialize, migrate, audit, and repair paths", () => {
     const skill = read("SKILL.md");
-    const guide = read("references/skill-factory-guide.md");
-
-    expect(skill).toContain("references/skill-factory-guide.md");
-    expect(guide).toContain("agents/openai.yaml");
-    expect(guide).toContain("history.jsonl");
-    expect(guide).toContain("--record-feedback <slug>");
+    expect(skill).toContain("1. **Initialize**");
+    expect(skill).toContain("2. **Migrate**");
+    expect(skill).toContain("3. **Audit**");
+    expect(skill).toContain("4. **Repair**");
+    expect(skill).not.toContain("5. **Skill Factory**");
+    expect(skill).not.toContain("references/skill-factory-guide.md");
+    expect(existsSync(join(ROOT, "references/skill-factory-guide.md"))).toBe(false);
   });
 
   test("Codex agent metadata should exist for user-level installation", () => {
@@ -42,8 +43,11 @@ describe("Bootstrap Script Contracts", () => {
 
     expect(claude).toContain("tasks/todo.md");
     expect(claude).toContain(".ai/hooks/");
+    expect(claude).toContain("external-tooling.md");
+    expect(claude).toContain("gstack");
     expect(agents).toContain("tasks/todo.md");
     expect(agents).toContain("check-task-workflow.sh --strict");
+    expect(agents).toContain("check-agent-tooling.sh --host both --check-updates");
   });
 
   test("repo package should expose workflow verification scripts", () => {
@@ -69,16 +73,18 @@ describe("Bootstrap Script Contracts", () => {
     expect(sharedLib).toContain("verify-contract.sh");
     expect(sharedLib).toContain("summarize-failures.sh");
     expect(sharedLib).toContain("check:context-files");
+    expect(sharedLib).toContain("pi_print_external_tooling_report");
     expect(sharedLib).toContain("check-task-sync.sh");
     expect(content).toContain("mkdir -p .ai/context");
     expect(content).toContain(".ai/harness/policy.json");
     expect(content).toContain(".ai/context/context-map.json");
     expect(contract.helpers.scripts).toContain("maintenance-triage.sh");
+    expect(contract.helpers.scripts).toContain("check-agent-tooling.sh");
     expect(contract.helpers.scripts).toContain("check-context-files.sh");
     expect(sharedLib).toContain("ensure-task-workflow.sh");
     expect(sharedLib).toContain("check-task-workflow.sh");
-    expect(sharedLib).toContain("skill-factory-create.sh");
-    expect(sharedLib).toContain("skill-factory-check.sh");
+    expect(sharedLib).not.toContain("skill-factory-create.sh");
+    expect(sharedLib).not.toContain("skill-factory-check.sh");
     expect(sharedLib).toContain("pi_install_workflow_contract");
     expect(sharedLib).toContain("check:task-sync");
     expect(sharedLib).toContain("check:task-workflow");
@@ -90,12 +96,15 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain("settings.template.json");
     expect(contract.helpers.scripts).toContain("switch-plan.sh");
     expect(contract.artifacts.requiredFiles).toContain(".ai/harness/workflow-contract.json");
-    expect(sharedLib).toContain(".skill-factory-state.json");
-    expect(sharedLib).toContain(".memory-context.json");
-    expect(sharedLib).toContain(".memory-snapshot.json");
-    expect(content).toContain("install_skill_factory_files");
+    expect(contract.artifacts.requiredFiles).toContain("docs/reference-configs/external-tooling.md");
+    expect(sharedLib).not.toContain(".skill-factory-state.json");
+    expect(sharedLib).not.toContain(".memory-context.json");
+    expect(sharedLib).not.toContain(".memory-snapshot.json");
+    expect(content).not.toContain("install_skill_factory_files");
     expect(content).toContain("Project Milestones");
     expect(content).toContain("milestone checkpoints only");
+    expect(content).toContain("tasks/contracts/");
+    expect(content).toContain("tasks/reviews/");
     expect(content).toContain("**Source Plan**: (none)");
     expect(content).not.toContain("PROJECT_SETTINGS_EOF");
     expect(content).not.toContain("\"$TOOL_INPUT\"");
@@ -119,6 +128,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(sharedLib).toContain("verify-contract.sh");
     expect(sharedLib).toContain("summarize-failures.sh");
     expect(sharedLib).toContain("check:context-files");
+    expect(sharedLib).toContain("pi_print_external_tooling_report");
     expect(sharedLib).toContain("check-task-sync.sh");
     expect(sharedLib).toContain("ensure-task-workflow.sh");
     expect(sharedLib).toContain("check-task-workflow.sh");
@@ -126,10 +136,11 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain(".ai/harness/policy.json");
     expect(content).toContain(".ai/context/context-map.json");
     expect(contract.helpers.scripts).toContain("maintenance-triage.sh");
+    expect(contract.helpers.scripts).toContain("check-agent-tooling.sh");
     expect(contract.helpers.scripts).toContain("check-context-files.sh");
-    expect(content).toContain("pi_install_skill_factory");
-    expect(sharedLib).toContain("skill-factory-create.sh");
-    expect(sharedLib).toContain("skill-factory-check.sh");
+    expect(content).not.toContain("pi_install_skill_factory");
+    expect(sharedLib).not.toContain("skill-factory-create.sh");
+    expect(sharedLib).not.toContain("skill-factory-check.sh");
     expect(sharedLib).toContain("pi_workflow_contract_query_lines");
     expect(sharedLib).toContain("check:task-sync");
     expect(sharedLib).toContain("check:task-workflow");
@@ -137,11 +148,13 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).toContain('cp "$ASSETS_HOOKS_DIR/settings.template.json" .claude/settings.json');
     expect(content).toContain("settings.template.json");
     expect(content).toContain("mkdir -p .ai/hooks");
-    expect(sharedLib).toContain(".skill-factory-state.json");
-    expect(sharedLib).toContain(".memory-context.json");
-    expect(sharedLib).toContain(".memory-snapshot.json");
+    expect(sharedLib).not.toContain(".skill-factory-state.json");
+    expect(sharedLib).not.toContain(".memory-context.json");
+    expect(sharedLib).not.toContain(".memory-snapshot.json");
     expect(content).toContain("Project Milestones");
     expect(content).toContain("milestone checkpoints only");
+    expect(content).toContain("tasks/contracts/");
+    expect(content).toContain("tasks/reviews/");
     expect(content).toContain("**Source Plan**: (none)");
     expect(content).not.toContain(".*/");
     expect(content).toContain("ensure_runtime_gitignore_block");
@@ -149,6 +162,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(content).not.toContain("\"$TOOL_INPUT\"");
     expect(content).not.toContain("\"$PROMPT\"");
     expect(content).toContain("cp \"$ASSETS_REF_DIR\"/*.md docs/reference-configs/");
+    expect(content).toContain("pi_print_external_tooling_report");
   });
 
   test("prompt-guard should monitor tasks-first files", () => {
@@ -177,15 +191,15 @@ describe("Bootstrap Script Contracts", () => {
     expect(hookCommands).toContain("run-hook.sh");
     expect(settings).toContain(".ai/hooks/run-hook.sh");
     expect(settings).toContain("worktree-guard.sh");
-    expect(settings).toContain("memory-intake.sh");
     expect(settings).toContain("pre-edit-guard.sh");
     expect(settings).toContain("post-edit-guard.sh");
     expect(settings).toContain("prompt-guard.sh");
     expect(settings).toContain("finalize-handoff.sh");
-    expect(settings).toContain("skill-factory-session-end.sh");
     expect(settings).toContain("post-bash.sh");
     expect(settings).toContain("trace-event.sh");
     expect(settings).toContain("context-pressure-hook.sh");
+    expect(settings).not.toContain("memory-intake.sh");
+    expect(settings).not.toContain("skill-factory-session-end.sh");
     expect(settings).not.toContain("bash -lc");
     expect(settings).not.toContain("atomic-pending.sh");
     expect(settings).not.toContain("atomic-commit.sh");

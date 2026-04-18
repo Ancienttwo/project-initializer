@@ -7,6 +7,20 @@
 > **Last Updated**: {{TIMESTAMP}}
 > **Recommendation**: fail
 
+## Verification Evidence
+
+- Commands run:
+- Manual checks:
+- Supporting artifacts:
+
+## Behavior Diff Notes
+
+- ...
+
+## Residual Risks / Follow-ups
+
+- ...
+
 ## Scorecard
 
 | Dimension | Score | Notes |

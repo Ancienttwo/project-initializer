@@ -106,6 +106,17 @@
       "required": false
     },
     {
+      "id": "external_tooling",
+      "title": "External Tooling",
+      "batch": 5,
+      "questions": [
+        "Use layered routing for complex/gstack, simple/Waza, and knowledge/gbrain workflows",
+        "Default host coverage: Claude Code + Codex",
+        "Enable gbrain knowledge-layer guidance while leaving MCP disabled by default"
+      ],
+      "required": false
+    },
+    {
       "id": "plugin_profile",
       "title": "Plugin Profile",
       "batch": 5,

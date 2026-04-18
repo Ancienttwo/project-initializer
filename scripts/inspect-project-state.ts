@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { loadWorkflowContract, resolveWorkflowContractForRepo } from "./workflow-contract.ts";
 
-type Mode = "initialize" | "migrate" | "audit" | "repair" | "skill-factory";
+type Mode = "initialize" | "migrate" | "audit" | "repair";
 
 type InspectionResult = {
   repo: string;
@@ -42,13 +42,17 @@ function fileHasContent(path: string, pattern: RegExp): boolean {
 function detectMode(repo: string): Mode {
   const hasTasks = existsSync(join(repo, "tasks"));
   const hasPlan = existsSync(join(repo, "plans"));
-  const hasSkillFactory = existsSync(join(repo, ".claude", "skill-factory"));
   const hasLegacyDocs =
     existsSync(join(repo, "docs", "plan.md")) || existsSync(join(repo, "docs", "TODO.md"));
+  const hasLegacySkillFactory =
+    existsSync(join(repo, ".claude", "skill-factory")) ||
+    existsSync(join(repo, "scripts", "skill-factory-check.sh")) ||
+    existsSync(join(repo, "scripts", "skill-factory-create.sh")) ||
+    existsSync(join(repo, ".ai", "hooks", "memory-intake.sh")) ||
+    existsSync(join(repo, ".ai", "hooks", "skill-factory-session-end.sh"));
 
-  if (hasSkillFactory) return "skill-factory";
+  if (hasLegacyDocs || hasLegacySkillFactory) return "migrate";
   if (!hasTasks && !hasPlan && !hasLegacyDocs) return "initialize";
-  if (hasLegacyDocs) return "migrate";
   if (hasTasks && hasPlan) return "audit";
   return "repair";
 }
@@ -64,6 +68,7 @@ export function inspectRepo(repo: string): InspectionResult {
     "Preserve repo-local tasks-first workflow",
     "Archive uncertain legacy content instead of overwriting it",
     "Normalize docs/PROGRESS.md to milestone-only usage",
+    "Distill repeated corrections into tasks/lessons.md and hidden contracts into tasks/research.md",
   ];
 
   const runtimeManifest = join(repo, contract.artifacts.runtimeManifest);
@@ -78,6 +83,15 @@ export function inspectRepo(repo: string): InspectionResult {
   }
   if (existsSync(join(repo, "docs", "TODO.md"))) {
     driftSignals.push("legacy-docs-todo");
+  }
+  if (
+    existsSync(join(repo, ".claude", "skill-factory")) ||
+    existsSync(join(repo, "scripts", "skill-factory-check.sh")) ||
+    existsSync(join(repo, "scripts", "skill-factory-create.sh")) ||
+    existsSync(join(repo, ".ai", "hooks", "memory-intake.sh")) ||
+    existsSync(join(repo, ".ai", "hooks", "skill-factory-session-end.sh"))
+  ) {
+    driftSignals.push("legacy-skill-factory-surface");
   }
   if (existsSync(progressFile) && !fileHasContent(progressFile, /milestone checkpoints only/i)) {
     driftSignals.push("progress-ledger-used-as-active-log");
@@ -94,6 +108,9 @@ export function inspectRepo(repo: string): InspectionResult {
   }
   if (driftSignals.includes("progress-ledger-used-as-active-log")) {
     requiredDecisions.push("Split active progress notes into tasks/research surfaces");
+  }
+  if (driftSignals.includes("legacy-skill-factory-surface")) {
+    requiredDecisions.push("Remove repo-local Skill Factory and auto-memory surfaces");
   }
 
   let legacyContractVersion = "current-v1";

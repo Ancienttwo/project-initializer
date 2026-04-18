@@ -1,6 +1,6 @@
 {
-  "version": "3.2.1",
-  "templateVersion": "3.2.1",
+  "version": "3.3.0",
+  "templateVersion": "3.3.0",
   "compatibility": {
     "minClaudeCodeVersion": "1.0.0",
     "minBunVersion": "1.0.0"
@@ -33,6 +33,10 @@
     {
       "version": "3.2.1",
       "description": "Added progressive context and harness policy surfaces, plus fixed nested AGENTS placement and custom-plan monorepo drift"
+    },
+    {
+      "version": "3.3.0",
+      "description": "Removed legacy Skill Factory and auto-memory surfaces, and added guidance-only external tooling detection plus migration defaults"
     }
   ],
   "generatedProjectStamp": {

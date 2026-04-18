@@ -30,12 +30,6 @@ PI_DEFAULT_RUNTIME_ENTRIES=$(cat <<'EOF_RUNTIME'
 .claude/.session-handoff.md
 .claude/.task-state.json
 .claude/.task-handoff.md
-.claude/.skill-factory-state.json
-.claude/.skill-factory-session.json
-.claude/.skill-factory-session-marker.json
-.claude/.memory-context.json
-.claude/.memory-snapshot.json
-.claude/.skill-factory-user/
 .claude/.context-pressure/
 .claude/*.tmp
 .claude/*.bak
@@ -44,6 +38,13 @@ PI_DEFAULT_RUNTIME_ENTRIES=$(cat <<'EOF_RUNTIME'
 .ai/harness/events.jsonl
 .ai/harness/runs/
 EOF_RUNTIME
+)
+PI_EXTERNAL_TOOLING_HOSTS_DEFAULT=$(cat <<'EOF_EXTERNAL_TOOLING_HOSTS'
+[
+  "claude-code",
+  "codex"
+]
+EOF_EXTERNAL_TOOLING_HOSTS
 )
 PI_TEMPLATE_RESEARCH=$(cat <<'EOF_TEMPLATE_RESEARCH'
 # {{PROJECT_NAME}} — Research Notes
@@ -208,6 +209,20 @@ PI_TEMPLATE_REVIEW=$(cat <<'EOF_TEMPLATE_REVIEW'
 > **Checks File**: {{CHECKS_FILE}}
 > **Last Updated**: {{TIMESTAMP}}
 > **Recommendation**: fail
+
+## Verification Evidence
+
+- Commands run:
+- Manual checks:
+- Supporting artifacts:
+
+## Behavior Diff Notes
+
+- ...
+
+## Residual Risks / Follow-ups
+
+- ...
 
 ## Scorecard
 
@@ -486,7 +501,7 @@ pi_install_helpers() {
   local target_dir="$1"
   local helpers_dir="$2"
   local mode="${3:-apply}"
-  local helper_names="${4:-new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh check-task-sync.sh ensure-task-workflow.sh check-task-workflow.sh}"
+  local helper_names="${4:-new-plan.sh plan-to-todo.sh archive-workflow.sh prepare-handoff.sh verify-contract.sh summarize-failures.sh check-task-sync.sh check-agent-tooling.sh ensure-task-workflow.sh check-task-workflow.sh}"
   local scripts_dir="$target_dir/scripts"
   local helper_name
 
@@ -503,7 +518,7 @@ pi_install_helpers() {
         cp "$helpers_dir/$helper_name" "$scripts_dir/$helper_name"
       fi
     done
-    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-spec.sh "$scripts_dir"/new-sprint.sh "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/summarize-failures.sh "$scripts_dir"/verify-sprint.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
+    pi_ensure_executable_if_apply "$mode" "$scripts_dir"/new-spec.sh "$scripts_dir"/new-sprint.sh "$scripts_dir"/new-plan.sh "$scripts_dir"/plan-to-todo.sh "$scripts_dir"/archive-workflow.sh "$scripts_dir"/prepare-handoff.sh "$scripts_dir"/verify-contract.sh "$scripts_dir"/summarize-failures.sh "$scripts_dir"/verify-sprint.sh "$scripts_dir"/check-task-sync.sh "$scripts_dir"/check-agent-tooling.sh "$scripts_dir"/ensure-task-workflow.sh "$scripts_dir"/check-task-workflow.sh "$scripts_dir"/switch-plan.sh
     return 0
   fi
 
@@ -516,46 +531,6 @@ exit 1
 EOF_STUB
   done
   pi_ensure_executable_if_apply "$mode" "$scripts_dir"/*.sh
-}
-
-pi_install_skill_factory() {
-  local target_dir="$1"
-  local skill_factory_assets_dir="$2"
-  local scripts_source_dir="$3"
-  local mode="${4:-apply}"
-  local scripts_dir="$target_dir/scripts"
-  local skill_factory_dir="$target_dir/.claude/skill-factory"
-
-  if [[ "$mode" != "apply" ]]; then
-    echo "[dry-run] install skill factory assets into $target_dir"
-    return 0
-  fi
-
-  mkdir -p "$scripts_dir" "$skill_factory_dir"
-
-  if [[ -d "$skill_factory_assets_dir" ]]; then
-    cp -R "$skill_factory_assets_dir"/. "$skill_factory_dir/"
-  fi
-
-  if [[ ! -f "$skill_factory_dir/registry.json" ]]; then
-    cat > "$skill_factory_dir/registry.json" <<'EOF_SKILL_REGISTRY'
-{
-  "version": 1,
-  "proposals": [],
-  "promoted": [],
-  "disabled": []
-}
-EOF_SKILL_REGISTRY
-  fi
-
-  if [[ -f "$scripts_source_dir/skill-factory-create.sh" ]]; then
-    pi_copy_file_if_apply "$mode" "$scripts_source_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-create.sh"
-  fi
-  if [[ -f "$scripts_source_dir/skill-factory-check.sh" ]]; then
-    pi_copy_file_if_apply "$mode" "$scripts_source_dir/skill-factory-check.sh" "$scripts_dir/skill-factory-check.sh"
-  fi
-
-  pi_ensure_executable_if_apply "$mode" "$scripts_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-check.sh"
 }
 
 pi_context_profile() {
@@ -582,6 +557,73 @@ pi_handoff_profile() {
   printf '%s' "${PROJECT_INITIALIZER_HANDOFF_PROFILE:-$PI_HANDOFF_PROFILE_DEFAULT}"
 }
 
+pi_external_tooling_hosts_json() {
+  printf '%s' "${PROJECT_INITIALIZER_EXTERNAL_TOOLING_HOSTS_JSON:-$PI_EXTERNAL_TOOLING_HOSTS_DEFAULT}"
+}
+
+pi_external_tooling_gbrain_mcp() {
+  printf '%s' "${PROJECT_INITIALIZER_EXTERNAL_TOOLING_GBRAIN_MCP:-candidate-disabled}"
+}
+
+pi_external_tooling_defaults_summary() {
+  cat <<'EOF_EXTERNAL_TOOLING_DEFAULTS'
+- Policy defaults: routing complex->gstack, simple->waza, knowledge->gbrain
+- Hosts: claude-code, codex
+- Mode: guidance-only
+- Detection: init-migrate
+- gbrain MCP: candidate-disabled
+- Auto-actions: never install, upgrade, serve, sync, or enable MCP automatically
+EOF_EXTERNAL_TOOLING_DEFAULTS
+}
+
+pi_resolve_external_tooling_detector() {
+  local repo_dir="$1"
+  local fallback_script="${2:-}"
+  local repo_detector="$repo_dir/scripts/check-agent-tooling.sh"
+
+  if [[ -f "$repo_detector" ]]; then
+    printf '%s' "$repo_detector"
+    return 0
+  fi
+
+  if [[ -n "$fallback_script" && -f "$fallback_script" ]]; then
+    printf '%s' "$fallback_script"
+    return 0
+  fi
+
+  return 1
+}
+
+pi_print_external_tooling_report() {
+  local repo_dir="$1"
+  local mode="${2:-apply}"
+  local fallback_script="${3:-}"
+  local detector
+  local output
+
+  echo "--- External Tooling ---"
+  pi_external_tooling_defaults_summary
+
+  detector="$(pi_resolve_external_tooling_detector "$repo_dir" "$fallback_script" || true)"
+  if [[ -z "$detector" ]]; then
+    echo "- Advisory detector: unavailable"
+    return 0
+  fi
+
+  if output="$(cd "$repo_dir" && bash "$detector" --host both --check-updates 2>&1)"; then
+    if [[ "$mode" == "apply" ]]; then
+      echo "- Advisory report:"
+    else
+      echo "- Advisory report (dry-run snapshot):"
+    fi
+    printf '%s\n' "$output" | sed 's/^/  /'
+    return 0
+  fi
+
+  echo "- Advisory report: detector failed (non-fatal)"
+  printf '%s\n' "$output" | sed 's/^/  /'
+}
+
 pi_should_generate_directory_context() {
   local target_dir="$1"
   local dir
@@ -599,6 +641,8 @@ pi_write_harness_policy() {
   local target_dir="$1"
   local mode="${2:-apply}"
   local output_file="$target_dir/.ai/harness/policy.json"
+  local default_file
+  local merged_file
 
   if [[ "$mode" != "apply" ]]; then
     echo "[dry-run] write $output_file"
@@ -606,7 +650,9 @@ pi_write_harness_policy() {
   fi
 
   mkdir -p "$(dirname "$output_file")"
-  cat > "$output_file" <<EOF_POLICY
+  default_file="$(mktemp)"
+  merged_file="$(mktemp)"
+  cat > "$default_file" <<EOF_POLICY
 {
   "version": 1,
   "active_plan": {
@@ -646,6 +692,19 @@ pi_write_harness_policy() {
     "recovery": "$(pi_recovery_profile)",
     "state": "$(pi_state_profile)"
   },
+  "external_tooling": {
+    "routing": {
+      "complex": "gstack",
+      "simple": "waza",
+      "knowledge": "gbrain"
+    },
+    "hosts": $(pi_external_tooling_hosts_json),
+    "mode": "guidance-only",
+    "detection": "init-migrate",
+    "gbrain": {
+      "mcp": "$(pi_external_tooling_gbrain_mcp)"
+    }
+  },
   "enforcement": {
     "worktree_guard": "warn-by-default",
     "verification_gate": "contract-and-review",
@@ -653,6 +712,17 @@ pi_write_harness_policy() {
   }
 }
 EOF_POLICY
+
+  if [[ -f "$output_file" ]]; then
+    if ! pi_merge_json_defaults "$default_file" "$output_file" "$merged_file"; then
+      cp "$default_file" "$merged_file"
+    fi
+  else
+    cp "$default_file" "$merged_file"
+  fi
+
+  mv "$merged_file" "$output_file"
+  rm -f "$default_file"
 }
 
 pi_write_context_map() {
@@ -803,6 +873,94 @@ pi_resolve_js_runtime() {
   if [[ -x "${HOME}/.bun/bin/bun" ]]; then
     printf '%s' "${HOME}/.bun/bin/bun"
     return 0
+  fi
+
+  return 1
+}
+
+pi_merge_json_defaults() {
+  local defaults_file="$1"
+  local current_file="$2"
+  local output_file="$3"
+  local js_runtime
+
+  js_runtime="$(pi_resolve_js_runtime || true)"
+  if [[ -n "$js_runtime" ]]; then
+    "$js_runtime" -e '
+const fs = require("fs");
+const [defaultsPath, currentPath, outputPath] = process.argv.slice(1);
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeDefaults(defaultsValue, currentValue) {
+  if (Array.isArray(defaultsValue)) {
+    return Array.isArray(currentValue) ? currentValue : defaultsValue;
+  }
+
+  if (isPlainObject(defaultsValue)) {
+    const result = { ...defaultsValue };
+    if (isPlainObject(currentValue)) {
+      for (const [key, value] of Object.entries(currentValue)) {
+        result[key] = Object.prototype.hasOwnProperty.call(defaultsValue, key)
+          ? mergeDefaults(defaultsValue[key], value)
+          : value;
+      }
+    }
+    return result;
+  }
+
+  return currentValue === undefined ? defaultsValue : currentValue;
+}
+
+const defaultsJson = JSON.parse(fs.readFileSync(defaultsPath, "utf8"));
+let currentJson = {};
+try {
+  currentJson = JSON.parse(fs.readFileSync(currentPath, "utf8"));
+} catch (_error) {
+  currentJson = {};
+}
+
+const merged = mergeDefaults(defaultsJson, currentJson);
+fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2) + "\n");
+' "$defaults_file" "$current_file" "$output_file"
+    return $?
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$defaults_file" "$current_file" "$output_file" <<'PY_EOF'
+import json
+import sys
+
+defaults_path, current_path, output_path = sys.argv[1:]
+
+def merge_defaults(defaults_value, current_value):
+    if isinstance(defaults_value, list):
+        return current_value if isinstance(current_value, list) else defaults_value
+    if isinstance(defaults_value, dict):
+        result = dict(defaults_value)
+        if isinstance(current_value, dict):
+            for key, value in current_value.items():
+                result[key] = merge_defaults(defaults_value[key], value) if key in defaults_value else value
+        return result
+    return defaults_value if current_value is None else current_value
+
+with open(defaults_path, "r", encoding="utf-8") as handle:
+    defaults_json = json.load(handle)
+
+try:
+    with open(current_path, "r", encoding="utf-8") as handle:
+        current_json = json.load(handle)
+except Exception:
+    current_json = {}
+
+merged = merge_defaults(defaults_json, current_json)
+with open(output_path, "w", encoding="utf-8") as handle:
+    json.dump(merged, handle, indent=2)
+    handle.write("\n")
+PY_EOF
+    return $?
   fi
 
   return 1
