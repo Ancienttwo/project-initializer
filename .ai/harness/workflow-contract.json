@@ -17,8 +17,10 @@
       "summarize-failures.sh",
       "verify-sprint.sh",
       "check-task-sync.sh",
+      "check-context-files.sh",
       "ensure-task-workflow.sh",
       "check-task-workflow.sh",
+      "maintenance-triage.sh",
       "switch-plan.sh"
     ]
   },
@@ -32,9 +34,12 @@
       "tasks/contracts",
       "tasks/reviews",
       ".claude/templates",
+      ".ai/context",
       ".ai/harness",
       ".ai/harness/checks",
+      ".ai/harness/failures",
       ".ai/harness/handoff",
+      ".ai/harness/runs",
       "docs/reference-configs"
     ],
     "requiredFiles": [
@@ -54,15 +59,22 @@
       "scripts/summarize-failures.sh",
       "scripts/verify-sprint.sh",
       "scripts/check-task-sync.sh",
+      "scripts/check-context-files.sh",
       "scripts/ensure-task-workflow.sh",
       "scripts/check-task-workflow.sh",
+      "scripts/maintenance-triage.sh",
       "scripts/switch-plan.sh",
       "tasks/todo.md",
       "tasks/lessons.md",
       "tasks/research.md",
       "docs/PROGRESS.md",
+      ".ai/context/context-map.json",
       ".ai/harness/checks/latest.json",
+      ".ai/harness/events.jsonl",
+      ".ai/harness/failures/latest.jsonl",
       ".ai/harness/handoff/current.md",
+      ".ai/harness/policy.json",
+      ".ai/harness/runs/.gitkeep",
       ".ai/harness/workflow-contract.json"
     ]
   },

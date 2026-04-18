@@ -120,6 +120,11 @@ mkdir -p docs/reference-configs
 mkdir -p scripts
 mkdir -p .claude/hooks
 mkdir -p .ai/hooks
+mkdir -p .ai/context
+mkdir -p .ai/harness/checks
+mkdir -p .ai/harness/handoff
+mkdir -p .ai/harness/failures
+mkdir -p .ai/harness/runs
 mkdir -p .ops/database
 mkdir -p .ops/secrets
 mkdir -p artifacts
@@ -228,16 +233,15 @@ cat > docs/spec.md << 'DOCS_SPEC_EOF'
 > **Status**: Draft
 > **Owner**: Planner
 DOCS_SPEC_EOF
-
-cat > .ai/harness/checks/latest.json << 'HARNESS_CHECKS_EOF'
-{}
-HARNESS_CHECKS_EOF
-
-cat > .ai/harness/handoff/current.md << 'HARNESS_HANDOFF_EOF'
-# Harness Handoff
-
-> **Reason**: bootstrap
-HARNESS_HANDOFF_EOF
+# Canonical harness state surface:
+# - .ai/context/context-map.json
+# - .ai/harness/policy.json
+# - .ai/harness/checks/latest.json
+# - .ai/harness/events.jsonl
+# - .ai/harness/handoff/current.md
+# - .ai/harness/failures/latest.jsonl
+# - .ai/harness/runs/.gitkeep
+pi_ensure_harness_state_surface "$PWD" "apply"
 
 cat > specs/overview.md << 'SPECS_OVERVIEW_EOF'
 # Project Specifications

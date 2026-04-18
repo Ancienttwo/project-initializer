@@ -2,6 +2,14 @@
 
 All notable changes to this skill are documented here.
 
+## [3.2.1] - 2026-04-19
+
+### Fixed
+
+- Added progressive context and harness policy surfaces alongside the workflow contract manifest so generated repos keep root context stable while exposing deeper context on demand.
+- Wrote directory-level `AGENTS.md` files to discoverable module paths like `apps/*/AGENTS.md` instead of the container roots.
+- Stopped custom plan `K` from creating `apps/`, `packages/`, and `services/` unless the target repo already has real module directories there.
+
 ## [3.2.0] - 2026-04-08
 
 ### Changed

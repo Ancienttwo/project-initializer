@@ -270,8 +270,11 @@ mkdir -p tasks/archive
 mkdir -p tasks/contracts
 mkdir -p tasks/reviews
 mkdir -p .claude
+mkdir -p .ai/context
 mkdir -p .ai/harness/checks
 mkdir -p .ai/harness/handoff
+mkdir -p .ai/harness/failures
+mkdir -p .ai/harness/runs
 
 timestamp="$(date +%Y%m%d-%H%M)"
 timestamp_human="$(date '+%Y-%m-%d %H:%M')"
@@ -279,6 +282,8 @@ plan_base="$(basename "$plan_file")"
 slug="$(echo "$plan_base" | sed -E 's/^plan-[0-9]{8}-[0-9]{4}-//; s/\.md$//')"
 contract_file="tasks/contracts/${slug}.contract.md"
 review_file="tasks/reviews/${slug}.review.md"
+previous_source_plan="$(get_todo_source_plan || true)"
+parent_run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-run-${timestamp}}}}"
 
 if [[ -f "tasks/todo.md" ]] && grep -q '[^[:space:]]' tasks/todo.md; then
   archive_file="$(unique_archive_path "tasks/archive/todo-${timestamp}-${slug}.md")"
@@ -286,6 +291,8 @@ if [[ -f "tasks/todo.md" ]] && grep -q '[^[:space:]]' tasks/todo.md; then
     echo "> **Archived**: $(date '+%Y-%m-%d %H:%M')"
     echo "> **Related Plan**: ${plan_file}"
     echo "> **Outcome**: Superseded"
+    echo "> **Source Plan**: ${previous_source_plan:-"(none)"}"
+    echo "> **Parent Run ID**: ${parent_run_id}"
     echo
     cat tasks/todo.md
   } > "$archive_file"
@@ -312,6 +319,9 @@ fi
   echo "> **Source Plan**: ${plan_file}"
   echo "> **Status**: Executing"
   echo "> **Generated**: ${timestamp_human}"
+  echo "> **Source Plan Slug**: ${slug}"
+  echo "> **Parent Run ID**: ${parent_run_id}"
+  echo "> **Supersedes**: ${previous_source_plan:-"(none)"}"
   echo
   echo "## Execution"
   cat "$tasks_tmp"

@@ -29,6 +29,7 @@ done
 
 issues=0
 WORKFLOW_CONTRACT_PATH=".ai/harness/workflow-contract.json"
+policy_file=".ai/harness/policy.json"
 
 report_issue() {
   local message="$1"
@@ -125,10 +126,10 @@ extract_status() {
 }
 
 todo_source_plan() {
-  if [[ ! -f "tasks/todo.md" ]]; then
+  if [[ ! -f "${todo_file:-tasks/todo.md}" ]]; then
     return 1
   fi
-  awk -F': ' '/^\> \*\*Source Plan\*\*:/ {print $2; exit}' tasks/todo.md | xargs
+  awk -F': ' '/^\> \*\*Source Plan\*\*:/ {print $2; exit}' "${todo_file:-tasks/todo.md}" | xargs
 }
 
 derive_slug() {
@@ -156,6 +157,76 @@ check_required_dir() {
   fi
 }
 
+policy_get() {
+  local jq_path="$1"
+  local default_value="$2"
+
+  if [[ -f "$policy_file" ]] && command -v jq >/dev/null 2>&1; then
+    local value
+    value="$(jq -r "$jq_path // empty" "$policy_file" 2>/dev/null || true)"
+    if [[ -n "$value" ]]; then
+      printf '%s' "$value"
+      return 0
+    fi
+  fi
+
+  printf '%s' "$default_value"
+}
+
+todo_file="$(policy_get '.tasks.todo_file' 'tasks/todo.md')"
+lessons_file="$(policy_get '.tasks.lessons_file' 'tasks/lessons.md')"
+research_file="$(policy_get '.tasks.research_file' 'tasks/research.md')"
+contracts_dir="$(policy_get '.tasks.contracts_dir' 'tasks/contracts')"
+reviews_dir="$(policy_get '.tasks.reviews_dir' 'tasks/reviews')"
+progress_file="$(policy_get '.progress.file' 'docs/PROGRESS.md')"
+checks_file="$(policy_get '.harness.checks_file' '.ai/harness/checks/latest.json')"
+handoff_file="$(policy_get '.harness.handoff_file' '.ai/harness/handoff/current.md')"
+failure_log_file="$(policy_get '.harness.failure_log_file' '.ai/harness/failures/latest.jsonl')"
+events_file="$(policy_get '.harness.events_file' '.ai/harness/events.jsonl')"
+runs_dir="$(policy_get '.harness.runs_dir' '.ai/harness/runs')"
+context_map_file="$(policy_get '.context.map_file' '.ai/context/context-map.json')"
+
+check_required_dir "plans"
+check_required_dir "plans/archive"
+check_required_dir "tasks"
+check_required_dir "tasks/archive"
+check_required_dir "$contracts_dir"
+check_required_dir "$reviews_dir"
+check_required_dir ".claude/templates"
+check_required_dir ".ai/context"
+check_required_dir ".ai/harness"
+check_required_dir "$runs_dir"
+
+check_required_file "docs/spec.md"
+check_required_file ".claude/templates/spec.template.md"
+check_required_file ".claude/templates/plan.template.md"
+check_required_file ".claude/templates/research.template.md"
+check_required_file ".claude/templates/contract.template.md"
+check_required_file ".claude/templates/review.template.md"
+check_required_file "scripts/new-spec.sh"
+check_required_file "scripts/new-sprint.sh"
+check_required_file "scripts/new-plan.sh"
+check_required_file "scripts/plan-to-todo.sh"
+check_required_file "scripts/archive-workflow.sh"
+check_required_file "scripts/prepare-handoff.sh"
+check_required_file "scripts/verify-contract.sh"
+check_required_file "scripts/verify-sprint.sh"
+check_required_file "scripts/check-task-sync.sh"
+check_required_file "scripts/check-context-files.sh"
+check_required_file "scripts/ensure-task-workflow.sh"
+check_required_file "scripts/check-task-workflow.sh"
+check_required_file "scripts/maintenance-triage.sh"
+check_required_file "$todo_file"
+check_required_file "$lessons_file"
+check_required_file "$research_file"
+check_required_file "$progress_file"
+check_required_file "$checks_file"
+check_required_file "$handoff_file"
+check_required_file "$failure_log_file"
+check_required_file "$events_file"
+check_required_file "$context_map_file"
+check_required_file "$policy_file"
+
 if [[ ! -f "$WORKFLOW_CONTRACT_PATH" ]]; then
   report_issue "Missing workflow contract manifest: $WORKFLOW_CONTRACT_PATH"
 else
@@ -178,18 +249,18 @@ if [[ -f "docs/TODO.md" ]]; then
   report_issue "Legacy docs/TODO.md detected; migrate it into tasks/todo.md."
 fi
 
-if [[ -f "docs/PROGRESS.md" ]] && ! grep -Fq "milestone checkpoints only" "docs/PROGRESS.md"; then
-  report_issue "docs/PROGRESS.md is not normalized for milestone-only usage."
+if [[ -f "$progress_file" ]] && ! grep -Fq "milestone checkpoints only" "$progress_file"; then
+  report_issue "${progress_file} is not normalized for milestone-only usage."
 fi
 
 todo_source="$(todo_source_plan || true)"
-if [[ -f "tasks/todo.md" ]]; then
+if [[ -f "$todo_file" ]]; then
   if [[ -z "$todo_source" ]]; then
-    if grep -q '[^[:space:]]' "tasks/todo.md"; then
-      report_issue "Legacy tasks/todo.md detected; expected a '> **Source Plan**:' header."
+    if grep -q '[^[:space:]]' "$todo_file"; then
+      report_issue "Legacy ${todo_file} detected; expected a '> **Source Plan**:' header."
     fi
   elif [[ "$todo_source" != "(none)" && ! -f "$todo_source" ]]; then
-    report_issue "tasks/todo.md points to a missing source plan: $todo_source"
+    report_issue "${todo_file} points to a missing source plan: $todo_source"
   fi
 fi
 
@@ -213,7 +284,7 @@ else
 
   if [[ "$plan_status" == "Executing" ]]; then
     if [[ "$todo_source" != "$active_plan" ]]; then
-      report_issue "Executing plan is $active_plan but tasks/todo.md is sourced from ${todo_source:-missing header}."
+      report_issue "Executing plan is $active_plan but ${todo_file} is sourced from ${todo_source:-missing header}."
     fi
   fi
 fi

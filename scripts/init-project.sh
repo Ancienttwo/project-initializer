@@ -243,6 +243,15 @@ create_structure() {
 
     mkdir -p docs/architecture
     mkdir -p docs/reference-configs
+    mkdir -p tasks/archive
+    mkdir -p tasks/contracts
+    mkdir -p tasks/reviews
+    mkdir -p plans/archive
+    mkdir -p .ai/context
+    mkdir -p .ai/harness/checks
+    mkdir -p .ai/harness/handoff
+    mkdir -p .ai/harness/failures
+    mkdir -p .ai/harness/runs
     mkdir -p .claude/hooks
     mkdir -p .claude/templates
     mkdir -p .ops
@@ -362,6 +371,15 @@ EOF
         pi_install_factor_factory "$PWD" "$ASSETS_FACTOR_FACTORY_DIR" "$SCRIPT_DIR" "apply"
     fi
     ensure_task_sync_package_script
+    # Canonical harness state surface:
+    # - .ai/context/context-map.json
+    # - .ai/harness/policy.json
+    # - .ai/harness/checks/latest.json
+    # - .ai/harness/events.jsonl
+    # - .ai/harness/handoff/current.md
+    # - .ai/harness/failures/latest.jsonl
+    # - .ai/harness/runs/.gitkeep
+    pi_ensure_harness_state_surface "$PWD" "apply"
 
     install_hook_settings_template
 

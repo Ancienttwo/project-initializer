@@ -15,7 +15,10 @@ This repo uses a shared long-running harness. The durable workflow lives in repo
 3. `tasks/contracts/<slug>.contract.md` defines done for the active sprint.
 4. `tasks/todo.md` is the execution projection for the active sprint.
 5. `tasks/reviews/<slug>.review.md` records evaluator judgment.
-6. `.ai/harness/handoff/current.md` preserves resumable state across sessions.
+6. `.ai/harness/policy.json` is the machine-readable workflow contract.
+7. `.ai/context/context-map.json` indexes stable root context and discoverable nested context.
+8. `.ai/harness/handoff/current.md` preserves resumable state across sessions.
+9. `.ai/harness/events.jsonl` and `.ai/harness/runs/*.json` retain lightweight execution traces.
 
 ## Session Boundaries
 

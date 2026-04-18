@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -f ".ai/hooks/lib/workflow-state.sh" ]]; then
+  # shellcheck source=/dev/null
+  . ".ai/hooks/lib/workflow-state.sh"
+fi
+
 usage() {
   cat <<'USAGE_EOF'
 Usage: scripts/summarize-failures.sh [--file <path>] [--run-id <id>]
@@ -26,7 +31,11 @@ resolve_js_runtime() {
   return 1
 }
 
-log_file=".ai/harness/failures/latest.jsonl"
+if declare -F workflow_failure_log_file >/dev/null 2>&1; then
+  log_file="$(workflow_failure_log_file)"
+else
+  log_file=".ai/harness/failures/latest.jsonl"
+fi
 filter_run_id=""
 js_runtime=""
 js_code=""

@@ -36,10 +36,13 @@ describe("AGENTS Target Assembly", () => {
     expect(output).toContain("sync tasks/");
     expect(output).toContain("Default to **Plan-only**.");
     expect(output).toContain("Runtime profile: Plan-only (recommended).");
-    expect(output).toContain("Recovery profile: `lesson-driven`.");
+    expect(output).toContain("Recovery profile: `hybrid`.");
     expect(output).toContain("State profile: `file-backed`.");
+    expect(output).toContain("Context profile: `stable-root-progressive-subdir`.");
     expect(output).toContain("Codex runtime expectation: `sandbox_mode=platform-default, approval_policy=on-failure`.");
     expect(output).toContain(".claude/.require-worktree");
+    expect(output).toContain(".ai/harness/policy.json");
+    expect(output).toContain(".ai/context/context-map.json");
     expect(output).toContain("single source of truth for the current active plan");
     expect(output).toContain("new-spec.sh");
     expect(output).toContain("new-sprint.sh");
@@ -70,8 +73,8 @@ describe("AGENTS Target Assembly", () => {
     expect(agents.toLowerCase()).toContain("product truth");
     expect(claude.toLowerCase()).toContain("execution truth");
     expect(agents.toLowerCase()).toContain("single source of truth");
-    expect(claude).toContain("RECOVERY: lesson-driven");
-    expect(agents).toContain("Recovery profile: `lesson-driven`.");
+    expect(claude).toContain("RECOVERY: hybrid");
+    expect(agents).toContain("Recovery profile: `hybrid`.");
   });
 
   test("should render cloudflare section for both targets when enabled by plan", () => {

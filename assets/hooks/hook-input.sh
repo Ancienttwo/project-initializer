@@ -14,6 +14,11 @@ if [[ -z "${HOOK_REPO_ROOT:-}" ]]; then
   export HOOK_REPO_ROOT
 fi
 
+if [[ -f "${HOOK_REPO_ROOT:-$(pwd)}/.ai/hooks/lib/workflow-state.sh" ]]; then
+  # shellcheck source=/dev/null
+  . "${HOOK_REPO_ROOT:-$(pwd)}/.ai/hooks/lib/workflow-state.sh"
+fi
+
 hook_read_stdin_once() {
   if [[ -n "${HOOK_STDIN_JSON+x}" ]]; then
     return
@@ -416,6 +421,10 @@ hook_get_run_id() {
 }
 
 hook_failure_log_file() {
+  if declare -F workflow_failure_log_file >/dev/null 2>&1; then
+    workflow_failure_log_file
+    return 0
+  fi
   printf '.ai/harness/failures/latest.jsonl'
 }
 

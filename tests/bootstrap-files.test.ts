@@ -50,6 +50,7 @@ describe("Bootstrap Script Contracts", () => {
     const pkg = JSON.parse(read("package.json"));
     expect(pkg.scripts["check:task-sync"]).toBe("bash scripts/check-task-sync.sh");
     expect(pkg.scripts["check:task-workflow"]).toBe("bash scripts/check-task-workflow.sh --strict");
+    expect(pkg.scripts["check:context-files"]).toBe("bash scripts/check-context-files.sh");
   });
 
   test("create-project-dirs should create tasks primary files", () => {
@@ -67,7 +68,13 @@ describe("Bootstrap Script Contracts", () => {
     expect(sharedLib).toContain("archive-workflow.sh");
     expect(sharedLib).toContain("verify-contract.sh");
     expect(sharedLib).toContain("summarize-failures.sh");
+    expect(sharedLib).toContain("check:context-files");
     expect(sharedLib).toContain("check-task-sync.sh");
+    expect(content).toContain("mkdir -p .ai/context");
+    expect(content).toContain(".ai/harness/policy.json");
+    expect(content).toContain(".ai/context/context-map.json");
+    expect(contract.helpers.scripts).toContain("maintenance-triage.sh");
+    expect(contract.helpers.scripts).toContain("check-context-files.sh");
     expect(sharedLib).toContain("ensure-task-workflow.sh");
     expect(sharedLib).toContain("check-task-workflow.sh");
     expect(sharedLib).toContain("skill-factory-create.sh");
@@ -98,6 +105,7 @@ describe("Bootstrap Script Contracts", () => {
   test("init-project should scaffold tasks primary workflow", () => {
     const content = read("scripts/init-project.sh");
     const sharedLib = read("scripts/lib/project-init-lib.sh");
+    const contract = JSON.parse(read("assets/workflow-contract.v1.json"));
 
     expect(content).toContain("create_contract_directories");
     expect(content).toContain("cat > tasks/todo.md");
@@ -110,9 +118,15 @@ describe("Bootstrap Script Contracts", () => {
     expect(sharedLib).toContain("contract.template.md");
     expect(sharedLib).toContain("verify-contract.sh");
     expect(sharedLib).toContain("summarize-failures.sh");
+    expect(sharedLib).toContain("check:context-files");
     expect(sharedLib).toContain("check-task-sync.sh");
     expect(sharedLib).toContain("ensure-task-workflow.sh");
     expect(sharedLib).toContain("check-task-workflow.sh");
+    expect(content).toContain(".ai/context");
+    expect(content).toContain(".ai/harness/policy.json");
+    expect(content).toContain(".ai/context/context-map.json");
+    expect(contract.helpers.scripts).toContain("maintenance-triage.sh");
+    expect(contract.helpers.scripts).toContain("check-context-files.sh");
     expect(content).toContain("pi_install_skill_factory");
     expect(sharedLib).toContain("skill-factory-create.sh");
     expect(sharedLib).toContain("skill-factory-check.sh");
@@ -168,6 +182,7 @@ describe("Bootstrap Script Contracts", () => {
     expect(settings).toContain("post-edit-guard.sh");
     expect(settings).toContain("prompt-guard.sh");
     expect(settings).toContain("finalize-handoff.sh");
+    expect(settings).toContain("skill-factory-session-end.sh");
     expect(settings).toContain("post-bash.sh");
     expect(settings).toContain("trace-event.sh");
     expect(settings).toContain("context-pressure-hook.sh");

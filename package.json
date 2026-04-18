@@ -1,12 +1,13 @@
 {
   "name": "project-initializer",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Cross-agent project scaffolding skill for Claude and Codex",
   "type": "module",
   "scripts": {
     "benchmark:skills": "bun scripts/run-skill-evals.ts",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
+    "check:context-files": "bash scripts/check-context-files.sh",
     "check:task-sync": "bash scripts/check-task-sync.sh",
     "check:task-workflow": "bash scripts/check-task-workflow.sh --strict"
   },

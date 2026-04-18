@@ -24,7 +24,7 @@ export interface ProfileChoice {
 }
 
 interface InitializerQuestionPackBase {
-  version: "initializer-question-pack.v2" | "initializer-question-pack.v3";
+  version: "initializer-question-pack.v2" | "initializer-question-pack.v3" | "initializer-question-pack.v4";
   goal: string;
   decisionPoints: DecisionPoint[];
   planTiers: {
@@ -39,6 +39,7 @@ interface InitializerQuestionPackBase {
     handoffProfile: string;
     recoveryProfile?: string;
     stateProfile?: string;
+    contextProfile?: string;
   };
   runtimeProfiles: Record<string, RuntimeProfile>;
   orchestrationProfiles: Record<string, ProfileChoice>;
@@ -56,9 +57,16 @@ export interface InitializerQuestionPackV3 extends InitializerQuestionPackBase {
   stateProfiles: Record<string, ProfileChoice>;
 }
 
-export type InitializerQuestionPack = InitializerQuestionPackV2 | InitializerQuestionPackV3;
+export interface InitializerQuestionPackV4 extends InitializerQuestionPackBase {
+  version: "initializer-question-pack.v4";
+  recoveryProfiles: Record<string, ProfileChoice>;
+  stateProfiles: Record<string, ProfileChoice>;
+  contextProfiles: Record<string, ProfileChoice>;
+}
 
-const PACK_PATH = join(import.meta.dir, "..", "assets", "initializer-question-pack.v3.json");
+export type InitializerQuestionPack = InitializerQuestionPackV2 | InitializerQuestionPackV3 | InitializerQuestionPackV4;
+
+const PACK_PATH = join(import.meta.dir, "..", "assets", "initializer-question-pack.v4.json");
 
 export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionPack {
   if (!existsSync(path)) {
@@ -66,7 +74,11 @@ export function loadQuestionPack(path: string = PACK_PATH): InitializerQuestionP
   }
 
   const parsed = JSON.parse(readFileSync(path, "utf-8")) as InitializerQuestionPack;
-  if (parsed.version !== "initializer-question-pack.v2" && parsed.version !== "initializer-question-pack.v3") {
+  if (
+    parsed.version !== "initializer-question-pack.v2" &&
+    parsed.version !== "initializer-question-pack.v3" &&
+    parsed.version !== "initializer-question-pack.v4"
+  ) {
     throw new Error(`Unsupported question pack version: ${parsed.version}`);
   }
 

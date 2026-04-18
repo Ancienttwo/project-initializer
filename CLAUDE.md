@@ -11,7 +11,9 @@ This repository dogfoods the `project-initializer` workflow. Treat it as a Bun +
 
 - `tasks/research.md` for codebase findings and migration quirks
 - `plans/` for any active implementation plan
-- `.ai/harness/workflow-contract.json` for the installed repo-local workflow contract
+- `.ai/harness/workflow-contract.json`
+- `.ai/harness/policy.json`
+- `.ai/context/context-map.json`
 - `docs/reference-configs/ai-workflows.md`
 - `docs/reference-configs/development-protocol.md`
 - `docs/reference-configs/workflow-orchestration.md`

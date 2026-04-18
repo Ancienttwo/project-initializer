@@ -25,7 +25,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -43,7 +43,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "jdtls-lsp",
@@ -60,7 +60,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -78,7 +78,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -96,7 +96,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -113,7 +113,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -132,7 +132,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "pyright-lsp",
@@ -149,7 +149,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "rust-analyzer-lsp",
@@ -166,7 +166,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "browser-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -183,7 +183,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",
@@ -200,7 +200,7 @@
         "orchestration": "shared-long-running-harness",
         "evaluation": "command-qa",
         "handoff": "artifact-aware",
-        "recovery": "lesson-driven",
+        "recovery": "hybrid",
         "state": "file-backed"
       },
       "defaultLsp": "typescript-lsp",

@@ -99,7 +99,7 @@ const PARTIALS_AGENTS_DIR = join(ASSETS_DIR, "partials-agents");
 const VERSIONS_FILE = join(ASSETS_DIR, "versions.json");
 const SKILL_VERSION_FILE = join(ASSETS_DIR, "skill-version.json");
 const PLAN_MAP_FILE = join(ASSETS_DIR, "plan-map.json");
-const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v3.json");
+const QUESTION_PACK_FILE = join(ASSETS_DIR, "initializer-question-pack.v4.json");
 
 const TARGET_DIRS: Record<TemplateTarget, string> = {
   claude: PARTIALS_DIR,
@@ -115,8 +115,9 @@ const FALLBACK_TEMPLATE_VARIABLES: Record<string, string> = {
   ORCHESTRATION_PROFILE: "shared-long-running-harness",
   EVALUATION_PROFILE: "browser-qa",
   HANDOFF_PROFILE: "artifact-aware",
-  RECOVERY_PROFILE: "lesson-driven",
+  RECOVERY_PROFILE: "hybrid",
   STATE_PROFILE: "file-backed",
+  CONTEXT_PROFILE: "stable-root-progressive-subdir",
   PROHIBITIONS:
     "- No `any` in production code\n" +
     "- No `console.log` in production code\n" +

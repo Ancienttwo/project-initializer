@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "profile": "stable-root-progressive-subdir",
+  "root_context_files": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "docs/spec.md",
+    "tasks/todo.md",
+    "tasks/lessons.md",
+    "tasks/research.md",
+    ".ai/harness/policy.json"
+  ],
+  "discoverable_contexts": [
+    {
+      "path": "apps/*/AGENTS.md",
+      "priority": "high",
+      "char_budget": 1200,
+      "purpose": "subdir-contract"
+    },
+    {
+      "path": "packages/*/AGENTS.md",
+      "priority": "medium",
+      "char_budget": 1000,
+      "purpose": "package-contract"
+    },
+    {
+      "path": "services/*/AGENTS.md",
+      "priority": "medium",
+      "char_budget": 1000,
+      "purpose": "service-contract"
+    },
+    {
+      "path": "docs/reference-configs/*.md",
+      "priority": "low",
+      "char_budget": 900,
+      "purpose": "deep-doc"
+    }
+  ],
+  "budgets": {
+    "root_total_chars": 12000,
+    "per_discoverable_file_chars": 1200
+  }
+}

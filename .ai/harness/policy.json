@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "active_plan": {
+    "marker_file": ".claude/.active-plan",
+    "directory": "plans",
+    "archive_directory": "plans/archive",
+    "glob": "plan-*.md",
+    "source_of_truth": "latest non-archived plan or explicit marker"
+  },
+  "tasks": {
+    "todo_file": "tasks/todo.md",
+    "lessons_file": "tasks/lessons.md",
+    "research_file": "tasks/research.md",
+    "contracts_dir": "tasks/contracts",
+    "reviews_dir": "tasks/reviews"
+  },
+  "progress": {
+    "file": "docs/PROGRESS.md",
+    "mode": "milestone-only"
+  },
+  "context": {
+    "profile": "stable-root-progressive-subdir",
+    "map_file": ".ai/context/context-map.json"
+  },
+  "harness": {
+    "policy_file": ".ai/harness/policy.json",
+    "checks_file": ".ai/harness/checks/latest.json",
+    "handoff_file": ".ai/harness/handoff/current.md",
+    "failure_log_file": ".ai/harness/failures/latest.jsonl",
+    "events_file": ".ai/harness/events.jsonl",
+    "runs_dir": ".ai/harness/runs"
+  },
+  "profiles": {
+    "orchestration": "shared-long-running-harness",
+    "evaluation": "browser-qa",
+    "handoff": "artifact-aware",
+    "recovery": "hybrid",
+    "state": "file-backed"
+  },
+  "enforcement": {
+    "worktree_guard": "warn-by-default",
+    "verification_gate": "contract-and-review",
+    "completion_requires_checks": true
+  }
+}

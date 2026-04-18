@@ -279,6 +279,7 @@ sf_jq --arg id "$PROPOSAL_ID" '
 ' "$SF_PROPOSALS_FILE" > "$SF_PROPOSALS_FILE.tmp" && mv "$SF_PROPOSALS_FILE.tmp" "$SF_PROPOSALS_FILE"
 
 sf_mark_skill_usage "$proposal_slug" "$TYPE" "skill-factory-create"
+sf_sync_registry
 
 echo "[SkillFactory] Created ${TYPE} skill at ${skill_file}"
 echo "[SkillFactory] Agent metadata initialized at ${openai_yaml}"

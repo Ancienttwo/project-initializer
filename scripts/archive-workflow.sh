@@ -103,8 +103,11 @@ fi
 mkdir -p plans/archive tasks/archive
 
 timestamp="$(date +%Y%m%d-%H%M)"
+timestamp_human="$(date '+%Y-%m-%d %H:%M')"
 plan_base="$(basename "$plan_file")"
 slug="$(echo "$plan_base" | sed -E 's/^plan-[0-9]{8}-[0-9]{4}-//; s/\.md$//')"
+parent_run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-run-${timestamp}}}}"
+todo_source_plan="$(awk -F': ' '/^\> \*\*Source Plan\*\*:/ {print $2; exit}' tasks/todo.md 2>/dev/null | xargs)"
 
 plan_status="Archived"
 if [[ "$outcome" == "Abandoned" ]]; then
@@ -122,9 +125,11 @@ fi
 if [[ -f tasks/todo.md ]] && grep -q '[^[:space:]]' tasks/todo.md; then
   archive_todo="tasks/archive/todo-${timestamp}-${slug}.md"
   {
-    echo "> **Archived**: $(date '+%Y-%m-%d %H:%M')"
+    echo "> **Archived**: ${timestamp_human}"
     echo "> **Related Plan**: ${archive_plan_path}"
     echo "> **Outcome**: ${outcome}"
+    echo "> **Source Plan**: ${todo_source_plan:-"(none)"}"
+    echo "> **Parent Run ID**: ${parent_run_id}"
     echo
     cat tasks/todo.md
   } > "$archive_todo"

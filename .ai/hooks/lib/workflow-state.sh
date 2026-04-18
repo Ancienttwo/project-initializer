@@ -25,6 +25,58 @@ workflow_json_escape() {
   printf '%s' "$value"
 }
 
+workflow_policy_file() {
+  printf '.ai/harness/policy.json'
+}
+
+workflow_policy_get() {
+  local jq_path="$1"
+  local default_value="${2:-}"
+  local policy_file value
+
+  policy_file="$(workflow_policy_file)"
+  if [[ -f "$policy_file" ]] && command -v jq >/dev/null 2>&1; then
+    value="$(jq -r "$jq_path // empty" "$policy_file" 2>/dev/null || true)"
+    if [[ -n "$value" ]]; then
+      printf '%s' "$value"
+      return 0
+    fi
+  fi
+
+  printf '%s' "$default_value"
+}
+
+workflow_context_map_file() {
+  workflow_policy_get '.context.map_file' '.ai/context/context-map.json'
+}
+
+workflow_failure_log_file() {
+  workflow_policy_get '.harness.failure_log_file' '.ai/harness/failures/latest.jsonl'
+}
+
+workflow_events_file() {
+  workflow_policy_get '.harness.events_file' '.ai/harness/events.jsonl'
+}
+
+workflow_runs_dir() {
+  workflow_policy_get '.harness.runs_dir' '.ai/harness/runs'
+}
+
+workflow_ensure_harness_surface() {
+  mkdir -p \
+    "$(dirname "$(workflow_context_map_file)")" \
+    "$(dirname "$(workflow_policy_file)")" \
+    "$(dirname "$(workflow_checks_file)")" \
+    "$(dirname "$(workflow_handoff_file)")" \
+    "$(dirname "$(workflow_failure_log_file)")" \
+    "$(workflow_runs_dir)"
+
+  [[ -f "$(workflow_checks_file)" ]] || printf "{}\n" > "$(workflow_checks_file)"
+  [[ -f "$(workflow_handoff_file)" ]] || printf "# Harness Handoff\n\n> **Reason**: bootstrap\n" > "$(workflow_handoff_file)"
+  [[ -f "$(workflow_failure_log_file)" ]] || : > "$(workflow_failure_log_file)"
+  [[ -f "$(workflow_events_file)" ]] || : > "$(workflow_events_file)"
+}
+
 is_git_repo() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
@@ -467,11 +519,89 @@ workflow_active_review() {
 }
 
 workflow_checks_file() {
-  printf '.ai/harness/checks/latest.json'
+  workflow_policy_get '.harness.checks_file' '.ai/harness/checks/latest.json'
 }
 
 workflow_handoff_file() {
-  printf '.ai/harness/handoff/current.md'
+  workflow_policy_get '.harness.handoff_file' '.ai/harness/handoff/current.md'
+}
+
+workflow_append_event() {
+  local event_type="$1"
+  local reason="${2:-}"
+  local extra_json="${3:-{}}"
+  local events_file run_id
+
+  workflow_ensure_harness_surface
+  events_file="$(workflow_events_file)"
+  run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-run-$(date '+%Y%m%dT%H%M%S')-$$}}}"
+
+  if command -v jq >/dev/null 2>&1; then
+    jq -nc \
+      --arg ts "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+      --arg event_type "$event_type" \
+      --arg reason "$reason" \
+      --arg run_id "$run_id" \
+      --arg extra_json "$extra_json" \
+      '{
+        ts: $ts,
+        event_type: $event_type,
+        reason: $reason,
+        run_id: $run_id,
+        extra: (try ($extra_json | fromjson) catch {})
+      }' >> "$events_file"
+    return 0
+  fi
+
+  printf '{"ts":"%s","event_type":"%s","reason":"%s","run_id":"%s"}\n' \
+    "$(workflow_json_escape "$(date '+%Y-%m-%dT%H:%M:%S%z')")" \
+    "$(workflow_json_escape "$event_type")" \
+    "$(workflow_json_escape "$reason")" \
+    "$(workflow_json_escape "$run_id")" \
+    >> "$events_file"
+}
+
+workflow_write_run_summary() {
+  local reason="${1:-state-update}"
+  local run_id active_plan active_contract active_review output_file
+
+  workflow_ensure_harness_surface
+  run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-run-$(date '+%Y%m%dT%H%M%S')-$$}}}"
+  active_plan="$(get_active_plan || true)"
+  active_contract="$(workflow_active_contract || true)"
+  active_review="$(workflow_active_review || true)"
+  output_file="$(workflow_runs_dir)/${run_id}.json"
+
+  if command -v jq >/dev/null 2>&1; then
+    jq -nc \
+      --arg generated_at "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+      --arg run_id "$run_id" \
+      --arg reason "$reason" \
+      --arg active_plan "${active_plan:-}" \
+      --arg active_contract "${active_contract:-}" \
+      --arg active_review "${active_review:-}" \
+      --arg checks_file "$(workflow_checks_file)" \
+      --arg handoff_file "$(workflow_handoff_file)" \
+      --arg policy_file "$(workflow_policy_file)" \
+      --arg context_map_file "$(workflow_context_map_file)" \
+      '{
+        generated_at: $generated_at,
+        run_id: $run_id,
+        reason: $reason,
+        active_plan: $active_plan,
+        active_contract: $active_contract,
+        active_review: $active_review,
+        checks_file: $checks_file,
+        handoff_file: $handoff_file,
+        policy_file: $policy_file,
+        context_map_file: $context_map_file
+      }' > "$output_file"
+    return 0
+  fi
+
+  cat > "$output_file" <<EOF_RUN
+{"generated_at":"$(workflow_json_escape "$(date '+%Y-%m-%dT%H:%M:%S%z')")","run_id":"$(workflow_json_escape "$run_id")","reason":"$(workflow_json_escape "$reason")","checks_file":"$(workflow_json_escape "$(workflow_checks_file)")","handoff_file":"$(workflow_json_escape "$(workflow_handoff_file)")"}
+EOF_RUN
 }
 
 workflow_review_recommends_pass() {
@@ -528,16 +658,18 @@ workflow_contract_allows_path() {
 }
 workflow_write_handoff() {
   local reason="${1:-session-stop}"
-  local handoff_file active_plan active_contract active_review checks_file next_task changed_files diff_stat spec_file
+  local handoff_file active_plan active_contract active_review checks_file next_task changed_files diff_stat spec_file source_plan parent_run_id supersedes
 
+  workflow_ensure_harness_surface
   handoff_file="$(workflow_handoff_file)"
   checks_file="$(workflow_checks_file)"
   spec_file="docs/spec.md"
   active_plan="$(get_active_plan || true)"
   active_contract="$(workflow_active_contract || true)"
   active_review="$(workflow_active_review || true)"
-
-  mkdir -p "$(dirname "$handoff_file")"
+  source_plan="$(get_todo_source_plan || true)"
+  parent_run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-run-$(date '+%Y%m%dT%H%M%S')-$$}}}"
+  supersedes="$(workflow_read_state_field "$(workflow_task_state_file)" 'source_plan' || true)"
 
   next_task="$(
     {
@@ -569,14 +701,19 @@ workflow_write_handoff() {
 
 - Spec: ${spec_file}
 - Plan: ${active_plan:-(none)}
+- Todo Source Plan: ${source_plan:-(none)}
 - Contract: ${active_contract:-(none)}
 - Review: ${active_review:-(none)}
 - Checks: ${checks_file}
+- Policy: $(workflow_policy_file)
+- Context Map: $(workflow_context_map_file)
 
 ## Current Status
 
 - Next recommended action: ${next_task}
 - Working tree: ${diff_stat}
+- Parent Run ID: ${parent_run_id}
+- Supersedes: ${supersedes:-(none)}
 
 ## Changed Files
 
@@ -584,4 +721,7 @@ workflow_write_handoff() {
 ${changed_files}
 \`\`\`
 EOF_HANDOFF
+
+  workflow_append_event "handoff_refresh" "$reason" "{\"source_plan\":\"$(workflow_json_escape "${source_plan:-}")\",\"parent_run_id\":\"$(workflow_json_escape "$parent_run_id")\"}"
+  workflow_write_run_summary "$reason"
 }

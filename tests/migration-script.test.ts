@@ -52,7 +52,10 @@ describe("Migration script contract", () => {
     expect(script).toContain("tasks/todo.md");
     expect(script).toContain("tasks/lessons.md");
     expect(script).toContain("tasks/reviews");
+    expect(script).toContain(".ai/context");
     expect(script).toContain(".ai/harness/checks/latest.json");
+    expect(script).toContain(".ai/harness/policy.json");
+    expect(script).toContain(".ai/harness/events.jsonl");
     expect(script).toContain(".ai/harness/handoff/current.md");
     expect(script).toContain(".ai/harness/workflow-contract.json");
     expect(workflowContract).toContain("new-spec.sh");
@@ -65,8 +68,10 @@ describe("Migration script contract", () => {
     expect(workflowContract).toContain("summarize-failures.sh");
     expect(workflowContract).toContain("verify-sprint.sh");
     expect(workflowContract).toContain("check-task-sync.sh");
+    expect(workflowContract).toContain("check-context-files.sh");
     expect(workflowContract).toContain("ensure-task-workflow.sh");
     expect(workflowContract).toContain("check-task-workflow.sh");
+    expect(workflowContract).toContain("maintenance-triage.sh");
     expect(script).toContain("pi_ensure_task_sync");
     expect(sharedLib).toContain("check:task-sync");
     expect(sharedLib).toContain("check:task-workflow");
@@ -112,9 +117,14 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, ".claude/templates/review.template.md"))).toBe(true);
       expect(existsSync(join(repo, "docs/spec.md"))).toBe(true);
       expect(existsSync(join(repo, "tasks/reviews"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/context/context-map.json"))).toBe(true);
       expect(existsSync(join(repo, ".ai/harness/checks/latest.json"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/harness/policy.json"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/harness/events.jsonl"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/harness/failures/latest.jsonl"))).toBe(true);
       expect(existsSync(join(repo, ".ai/harness/handoff/current.md"))).toBe(true);
       expect(existsSync(join(repo, ".ai/harness/workflow-contract.json"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/harness/runs/.gitkeep"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-spec.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-sprint.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/new-plan.sh"))).toBe(true);
@@ -125,15 +135,19 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "scripts/summarize-failures.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/verify-sprint.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/check-task-sync.sh"))).toBe(true);
+      expect(existsSync(join(repo, "scripts/check-context-files.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/ensure-task-workflow.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/check-task-workflow.sh"))).toBe(true);
+      expect(existsSync(join(repo, "scripts/maintenance-triage.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/skill-factory-create.sh"))).toBe(true);
       expect(existsSync(join(repo, "scripts/skill-factory-check.sh"))).toBe(true);
       expect(existsSync(join(repo, ".ai/hooks/run-hook.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".ai/hooks/finalize-handoff.sh"))).toBe(true);
       expect(existsSync(join(repo, ".ai/hooks/lib/skill-factory.sh"))).toBe(true);
       expect(existsSync(join(repo, ".ai/hooks/lib/memory-state.sh"))).toBe(true);
       expect(existsSync(join(repo, ".ai/hooks/memory-intake.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/run-hook.sh"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/hooks/finalize-handoff.sh"))).toBe(true);
       expect(existsSync(join(repo, "tasks/research.md"))).toBe(true);
       expect(existsSync(join(repo, "tasks/todo.md"))).toBe(true);
       expect(existsSync(join(repo, "tasks/lessons.md"))).toBe(true);
@@ -141,12 +155,14 @@ describe("Migration script contract", () => {
       expect(existsSync(join(repo, "docs/reference-configs/spa-day-protocol.md"))).toBe(true);
       expect(existsSync(join(repo, "docs/reference-configs/handoff-protocol.md"))).toBe(true);
       expect(existsSync(join(repo, "docs/reference-configs/harness-overview.md"))).toBe(true);
+      expect(existsSync(join(repo, "docs/reference-configs/hook-operations.md"))).toBe(true);
       expect(existsSync(join(repo, "docs/reference-configs/evaluator-rubric.md"))).toBe(true);
       expect(existsSync(join(repo, "docs/reference-configs/sprint-contracts.md"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/lib/skill-factory.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/lib/memory-state.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/hooks/memory-intake.sh"))).toBe(true);
       expect(existsSync(join(repo, ".claude/skill-factory/rubric.template.json"))).toBe(true);
+      expect(existsSync(join(repo, ".claude/skill-factory/registry.json"))).toBe(true);
 
       expect(existsSync(join(repo, "docs/TODO.md"))).toBe(false);
       expect(existsSync(join(repo, "docs/plan.md"))).toBe(false);
@@ -163,13 +179,17 @@ describe("Migration script contract", () => {
       const settings = readFileSync(join(repo, ".claude/settings.json"), "utf-8");
       expect(settings).toContain(".ai/hooks/run-hook.sh");
       expect(settings).toContain("trace-event.sh");
+      expect(settings).toContain("skill-factory-session-end.sh");
 
       const handoff = readFileSync(join(repo, ".ai/harness/handoff/current.md"), "utf-8");
       expect(handoff).toContain("# Harness Handoff");
       const workflowContract = JSON.parse(readFileSync(join(repo, ".ai/harness/workflow-contract.json"), "utf-8"));
       expect(workflowContract.helpers.scripts).toContain("switch-plan.sh");
+      expect(workflowContract.helpers.scripts).toContain("check-context-files.sh");
+      expect(workflowContract.helpers.scripts).toContain("maintenance-triage.sh");
 
       const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf-8"));
+      expect(pkg.scripts["check:context-files"]).toBe("bash scripts/check-context-files.sh");
       expect(pkg.scripts["check:task-sync"]).toBe("bash scripts/check-task-sync.sh");
       expect(pkg.scripts["check:task-workflow"]).toBe("bash scripts/check-task-workflow.sh --strict");
 

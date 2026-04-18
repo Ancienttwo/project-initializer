@@ -4,7 +4,10 @@
 # - Claude adapter: .claude/settings.json
 # - Stable product truth: docs/spec.md
 # - Active-plan source of truth: plans/
-# - Sprint artifacts: tasks/contracts/, tasks/reviews/, .ai/harness/*
+# - Sprint artifacts: tasks/contracts/, tasks/reviews/, .ai/context/context-map.json
+# - Harness state: .ai/harness/checks/latest.json, .ai/harness/policy.json,
+#   .ai/harness/events.jsonl, .ai/harness/handoff/current.md,
+#   .ai/harness/failures/latest.jsonl, .ai/harness/runs/.gitkeep
 #
 # Usage:
 #   bash scripts/migrate-project-template.sh --repo /path/to/repo --dry-run
@@ -254,7 +257,7 @@ create_task_files_if_missing() {
   timestamp="$(date '+%Y-%m-%d %H:%M')"
 
   if [[ "$MODE" != "apply" ]]; then
-    echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, and harness files exist with 3.1 guidance"
+    echo "[dry-run] ensure docs/spec.md, tasks/*, reviews, .ai/context/context-map.json, and .ai/harness/{checks/latest.json,policy.json,events.jsonl,handoff/current.md,failures/latest.jsonl,runs/.gitkeep} exist with 3.1 guidance"
     return
   fi
 
@@ -263,8 +266,11 @@ create_task_files_if_missing() {
     "$repo/tasks/contracts" \
     "$repo/tasks/reviews" \
     "$repo/docs" \
+    "$repo/.ai/context" \
     "$repo/.ai/harness/checks" \
-    "$repo/.ai/harness/handoff"
+    "$repo/.ai/harness/handoff" \
+    "$repo/.ai/harness/failures" \
+    "$repo/.ai/harness/runs"
 
   if [[ ! -f "$repo/docs/spec.md" ]]; then
     if [[ -f "$repo/.claude/templates/spec.template.md" ]]; then
@@ -318,17 +324,7 @@ TODO_EOF
 LESSONS_EOF
   fi
 
-  if [[ ! -f "$repo/.ai/harness/checks/latest.json" ]]; then
-    printf "{}\n" > "$repo/.ai/harness/checks/latest.json"
-  fi
-
-  if [[ ! -f "$repo/.ai/harness/handoff/current.md" ]]; then
-    cat > "$repo/.ai/harness/handoff/current.md" <<'HANDOFF_EOF'
-# Harness Handoff
-
-> **Reason**: migration
-HANDOFF_EOF
-  fi
+  pi_ensure_harness_state_surface "$repo" "apply"
 
   if [[ ! -f "$repo/docs/PROGRESS.md" ]]; then
     cat > "$repo/docs/PROGRESS.md" <<'PROGRESS_EOF'
@@ -683,9 +679,9 @@ print_report() {
   echo "- Project hooks synced from: $HOOK_ASSETS_DIR"
   echo "- Team hook config target: .claude/settings.json"
   echo "- Legacy docs/TODO.md / docs/plan.md / docs/PROGRESS.md: migrated by scripts/migrate-workflow-docs.ts"
-  echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/harness/*"
+  echo "- Workflow migration: docs/spec.md + plans/ + tasks/contracts + tasks/reviews + .ai/context/context-map.json + .ai/harness/*"
   echo "- Workflow contract manifest installed at: .ai/harness/workflow-contract.json"
-  echo "- Helper scripts installed from workflow contract manifest"
+  echo "- Helper scripts: installed from workflow contract manifest, including context scans and maintenance triage"
   echo "- Runtime temporary ignore block synced to .gitignore"
 }
 

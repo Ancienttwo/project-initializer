@@ -255,7 +255,7 @@ TODO_EOF
 }
 
 ensure_auxiliary_files() {
-  mkdir -p plans plans/archive tasks/archive tasks/contracts tasks/reviews docs scripts .ai/harness/checks .ai/harness/handoff
+  mkdir -p plans plans/archive tasks/archive tasks/contracts tasks/reviews docs scripts .ai/context .ai/harness/checks .ai/harness/handoff .ai/harness/failures .ai/harness/runs
 
   if [[ ! -f "docs/spec.md" ]]; then
     cat > docs/spec.md <<'SPEC_EOF'
@@ -334,6 +334,116 @@ PROGRESS_EOF
 
 > **Reason**: bootstrap
 HANDOFF_EOF
+  fi
+
+  if [[ ! -f ".ai/harness/events.jsonl" ]]; then
+    : > ".ai/harness/events.jsonl"
+  fi
+
+  if [[ ! -f ".ai/harness/failures/latest.jsonl" ]]; then
+    : > ".ai/harness/failures/latest.jsonl"
+  fi
+
+  if [[ ! -f ".ai/harness/runs/.gitkeep" ]]; then
+    : > ".ai/harness/runs/.gitkeep"
+  fi
+
+  if [[ ! -f ".ai/harness/policy.json" ]]; then
+    cat > ".ai/harness/policy.json" <<'POLICY_EOF'
+{
+  "version": 1,
+  "active_plan": {
+    "marker_file": ".claude/.active-plan",
+    "directory": "plans",
+    "archive_directory": "plans/archive",
+    "glob": "plan-*.md",
+    "source_of_truth": "latest non-archived plan or explicit marker"
+  },
+  "tasks": {
+    "todo_file": "tasks/todo.md",
+    "lessons_file": "tasks/lessons.md",
+    "research_file": "tasks/research.md",
+    "contracts_dir": "tasks/contracts",
+    "reviews_dir": "tasks/reviews"
+  },
+  "progress": {
+    "file": "docs/PROGRESS.md",
+    "mode": "milestone-only"
+  },
+  "context": {
+    "profile": "stable-root-progressive-subdir",
+    "map_file": ".ai/context/context-map.json"
+  },
+  "harness": {
+    "policy_file": ".ai/harness/policy.json",
+    "checks_file": ".ai/harness/checks/latest.json",
+    "handoff_file": ".ai/harness/handoff/current.md",
+    "failure_log_file": ".ai/harness/failures/latest.jsonl",
+    "events_file": ".ai/harness/events.jsonl",
+    "runs_dir": ".ai/harness/runs"
+  },
+  "profiles": {
+    "orchestration": "shared-long-running-harness",
+    "evaluation": "browser-qa",
+    "handoff": "artifact-aware",
+    "recovery": "hybrid",
+    "state": "file-backed"
+  },
+  "enforcement": {
+    "worktree_guard": "warn-by-default",
+    "verification_gate": "contract-and-review",
+    "completion_requires_checks": true
+  }
+}
+POLICY_EOF
+  fi
+
+  if [[ ! -f ".ai/context/context-map.json" ]]; then
+    cat > ".ai/context/context-map.json" <<'CONTEXT_EOF'
+{
+  "version": 1,
+  "profile": "stable-root-progressive-subdir",
+  "root_context_files": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "docs/spec.md",
+    "tasks/todo.md",
+    "tasks/lessons.md",
+    "tasks/research.md",
+    ".ai/harness/policy.json"
+  ],
+  "discoverable_contexts": [
+    {
+      "path": "apps/*/AGENTS.md",
+      "priority": "high",
+      "char_budget": 1200,
+      "purpose": "subdir-contract"
+    },
+    {
+      "path": "packages/*/AGENTS.md",
+      "priority": "medium",
+      "char_budget": 1000,
+      "purpose": "package-contract"
+    },
+    {
+      "path": "services/*/AGENTS.md",
+      "priority": "medium",
+      "char_budget": 1000,
+      "purpose": "service-contract"
+    },
+    {
+      "path": "docs/reference-configs/*.md",
+      "priority": "low",
+      "char_budget": 900,
+      "purpose": "deep-doc"
+    }
+  ],
+  "budgets": {
+    "root_total_chars": 12000,
+    "per_discoverable_file_chars": 1200
+  }
+}
+CONTEXT_EOF
   fi
 }
 

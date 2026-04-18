@@ -9,7 +9,9 @@ This repository self-hosts the `project-initializer` contract. Claude and Codex 
 - `tasks/research.md` for deep repo knowledge
 - `plans/` for timestamped plans, with `plans/archive/` for history
 - `docs/PROGRESS.md` for milestone-only updates
-- `.ai/harness/workflow-contract.json` for the installed workflow contract
+- `.ai/harness/workflow-contract.json` for the installed workflow contract manifest
+- `.ai/harness/policy.json` for the machine-readable workflow contract
+- `.ai/context/context-map.json` for progressive context loading
 
 ## Operating Rules
 

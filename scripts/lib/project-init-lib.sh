@@ -41,6 +41,8 @@ PI_DEFAULT_RUNTIME_ENTRIES=$(cat <<'EOF_RUNTIME'
 .claude/*.bak
 .claude/*.bak.*
 .claude/*.backup-*
+.ai/harness/events.jsonl
+.ai/harness/runs/
 EOF_RUNTIME
 )
 PI_TEMPLATE_RESEARCH=$(cat <<'EOF_TEMPLATE_RESEARCH'
@@ -230,6 +232,12 @@ PI_TEMPLATE_REVIEW=$(cat <<'EOF_TEMPLATE_REVIEW'
 - ...
 EOF_TEMPLATE_REVIEW
 )
+PI_CONTEXT_PROFILE_DEFAULT="stable-root-progressive-subdir"
+PI_RECOVERY_PROFILE_DEFAULT="hybrid"
+PI_STATE_PROFILE_DEFAULT="file-backed"
+PI_ORCHESTRATION_PROFILE_DEFAULT="shared-long-running-harness"
+PI_EVALUATION_PROFILE_DEFAULT="browser-qa"
+PI_HANDOFF_PROFILE_DEFAULT="artifact-aware"
 
 pi_write_file_if_apply() {
   local mode="${1:-apply}"
@@ -529,6 +537,17 @@ pi_install_skill_factory() {
     cp -R "$skill_factory_assets_dir"/. "$skill_factory_dir/"
   fi
 
+  if [[ ! -f "$skill_factory_dir/registry.json" ]]; then
+    cat > "$skill_factory_dir/registry.json" <<'EOF_SKILL_REGISTRY'
+{
+  "version": 1,
+  "proposals": [],
+  "promoted": [],
+  "disabled": []
+}
+EOF_SKILL_REGISTRY
+  fi
+
   if [[ -f "$scripts_source_dir/skill-factory-create.sh" ]]; then
     pi_copy_file_if_apply "$mode" "$scripts_source_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-create.sh"
   fi
@@ -537,6 +556,237 @@ pi_install_skill_factory() {
   fi
 
   pi_ensure_executable_if_apply "$mode" "$scripts_dir/skill-factory-create.sh" "$scripts_dir/skill-factory-check.sh"
+}
+
+pi_context_profile() {
+  printf '%s' "${PROJECT_INITIALIZER_CONTEXT_PROFILE:-$PI_CONTEXT_PROFILE_DEFAULT}"
+}
+
+pi_recovery_profile() {
+  printf '%s' "${PROJECT_INITIALIZER_RECOVERY_PROFILE:-$PI_RECOVERY_PROFILE_DEFAULT}"
+}
+
+pi_state_profile() {
+  printf '%s' "${PROJECT_INITIALIZER_STATE_PROFILE:-$PI_STATE_PROFILE_DEFAULT}"
+}
+
+pi_orchestration_profile() {
+  printf '%s' "${PROJECT_INITIALIZER_ORCHESTRATION_PROFILE:-$PI_ORCHESTRATION_PROFILE_DEFAULT}"
+}
+
+pi_evaluation_profile() {
+  printf '%s' "${PROJECT_INITIALIZER_EVALUATION_PROFILE:-$PI_EVALUATION_PROFILE_DEFAULT}"
+}
+
+pi_handoff_profile() {
+  printf '%s' "${PROJECT_INITIALIZER_HANDOFF_PROFILE:-$PI_HANDOFF_PROFILE_DEFAULT}"
+}
+
+pi_should_generate_directory_context() {
+  local target_dir="$1"
+  local dir
+
+  for dir in apps packages services; do
+    if [[ -d "$target_dir/$dir" ]] && find "$target_dir/$dir" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null | grep -q .; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+pi_write_harness_policy() {
+  local target_dir="$1"
+  local mode="${2:-apply}"
+  local output_file="$target_dir/.ai/harness/policy.json"
+
+  if [[ "$mode" != "apply" ]]; then
+    echo "[dry-run] write $output_file"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$output_file")"
+  cat > "$output_file" <<EOF_POLICY
+{
+  "version": 1,
+  "active_plan": {
+    "marker_file": ".claude/.active-plan",
+    "directory": "plans",
+    "archive_directory": "plans/archive",
+    "glob": "plan-*.md",
+    "source_of_truth": "latest non-archived plan or explicit marker"
+  },
+  "tasks": {
+    "todo_file": "tasks/todo.md",
+    "lessons_file": "tasks/lessons.md",
+    "research_file": "tasks/research.md",
+    "contracts_dir": "tasks/contracts",
+    "reviews_dir": "tasks/reviews"
+  },
+  "progress": {
+    "file": "docs/PROGRESS.md",
+    "mode": "milestone-only"
+  },
+  "context": {
+    "profile": "$(pi_context_profile)",
+    "map_file": ".ai/context/context-map.json"
+  },
+  "harness": {
+    "policy_file": ".ai/harness/policy.json",
+    "checks_file": ".ai/harness/checks/latest.json",
+    "handoff_file": ".ai/harness/handoff/current.md",
+    "failure_log_file": ".ai/harness/failures/latest.jsonl",
+    "events_file": ".ai/harness/events.jsonl",
+    "runs_dir": ".ai/harness/runs"
+  },
+  "profiles": {
+    "orchestration": "$(pi_orchestration_profile)",
+    "evaluation": "$(pi_evaluation_profile)",
+    "handoff": "$(pi_handoff_profile)",
+    "recovery": "$(pi_recovery_profile)",
+    "state": "$(pi_state_profile)"
+  },
+  "enforcement": {
+    "worktree_guard": "warn-by-default",
+    "verification_gate": "contract-and-review",
+    "completion_requires_checks": true
+  }
+}
+EOF_POLICY
+}
+
+pi_write_context_map() {
+  local target_dir="$1"
+  local mode="${2:-apply}"
+  local output_file="$target_dir/.ai/context/context-map.json"
+  local discoverable_entries
+
+  discoverable_entries=$(
+    cat <<'EOF_DISCOVERABLE'
+    {
+      "path": "apps/*/AGENTS.md",
+      "priority": "high",
+      "char_budget": 1200,
+      "purpose": "subdir-contract"
+    },
+    {
+      "path": "packages/*/AGENTS.md",
+      "priority": "medium",
+      "char_budget": 1000,
+      "purpose": "package-contract"
+    },
+    {
+      "path": "services/*/AGENTS.md",
+      "priority": "medium",
+      "char_budget": 1000,
+      "purpose": "service-contract"
+    },
+    {
+      "path": "docs/reference-configs/*.md",
+      "priority": "low",
+      "char_budget": 900,
+      "purpose": "deep-doc"
+    }
+EOF_DISCOVERABLE
+  )
+
+  if [[ "$mode" != "apply" ]]; then
+    echo "[dry-run] write $output_file"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$output_file")"
+  cat > "$output_file" <<EOF_CONTEXT
+{
+  "version": 1,
+  "profile": "$(pi_context_profile)",
+  "root_context_files": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "docs/spec.md",
+    "tasks/todo.md",
+    "tasks/lessons.md",
+    "tasks/research.md",
+    ".ai/harness/policy.json"
+  ],
+  "discoverable_contexts": [
+${discoverable_entries}
+  ],
+  "budgets": {
+    "root_total_chars": 12000,
+    "per_discoverable_file_chars": 1200
+  }
+}
+EOF_CONTEXT
+}
+
+pi_install_directory_context_files() {
+  local target_dir="$1"
+  local mode="${2:-apply}"
+  local directory_agents_content
+  local dir
+  local module_dir
+
+  if ! pi_should_generate_directory_context "$target_dir"; then
+    return 0
+  fi
+
+  if [[ "$mode" != "apply" ]]; then
+    echo "[dry-run] install nested AGENTS.md files in $target_dir"
+    return 0
+  fi
+
+  directory_agents_content=$(cat <<'EOF_DIRECTORY_AGENTS'
+# Directory AGENTS.md
+
+Keep this file focused on the local module contract for this subtree.
+
+## Local Context Contract
+
+- Describe only the ownership, boundaries, and stable entrypoints for this subtree.
+- Route deep implementation detail into nearby docs instead of inflating the root AGENTS.md.
+- Treat `.ai/context/context-map.json` as the index of discoverable context files.
+- Prefer repo-local workflow artifacts over tool-specific chat memory.
+EOF_DIRECTORY_AGENTS
+)
+
+  for dir in apps packages services; do
+    [[ -d "$target_dir/$dir" ]] || continue
+
+    while IFS= read -r module_dir; do
+      [[ -n "$module_dir" ]] || continue
+      if [[ ! -f "$module_dir/AGENTS.md" ]]; then
+        printf '%s\n' "$directory_agents_content" > "$module_dir/AGENTS.md"
+      fi
+    done < <(find "$target_dir/$dir" -mindepth 1 -maxdepth 1 -type d | sort)
+  done
+}
+
+pi_ensure_harness_state_surface() {
+  local target_dir="$1"
+  local mode="${2:-apply}"
+
+  if [[ "$mode" != "apply" ]]; then
+    echo "[dry-run] ensure harness policy/context/events/runs in $target_dir"
+    return 0
+  fi
+
+  mkdir -p \
+    "$target_dir/.ai/context" \
+    "$target_dir/.ai/harness/checks" \
+    "$target_dir/.ai/harness/handoff" \
+    "$target_dir/.ai/harness/failures" \
+    "$target_dir/.ai/harness/runs"
+
+  [[ -f "$target_dir/.ai/harness/checks/latest.json" ]] || printf "{}\n" > "$target_dir/.ai/harness/checks/latest.json"
+  [[ -f "$target_dir/.ai/harness/handoff/current.md" ]] || printf "# Harness Handoff\n\n> **Reason**: bootstrap\n" > "$target_dir/.ai/harness/handoff/current.md"
+  [[ -f "$target_dir/.ai/harness/events.jsonl" ]] || : > "$target_dir/.ai/harness/events.jsonl"
+  [[ -f "$target_dir/.ai/harness/failures/latest.jsonl" ]] || : > "$target_dir/.ai/harness/failures/latest.jsonl"
+  [[ -f "$target_dir/.ai/harness/runs/.gitkeep" ]] || : > "$target_dir/.ai/harness/runs/.gitkeep"
+
+  pi_write_harness_policy "$target_dir" "$mode"
+  pi_write_context_map "$target_dir" "$mode"
+  pi_install_directory_context_files "$target_dir" "$mode"
 }
 
 pi_resolve_js_runtime() {
@@ -586,6 +836,7 @@ pi_ensure_task_sync() {
   "name": "$project_name",
   "private": true,
   "scripts": {
+    "check:context-files": "bash scripts/check-context-files.sh",
     "check:task-sync": "bash scripts/check-task-sync.sh",
     "check:task-workflow": "bash scripts/check-task-workflow.sh --strict"
   }
@@ -606,6 +857,7 @@ const file = process.argv[1];
 const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
 pkg.private ??= true;
 pkg.scripts ??= {};
+pkg.scripts["check:context-files"] = "bash scripts/check-context-files.sh";
 pkg.scripts["check:task-sync"] = "bash scripts/check-task-sync.sh";
 pkg.scripts["check:task-workflow"] = "bash scripts/check-task-workflow.sh --strict";
 fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");

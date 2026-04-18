@@ -38,6 +38,8 @@ bun.lockb
 .claude/*.bak
 .claude/*.bak.*
 .claude/*.backup-*
+.ai/harness/events.jsonl
+.ai/harness/runs/
 .claude/.active-plan
 .claude/.plan-state/
 # END: claude-runtime-temp

@@ -8,6 +8,7 @@ This guide contains detailed protocol steps that do not need to stay in the alwa
 - Correction-derived prevention rules live in `tasks/lessons.md`.
 - Deep investigation notes live in `tasks/research.md`.
 - Milestones live in `docs/PROGRESS.md`.
+- Hook ownership, failure logs, and parity expectations live in `docs/reference-configs/hook-operations.md`.
 
 For any non-chat task that changes the repo in a substantive way, update `tasks/` as part of the same unit of work.
 

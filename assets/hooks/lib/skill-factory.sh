@@ -29,6 +29,7 @@ if ! mkdir -p "$SF_GLOBAL_HOME" 2>/dev/null; then
 fi
 SF_PROPOSALS_FILE="${SF_GLOBAL_HOME}/.skill-proposals.json"
 SF_SKILLS_DIR="${SF_GLOBAL_HOME}/skills"
+SF_REGISTRY_FILE=".claude/skill-factory/registry.json"
 SF_JQ_BIN="${PROJECT_INITIALIZER_JQ_BIN:-jq}"
 SF_HINT_THRESHOLD="${SF_HINT_THRESHOLD:-3}"
 SF_WORKFLOW_THRESHOLD="${SF_WORKFLOW_THRESHOLD:-3}"
@@ -87,6 +88,11 @@ sf_ensure_state() {
   "pattern_feedback": {
     "workflow": {}
   },
+  "signal_counts": {
+    "usage": {},
+    "correction": {},
+    "explicit_feedback": {}
+  },
   "memory": {
     "last_scan_at": 0,
     "last_snapshot_hash": "",
@@ -106,6 +112,7 @@ EOF_STATE
       | .sessions = (.sessions // {recent: []})
       | .patterns = (.patterns // {workflow: {}, knowledge: {}})
       | .pattern_feedback = (.pattern_feedback // {workflow: {}})
+      | .signal_counts = (.signal_counts // {usage: {}, correction: {}, explicit_feedback: {}})
       | .memory = (.memory // {last_scan_at: 0, last_snapshot_hash: "", recent_deltas: [], themes: {}, corroborations: {}})
       | .optimization_hints = (.optimization_hints // [])
       | .dismissed = (.dismissed // [])
@@ -119,6 +126,70 @@ EOF_STATE
 }
 EOF_PROPOSALS
   fi
+
+  if [[ ! -f "$SF_REGISTRY_FILE" ]]; then
+    mkdir -p "$(dirname "$SF_REGISTRY_FILE")"
+    cat > "$SF_REGISTRY_FILE" <<'EOF_REGISTRY'
+{
+  "version": 1,
+  "proposals": [],
+  "promoted": [],
+  "disabled": []
+}
+EOF_REGISTRY
+  fi
+}
+
+sf_increment_signal_count() {
+  local bucket="$1"
+  local key="$2"
+  local now
+
+  sf_ensure_state
+  if ! sf_require_jq || [[ -z "$key" ]]; then
+    return 0
+  fi
+
+  now="$(sf_now_epoch)"
+  sf_jq \
+    --arg bucket "$bucket" \
+    --arg key "$key" \
+    --arg ts "$now" \
+    '
+      .signal_counts[$bucket][$key] = (
+        .signal_counts[$bucket][$key] // {count: 0, last_seen: 0}
+      )
+      | .signal_counts[$bucket][$key].count += 1
+      | .signal_counts[$bucket][$key].last_seen = ($ts | tonumber)
+    ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
+}
+
+sf_sync_registry() {
+  sf_ensure_state
+  if ! sf_require_jq; then
+    return 0
+  fi
+
+  local promoted_json proposals_json disabled_json
+  promoted_json="$(
+    find "$SF_SKILLS_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null \
+      | sort \
+      | jq -R . \
+      | jq -s .
+  )"
+  proposals_json="$(sf_jq '(.proposals // [])' "$SF_PROPOSALS_FILE" 2>/dev/null || printf '[]')"
+  disabled_json="$(sf_jq '(.dismissed // [])' "$SF_STATE_FILE" 2>/dev/null || printf '[]')"
+
+  sf_jq -nc \
+    --argjson proposals "$proposals_json" \
+    --argjson promoted "${promoted_json:-[]}" \
+    --argjson disabled "$disabled_json" \
+    '{
+      version: 1,
+      proposals: $proposals,
+      promoted: $promoted,
+      disabled: $disabled
+    }' > "$SF_REGISTRY_FILE"
 }
 
 sf_normalize_slug() {
@@ -496,6 +567,9 @@ sf_mark_skill_usage() {
       '{skill_slug:$slug, skill_type:$type, source:$source, last_used_at:($ts|tonumber)}' \
       > "$skill_dir/.factory/last-used.json"
   fi
+
+  sf_increment_signal_count "usage" "$skill_slug"
+  sf_sync_registry
 }
 
 sf_resolve_skill_context() {
@@ -604,7 +678,7 @@ sf_record_feedback() {
             . + [{slug:$slug, feedback_count:($score_delta|tonumber), last_seen:($ts|tonumber)}]
           end
       )
-    ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
+      ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
 
   local source_pattern_key
   source_pattern_key="$(
@@ -624,6 +698,12 @@ sf_record_feedback() {
         | .pattern_feedback.workflow[$key].last_seen = ($ts | tonumber)
       ' "$SF_STATE_FILE" > "$SF_STATE_FILE.tmp" && mv "$SF_STATE_FILE.tmp" "$SF_STATE_FILE"
   fi
+
+  sf_increment_signal_count "explicit_feedback" "$skill_slug"
+  if printf '%s' "$signal" | grep -qEi '(correction|fix|wrong|regression)'; then
+    sf_increment_signal_count "correction" "$skill_slug"
+  fi
+  sf_sync_registry
 }
 
 sf_read_new_lessons() {
@@ -826,6 +906,8 @@ sf_create_proposal() {
         }]
       )
     ' "$SF_PROPOSALS_FILE" > "$SF_PROPOSALS_FILE.tmp" && mv "$SF_PROPOSALS_FILE.tmp" "$SF_PROPOSALS_FILE"
+
+  sf_sync_registry
 }
 
 sf_summarize_session() {
@@ -929,6 +1011,8 @@ sf_check_proposals() {
     echo "[SkillFactory] Pending proposal detected: ${pending}"
     echo "[SkillFactory] Review with: bash scripts/skill-factory-create.sh --proposal ${pending_id}"
   fi
+
+  sf_sync_registry
 }
 
 sf_check_optimization() {

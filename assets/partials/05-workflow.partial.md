@@ -7,6 +7,7 @@ PLAN_LOOP:
   MODE: {{RUNTIME_PROFILE}}
   RECOVERY: {{RECOVERY_PROFILE}}
   STATE: {{STATE_PROFILE}}
+  CONTEXT: {{CONTEXT_PROFILE}}
   PHASES: research -> spec -> plan -> contract -> todo -> implement -> verify -> review -> handoff
   RESEARCH_FILE: tasks/research.md
   SPEC_FILE: docs/spec.md
@@ -18,9 +19,13 @@ PLAN_LOOP:
   TODO_ARCHIVE: tasks/archive/
   CONTRACT_DIR: tasks/contracts/
   REVIEW_DIR: tasks/reviews/
+  POLICY_FILE: .ai/harness/policy.json
   CHECKS_FILE: .ai/harness/checks/latest.json
   HANDOFF_FILE: .ai/harness/handoff/current.md
+  EVENTS_FILE: .ai/harness/events.jsonl
+  RUNS_DIR: .ai/harness/runs/
   LESSONS_FILE: tasks/lessons.md
+  CONTEXT_MAP: .ai/context/context-map.json
   ANNOTATION_GUARD: do not implement until plan Status is "Approved"
   CONTRACT_GUARD: do not mark done until contract exit criteria pass and review recommends pass
   EXECUTION_CONTEXT: primary worktree warning by default; enforce via .claude/.require-worktree

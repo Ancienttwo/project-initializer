@@ -86,12 +86,16 @@ restore_plan_state() {
 reset_todo_idle() {
   local plan_file="$1"
   local status="$2"
+  local parent_run_id
+  parent_run_id="${HOOK_RUN_ID:-${CLAUDE_RUN_ID:-${CODEX_RUN_ID:-run-$(date '+%Y%m%d-%H%M%S')}}}"
   mkdir -p tasks
   cat > tasks/todo.md <<TODO_EOF
 # Task Execution Checklist (Primary)
 
-> **Source Plan**: (none)
+> **Source Plan**: ${plan_file}
 > **Status**: Idle
+> **Parent Run ID**: ${parent_run_id}
+> **Supersedes**: ${plan_file}
 
 Switched to ${plan_file} (status: ${status}). Plan not yet approved for execution.
 

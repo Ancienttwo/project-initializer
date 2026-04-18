@@ -1,6 +1,6 @@
 {
-  "version": "3.2.0",
-  "templateVersion": "3.2.0",
+  "version": "3.2.1",
+  "templateVersion": "3.2.1",
   "compatibility": {
     "minClaudeCodeVersion": "1.0.0",
     "minBunVersion": "1.0.0"
@@ -29,6 +29,10 @@
     {
       "version": "3.2.0",
       "description": "Introduced a versioned workflow contract manifest, inspection-first routing, and first-class legacy workflow-doc migration"
+    },
+    {
+      "version": "3.2.1",
+      "description": "Added progressive context and harness policy surfaces, plus fixed nested AGENTS placement and custom-plan monorepo drift"
     }
   ],
   "generatedProjectStamp": {

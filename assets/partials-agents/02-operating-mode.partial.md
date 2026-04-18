@@ -4,6 +4,7 @@
 - Runtime profile: {{RUNTIME_PROFILE}}.
 - Recovery profile: `{{RECOVERY_PROFILE}}`.
 - State profile: `{{STATE_PROFILE}}`.
+- Context profile: `{{CONTEXT_PROFILE}}`.
 - Claude runtime expectation: `{{CLAUDE_POLICY}}`.
 - Codex runtime expectation: `{{CODEX_POLICY}}`.
 - Do not implement until the user explicitly asks to implement.
@@ -14,6 +15,8 @@
 - Evaluator verdicts: `tasks/reviews/`.
 - Structured checks: `.ai/harness/checks/latest.json`.
 - Session handoff: `.ai/harness/handoff/current.md`.
+- Harness policy: `.ai/harness/policy.json`.
+- Context map: `.ai/context/context-map.json`.
 - Lessons contract: `tasks/lessons.md`.
 - Plan directory: `plans/` (timestamped plans).
 - Active plan rule: latest non-archived `plans/plan-*.md` file.

@@ -4,6 +4,7 @@
 - `docs/spec.md`: stable product truth
 - `tasks/todo.md`: primary execution checklist and evidence log
 - `.ai/harness/handoff/current.md`: resumable session state
+- `.ai/harness/policy.json`: machine-readable workflow contract
 
 ### Load On Demand
 - `tasks/research.md`: deep codebase analysis and hidden contracts
@@ -11,6 +12,7 @@
 - `tasks/contracts/`: active sprint done definitions
 - `tasks/reviews/`: evaluator verdicts
 - `.ai/harness/checks/latest.json`: structured verification evidence
+- `.ai/context/context-map.json`: progressive context index for nested AGENTS.md files
 - `plans/archive/`: archived plans and outcomes
 - `tasks/archive/`: archived todo snapshots
 - `docs/reference-configs/harness-overview.md`: orchestration playbook

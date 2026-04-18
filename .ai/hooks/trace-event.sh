@@ -8,6 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/hook-input.sh"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/lib/session-state.sh"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/lib/workflow-state.sh"
 
 mkdir -p .claude
 
@@ -50,3 +52,5 @@ printf '{"ts":"%s","event_type":"%s","tool_name":"%s","file_path":"%s","exit_cod
   "$(hook_json_escape "$session_key")" \
   "$(hook_json_escape "$run_id")" \
   >> "$TRACE_FILE"
+
+workflow_append_event "tool_trace" "$event_type" "{\"tool_name\":\"$(hook_json_escape "$tool_name")\",\"file_path\":\"$(hook_json_escape "$file_path")\",\"exit_code\":${exit_code},\"duration_ms\":${duration_ms}}"
