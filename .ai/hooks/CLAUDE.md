@@ -74,6 +74,6 @@ Owns the runtime-harness-hook-adapters capability boundary declared in .archcont
 ## Current Session Projection
 
 - Durable progress lives under `tasks/workstreams/runtime-harness/hook-adapters`.
-- `tasks/current.md` is the tracked derived status snapshot; it is not a live lock or task source.
+- `tasks/current.md` is the ignored local derived status read model; it is not a live lock or task source.
 - `tasks/todos.md` is the deferred-goal ledger; current execution slices stay in the active plan's `## Task Breakdown`.
 <!-- END ARCHITECTURE CONTRACT -->

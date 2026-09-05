@@ -117,6 +117,8 @@ Cut over in one change with no compatibility path:
 7. Tests: update assertions to the new contract; delete tests whose only subject was cross-branch reading; keep tests that assert generation and linked-worktree redaction.
 8a. `scripts/check-task-workflow.sh`: the snapshot check becomes tolerate-absent, mirroring how `check_handoff_resume_pair` early-returns when the handoff file is missing. When the file exists it is still validated as today. CI does not regenerate it; an absent snapshot is a valid state for an ignored local read model. Regenerate the helper projection.
 8b. Authority for reference docs is `assets/reference-configs/`; `docs/reference-configs/` is its projection via `sync-reference-configs.ts`. Edit the assets side and regenerate.
+8c. The capability-context generators (`scripts/architecture-event.ts` and `scripts/context-contract-sync.sh`) emit the "tracked derived status snapshot" sentence into every generated contract block; reword the generator lines, regenerate helper projections, and refresh the six generated blocks so a later projection run cannot revert the root contracts.
+8d. `scripts/lib/project-init-lib.sh` is a second downstream gitignore list used by shell bootstrap; add `tasks/current.md` there as well. Unifying it with `gitignore-plan.ts` is a separate slice; record it in tasks/todos.md as a deferred goal with the drift risk.
 8. Existing downstream repos that already track the file: no automated untrack operation. Record the one-line operator step (`git rm --cached tasks/current.md`) in `docs/reference-configs/harness-overview.md` next to the refresh guidance. Tradeoff: manual step for existing adopters versus adding an adoption operation that deletes tracked user files; the manual step is safer and the file is regenerated on the next refresh anyway.
 Cost at 10x: none; this removes code paths.
 
@@ -178,14 +180,16 @@ adoption ignore template is asserted by `tests/workflow-contract.test.ts` and
 |---------|---------|
 | `git ls-files tasks/current.md` | empty — untracked |
 | `git check-ignore -q tasks/current.md` | ignored via `.gitignore:40` |
-| rubric grep for cross-branch/tracked wording | no cross-branch read remains; 8 residual "tracked" lines in generated capability-context blocks (see notes, out of Allowed Paths) |
+| rubric grep for cross-branch/tracked wording | clean: no cross-branch read and no "tracked" claim remains; the 8 generated-block lines are closed by 8c |
 | `bun test` session-context, scaffold-parity, evidence-projection-drift, bootstrap-files, readme-dx, workflow-contract, create-project-dirs.runtime | 111 pass, 0 fail |
 | `bun test tests/helper-scripts.test.ts -t 'refresh-current-status\|check-task-workflow\|check-task-sync'` | 19 pass, 0 fail |
 | `bun run check:type` | exit 0 |
 | `bun run check:helpers` | projection OK, 56 helpers |
 | `bun run check:reference-configs` | projection OK, 23 docs |
 | `bash scripts/check-deploy-sql-order.sh` | `[deploy-sql] OK` |
-| `bash scripts/check-architecture-sync.sh` | exit 0, blocking=0 |
+| `bash scripts/check-architecture-sync.sh` | exit 0, blocking=0 (rerun after 8c) |
+| `bun run check:hooks` | projection OK, 3 files (`.ai/hooks` refreshed via `sync:hooks` after the `assets/hooks` block edit) |
+| `bun test` + contract-block-rewrite, architecture-event, hook-contracts, cli/capability-context | 158 pass, 0 fail |
 | `bash scripts/check-task-sync.sh` (merge-base vs origin/main) | exit 0 after binding the substantive digest |
 | `bash scripts/check-task-workflow.sh --strict` | `[workflow] OK` |
 | `bun scripts/inspect-project-state.ts --repo . --format text` | exit 0 |
@@ -202,3 +206,25 @@ across session-context, workflow-contract, create-project-dirs.runtime, helper-s
 - [x] Untrack the file, update both gitignores, cut over session-context, refresh script, and the two dead exemptions; regenerate helper projections.
 - [x] Sync both workflow-contract copies and reword docs and root contracts; grep `tests/readme-dx.test.ts` and other literal-string tests first.
 - [x] Update remaining tests; run verification commands; record results.
+
+## Follow-up: 8c and 8d Verification
+
+| Command | Outcome |
+|---------|---------|
+| `bun test` (11 focused files incl. generated-block coverage) | 158 pass, 0 fail |
+| `bun test tests/helper-scripts.test.ts -t 'refresh-current-status\|check-task-workflow\|check-task-sync'` | 19 pass, 0 fail |
+| `bun run check:type` | exit 0 |
+| `bun run check:helpers` | projection OK, 56 helpers |
+| `bun run check:reference-configs` | exit 0 |
+| `bun run check:hooks` | projection OK, 3 files |
+| `bash scripts/check-architecture-sync.sh` | exit 0, blocking=0 |
+| `bash scripts/check-deploy-sql-order.sh` | exit 0 |
+| `bash scripts/check-task-workflow.sh --strict` | exit 0 |
+| `bun scripts/inspect-project-state.ts --repo . --format text` | exit 0 |
+| `bun src/cli/index.ts init --repo . --dry-run` | exit 0 |
+| `cmp CLAUDE.md AGENTS.md` | byte-identical |
+| rubric grep | no "tracked derived status snapshot" line remains in any generated block |
+
+## Task Breakdown (Follow-up)
+- [x] 8c: reword both capability-context generators, resync helper projections, refresh the six generated blocks plus the two `.ai/hooks` parity copies.
+- [x] 8d: add `tasks/current.md` to `scripts/lib/project-init-lib.sh`, restore the create-project-dirs ignore assertion, and record the dual-authority deferred goal.

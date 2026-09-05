@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260906-0415-untrack-current-status.review.md
 > **Last Updated**: 2026-09-06 04:16
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:41673a1d14dd7dbcac95e82696ba33220e9ca196928797de62da0c643cfd3f4c`
+> **Substantive Change SHA256**: `sha256:9b2c19bc8cab96ee74a194751ce09340818598946ca6514cf0f1bdd09b05b315`
 
 ## Falsifier Result: FAILED on the first pass, resolved by the parent (decisions 8a/8b)
 
@@ -66,9 +66,10 @@ untracking reds CI." Result: **the falsifier fires.** Two independent Stop Condi
   `.ai/harness/handoff/current.md` instead of `requiredFiles`, which is the contract-level
   expression of the same 8a decision. `documents.currentStatus` is unchanged.
 
-## Residual: out-of-scope surfaces the cutover could not reach
+## Residual: closed by plan items 8c and 8d (follow-up commit)
 
-Reported, not fixed. Both are outside the contract's Allowed Paths.
+Both were reported out-of-scope on the first pass; the parent widened Allowed Paths and
+they are now fixed. Original findings kept below for the audit trail.
 
 1. **Generated capability-context blocks still call the file tracked.** Eight files carry
    `- \`tasks/current.md\` is the tracked derived status snapshot; ...`:
@@ -79,12 +80,31 @@ Reported, not fixed. Both are outside the contract's Allowed Paths.
    `check-architecture-sync.sh` passes today, but because the same block is generator-owned, a
    later projection run can rewrite the root line back to "tracked". Fix is two generator
    lines plus a projection refresh.
+   **Closed (8c).** Both generator lines now emit
+   `- \`tasks/current.md\` is the ignored local derived status read model; ...`, matching the
+   root contracts. Helper projections resynced. The six generated blocks were refreshed to the
+   generator's exact literal: `git diff --numstat` shows precisely one changed line per file,
+   and a byte comparison asserts both generator literals and all eight consumer files
+   (six generated blocks plus root `CLAUDE.md`/`AGENTS.md`) now carry the identical sentence, so
+   a future projection run is idempotent rather than reverting. There is no bulk-regeneration
+   entrypoint -- `context-contract-sync.sh sync-latest` processes a single event and a synthetic
+   event would restamp `Last architecture event`, `Severity`, and `Last changed path`, so the
+   generator-owned line was substituted directly and then proven equal to generator output.
+   A seventh and eighth file surfaced during verification: `.ai/hooks/CLAUDE.md` and
+   `.ai/hooks/AGENTS.md` are a byte-parity projection of `assets/hooks/`, enforced by
+   `tests/workflow-contract.test.ts`. They were refreshed with the repo's own
+   `bun run sync:hooks`, not hand-edited.
 2. **A second downstream gitignore authority was not updated.** `src/core/adoption/gitignore-plan.ts`
    (used by `repo-harness init`) now ignores `tasks/current.md`, but the shell bootstrap path
    `scripts/lib/project-init-lib.sh:57` has its own literal block and does not. Repos scaffolded
    through `create-project-dirs.sh` will still track the file. A speculative assertion for this
    was added and then reverted from `tests/create-project-dirs.runtime.test.ts` to keep the test
    suite honest about what actually changed.
+   **Closed (8d).** `tasks/current.md` added at `scripts/lib/project-init-lib.sh:58`, in the same
+   position as `gitignore-plan.ts` (directly after `tasks/.current.md.tmp.*`). The
+   `tests/create-project-dirs.runtime.test.ts` ignore-list assertion was restored and passes.
+   The dual authority itself is not unified here -- that is a separate slice, now recorded as a
+   deferred goal in `tasks/todos.md` with the drift risk and revisit trigger.
 
 ## Verification coverage rationale
 

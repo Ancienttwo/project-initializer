@@ -86,6 +86,17 @@ allowed_paths:
   - scripts/check-task-workflow.sh
   - assets/templates/helpers/check-task-workflow.sh
   - assets/reference-configs/
+  - scripts/architecture-event.ts
+  - scripts/context-contract-sync.sh
+  - assets/templates/helpers/architecture-event.ts
+  - assets/templates/helpers/context-contract-sync.sh
+  - scripts/lib/project-init-lib.sh
+  - assets/CLAUDE.md
+  - assets/AGENTS.md
+  - scripts/CLAUDE.md
+  - scripts/AGENTS.md
+  - assets/hooks/CLAUDE.md
+  - assets/hooks/AGENTS.md
   - assets/templates/helpers/refresh-current-status.sh
   - assets/templates/helpers/check-task-sync.sh
   - assets/workflow-contract.v1.json
