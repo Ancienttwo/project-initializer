@@ -15,7 +15,7 @@
 > **Task Contract**: `tasks/contracts/20260906-0323-context-map-drift-check.contract.md`
 > **Task Review**: `tasks/reviews/20260906-0323-context-map-drift-check.review.md`
 > **Implementation Notes**: `tasks/notes/20260906-0323-context-map-drift-check.notes.md`
-> **Substantive Change SHA256**: `sha256:f4e9864858657599be3e72e39abf23cdc6bd2e347160ed2be3d185dcd5b9bc1e`
+> **Substantive Change SHA256**: `sha256:35015d93d95bd3395d05b1c4787152b38e369515ed736bf930bfa4d03b6932ae`
 
 ## Agentic Routing
 - Selected route: planning
