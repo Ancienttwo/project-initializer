@@ -164,7 +164,10 @@ describe("workflow contract manifest", () => {
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/capture-plan.sh");
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/refresh-current-status.sh");
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/sync-brain-docs.sh");
-    expect(contract.artifacts.requiredFiles).toContain("tasks/current.md");
+    expect(contract.artifacts.requiredFiles).not.toContain("tasks/current.md");
+    // ignored local read model: same list membership as .ai/harness/handoff/current.md
+    expect(contract.artifacts.runtimeFiles).toContain("tasks/current.md");
+    expect(contract.artifacts.runtimeFiles).toContain(".ai/harness/handoff/current.md");
     expect(contract.artifacts.requiredFiles).toContain("docs/architecture/index.md");
     expect(contract.artifacts.requiredFiles).toContain(".claude/templates/implementation-notes.template.md");
     expect(contract.artifacts.requiredFiles).not.toContain(".claude/settings.json");
@@ -323,6 +326,7 @@ describe("workflow contract manifest", () => {
 
     const gitignore = readFileSync(join(ROOT, ".gitignore"), "utf-8");
     expect(gitignore).toContain("tasks/.current.md.tmp.*");
+    expect(gitignore).toContain("tasks/current.md");
     expect(gitignore).toContain(".claude/.plan-state/");
     expect(gitignore).toContain(".ai/harness/checks/latest.json");
     expect(gitignore).toContain(".ai/harness/evidence/");

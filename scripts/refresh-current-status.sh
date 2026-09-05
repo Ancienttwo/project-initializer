@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE_EOF'
 Usage: scripts/refresh-current-status.sh [--write] [--clear] [--reason <reason>] [--target <branch>]
 
-Refresh the tracked tasks/current.md read model from repo-local workflow
+Refresh the ignored local tasks/current.md read model from repo-local workflow
 artifacts. By default this prints a preview. Use --write to update the file.
 USAGE_EOF
 }
@@ -490,7 +490,7 @@ render_status() {
 > **Reason**: ${reason}
 > **Derived From**: active-plan, active-sprint, workstreams, handoff, checks, git status
 
-This file is a tracked mainline snapshot derived from repo artifacts. It is not a live lock, not a kanban board, and not an implementation gate. If it is stale, read the source artifacts below.
+This file is an ignored local read model derived from this worktree's artifacts. It is not tracked, not a live lock, not a kanban board, and not an implementation gate. If it is stale, read the source artifacts below.
 
 ## Current Focus
 
@@ -499,12 +499,6 @@ This file is a tracked mainline snapshot derived from repo artifacts. It is not 
 - Plan Status: ${plan_status}
 - Next Task: ${next_task}
 - Clear Note: ${clear_note}
-
-## Mainline Snapshot Reading
-
-- Current worktree: \`tasks/current.md\`
-- Target branch snapshot: \`git show ${target}:tasks/current.md\`
-- Rule: non-target worktrees may read the target branch snapshot, but must verify against source artifacts before acting.
 
 ## Active Work
 

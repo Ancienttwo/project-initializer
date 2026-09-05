@@ -404,7 +404,6 @@ function isOperationalReviewPath(path: string): boolean {
   return (
     path.startsWith('plans/') ||
     /^tasks\/(?:contracts|reviews|notes|archive)\//.test(path) ||
-    path === 'tasks/current.md' ||
     path === 'tasks/todos.md' ||
     path === '.ai/harness/active-plan' ||
     path === '.ai/harness/active-worktree' ||

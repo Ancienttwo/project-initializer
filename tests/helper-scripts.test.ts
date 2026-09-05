@@ -2868,7 +2868,7 @@ describe("Workflow helper scripts", () => {
     }
   }, 30_000);
 
-  test("refresh-current-status should preview and write an idle tracked snapshot", () => {
+  test("refresh-current-status should preview and write an idle local snapshot", () => {
     const cwd = tmpWorkspace("helper-current-idle");
     try {
       copyHelpers(cwd);
@@ -2887,7 +2887,10 @@ describe("Workflow helper scripts", () => {
       expect(current).toContain("> **Status**: Idle");
       expect(current).toContain("> **Reason**: unit-test");
       expect(current).toContain("<!-- stale_after: 24h -->");
-      expect(current).toContain("git show main:tasks/current.md");
+      expect(current).not.toContain("git show");
+      expect(current).not.toContain("Mainline Snapshot Reading");
+      expect(current).not.toContain("tracked mainline snapshot");
+      expect(current).toContain("ignored local read model");
       expect(current).not.toContain(".current.md.tmp");
       expect(current).not.toContain("- [ ]");
     } finally {
@@ -7132,6 +7135,37 @@ describe("Workflow helper scripts", () => {
 
       expect(res.status).toBe(1);
       expect(res.stdout).toContain("Resume packet is older than current status snapshot");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("check-task-workflow strict tolerates an absent tasks/current.md and still validates it when present", () => {
+    const cwd = tmpWorkspace("helper-check-workflow-current-absent");
+    try {
+      copyHelpers(cwd);
+      expect(
+        run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "current-absent", "--title", "Current Absent"], cwd)
+          .status
+      ).toBe(0);
+      writeWorkflowRequiredSurface(cwd);
+
+      // Present: strict passes and the read-model content checks still apply.
+      expect(existsSync(join(cwd, "tasks/current.md"))).toBe(true);
+      const present = run("bash", ["scripts/check-task-workflow.sh", "--strict"], cwd);
+      expect(present.status).toBe(0);
+
+      // Absent: an ignored local read model may legitimately be missing (fresh CI checkout).
+      rmSync(join(cwd, "tasks/current.md"), { force: true });
+      const absent = run("bash", ["scripts/check-task-workflow.sh", "--strict"], cwd);
+      expect(absent.stdout).not.toContain("Missing required file: tasks/current.md");
+      expect(absent.status).toBe(0);
+
+      // Present but malformed: still reported, so presence is validated exactly as before.
+      writeFileSync(join(cwd, "tasks/current.md"), "# Wrong Heading\n");
+      const malformed = run("bash", ["scripts/check-task-workflow.sh", "--strict"], cwd);
+      expect(malformed.status).toBe(1);
+      expect(malformed.stdout).toContain("missing '# Current Status Snapshot' heading");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -225,7 +225,7 @@ for file in "${changed_files[@]}"; do
     plans/archive/plan-*.md|tasks/archive/contract-*.md|tasks/archive/review-*.md|tasks/archive/notes-*.md)
       is_added_path "$file" && evidence_files+=("$file")
       ;;
-    docs/*|README.md|AGENTS.md|CLAUDE.md|plans/archive/*|tasks/current.md|tasks/todos.md|tasks/lessons.md|tasks/archive/*)
+    docs/*|README.md|AGENTS.md|CLAUDE.md|plans/archive/*|tasks/todos.md|tasks/lessons.md|tasks/archive/*)
       ;;
     plans/plan-*.md|plans/sprints/*.md|tasks/contracts/*.contract.md|tasks/reviews/*.review.md|tasks/notes/*.notes.md|tasks/workstreams/*.md|tasks/workstreams/**/*.md)
       evidence_files+=("$file")

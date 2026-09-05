@@ -279,7 +279,9 @@ describe("create-project-dirs runtime smoke", () => {
       expect(workflowContract.artifacts.runtimeFiles).toContain(".ai/harness/triage/inbox.md");
       expect(workflowContract.artifacts.runtimeFiles).not.toContain(".ai/harness/workstreams/events.jsonl");
       expect(workflowContract.artifacts.requiredFiles).toContain("docs/architecture/index.md");
-      expect(workflowContract.artifacts.requiredFiles).toContain("tasks/current.md");
+      expect(workflowContract.artifacts.requiredFiles).not.toContain("tasks/current.md");
+      // ignored local read model: same list membership as .ai/harness/handoff/current.md
+      expect(workflowContract.artifacts.runtimeFiles).toContain("tasks/current.md");
       expect(workflowContract.artifacts.requiredDirectories).toContain("plans/prds");
       expect(workflowContract.artifacts.requiredDirectories).toContain("plans/sprints");
       expect(workflowContract.artifacts.requiredFiles).not.toContain("scripts/refresh-current-status.sh");
