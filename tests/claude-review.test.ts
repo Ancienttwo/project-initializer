@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, realpathSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { execFileSync } from 'child_process';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
+import { acquireExclusiveDirectoryLock } from '../src/effects/locking/exclusive-directory-lock';
 import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { assessChange, buildReviewSelectionPacket } from '../src/core/review/change-assessment';
 import { claudeReviewStatus, closeClaudeReview, reviewSessionLocation, runClaudeReviewRound } from '../src/effects/review/claude-review-session';
@@ -181,4 +183,74 @@ test('schema enums reject array coercion instead of accepting malformed provider
     const malformed = structuredClone(event); mutate(malformed);
     expect(() => validateClaudeReviewResult(malformed, request)).toThrow('malformed');
   }
+});
+
+test('startup spawn failure can be cancelled without process metadata or acceptance', async () => {
+  const f = fixture();
+  chmodSync(f.options.providerCommand, 0o600);
+  await expect(runClaudeReviewRound(f.options)).rejects.toThrow();
+  const dir = reviewSessionLocation(f.root, contract).dir;
+  expect(existsSync(join(dir, 'processes.json'))).toBe(false);
+  expect(existsSync(join(dir, 'failure.json'))).toBe(true);
+  await expect(closeClaudeReview(f.options)).rejects.toThrow();
+  const result = await closeClaudeReview(f.options, true) as { cancelled: boolean };
+  expect(result.cancelled).toBe(true);
+  expect(claudeReviewStatus(f.root, contract).status).toBe('closed');
+  expect(existsSync(join(dir, 'accepted-1.json'))).toBe(false);
+  await expect(runClaudeReviewRound(f.options)).rejects.toThrow();
+}, 20_000);
+
+function unstartedSession() {
+  const f = fixture();
+  const location = reviewSessionLocation(f.root, contract);
+  const id = randomUUID();
+  const session = { protocol: 1, startup_protocol: 1, repo_root: location.root, contract_file: contract,
+    contract_sha256: 'contract', goal_sha256: 'goal', session_id: id, tmux_session: `review-${id}`,
+    tmux_bin: Bun.which('tmux')!, provider_bin: realpathSync(f.options.providerCommand) };
+  writeFileSync(join(location.dir, 'session.json'), JSON.stringify(session));
+  return { ...f, ...location, session };
+}
+
+test('pre-spawn cancel fences a delayed real tmux host and preserves a sentinel', async () => {
+  const f = unstartedSession();
+  const sentinel = `sentinel-${randomUUID()}`;
+  execFileSync('tmux', ['-L', 'repo-harness-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
+  const before = execFileSync('tmux', ['-L', 'repo-harness-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
+  const lock = acquireExclusiveDirectoryLock(f.root, join('.ai/harness/runs/claude-review', f.dir.split('/').at(-1)!, 'startup.lock'));
+  try { await expect(closeClaudeReview(f.options, true)).rejects.toThrow('exclusive lock'); }
+  finally { lock.release(); }
+  expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
+  await closeClaudeReview(f.options, true);
+  const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
+  const host = fileURLToPath(new URL('../src/effects/review/claude-review-host.ts', import.meta.url));
+  execFileSync('tmux', ['-L', 'repo-harness-review', 'new-session', '-d', '-s', f.session.tmux_session,
+    [process.execPath, host, f.dir].map(quote).join(' ')]);
+  const live = () => { try { execFileSync('tmux', ['-L', 'repo-harness-review', 'has-session', '-t', f.session.tmux_session], { stdio: 'ignore' }); return true; } catch { return false; } };
+  try {
+    for (let i = 0; i < 30 && live(); i++) await Bun.sleep(100);
+    expect(live()).toBe(false);
+    expect(existsSync(join(f.dir, 'spawn-intent.json'))).toBe(false);
+    expect(existsSync(join(f.dir, 'processes.json'))).toBe(false);
+    expect(existsSync(join(f.dir, 'accepted-1.json'))).toBe(false);
+    expect(execFileSync('tmux', ['-L', 'repo-harness-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' })).toBe(before);
+  } finally { if (live()) execFileSync('tmux', ['-L', 'repo-harness-review', 'kill-session', '-t', f.session.tmux_session]); }
+}, 10_000);
+
+test('pre-metadata cancel refuses ambiguous spawn intent and mismatched no-child proof', async () => {
+  const f = unstartedSession();
+  writeFileSync(join(f.dir, 'spawn-intent.json'), JSON.stringify({ session_id: f.session.session_id }));
+  await expect(closeClaudeReview(f.options, true)).rejects.toThrow('startup_ownership_unknown');
+  expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
+  writeFileSync(join(f.dir, 'startup-no-child.json'), JSON.stringify({ session_id: randomUUID() }));
+  await expect(closeClaudeReview(f.options, true)).rejects.toThrow('startup_ownership_unknown');
+  expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
+});
+
+
+test('pre-metadata cancel refuses sessions without recorded startup serialization', async () => {
+  const f = unstartedSession();
+  const { startup_protocol, ...unrecorded } = f.session;
+  writeFileSync(join(f.dir, 'session.json'), JSON.stringify(unrecorded));
+  await expect(closeClaudeReview(f.options, true)).rejects.toThrow('startup_ownership_unknown');
+  expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
 });

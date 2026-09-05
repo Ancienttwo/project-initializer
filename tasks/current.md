@@ -1,13 +1,13 @@
 # Current Status Snapshot
 
 <!-- generated-by: repo-harness refresh-current-status v1 -->
-<!-- updated_at: 2026-09-06T04:24:03+0800 -->
+<!-- updated_at: 2026-09-06T04:41:26+0800 -->
 <!-- stale_after: 24h -->
 
 > **Status**: ManualClearedWithActiveWork
-> **Updated At**: 2026-09-06T04:24:03+0800
-> **Source Branch**: codex/persistent-claude-review
-> **Source Commit**: 78b37376
+> **Updated At**: 2026-09-06T04:41:26+0800
+> **Source Branch**: codex/claude-startup-cancel
+> **Source Commit**: 4325ad97
 > **Target Branch**: main
 > **Stale After**: 24h
 > **Reason**: archive-workflow
@@ -33,8 +33,6 @@ This file is a tracked mainline snapshot derived from repo artifacts. It is not 
 
 - linked-worktree-1d61c85c9ea9: plans/plan-20260906-0401-brc8-bounded-worker-acquisition.md
 - linked-worktree-1d61c85c9ea9: active-worktree owner -> self
-- linked-worktree-3f716106ccee: plans/plan-20260906-0233-ci-isolate-discover-tsx.md
-- linked-worktree-3f716106ccee: active-worktree owner -> self
 - linked-worktree-279f22d4e2ce: plans/plan-20260906-0338-context-files-ci-step.md
 - linked-worktree-279f22d4e2ce: active-worktree owner -> self
 - linked-worktree-37f25a48fe33: plans/plan-20260906-0323-context-map-drift-check.md
@@ -69,16 +67,16 @@ This file is a tracked mainline snapshot derived from repo artifacts. It is not 
 - Summary: 10 changed/untracked path(s)
 
 ```
- D plans/plan-20260906-0305-persistent-claude-review.md
- D tasks/contracts/20260906-0305-persistent-claude-review.contract.md
- D tasks/notes/20260906-0305-persistent-claude-review.notes.md
- D tasks/reviews/20260906-0305-persistent-claude-review.review.md
+ D plans/plan-20260906-0428-claude-startup-cancel.md
+ D tasks/contracts/20260906-0428-claude-startup-cancel.contract.md
+ D tasks/notes/20260906-0428-claude-startup-cancel.notes.md
+ D tasks/reviews/20260906-0428-claude-startup-cancel.review.md
  M tasks/todos.md
-?? plans/archive/plan-20260906-0305-persistent-claude-review.md
-?? tasks/archive/contract-20260906-0423-persistent-claude-review.md
-?? tasks/archive/notes-20260906-0423-persistent-claude-review.md
-?? tasks/archive/review-20260906-0423-persistent-claude-review.md
-?? tasks/archive/todo-20260906-0423-persistent-claude-review.md
+?? plans/archive/plan-20260906-0428-claude-startup-cancel.md
+?? tasks/archive/contract-20260906-0441-claude-startup-cancel.md
+?? tasks/archive/notes-20260906-0441-claude-startup-cancel.md
+?? tasks/archive/review-20260906-0441-claude-startup-cancel.md
+?? tasks/archive/todo-20260906-0441-claude-startup-cancel.md
 ```
 
 ## Source Artifacts

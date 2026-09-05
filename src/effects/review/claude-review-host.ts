@@ -1,6 +1,7 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { appendFileSync, existsSync, realpathSync } from 'fs';
-import { join } from 'path';
+import { join, relative } from 'path';
+import { acquireExclusiveDirectoryLock } from '../locking/exclusive-directory-lock';
 import { createInterface } from 'readline';
 import { CLAUDE_REVIEW_MAX_ROUNDS, CLAUDE_REVIEW_SCHEMA, CLAUDE_REVIEW_TIMEOUT_MS, reviewContextDigest, validateClaudeReviewResult, type ClaudeReviewRequest } from '../../core/review/claude-review';
 import { processIdentity, readReviewJson, reviewSessionLocation, tmux, writeReviewJson, type ReviewProcesses, type ReviewSession } from './claude-review-session';
@@ -12,22 +13,42 @@ export async function runClaudeReviewHost(directory: string): Promise<void> {
   if (reviewSessionLocation(session.repo_root, session.contract_file).dir !== dir || existsSync(join(dir, 'processes.json'))) {
     throw new Error('claude_review_host_identity_mismatch');
   }
-  const pane = process.env.TMUX_PANE;
-  if (!pane) throw new Error('claude_review_host_requires_tmux');
-  const [serverPid, name, paneId, hostPid] = tmux(session, ['display-message', '-p', '-t', pane, '#{pid}\t#{session_name}\t#{pane_id}\t#{pane_pid}']).split('\t');
-  if (name !== session.tmux_session || paneId !== pane || Number(hostPid) !== process.pid) throw new Error('claude_review_host_pane_mismatch');
-  const env = { ...process.env };
-  delete env.CLAUDECODE;
-  const child = spawn(session.provider_bin, ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
-    '--session-id', session.session_id, '--no-session-persistence', '--model', 'fable',
-    '--tools', 'Read,Grep,Glob', '--allowedTools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk',
-    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--setting-sources', '',
-    '--settings', '{"disableAllHooks":true}', '--disable-slash-commands', '--no-chrome', '--json-schema', JSON.stringify(CLAUDE_REVIEW_SCHEMA)],
-  { cwd: session.repo_root, env, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
-  if (!child.pid) throw new Error('claude_review_spawn_failed');
-  const processes: ReviewProcesses = { host: processIdentity(process.pid), child: processIdentity(child.pid), child_pid: child.pid,
-    server: processIdentity(Number(serverPid)), pane };
-  writeReviewJson(join(dir, 'processes.json'), processes);
+  // Cancellation and child creation share this lock; missing metadata alone is not proof of absence.
+  if (session.startup_protocol !== 1) throw new Error('claude_review_startup_protocol_missing');
+  const startup = acquireExclusiveDirectoryLock(session.repo_root, relative(session.repo_root, join(dir, 'startup.lock')),
+    { waitTimeoutMs: 1000, reclaimStaleOwner: true });
+  let child: ChildProcessWithoutNullStreams;
+  let processes: ReviewProcesses;
+  try {
+    if (existsSync(join(dir, 'close.request.json')) || existsSync(join(dir, 'closed.json'))) return;
+    if (existsSync(join(dir, 'spawn-intent.json'))) throw new Error('claude_review_startup_already_attempted');
+    const pane = process.env.TMUX_PANE;
+    if (!pane) throw new Error('claude_review_host_requires_tmux');
+    const [serverPid, name, paneId, hostPid] = tmux(session, ['display-message', '-p', '-t', pane, '#{pid}\t#{session_name}\t#{pane_id}\t#{pane_pid}']).split('\t');
+    if (name !== session.tmux_session || paneId !== pane || Number(hostPid) !== process.pid) throw new Error('claude_review_host_pane_mismatch');
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+    writeReviewJson(join(dir, 'spawn-intent.json'), { session_id: session.session_id });
+    try { child = spawn(session.provider_bin, ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+      '--session-id', session.session_id, '--no-session-persistence', '--model', 'fable',
+      '--tools', 'Read,Grep,Glob', '--allowedTools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk',
+      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--setting-sources', '',
+      '--settings', '{"disableAllHooks":true}', '--disable-slash-commands', '--no-chrome', '--json-schema', JSON.stringify(CLAUDE_REVIEW_SCHEMA)],
+    { cwd: session.repo_root, env, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    } catch (error) {
+      writeReviewJson(join(dir, 'startup-no-child.json'), { session_id: session.session_id });
+      throw error;
+    }
+    if (!child.pid) {
+      // Failed spawn emits error asynchronously even though no process was created.
+      child.once('error', () => {});
+      writeReviewJson(join(dir, 'startup-no-child.json'), { session_id: session.session_id });
+      throw new Error('claude_review_spawn_failed');
+    }
+    processes = { host: processIdentity(process.pid), child: processIdentity(child.pid), child_pid: child.pid,
+      server: processIdentity(Number(serverPid)), pane };
+    writeReviewJson(join(dir, 'processes.json'), processes);
+  } finally { startup.release(); }
   console.log(`Claude reviewer | session=${session.session_id} pid=${child.pid} contract=${session.contract_file}`);
   console.log('Waiting for a review round. This pane shows streamed activity and structured findings.');
   let active: ClaudeReviewRequest | null = null;

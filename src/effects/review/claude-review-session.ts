@@ -11,6 +11,7 @@ import { acceptanceContext, authorityFingerprint, projectAcceptance, recordAccep
 
 export interface ReviewSession {
   protocol: 1;
+  startup_protocol?: 1;
   repo_root: string;
   contract_file: string;
   contract_sha256: string;
@@ -166,7 +167,7 @@ export async function runClaudeReviewRound(options: ClaudeReviewOptions) {
       execFileSync(tmuxBin, ['-V'], { timeout: 5000 });
       options.admitSession();
       const id = randomUUID();
-      session = { protocol: 1, repo_root: root, contract_file: contract, contract_sha256: identity.contract_sha256,
+      session = { protocol: 1, startup_protocol: 1, repo_root: root, contract_file: contract, contract_sha256: identity.contract_sha256,
         goal_sha256: identity.goal_sha256, session_id: id, tmux_session: `review-${id}`, tmux_bin: tmuxBin, provider_bin: providerBin };
       writeReviewJson(join(dir, 'session.json'), session);
       const host = fileURLToPath(new URL('./claude-review-host.ts', import.meta.url));
@@ -250,6 +251,27 @@ export async function closeClaudeReview(options: Pick<ClaudeReviewOptions, 'repo
   const { root, dir, contract } = reviewSessionLocation(options.repoRoot, options.contract);
   const session = readSession(dir, root, contract);
   if (existsSync(join(dir, 'closed.json'))) return readReviewJson(join(dir, 'closed.json'));
+  if (!existsSync(join(dir, 'processes.json'))) {
+    if (!cancel) throw new Error('claude_review_startup_incomplete; use cancel');
+    if (session.startup_protocol !== 1) throw new Error('claude_review_startup_ownership_unknown; startup serialization was not recorded');
+    const startup = acquireExclusiveDirectoryLock(root, relative(root, join(dir, 'startup.lock')),
+      { waitTimeoutMs: 1000, reclaimStaleOwner: true });
+    try {
+      if (existsSync(join(dir, 'closed.json'))) return readReviewJson(join(dir, 'closed.json'));
+      // The host may have finished bootstrap while we acquired the lock.
+      if (!existsSync(join(dir, 'processes.json'))) {
+        if (existsSync(join(dir, 'spawn-intent.json'))) {
+          if (!existsSync(join(dir, 'startup-no-child.json'))
+            || readReviewJson<{ session_id: string }>(join(dir, 'startup-no-child.json')).session_id !== session.session_id) {
+            throw new Error('claude_review_startup_ownership_unknown; inspect the owned tmux session; cleanup is not proven');
+          }
+        }
+        if (!existsSync(join(dir, 'close.request.json'))) writeReviewJson(join(dir, 'close.request.json'), { cancel: true, session_id: session.session_id });
+        writeReviewJson(join(dir, 'closed.json'), { session_id: session.session_id, cancelled: true, termination: 'startup-no-child' });
+        return readReviewJson(join(dir, 'closed.json'));
+      }
+    } finally { startup.release(); }
+  }
   const processes = readReviewJson<ReviewProcesses>(join(dir, 'processes.json'));
   // The host owns the child and may still be available to clean an exited provider.
   let hostAvailable = false;

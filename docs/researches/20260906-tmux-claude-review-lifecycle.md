@@ -121,3 +121,21 @@ results, pane capture and `live-proof.json` are retained in ignored runtime cach
 `.ai/harness/runs/claude-review-production-fixture/`. This live proof establishes
 the production transport/acceptance/cleanup path; it is not acceptance for the
 repo-harness implementation diff itself.
+
+## Startup cancellation ownership
+
+Explicit cancellation now serializes with bootstrap on `startup.lock`. New
+sessions declare that startup protocol; a delayed host observes a cancelled
+bootstrap before spawning. The host records spawn intent before the spawn
+call and records no-child evidence only when spawn fails without a PID. This
+lets cancellation close a proven pre-spawn failure without reading nonexistent
+`processes.json` or granting acceptance. The regression first failed with
+ENOENT on the unfixed host and passed after the fix using a real tmux pane.
+
+Missing metadata is not proof of absence: a session without recorded startup
+serialization, or spawn intent without no-child evidence, returns
+`claude_review_startup_ownership_unknown` and requires ownership inspection.
+No closed record or acceptance is synthesized in those ambiguous states.
+Normal process metadata still selects the existing identity-fenced cleanup.
+Real tmux regression coverage includes delayed startup after cancellation,
+startup lock contention, mismatched no-child proof and sentinel preservation.
