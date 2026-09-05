@@ -42,7 +42,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const os = require("os");
 const path = require("path");
-const { spawnSync } = require("child_process");
+const { spawnSync, execFileSync } = require("child_process");
 
 const argv = process.argv.slice(2);
 let jsonOutput = false;
@@ -795,7 +795,15 @@ function detectWaza() {
 }
 
 function detectRuntimeCapabilities(waza) {
+  const tmux = commandCapability("tmux", "persistent observable agent processes and task-scoped Claude acceptance review", "platform-runtime", true);
+  if (tmux.path) {
+    try {
+      tmux.version = execFileSync(tmux.path, ["-V"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
+      if (!/^tmux \S+$/.test(tmux.version)) tmux.status = "unavailable";
+    } catch (_) { tmux.status = "unavailable"; }
+  }
   return {
+    tmux,
     bun: commandCapability(
       "bun",
       "repo-harness-owned global installs, local package dependency install, and test/runtime execution",
@@ -1967,6 +1975,9 @@ const report = {
 };
 
 const strictFailures = [];
+if (strictReadiness && report.runtime_capabilities.tmux.status !== "present") {
+  strictFailures.push(`tmux runtime is ${report.runtime_capabilities.tmux.status}; install tmux and verify tmux -V`);
+}
 if (strictReadiness && ["missing", "partial"].includes(report.tools.codegraph.status)) {
   strictFailures.push(`CodeGraph readiness is ${report.tools.codegraph.status}: ${report.tools.codegraph.reason}`);
 }

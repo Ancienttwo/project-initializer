@@ -8,6 +8,8 @@ import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { applyReviewerDisagreement, assessChange, buildReviewSelectionPacket } from '../src/core/review/change-assessment';
 import {
   acceptanceAuthorityFingerprint,
+  acceptanceContext,
+  authorityFingerprint,
   acceptanceReceiptPath,
   archiveProjectionReceiptPath,
   parseAcceptancePolicy,
@@ -22,6 +24,25 @@ import {
 } from '../scripts/acceptance-receipt';
 
 const tempDirs: string[] = [];
+
+test('provider expected-context fence rejects each stale identity without overwriting acceptance', async () => {
+  const { root, home } = makeFixture();
+  await externalPass(root, home);
+  const before = readFileSync(acceptanceReceiptPath(root, home), 'utf8');
+  const context = await acceptanceContext({ root, contract: 'tasks/contracts/demo.contract.md', verification: '.ai/harness/checks/latest.json' });
+  const expected = {
+    contract_sha256: authorityFingerprint(context.contract.content), goal_sha256: authorityFingerprint(context.goal.content),
+    subject_sha256: context.subject.review_subject_sha256, verification_evidence_sha256: context.evidence.fingerprint,
+    target_revision: context.subject.target_rev,
+  };
+  for (const field of Object.keys(expected)) {
+    await expect(recordAcceptance({ root, authorityHome: home, contract: 'tasks/contracts/demo.contract.md',
+      verification: '.ai/harness/checks/latest.json', disposition: 'external_pass', reviewer: 'Claude', source: 'claude-review',
+      actor: null, summary: 'Real provider opinion for a different context', findings: [], expectedContext: { ...expected, [field]: 'stale' },
+    })).rejects.toThrow(`reviewed acceptance context is stale: ${field}`);
+    expect(readFileSync(acceptanceReceiptPath(root, home), 'utf8')).toBe(before);
+  }
+});
 
 afterEach(() => {
   for (const path of tempDirs.splice(0)) rmSync(path, { recursive: true, force: true });

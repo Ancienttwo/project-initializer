@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-06 04:23
+> **Related Plan**: plans/archive/plan-20260906-0305-persistent-claude-review.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260906-0423
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: 2026-09-06 02:33
+> **Updated**: 2026-09-06 03:05
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.

@@ -16,6 +16,7 @@ how to interpret findings, and the boundaries below.
 
 - Inside Claude Code -> direct Codex outside opinion: `references/codex-mode.md`.
 - Inside Codex -> official `codex@openai-codex` plugin app-server outside opinion: `references/codex-plugin-mode.md`.
+- Explicit Claude acceptance review -> `references/claude-mode.md`.
 - An explicit provider name request always wins over the host default.
 
 ## When to use
@@ -23,6 +24,9 @@ how to interpret findings, and the boundaries below.
 - Before merging an important diff (last gate).
 - After writing a spec/tests -- find ambiguity and weak assertions.
 - A hard bug whose root cause is unclear (independent diagnosis).
+
+The following interpretation and boundaries apply to advisory Codex modes.
+Claude acceptance follows its typed receipt and lifecycle rules in `claude-mode.md`.
 
 ## Interpreting findings
 

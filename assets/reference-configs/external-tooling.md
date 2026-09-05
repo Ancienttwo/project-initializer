@@ -294,12 +294,22 @@ boundary explicit:
 
 | Capability | Owner | Required for |
 |---|---|---|
+| `tmux` | platform package manager | required for both Claude and Codex host readiness; persistent task reviewer panes |
 | `bun` | repo-harness | repo-harness-owned global installs, local dependency install, tests, and runtime execution |
 | `bash` | repo-harness | helper scripts, migration, setup checks, and contract verification wrappers; Git-for-Windows Bash is the Windows platform contract |
 | `npm` | npm registry | registry readbacks, publish gates, and opt-in update checks; not repo-harness-owned global install repair |
 | `npx` / `skills_cli` | external Skills CLI | Waza and Mermaid skill bootstrap/update commands |
 | `rsync` | platform filesystem | Waza staging-to-Codex sync and installed-copy runtime mirroring |
 | `symlink` | platform filesystem | link-mode aliases; copy mode is the fallback |
+
+Install tmux with the platform package manager (`brew install tmux` on macOS,
+`sudo apt-get install tmux` on Debian/Ubuntu), then verify `tmux -V`.
+`check-agent-tooling.sh --strict-readiness` fails if tmux is missing or cannot
+report its version; `setup check` projects the same result as `runtime.tmux`.
+Repo-harness does not install it or edit user tmux configuration. The persistent
+reviewer requires POSIX process groups and tmux: run it within macOS/Linux or
+WSL on Windows. A native Windows host without tmux does not pass readiness.
+The native protected-helper tool contract below remains a separate boundary.
 
 The policy is Bun-first, not Bun-only. Repo-harness-owned install/repair commands
 use `bun add -g` or `bun install`. Waza/Mermaid remain explicit external Skills

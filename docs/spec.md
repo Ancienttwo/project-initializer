@@ -364,3 +364,35 @@ Only Human authority may accept or reject a submitted demand. Acceptance freezes
 - Execution bindings consume verifier-persisted receipts and the exact verified PR head. Post-merge evidence measures one exact final-main head; each recorded merge must be its ancestor. Board identity includes that measured head.
 - Campaign journal inspection and stop/reconciliation/expiry recording remain available after target movement or grant expiry; they grant no fresh execution authority. Post-merge continuation remains disabled until a typed Campaign-to-owned-publication proof is available. Omitted CLI start timestamps replay the first immutable start definition.
 - Live canonical Sprint carriers share one Task ID namespace, including completed rows in a live Sprint. Archived carriers are excluded. Canonical readers and proposed materialization validate the same invariant before shared Lease/message use or publication.
+
+## Persistent Claude acceptance reviewer
+
+`repo-harness claude-review round/status/close/cancel` owns one reviewer session
+per canonical task contract and worktree. Both host profiles require usable
+tmux in readiness. A dedicated `repo-harness-review` tmux server hosts a readable
+activity pane and one persistent Claude stream-json child; it does not parse a
+terminal screen or change user tmux configuration.
+
+The existing acceptance context owns contract/goal identity, current Git subject,
+target revision and prepared verification fingerprint. Each numbered request
+freezes these values. The provider returns a closed structured result with exact
+round/session/context identities, verdict and stable finding IDs. Host validation
+and a fresh context fence precede the existing protected `AcceptanceReceipt`
+writer. Raw provider results and receipt associations are transport evidence,
+not another acceptance authority. Review Markdown remains a receipt projection.
+
+Initial session creation consumes existing semantic-review admission. Up to three
+changed-subject repair rounds retain the same PID/session; each prior finding
+must explicitly remain open or become resolved. The read-only provider has only
+Read/Grep/Glob tools, no inherited MCP servers, hooks or skills. Unknown delivery,
+identity loss, timeout, malformed output, stale evidence or concurrent submission
+fails closed without replay or automatic recovery.
+
+After verification passes, explicit `close` checks the current passing receipt
+against the session's final recorded round, shuts down the child and its host,
+and retains evidence. `cancel` permits owned cleanup after failure without
+acceptance. PID/group/start-time/executable and tmux server/session/pane/host
+identity fence operations; a reused pane is never a cleanup target. Run close
+before `contract-worktree finish` removes the workspace. This reviewer does not
+create scheduler Tasks, Claims, Leases or Engineer Bindings; tmux notification
+adapters and the provider-free merge gate keep their existing authority.

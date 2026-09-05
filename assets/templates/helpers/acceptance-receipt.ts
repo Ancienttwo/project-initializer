@@ -1290,7 +1290,7 @@ export function revokeUserWaiverGrant(args: { root: string; authorityHome: strin
   if (existsSync(path)) unlinkSync(path);
 }
 
-async function acceptanceContext(args: {
+export async function acceptanceContext(args: {
   root: string;
   contract: string;
   verification: string;
@@ -1460,6 +1460,14 @@ export async function recordAcceptance(args: {
   actor: string | null;
   summary: string;
   findings: AcceptanceFinding[];
+  /** A provider must bind its opinion to the context it actually reviewed. */
+  expectedContext?: {
+    contract_sha256: string;
+    goal_sha256: string;
+    subject_sha256: string;
+    verification_evidence_sha256: string;
+    target_revision: string;
+  };
   now?: () => Date;
 }): Promise<AcceptanceReceipt> {
   if (args.summary.trim() === '') fail('acceptance summary is required');
@@ -1467,6 +1475,18 @@ export async function recordAcceptance(args: {
     fail('user_waiver must be materialized from a valid UserWaiverGrant');
   }
   const context = await acceptanceContext(args);
+  if (args.expectedContext) {
+    const actual = {
+      contract_sha256: authorityFingerprint(context.contract.content),
+      goal_sha256: authorityFingerprint(context.goal.content),
+      subject_sha256: context.subject.review_subject_sha256,
+      verification_evidence_sha256: context.evidence.fingerprint,
+      target_revision: context.subject.target_rev,
+    };
+    for (const field of Object.keys(actual) as (keyof typeof actual)[]) {
+      if (args.expectedContext[field] !== actual[field]) fail(`reviewed acceptance context is stale: ${field}`);
+    }
+  }
   validateDisposition(context.policy, context.owner, args.disposition, args.reviewer, args.source, args.actor, args.findings);
   const receipt = buildReceipt(
     context,

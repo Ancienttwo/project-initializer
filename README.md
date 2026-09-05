@@ -41,7 +41,7 @@ with a tasks-first agent contract that keeps Claude and Codex aligned.
 
 ### 1. Install the CLI
 
-Prerequisites: a Git working tree and `bun`; macOS/Linux also require `bash`,
+Prerequisites: a Git working tree, `bun`, and usable `tmux` for host readiness; macOS/Linux also require `bash`,
 while Windows requires Git for Windows (including its Bash and `usr/bin`
 tools). `jq` is optional. No Node.js required — the installer uses Bun >=
 1.4.0 as the runtime, installing or upgrading Bun first when needed.
@@ -64,6 +64,10 @@ bun add -g repo-harness              # or install the persistent CLI first
 repo-harness install
 npx -y repo-harness@latest install   # npx fallback; the CLI still runs on Bun
 ```
+
+Install tmux with `brew install tmux` (macOS) or your Linux package manager.
+Persistent Claude review uses POSIX process groups; Windows users run this
+workflow within WSL. Missing tmux blocks host readiness.
 
 ### 2. Bootstrap the host runtime
 

@@ -1,13 +1,13 @@
 # Current Status Snapshot
 
 <!-- generated-by: repo-harness refresh-current-status v1 -->
-<!-- updated_at: 2026-09-06T04:00:26+0800 -->
+<!-- updated_at: 2026-09-06T04:24:03+0800 -->
 <!-- stale_after: 24h -->
 
 > **Status**: ManualClearedWithActiveWork
-> **Updated At**: 2026-09-06T04:00:26+0800
-> **Source Branch**: codex/brc7-local-planning-handoff
-> **Source Commit**: 2a281a13
+> **Updated At**: 2026-09-06T04:24:03+0800
+> **Source Branch**: codex/persistent-claude-review
+> **Source Commit**: 78b37376
 > **Target Branch**: main
 > **Stale After**: 24h
 > **Reason**: archive-workflow
@@ -31,16 +31,18 @@ This file is a tracked mainline snapshot derived from repo artifacts. It is not 
 
 ## Active Work
 
+- linked-worktree-1d61c85c9ea9: plans/plan-20260906-0401-brc8-bounded-worker-acquisition.md
+- linked-worktree-1d61c85c9ea9: active-worktree owner -> self
 - linked-worktree-3f716106ccee: plans/plan-20260906-0233-ci-isolate-discover-tsx.md
 - linked-worktree-3f716106ccee: active-worktree owner -> self
 - linked-worktree-279f22d4e2ce: plans/plan-20260906-0338-context-files-ci-step.md
 - linked-worktree-279f22d4e2ce: active-worktree owner -> self
 - linked-worktree-37f25a48fe33: plans/plan-20260906-0323-context-map-drift-check.md
 - linked-worktree-37f25a48fe33: active-worktree owner -> self
-- linked-worktree-614f5719c922: plans/plan-20260906-0305-persistent-claude-review.md
-- linked-worktree-614f5719c922: active-worktree owner -> self
 - linked-worktree-6f3a8ac79bea: plans/plan-20260906-0257-route-eval-ci-gate.md
 - linked-worktree-6f3a8ac79bea: active-worktree owner -> self
+- linked-worktree-05b33ef995a5: plans/plan-20260906-0415-untrack-current-status.md
+- linked-worktree-05b33ef995a5: active-worktree owner -> self
 ## Active Sprint
 
 - Sprint: (none)
@@ -67,16 +69,16 @@ This file is a tracked mainline snapshot derived from repo artifacts. It is not 
 - Summary: 10 changed/untracked path(s)
 
 ```
- D plans/plan-20260906-0134-brc7-local-planning-handoff.md
- D tasks/contracts/20260906-0134-brc7-local-planning-handoff.contract.md
- D tasks/notes/20260906-0134-brc7-local-planning-handoff.notes.md
- D tasks/reviews/20260906-0134-brc7-local-planning-handoff.review.md
+ D plans/plan-20260906-0305-persistent-claude-review.md
+ D tasks/contracts/20260906-0305-persistent-claude-review.contract.md
+ D tasks/notes/20260906-0305-persistent-claude-review.notes.md
+ D tasks/reviews/20260906-0305-persistent-claude-review.review.md
  M tasks/todos.md
-?? plans/archive/plan-20260906-0134-brc7-local-planning-handoff.md
-?? tasks/archive/contract-20260906-0400-brc7-local-planning-handoff.md
-?? tasks/archive/notes-20260906-0400-brc7-local-planning-handoff.md
-?? tasks/archive/review-20260906-0400-brc7-local-planning-handoff.md
-?? tasks/archive/todo-20260906-0400-brc7-local-planning-handoff.md
+?? plans/archive/plan-20260906-0305-persistent-claude-review.md
+?? tasks/archive/contract-20260906-0423-persistent-claude-review.md
+?? tasks/archive/notes-20260906-0423-persistent-claude-review.md
+?? tasks/archive/review-20260906-0423-persistent-claude-review.md
+?? tasks/archive/todo-20260906-0423-persistent-claude-review.md
 ```
 
 ## Source Artifacts

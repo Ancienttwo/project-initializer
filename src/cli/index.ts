@@ -23,6 +23,7 @@ import { formatDoctor, runDoctor } from './commands/doctor';
 import { buildInitHookCommand, buildSetupCommand, formatInitHook, runInitHook } from './commands/init-hook';
 import { formatMigratePlan, runMigrate } from './commands/migrate';
 import { formatCrossReviewResult, runCrossReviewCommand } from './commands/cross-review';
+import { buildClaudeReviewCommand } from './commands/claude-review';
 import { CROSS_REVIEW_PROVIDER_MODES, type CrossReviewProviderMode } from '../core/review/cross-review';
 import { buildToolsCommand } from './commands/tools';
 import { buildBrainCommand } from './commands/brain';
@@ -838,6 +839,7 @@ export function buildProgram(): Command {
     });
 
   program.addCommand(buildInitHookCommand());
+  program.addCommand(buildClaudeReviewCommand());
   program.addCommand(buildSetupCommand());
 
   program
