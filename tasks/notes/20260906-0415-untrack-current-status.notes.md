@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260906-0415-untrack-current-status.review.md
 > **Last Updated**: 2026-09-06 04:16
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:9b2c19bc8cab96ee74a194751ce09340818598946ca6514cf0f1bdd09b05b315`
+> **Substantive Change SHA256**: `sha256:136e6e4129c26be0344d5dd96e6bec75ca5fcd03487e312434a0a1ed5c48e381`
 
 ## Falsifier Result: FAILED on the first pass, resolved by the parent (decisions 8a/8b)
 
