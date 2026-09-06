@@ -1,11 +1,21 @@
-# Task Review: untrack-current-status
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+> **Outcome**: Superseded
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0257-route-eval-ci-gate.md` => `plans/archive/plan-20260906-0257-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md` => `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md` => `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md` => `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+
+# Task Review: route-eval-ci-gate
 
 > **Status**: Pending
-> **Plan**: plans/plan-20260906-0415-untrack-current-status.md
-> **Contract**: tasks/contracts/20260906-0415-untrack-current-status.contract.md
-> **Notes File**: tasks/notes/20260906-0415-untrack-current-status.notes.md
+> **Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+> **Contract**: tasks/archive/contract-20260906-2248-route-eval-ci-gate.md
+> **Notes File**: tasks/archive/notes-20260906-2248-route-eval-ci-gate.md
 > **Checks File**: .ai/harness/checks/latest.json
-> **Last Updated**: 2026-09-06 04:16
+> **Last Updated**: 2026-09-06 02:57
 > **Recommendation**: fail
 > **Review Rubric Version**: 2
 > **Reviewed Subject SHA256**: pending

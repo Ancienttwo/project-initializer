@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
+> **Outcome**: Superseded
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0233-ci-isolate-discover-tsx.md` => `plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md` => `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md` => `tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md` => `tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md`
+
 # Task Review: ci-isolate-discover-tsx
 
 > **Status**: Complete
-> **Plan**: plans/plan-20260906-0233-ci-isolate-discover-tsx.md
-> **Contract**: tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md
-> **Notes File**: tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md
+> **Plan**: plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
+> **Contract**: tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md
+> **Notes File**: tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-06 02:33
 > **Recommendation**: pass
@@ -17,7 +27,7 @@
 - Verdict: pass
 - Change type: bugfix
 - Intended files changed: `scripts/lib/ci-run-tests.sh`, `tests/check-ci-isolate-aggregation.test.ts`, plus this work package's plan/contract/review/notes and `tasks/todos.md`
-- Actual files changed: `scripts/lib/ci-run-tests.sh`, `tests/check-ci-isolate-aggregation.test.ts`, `plans/plan-20260906-0233-ci-isolate-discover-tsx.md`, `tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md`, `tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md`, `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md`, `tasks/todos.md`
+- Actual files changed: `scripts/lib/ci-run-tests.sh`, `tests/check-ci-isolate-aggregation.test.ts`, `plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md`, `tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md`, `tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md`, `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`, `tasks/todos.md`
 - Commands passed: `bun test --timeout 60000 tests/check-ci-isolate-aggregation.test.ts tests/bootstrap-files.test.ts` (18 pass / 0 fail); `verify-contract --strict` (total=22 failed=0); the six repository-integrity checks (all exit 0); CI-mode `check-task-sync` bound `sha256:ce746420...`; `bun run check:helpers` OK; one full `bun test --timeout 60000` (4467 pass / 4 skip / 0 fail across 361 files); `git merge-tree` clean against main 29b3fd12
 - Residual risks: the CI `Test` job now runs three additional `tests/operator-web/*.test.tsx` suites, so the job gets longer and any pre-existing failure there surfaces as a new CI red
 - Reviewer action required: inspect diff and card
@@ -26,7 +36,7 @@
 ## Mode Evidence
 
 - Selected route: planning -> contract execution in an isolated worktree
-- P1/P2/P3 evidence: `plans/plan-20260906-0233-ci-isolate-discover-tsx.md` `## Captured Planning Output`
+- P1/P2/P3 evidence: `plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md` `## Captured Planning Output`
 - Root cause or plan evidence: `scripts/lib/ci-run-tests.sh:44` discovered only `-name '*.test.ts'`; pre-fix capture in `.ai/harness/evidence/pre-fix/check-ci-isolate-discover-tsx.log` (`PRE_FIX_EXIT=1`, missing `[ci] test tests/b.test.tsx`)
 
 ## Verification Evidence
@@ -35,7 +45,7 @@
 - Commands run: guard + `tests/bootstrap-files.test.ts` (18/18); discovery readback (`361` files with the widened predicate against `358` for the old one, including the three `tests/operator-web/*.test.tsx` paths); a bash 3.2 runtime probe of the isolate loop printing both the `.test.ts` and the `.test.tsx` line; `bun run check:helpers`; `check-deploy-sql-order`, `check-architecture-sync`, `check-task-sync`, `check-task-workflow --strict`, `inspect-project-state`, `init --dry-run`; CI-mode `check-task-sync` bound `sha256:ce746420...`; `verify-contract --strict` (22/22); one full `bun test --timeout 60000` (4467 pass / 4 skip / 0 fail across 361 files); `git merge-tree` clean against main 29b3fd12
 - Manual checks: no packaged mirror of `scripts/lib/ci-run-tests.sh` exists (`check:helpers` OK, repo-wide `run_bun_tests` scan finds only the lib and `scripts/check-ci.sh`)
 - Supporting artifacts: `/tmp/rh-tb/tsx/full.log`, `/tmp/rh-tb/tsx/discovered.txt`, `.ai/harness/evidence/pre-fix/check-ci-isolate-discover-tsx.log`
-- Implementation notes reviewed: `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md`
+- Implementation notes reviewed: `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`
 - Run snapshot: `.ai/harness/runs/`
 
 ## Acceptance Receipt Projection

@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
+> **Outcome**: Superseded
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0233-ci-isolate-discover-tsx.md` => `plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md` => `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md` => `tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md` => `tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md`
+
 # Implementation Notes: ci-isolate-discover-tsx
 
 > **Status**: Active
-> **Plan**: plans/plan-20260906-0233-ci-isolate-discover-tsx.md
-> **Contract**: tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md
-> **Review**: tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md
+> **Plan**: plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
+> **Contract**: tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md
+> **Review**: tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md
 > **Last Updated**: 2026-09-06 02:33
 > **Lifecycle**: notes
 

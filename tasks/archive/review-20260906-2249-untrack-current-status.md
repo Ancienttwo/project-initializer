@@ -1,11 +1,21 @@
-# Task Review: context-map-drift-check
+> **Archived**: 2026-09-06 22:49
+> **Related Plan**: plans/archive/plan-20260906-0415-untrack-current-status.md
+> **Outcome**: Superseded
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260906-2249
+> **Archive Projection V1**: `plans/plan-20260906-0415-untrack-current-status.md` => `plans/archive/plan-20260906-0415-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0415-untrack-current-status.notes.md` => `tasks/archive/notes-20260906-2249-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0415-untrack-current-status.contract.md` => `tasks/archive/contract-20260906-2249-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0415-untrack-current-status.review.md` => `tasks/archive/review-20260906-2249-untrack-current-status.md`
+
+# Task Review: untrack-current-status
 
 > **Status**: Pending
-> **Plan**: plans/plan-20260906-0323-context-map-drift-check.md
-> **Contract**: tasks/contracts/20260906-0323-context-map-drift-check.contract.md
-> **Notes File**: tasks/notes/20260906-0323-context-map-drift-check.notes.md
+> **Plan**: plans/archive/plan-20260906-0415-untrack-current-status.md
+> **Contract**: tasks/archive/contract-20260906-2249-untrack-current-status.md
+> **Notes File**: tasks/archive/notes-20260906-2249-untrack-current-status.md
 > **Checks File**: .ai/harness/checks/latest.json
-> **Last Updated**: 2026-09-06 03:23
+> **Last Updated**: 2026-09-06 04:16
 > **Recommendation**: fail
 > **Review Rubric Version**: 2
 > **Reviewed Subject SHA256**: pending
