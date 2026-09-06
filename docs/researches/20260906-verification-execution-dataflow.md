@@ -216,3 +216,9 @@ Receipt matching already binds the complete check fingerprint. Its materialized 
 The first cutover publication `879c9bfd` failed Required CI run `34025058232`. The failures demonstrate that executable authority removal must cover both runtime readers and every producer: disposable fleet/campaign contracts, continuation template installation, skill-evaluation grader contracts, and canonical contract templates. A missing plan remains an error; artifact-only contracts must explicitly declare an empty plan.
 
 The canonical template originally placed prose between the Verification Plan heading and its JSON fence, outside the parser's admitted syntax. Moving the guidance after the JSON restores valid generated contracts without relaxing parsing. A regression parses the actual source template and verifies the installed template is byte-identical. New helper IDs must also appear in the CLI help groups; otherwise the strict inventory equality prevents even `run --help` from rendering.
+
+### Portable fixture runtime authority
+
+CI `34027338609` on `322d7cde` passed every previously failing cutover consumer except two Human Review Card fixtures. Linux Docker with Bun 1.4.0 and Node 24 reproduced both failures: contract verification passed, but review-subject lookup had no hook CLI, so the frozen target revision was empty and Change Assessment failed. Local narrow tests had silently used the globally installed `repo-harness-hook` from PATH. This was independent of the canonical template prose defect.
+
+The two fixtures now explicitly select their copied `src/cli/hook-entry.ts` through `REPO_HARNESS_HOOK_CLI` and assert the resulting target revision equals their own Git main. The same Linux container passed both cases after that change. Fixture validation must name its runtime authority; a populated developer PATH is not evidence that a clean CI environment can resolve the same entrypoint.

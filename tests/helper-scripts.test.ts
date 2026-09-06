@@ -5401,8 +5401,10 @@ describe("Workflow helper scripts", () => {
       initGitRepo(cwd);
       commitAll(cwd, "card profile assessment baseline");
 
-      const res = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd);
-      expect(res.status).toBe(0);
+      const res = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
+        REPO_HARNESS_HOOK_CLI: join(cwd, "src/cli/hook-entry.ts"),
+      });
+      expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
       // EPC-05: emission cannot-binds in this fixture (no
       // scripts/emit-verify-evidence.ts is deployed here), so
       // checks/latest.json is never (re)written -- the identical content
@@ -5410,6 +5412,9 @@ describe("Workflow helper scripts", () => {
       expectChecksLatestAbsent(cwd);
       const checks = latestRunSnapshot(cwd).content;
       expect(checks.review.status).toBe("pass");
+      expect(checks.change_assessment.selection_packet.target_revision).toBe(
+        run("git", ["rev-parse", "main"], cwd).stdout.trim(),
+      );
       expect(checks.review.card).toBeUndefined();
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -5529,8 +5534,10 @@ describe("Workflow helper scripts", () => {
       initGitRepo(cwd);
       commitAll(cwd, "missing card assessment baseline");
 
-      const res = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd);
-      expect(res.status).toBe(0);
+      const res = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
+        REPO_HARNESS_HOOK_CLI: join(cwd, "src/cli/hook-entry.ts"),
+      });
+      expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
       // EPC-05: emission cannot-binds in this fixture (no
       // scripts/emit-verify-evidence.ts is deployed here), so
       // checks/latest.json is never (re)written -- the identical content
@@ -5538,6 +5545,9 @@ describe("Workflow helper scripts", () => {
       expectChecksLatestAbsent(cwd);
       const checks = latestRunSnapshot(cwd).content;
       expect(checks.review.status).toBe("pass");
+      expect(checks.change_assessment.selection_packet.target_revision).toBe(
+        run("git", ["rev-parse", "main"], cwd).stdout.trim(),
+      );
       expect(checks.review.card).toBeUndefined();
     } finally {
       rmSync(cwd, { recursive: true, force: true });
