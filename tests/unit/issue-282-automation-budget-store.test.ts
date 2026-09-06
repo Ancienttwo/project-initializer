@@ -5,7 +5,7 @@
  * and its usage append, and revision invalidation -- is a filesystem-ordering
  * hazard that a fake filesystem would prove nothing about.
  */
-import { afterAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
@@ -55,10 +55,9 @@ import {
   listStoredProgramAuthorizations,
   mintProgramAuthorization,
 } from '../../src/effects/automation/grant-store';
-import { __setAutomationClockForTests } from '../../src/effects/automation/budget-store.internal';
+import { __resetAutomationClockForTests, __setAutomationClockForTests } from '../../src/effects/automation/budget-store.internal';
 
 const hex = (seed: string): string => createHash('sha256').update(seed, 'utf8').digest('hex');
-process.env.REPO_HARNESS_TEST_CLOCK_SEAM = '1';
 /**
  * The store owns the clock, so a fixture cannot pass a time in beside an
  * operation; it installs one through the closed test seam instead. The default
@@ -67,11 +66,6 @@ process.env.REPO_HARNESS_TEST_CLOCK_SEAM = '1';
  */
 let fixtureClockMs = Date.parse('2026-09-03T00:00:01.000Z');
 let fixtureAutoAdvance = true;
-__setAutomationClockForTests(() => {
-  const value = new Date(fixtureClockMs);
-  if (fixtureAutoAdvance) fixtureClockMs += 1_000;
-  return value;
-});
 const at = (iso: string): void => { fixtureClockMs = Date.parse(iso); fixtureAutoAdvance = false; };
 const resumeAutoClock = (): void => { fixtureAutoAdvance = true; };
 
@@ -79,7 +73,19 @@ const FIXTURES = new Set<string>();
 // The grant store is account-level, so every fixture gets its own harness home
 // outside the repository; a shared one would leak grants between fixtures.
 const FIXTURE_HOME = realpathSync(mkdtempSync(join(tmpdir(), 'automation-budget-home-')));
-process.env.REPO_HARNESS_HOME = FIXTURE_HOME;
+let previousHome: string | undefined;
+let previousClockSeam: string | undefined;
+beforeAll(() => {
+  previousHome = process.env.REPO_HARNESS_HOME;
+  previousClockSeam = process.env.REPO_HARNESS_TEST_CLOCK_SEAM;
+  process.env.REPO_HARNESS_HOME = FIXTURE_HOME;
+  process.env.REPO_HARNESS_TEST_CLOCK_SEAM = '1';
+  __setAutomationClockForTests(() => {
+    const value = new Date(fixtureClockMs);
+    if (fixtureAutoAdvance) fixtureClockMs += 1_000;
+    return value;
+  });
+});
 
 /** Grants are operator-minted; a fixture mints before it publishes. */
 function mintFor(repo: string, budget: AutomationBudgetV1): void {
@@ -92,6 +98,11 @@ function publishBudget(repo: string, budget: AutomationBudgetV1): AutomationBudg
 }
 
 afterAll(() => {
+  __resetAutomationClockForTests();
+  if (previousHome === undefined) delete process.env.REPO_HARNESS_HOME;
+  else process.env.REPO_HARNESS_HOME = previousHome;
+  if (previousClockSeam === undefined) delete process.env.REPO_HARNESS_TEST_CLOCK_SEAM;
+  else process.env.REPO_HARNESS_TEST_CLOCK_SEAM = previousClockSeam;
   for (const dir of [...FIXTURES, FIXTURE_HOME]) rmSync(dir, { recursive: true, force: true });
 });
 

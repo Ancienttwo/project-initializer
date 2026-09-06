@@ -65,6 +65,7 @@ export interface StartIssueBatchAuthoringInput {
   readonly env?: NodeJS.ProcessEnv;
   readonly dry_run?: boolean;
   readonly gitleaks_bin?: string;
+  readonly step_admission_sha256?: string | null;
 }
 
 export interface ContinueIssueBatchAuthoringInput extends StartIssueBatchAuthoringInput {
@@ -167,6 +168,7 @@ function prepareBudgetedAuthoring<Result extends IssueAuthoringBrowserResult>(
       repo_root: input.repo_root, automation_run_id: status.budget.automation_run_id,
       expected_budget_sha256: status.budget.budget_sha256, campaign_id: intent.campaign_id,
       group_number: intent.group_number as 1 | 2 | 3, intent_sha256: intent.intent_sha256,
+      step_admission_sha256: input.step_admission_sha256 ?? null,
       operation, idempotency_key: automationDigest({ intent_sha256: intent.intent_sha256, operation, prompt, source_session_ref: sourceSessionRef }), env: input.env,
     });
   })();

@@ -244,6 +244,10 @@ interface ProgramAuthorizationCampaignV1 {
   issues_per_group: number;
   allowed_issue_kinds: readonly ["bugfix", "test_gap"];
   max_parallel_tasks: 1 | 2 | 3;
+  max_authoring_rounds_per_group: number;
+  max_controller_steps: number;
+  max_provider_calls: number;
+  chrome_profile_directory: string;
   issue_author: "gpt_pro";
   local_parent_host: "claude" | "codex";
   require_fresh_main_audit: true;

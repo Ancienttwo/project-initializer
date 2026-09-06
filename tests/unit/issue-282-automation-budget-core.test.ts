@@ -196,6 +196,7 @@ describe('issue #282 — schema and digest binding', () => {
         group_number: 1,
         intent_sha256: `sha256:${'c'.repeat(64)}`,
         operation: 'initial',
+      step_admission_sha256: null,
       },
       step_index: 1,
       reserved: generic.reserved,

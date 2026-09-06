@@ -9,7 +9,7 @@ import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { sealProgramAuthorization, type ProgramBudgetLimitV1 } from '../../src/core/automation/budget';
+import { sealProgramAuthorization, type ProgramAuthorizationCampaignV1, type ProgramBudgetLimitV1 } from '../../src/core/automation/budget';
 
 const ROOT = join(import.meta.dir, '..', '..');
 const PRD = join(ROOT, 'plans/prds/20260828-2321-guarded-merge-unattended-automation.prd.md');
@@ -64,6 +64,16 @@ describe('issue #282 — the PRD schema and the implemented type cannot drift', 
       expires_at: '2026-09-04T00:00:00.000Z',
     })).sort();
     expect([...prdInterfaceFields(markdown, 'ProgramAuthorizationV1')].sort()).toEqual(implemented);
+  });
+
+  test('campaign payload declares exactly the implemented required key set', () => {
+    const campaign: ProgramAuthorizationCampaignV1 = {
+      campaign_id: 'campaign-schema', group_count: 1, issues_per_group: 10,
+      allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 1,
+      max_authoring_rounds_per_group: 3, max_controller_steps: 8, max_provider_calls: 16,
+      issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Default', require_fresh_main_audit: true,
+    };
+    expect([...prdInterfaceFields(markdown, 'ProgramAuthorizationCampaignV1')].sort()).toEqual(Object.keys(campaign).sort());
   });
 
   test('ProgramBudgetLimitV1 declares exactly the implemented key set', () => {

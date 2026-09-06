@@ -76,7 +76,7 @@ function authorization(rounds = 2, runnerInvocations = 8): ProgramAuthorizationV
       issues_per_group: 10,
       allowed_issue_kinds: ['bugfix', 'test_gap'],
       max_parallel_tasks: 3,
-      max_authoring_rounds_per_group: rounds,
+      max_authoring_rounds_per_group: rounds, max_controller_steps: 100, max_provider_calls: 100,
       issue_author: 'gpt_pro',
       local_parent_host: 'codex',
       chrome_profile_directory: 'Profile-1',

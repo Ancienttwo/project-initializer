@@ -28,6 +28,22 @@ import { createHash } from 'crypto';
 import { basename, dirname, join, relative, resolve, sep } from 'path';
 
 import {
+  AUTOMATION_USAGE_EVENT_KIND,
+  CAMPAIGN_STEP_ADMISSION_KIND,
+  CAMPAIGN_STEP_COMPLETION_KIND,
+  campaignBudgetStepKey,
+  validateCampaignBudgetStepIdentity,
+  validateCampaignBudgetStepEvent,
+  validateAutomationLedgerEvent,
+  sealCampaignBudgetStepEvent,
+  foldCampaignBudgetLedger,
+  isCampaignAuthoringOperation,
+  type AutomationLedgerEventV1,
+  type CampaignBudgetStepIdentityV1,
+  type CampaignBudgetStepAdmissionV1,
+  type CampaignBudgetStepCompletionV1,
+  type CampaignBudgetStepEventV1,
+  type CampaignBudgetLedgerV1,
   AUTOMATION_ENFORCEMENT_ORDER,
   AUTOMATION_LEDGER_GENESIS,
   AUTOMATION_METRIC_LIMIT_FIELDS,
@@ -212,11 +228,11 @@ export const AUTOMATION_RECORD_KINDS: readonly AutomationRecordKindV1[] = Object
     counted: true,
   }),
   Object.freeze({
-    id: 'usage-event',
+    id: 'ledger-event',
     relative_path: 'events',
     scope: 'run' as const,
     role: 'durable' as const,
-    write_order: 'published after any reconciliation decision and before current.json',
+    write_order: 'usage follows its reservation/reconciliation; campaign step admission/completion are local charges/outcomes; every event is published before current.json',
     drift_faces: Object.freeze(['unfolded_event'] as const),
     counted: true,
   }),
@@ -749,7 +765,7 @@ function readAutomationBudgetStatusAt(repoRoot: string, runId: string, now: stri
     fail('automation_budget_store_invalid', 'automation stop receipt does not match the current projection');
   }
   const drift = detectAutomationCurrentDrift(paths, budget, current, now);
-  const derived = drift === 'none' ? null : deriveCurrentFromDurableRecords(paths, current, receipt, now);
+  const derived = drift === 'none' ? null : deriveCurrentFromDurableRecords(paths, budget, current, receipt, now);
   return Object.freeze({
     budget,
     current: derived === null ? current : derived.current,
@@ -792,6 +808,52 @@ function jsonEntries(directory: string): readonly string[] {
   }
 }
 
+function campaignStepEventPath(paths: RunPaths, event: CampaignBudgetStepEventV1): string {
+  return join(paths.events, `step-${campaignBudgetStepKey(event)}-${event.kind === CAMPAIGN_STEP_ADMISSION_KIND ? 'admission' : 'completion'}.json`);
+}
+
+function readLedgerEvents(paths: RunPaths): readonly AutomationLedgerEventV1[] {
+  return jsonEntries(paths.events).map(entry => {
+    const event = parse(readRaw(join(paths.events, entry), 'automation ledger event'), validateAutomationLedgerEvent, 'automation ledger event');
+    const expected = event.kind === AUTOMATION_USAGE_EVENT_KIND
+      ? join(paths.events, `${event.reservation_sha256}.json`) : campaignStepEventPath(paths, event);
+    if (join(paths.events, entry) !== expected) fail('automation_budget_store_invalid', 'automation ledger event filename does not bind its identity');
+    return event;
+  }).sort((a, b) => a.step_index - b.step_index);
+}
+
+function readLedgerReservations(paths: RunPaths): readonly AutomationBudgetReservationV1[] {
+  return jsonEntries(paths.reservations).map(entry => parse(readRaw(join(paths.reservations, entry), 'automation reservation'), validateAutomationReservation, 'automation reservation'));
+}
+
+function campaignLedger(paths: RunPaths, budget: AutomationBudgetV1): CampaignBudgetLedgerV1 {
+  return foldStoredCampaignLedger(paths, budget, readLedgerEvents(paths), readLedgerReservations(paths));
+}
+
+function foldStoredCampaignLedger(
+  paths: RunPaths, budget: AutomationBudgetV1,
+  events: readonly AutomationLedgerEventV1[], reservations: readonly AutomationBudgetReservationV1[],
+): CampaignBudgetLedgerV1 {
+  // Completed steps survive revisions, but a sealed record alone cannot grant
+  // authority: only the current budget and its published ancestors may appear.
+  const remaining = new Set(events.filter(event => event.kind !== AUTOMATION_USAGE_EVENT_KIND).map(event => event.budget_sha256));
+  let revision = budget;
+  remaining.delete(revision.budget_sha256);
+  while (remaining.size > 0 && revision.supersedes_sha256 !== null) {
+    const digest = revision.supersedes_sha256;
+    const previous = parse(readRaw(join(paths.budgets, `${digest}.json`), 'campaign budget ancestor'), validateAutomationBudget, 'campaign budget ancestor');
+    if (previous.budget_sha256 !== digest || previous.automation_run_id !== budget.automation_run_id
+      || previous.authorization.authorization_sha256 !== budget.authorization.authorization_sha256
+      || previous.revision !== revision.revision - 1) {
+      fail('automation_budget_store_invalid', 'campaign step budget ancestry is invalid');
+    }
+    remaining.delete(previous.budget_sha256);
+    revision = previous;
+  }
+  if (remaining.size > 0) fail('automation_budget_store_invalid', 'campaign step budget is not a published ancestor');
+  return foldCampaignBudgetLedger(budget, events, reservations);
+}
+
 /**
  * Which durable record the stored projection has not adopted -- and, crucially,
  * in which direction the two disagree.
@@ -814,7 +876,16 @@ export function detectAutomationCurrentDrift(
 ): AutomationCurrentDrift {
   // The healthy path is exactly two directory listings plus one stat and parse
   // per open reservation, of which there is at most one.
-  const events = jsonEntries(paths.events).length;
+  const eventNames = jsonEntries(paths.events);
+  const events = eventNames.length;
+  const usageNames = eventNames.filter(entry => !entry.startsWith('step-'));
+  if (budget.authorization.campaign !== null) {
+    const records = readLedgerEvents(paths);
+    foldStoredCampaignLedger(paths, budget, records, readLedgerReservations(paths));
+    let prefix = AUTOMATION_LEDGER_GENESIS;
+    for (const event of records.slice(0, current.event_count)) prefix = chainAutomationLedgerDigest(prefix, event.event_sha256);
+    if (records.length >= current.event_count && prefix !== current.ledger_sha256) fail('automation_budget_store_invalid', 'campaign ledger contradicts the stored durable prefix');
+  } else if (usageNames.length !== events) fail('automation_budget_store_invalid', 'generic ledger cannot contain campaign step events');
   const reservations = jsonEntries(paths.reservations).length;
   if (events < current.event_count) {
     fail(
@@ -827,7 +898,7 @@ export function detectAutomationCurrentDrift(
   // fewer reservation files than events. The projection's own open list is not
   // added here: in the unfolded-event window the same reservation is still
   // listed open while its event already exists, which is one file, not two.
-  if (reservations < events) {
+  if (reservations < usageNames.length) {
     fail(
       'automation_budget_store_invalid',
       `automation ledger is missing reservations: ${events} usage events are on disk but only ${reservations} reservations are`,
@@ -839,7 +910,7 @@ export function detectAutomationCurrentDrift(
   // each one is resolved through the by-digest index -- one `existsSync` per
   // event against a known path, never a re-listing of `reservations/` -- and a
   // charge whose reservation is gone is corruption.
-  for (const entry of jsonEntries(paths.events)) {
+  for (const entry of usageNames) {
     const digest = entry.replace(/\.json$/u, '');
     if (!existsSync(join(paths.reservationsByDigest, `${digest}.json`))) {
       fail('automation_budget_store_invalid', `automation ledger is missing the reservation ${digest} that a usage event charges`);
@@ -864,7 +935,7 @@ export function detectAutomationCurrentDrift(
   // writing it and renaming the projection is invisible here.
   if (current.stop_receipt_sha256 === null && existsSync(paths.stopReceipt)) return 'unadopted_stop_receipt';
   if (events > current.event_count) return 'unfolded_event';
-  if (reservations > events + listedOpen) return 'unlisted_reservation';
+  if (reservations > usageNames.length + listedOpen) return 'unlisted_reservation';
   // A reconciliation decision with no charge behind it is the crash window
   // between recording the decision and committing the usage event. The
   // reservation stays open and the run stays in reconciliation until the event
@@ -896,16 +967,16 @@ export function detectAutomationCurrentDrift(
  */
 function deriveCurrentFromDurableRecords(
   paths: RunPaths,
+  budget: AutomationBudgetV1,
   storedCurrent: AutomationBudgetCurrentV1,
   stopReceipt: AutomationStopReceiptV1 | null,
   derivedAt: string,
 ): { readonly current: AutomationBudgetCurrentV1; readonly latest_record_at: string | null } {
-  const events = jsonEntries(paths.events)
-    .map((entry) => parse(readRaw(join(paths.events, entry), 'automation usage event'), validateAutomationUsageEvent, 'automation usage event'))
-    .sort((left, right) => left.step_index - right.step_index);
+  const events = readLedgerEvents(paths);
   const reservations = jsonEntries(paths.reservations)
     .map((entry) => parse(readRaw(join(paths.reservations, entry), 'automation reservation'), validateAutomationReservation, 'automation reservation'));
-  const closed = new Set(events.map((event) => event.reservation_sha256));
+  if (budget.authorization.campaign !== null) foldStoredCampaignLedger(paths, budget, events, reservations);
+  const closed = new Set(events.filter((event): event is AutomationUsageEventV1 => event.kind === AUTOMATION_USAGE_EVENT_KIND).map(event => event.reservation_sha256));
   const open = reservations.filter((reservation) => !closed.has(reservation.reservation_sha256));
   // A reconciliation with no event is a decision that has not been charged yet.
   // It does not add consumption -- the event is what spends -- but it does mean
@@ -916,7 +987,7 @@ function deriveCurrentFromDurableRecords(
   if (open.length > 1) {
     fail('automation_budget_store_conflict', 'more than one automation reservation is unresolved; this run cannot be reconciled automatically');
   }
-  const folded = foldAutomationLedger(events);
+  const folded = foldAutomationLedger(events, budget.authorization.campaign !== null);
   let ledger = AUTOMATION_LEDGER_GENESIS;
   for (const event of events) ledger = chainAutomationLedgerDigest(ledger, event.event_sha256);
   const nextStepIndex = folded.last_completed_step_index + 1;
@@ -958,7 +1029,7 @@ function repairCurrentFromDurableRecords(
   status: AutomationBudgetStatusV1,
   repairedAt: string,
 ): AutomationBudgetStatusV1 {
-  const derived = deriveCurrentFromDurableRecords(paths, status.stored_current, status.stop_receipt, repairedAt);
+  const derived = deriveCurrentFromDurableRecords(paths, status.budget, status.stored_current, status.stop_receipt, repairedAt);
   const current = derived.current;
   if (derived.latest_record_at !== null) {
     assertClockNotRegressed(status.stored_current.automation_run_id, status.stored_current.budget_sha256, repairedAt, derived.latest_record_at, 'dispatch');
@@ -1040,12 +1111,29 @@ export function readAutomationBudgetBoardSlice(
   // left behind. `projection_stale` still says the stored projection has not
   // caught up.
   const status = readAutomationBudgetStatusAt(repoRoot, runId, observedAt);
+  let campaign: CampaignBudgetLedgerV1 | null = null;
+  if (status.budget.authorization.campaign !== null) {
+    const paths = runPaths(repoRoot, runId);
+    const events = readLedgerEvents(paths);
+    const reservations = readLedgerReservations(paths);
+    campaign = foldStoredCampaignLedger(paths, status.budget, events, reservations);
+    const ledger = events.reduce((digest, event) => chainAutomationLedgerDigest(digest, event.event_sha256), AUTOMATION_LEDGER_GENESIS);
+    const closed = new Set(events.filter((event): event is AutomationUsageEventV1 => event.kind === AUTOMATION_USAGE_EVENT_KIND).map(event => event.reservation_sha256));
+    const open = reservations.filter(reservation => !closed.has(reservation.reservation_sha256)).map(reservation => reservation.reservation_sha256).sort();
+    // Capture may race a writer. Reject mixed generations rather than report
+    // new campaign metrics alongside an older current digest or held-call set.
+    if (events.length !== status.current.event_count || ledger !== status.current.ledger_sha256
+      || canonicalAutomationJson(open) !== canonicalAutomationJson([...status.current.open_reservation_sha256s].sort())) {
+      fail('automation_budget_store_conflict', 'campaign budget changed during board read; read again');
+    }
+  }
   return projectAutomationBudgetSlice({
     budget: status.budget,
     current: status.current,
     stop_receipt: status.stop_receipt,
     drift: status.drift,
     observed_at: observedAt,
+    campaign_ledger: campaign,
   });
 }
 
@@ -1149,6 +1237,12 @@ export function publishAutomationBudget(input: PublishAutomationBudgetInput): Au
       fail(
         'automation_budget_store_conflict',
         'a budget revision cannot be published while an in-flight operation holds a reservation; append or reconcile it first',
+      );
+    }
+    if (previous.authorization.campaign !== null && campaignLedger(paths, previous).active_step !== null) {
+      fail(
+        'automation_budget_store_conflict',
+        'a budget revision cannot be published with an active campaign step; complete it first',
       );
     }
     const current = sealAutomationBudgetCurrent({
@@ -1381,7 +1475,7 @@ function campaignGroupLedger(
       : [];
   });
   const eventByReservation = new Map(allEvents.map((event) => [event.reservation_sha256, event]));
-  const authoring = groupReservations.filter((reservation) => reservation.campaign_context.operation !== 'challenge');
+  const authoring = groupReservations.filter((reservation) => isCampaignAuthoringOperation(reservation.campaign_context.operation));
   const authoringDigests = new Set(authoring.map((reservation) => reservation.reservation_sha256));
   const authoringEvents = allEvents.filter((event) => authoringDigests.has(event.reservation_sha256));
   let completedRounds = 0;
@@ -1426,7 +1520,7 @@ function validateCampaignReservationAdmission(
     fail('automation_budget_store_conflict', 'a sealed campaign group is bound to a different issue-batch intent');
   }
   const ledger = campaignGroupLedger(paths, context);
-  if (context.operation !== 'challenge') {
+  if (isCampaignAuthoringOperation(context.operation)) {
     if (terminal !== null) fail('automation_budget_refused', 'campaign authoring is permanently sealed for this group');
     if (ledger.completed_rounds + ledger.held_rounds >= campaign.max_authoring_rounds_per_group) {
       fail('automation_budget_refused', 'campaign authoring round limit is exhausted for this group');
@@ -1596,6 +1690,24 @@ function reserveAutomationBudgetAdmission(input: ReservationAdmissionInput): Aut
     const replayed = replay();
     if (replayed !== null) return Object.freeze({ reservation: replayed, disposition: 'replayed' as const });
     const campaignContext = validateCampaignReservationAdmission(paths, status.budget, input);
+    if (status.budget.authorization.campaign !== null) {
+      const ledger = campaignLedger(paths, status.budget);
+      if (campaignContext === null) {
+        if (ledger.active_step !== null) fail('automation_budget_refused', 'generic reservation cannot bypass the active campaign step');
+      } else {
+        const step = ledger.active_step;
+        if (campaignContext.step_admission_sha256 === null) {
+          if (step !== null || input.provider !== 'gpt-pro') fail('automation_budget_refused', 'standalone provider call cannot bypass the active campaign step');
+        } else if (step === null || step.event_sha256 !== campaignContext.step_admission_sha256
+          || step.group_number !== campaignContext.group_number || step.intent_sha256 !== campaignContext.intent_sha256) {
+          fail('automation_budget_refused', 'provider call does not belong to the active campaign step');
+        }
+        const github = campaignContext.operation === 'github_read' || campaignContext.operation === 'github_comment' || campaignContext.operation === 'github_close';
+        if (input.provider !== (github ? 'github' : 'gpt-pro')) fail('automation_budget_store_invalid', 'campaign provider does not match its operation');
+        const limit = status.budget.authorization.campaign.max_provider_calls;
+        if (ledger.provider_calls + ledger.reserved_provider_calls >= limit) campaignLimitRefusal(paths, status, 'provider_calls', limit, ledger.provider_calls, ledger.reserved_provider_calls, effectiveIdempotencyKey, reservedAt);
+      }
+    }
     const commonReservation = {
       automation_run_id: status.budget.automation_run_id,
       budget_sha256: status.budget.budget_sha256,
@@ -1649,6 +1761,145 @@ export function reserveAutomationBudget(input: ReserveAutomationBudgetInput): Ge
     return fail('automation_budget_store_invalid', 'generic admission returned a campaign reservation');
   }
   return admission.reservation;
+}
+
+export interface BeginCampaignBudgetStepInput extends CampaignBudgetStepIdentityV1 {
+  readonly repo_root: string;
+  readonly expected_budget_sha256: string;
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+function assertStepBudgetBinding(input: BeginCampaignBudgetStepInput, status: AutomationBudgetStatusV1): void {
+  const identity = validateCampaignBudgetStepIdentity(input);
+  const campaign = assertCampaignAuthorizationForRun(status.budget.authorization, identity.automation_run_id);
+  if (status.budget.budget_sha256 !== input.expected_budget_sha256) fail('automation_budget_store_conflict', 'campaign step expected budget revision is stale');
+  if (identity.campaign_id !== campaign.campaign_id || identity.group_number > campaign.group_count) fail('automation_budget_store_conflict', 'campaign step does not match its authorization');
+}
+
+function campaignLimitRefusal(
+  paths: RunPaths, status: AutomationBudgetStatusV1, metric: 'controller_steps' | 'provider_calls',
+  limit: number, consumed: number, reserved: number, key: string, now: string,
+): never {
+  const refusal: AutomationBudgetRefusalV1 = Object.freeze({
+    protocol: 1, kind: 'repo-harness-automation-budget-refusal',
+    automation_run_id: status.budget.automation_run_id, budget_sha256: status.budget.budget_sha256,
+    refusal_code: 'budget_limit_exceeded', operation: 'provider_invocation', idempotency_key: key,
+    metric, limit, consumed, reserved, would_consume: consumed + reserved + 1, refused_at: now,
+  });
+  persistStopReceipt(paths, status.budget, status.current, refusal,
+    status.current.open_reservation_sha256s.map(digest => ({ authority_kind: 'reservation', authority_id: digest, recovery: 'normal_recovery_required' })), now);
+  throw new AutomationBudgetStoreError('automation_budget_refused', `campaign ${metric} limit is exhausted`, refusal);
+}
+
+function persistCampaignStepEvent(
+  repoRoot: string, paths: RunPaths, status: AutomationBudgetStatusV1, event: CampaignBudgetStepEventV1,
+): void {
+  if (!writeExclusive(campaignStepEventPath(paths, event), bytes(event), 'campaign budget step event')) {
+    fail('automation_budget_store_conflict', 'campaign budget step event was created concurrently');
+  }
+  // Same repair path as a crash after immutable event publication. A completion
+  // is bookkeeping even when an earlier limit already sealed the stop receipt.
+  repairCurrentFromDurableRecords(repoRoot, paths, status, event.observed_at);
+}
+
+export function beginCampaignBudgetStep(input: BeginCampaignBudgetStepInput): {
+  readonly admission: CampaignBudgetStepAdmissionV1; readonly disposition: 'admitted' | 'replayed';
+} {
+  const repoRoot = resolve(input.repo_root);
+  const identity = validateCampaignBudgetStepIdentity(input);
+  const paths = runPaths(repoRoot, identity.automation_run_id);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    const now = automationStoreNow();
+    const status = lockedStatus(repoRoot, paths, identity.automation_run_id, now, input.env);
+    assertStepBudgetBinding(input, status);
+    const records = readLedgerEvents(paths);
+    const prior = records.find((event): event is CampaignBudgetStepAdmissionV1 => event.kind === CAMPAIGN_STEP_ADMISSION_KIND && campaignBudgetStepKey(event) === campaignBudgetStepKey(identity));
+    if (prior !== undefined) {
+      if (prior.budget_sha256 !== input.expected_budget_sha256) fail('automation_budget_store_conflict', 'campaign step replay names a stale admission');
+      return Object.freeze({ admission: prior, disposition: 'replayed' as const });
+    }
+    const ledger = campaignLedger(paths, status.budget);
+    if (ledger.active_step !== null || status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_refused', 'campaign step reconciliation_required before another admission');
+    if (status.stop_receipt !== null || status.current.state === 'budget_exhausted') fail('automation_budget_refused', 'campaign budget_exhausted before step admission');
+    const campaign = status.budget.authorization.campaign!;
+    if (ledger.controller_steps >= campaign.max_controller_steps) campaignLimitRefusal(paths, status, 'controller_steps', campaign.max_controller_steps, ledger.controller_steps, 0, identity.idempotency_key, now);
+    const event = sealCampaignBudgetStepEvent({
+      ...identity, kind: CAMPAIGN_STEP_ADMISSION_KIND,
+      authorization_id: status.budget.authorization.authorization_id, budget_sha256: status.budget.budget_sha256,
+      step_index: status.current.next_step_index, previous_ledger_sha256: status.current.ledger_sha256, observed_at: now,
+    }) as CampaignBudgetStepAdmissionV1;
+    // Validate the prospective fold before publishing any new authority.
+    foldStoredCampaignLedger(paths, status.budget, [...records, event], readLedgerReservations(paths));
+    persistCampaignStepEvent(repoRoot, paths, status, event);
+    return Object.freeze({ admission: event, disposition: 'admitted' as const });
+  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
+
+export interface CompleteCampaignBudgetStepInput {
+  readonly repo_root: string;
+  readonly admission: CampaignBudgetStepAdmissionV1;
+  readonly outcome: 'progress' | 'no_progress';
+  readonly evidence_refs: readonly AutomationEvidenceRefV1[];
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+export function completeCampaignBudgetStep(input: CompleteCampaignBudgetStepInput): CampaignBudgetStepCompletionV1 {
+  const validated = validateCampaignBudgetStepEvent(input.admission);
+  if (validated.kind !== CAMPAIGN_STEP_ADMISSION_KIND) fail('automation_budget_store_invalid', 'campaign completion requires an admission');
+  const repoRoot = resolve(input.repo_root);
+  const paths = runPaths(repoRoot, validated.automation_run_id);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    const now = automationStoreNow();
+    const status = lockedStatus(repoRoot, paths, validated.automation_run_id, now, input.env);
+    assertStepBudgetBinding({ ...validated, repo_root: repoRoot, expected_budget_sha256: validated.budget_sha256 }, status);
+    const records = readLedgerEvents(paths);
+    const stored = records.find(event => event.event_sha256 === validated.event_sha256);
+    if (stored === undefined || canonicalAutomationJson(stored) !== canonicalAutomationJson(validated)) fail('automation_budget_store_conflict', 'campaign completion admission is not durable');
+    const prior = records.find((event): event is CampaignBudgetStepCompletionV1 => event.kind === CAMPAIGN_STEP_COMPLETION_KIND && event.admission_sha256 === validated.event_sha256);
+    if (prior !== undefined) {
+      if (prior.outcome !== input.outcome || canonicalAutomationJson(prior.evidence_refs) !== canonicalAutomationJson(input.evidence_refs)) fail('automation_budget_store_conflict', 'campaign completion replay changes its outcome or evidence');
+      return prior;
+    }
+    if (status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_refused', 'campaign completion requires external reservation reconciliation');
+    const ledger = campaignLedger(paths, status.budget);
+    if (ledger.active_step?.event_sha256 !== validated.event_sha256) fail('automation_budget_store_conflict', 'campaign admission is not the active step');
+    const event = sealCampaignBudgetStepEvent({
+      ...validateCampaignBudgetStepIdentity(validated), kind: CAMPAIGN_STEP_COMPLETION_KIND,
+      admission_sha256: validated.event_sha256, outcome: input.outcome, evidence_refs: input.evidence_refs,
+      authorization_id: validated.authorization_id, budget_sha256: validated.budget_sha256,
+      step_index: status.current.next_step_index, previous_ledger_sha256: status.current.ledger_sha256, observed_at: now,
+    }) as CampaignBudgetStepCompletionV1;
+    foldStoredCampaignLedger(paths, status.budget, [...records, event], readLedgerReservations(paths));
+    persistCampaignStepEvent(repoRoot, paths, status, event);
+    return event;
+  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
+
+export function readCampaignBudgetLedger(repoRoot: string, runId: string, env: NodeJS.ProcessEnv = process.env): CampaignBudgetLedgerV1 {
+  const status = readAutomationBudgetStatus(repoRoot, runId, env);
+  return campaignLedger(runPaths(repoRoot, runId), status.budget);
+}
+
+export interface ReserveCampaignProviderBudgetInput extends BeginCampaignBudgetStepInput {
+  readonly step_admission_sha256: string;
+  readonly operation: 'github_read' | 'github_comment' | 'github_close';
+  readonly request_sha256: string;
+}
+
+export function reserveCampaignProviderBudget(input: ReserveCampaignProviderBudgetInput): CampaignAuthoringBudgetAdmissionV1 {
+  const admission = reserveAutomationBudgetAdmission({
+    repo_root: input.repo_root, automation_run_id: input.automation_run_id,
+    expected_budget_sha256: input.expected_budget_sha256, idempotency_key: input.idempotency_key,
+    original_idempotency_key: input.idempotency_key, reservation_kind: 'campaign',
+    operation: 'provider_invocation', unit_kind: 'execute', unit_id: `${input.campaign_id}:group:${input.group_number}`,
+    attempt: 1, provider: 'github',
+    campaign_context: { campaign_id: input.campaign_id, group_number: input.group_number,
+      intent_sha256: input.intent_sha256, operation: input.operation,
+      step_admission_sha256: input.step_admission_sha256, request_sha256: input.request_sha256 },
+    env: input.env,
+  });
+  if (admission.reservation.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND) fail('automation_budget_store_invalid', 'campaign provider admission returned a generic reservation');
+  return Object.freeze({ reservation: admission.reservation, disposition: admission.disposition });
 }
 
 export interface EnsureCampaignAuthoringBudgetInput {
@@ -1741,6 +1992,7 @@ export interface ReserveCampaignAuthoringBudgetInput {
   readonly group_number: 1 | 2 | 3;
   readonly intent_sha256: string;
   readonly operation: CampaignAuthoringOperation | 'challenge';
+  readonly step_admission_sha256?: string | null;
   readonly idempotency_key: string;
   readonly env?: NodeJS.ProcessEnv;
 }
@@ -1770,6 +2022,7 @@ export function reserveCampaignAuthoringBudget(
       group_number: input.group_number,
       intent_sha256: input.intent_sha256,
       operation: input.operation,
+      step_admission_sha256: input.step_admission_sha256 ?? null,
     },
     env: input.env,
   });
@@ -1862,6 +2115,7 @@ export function sealCampaignAuthoringBudget(
       group_number: input.group_number,
       intent_sha256: input.intent_sha256,
       operation: 'initial',
+      step_admission_sha256: null,
     });
     const ledger = campaignGroupLedger(paths, context);
     if (ledger.open_provider_invocations !== 0 || ledger.held_rounds !== 0 || ledger.reservations.length !== ledger.events.length) {
@@ -1920,6 +2174,7 @@ export function readCampaignAuthoringBudgetTerminal(
       group_number: input.group_number,
       intent_sha256: input.intent_sha256,
       operation: 'initial',
+      step_admission_sha256: null,
     });
     if (campaign.campaign_id !== context.campaign_id || context.group_number > campaign.group_count) {
       fail('automation_budget_store_conflict', 'campaign terminal binding does not match current authority');
@@ -2050,9 +2305,8 @@ function commitUsage(
     fail('automation_budget_store_conflict', 'automation usage event was created concurrently');
   }
   const consumed = addAutomationMetricVectors(status.current.consumed, event.consumed);
-  const streak = event.outcome === 'progress' || event.outcome === 'completed'
-    ? 0
-    : status.current.consecutive_no_progress_steps + 1;
+  const streak = status.budget.authorization.campaign !== null ? status.current.consecutive_no_progress_steps
+    : event.outcome === 'progress' || event.outcome === 'completed' ? 0 : status.current.consecutive_no_progress_steps + 1;
   const next = sealAutomationBudgetCurrent({
     automation_run_id: status.current.automation_run_id,
     budget_sha256: status.current.budget_sha256,

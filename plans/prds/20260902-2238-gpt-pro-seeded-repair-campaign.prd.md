@@ -163,7 +163,7 @@
 
 - Purpose: 把用户的一句授权冻结成 Host-owned、candidate branch 不可放宽的授权事实。
 - Hard Constraints:
-  - 复用 `ProgramAuthorizationV1`（定义见 guarded-merge PRD）。campaign 特有字段作为它的 **campaign-scoped payload**，不新建顶层协议：`group_count: 1 | 2 | 3`、`issues_per_group`（上限，≤ 10）、`allowed_issue_kinds: ['bugfix', 'test_gap']`、`max_parallel_tasks: 1 | 2 | 3`、`max_authoring_rounds_per_group`（正整数；initial/fill_missing/edit_issue 各计一轮，challenge 仍受全局调用预算约束但不计轮） 、`issue_author: 'gpt_pro'`、`local_parent_host: 'claude' | 'codex'`、`require_fresh_main_audit: true`。
+  - 复用 `ProgramAuthorizationV1`（定义见 guarded-merge PRD）。campaign 特有字段作为它的 **campaign-scoped payload**，不新建顶层协议：`group_count: 1 | 2 | 3`、`issues_per_group`（上限，≤ 10）、`allowed_issue_kinds: ['bugfix', 'test_gap']`、`max_parallel_tasks: 1 | 2 | 3`、`max_authoring_rounds_per_group`（正整数；initial/fill_missing/edit_issue 各计一轮，challenge 仍受全局调用预算约束但不计轮） 、`max_controller_steps`（正整数；同一 step key 入场仅计一次，完成不再次扣款）、`max_provider_calls`（正整数；GPT adapter invocation 或每次 GitHub runner invocation 各计一次，snapshot 按 identity/分页分别预留）、`issue_author: 'gpt_pro'`、`local_parent_host: 'claude' | 'codex'`、`require_fresh_main_audit: true`。
   - `merge_mode` 在 Phase A 恒为 `"manual"`。
   - 授权存于 `REPO_HARNESS_HOME`，不在 candidate branch；prompt 不能派生授权。
 - Recommended Defaults: `group_count = 1`、`max_parallel_tasks = 2`。
