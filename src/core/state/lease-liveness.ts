@@ -104,7 +104,7 @@ export function validateLeaseLivenessPolicy(value: unknown): LeaseLivenessPolicy
   const row = record(value, ['protocol', 'kind', 'renewal_interval_ms', 'maximum_ttl_ms', 'renewal_actor_kind', 'required_evidence_sources', 'unproven_behavior', 'policy_sha256'], 'lease liveness policy');
   if (row.protocol !== LEASE_LIVENESS_PROTOCOL || row.kind !== LEASE_LIVENESS_POLICY_KIND || !Array.isArray(row.required_evidence_sources)) throw new Error('lease liveness policy protocol, kind or sources are invalid');
   const built = buildLeaseLivenessPolicy(row as unknown as Omit<LeaseLivenessPolicyV1, 'protocol' | 'kind' | 'policy_sha256'>);
-  if (JSON.stringify(value) !== JSON.stringify(built)) throw new Error('lease liveness policy is not canonical');
+  if (row.policy_sha256 !== built.policy_sha256) throw new Error('lease liveness policy digest is stale');
   return built;
 }
 

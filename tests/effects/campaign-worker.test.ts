@@ -14,6 +14,7 @@ import { __setAutomationClockForTests, __resetAutomationClockForTests } from '..
 import { canonicalMessageDigest } from '../../src/core/messages/mechanics';
 import { processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
 import type { WorkPackageRetryPolicyV1 } from '../../src/core/engineers/scheduling';
+import { LeaseLivenessStoreError, readLeaseLiveness } from '../../src/effects/state/coordination-lease-liveness-store';
 
 const roots: string[] = [];
 afterEach(() => { roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); });
@@ -25,6 +26,66 @@ async function acquired(requiredReview = false, retryPolicy?: WorkPackageRetryPo
   const handoff = readPlanningRecord<{ acquired: { offer: { work_package_id: string; work_package_revision: string } } }>(f.root, f.intent, canonicalMessageDigest({ dispatch: result.worker_handoff.dispatch_id, part: 'handoff' }).slice(7))!;
   return { ...f, result: { ...result, worker_handoff: result.worker_handoff, envelope: result.envelope }, handoff, worktree: result.envelope.worktree_path };
 }
+
+test('real supervised campaign child renews while alive and persists scoped quiescence', async () => {
+  const f = await acquired();
+  writeFileSync(join(f.worktree, 'selector.json'), JSON.stringify(f.result.worker_handoff));
+  const worker = "sleep 2.3; printf '{\"outcome\":\"completed\",\"evidence_paths\":[\"src/index.ts\"]}' > \"$CONTRACT_RUN_ATTEMPT_RESULT\"";
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../../scripts/contract-run.ts'), 'run', '--repo', f.worktree,
+    '--contract', f.result.envelope.plan.contract_path, '--campaign-handoff', 'selector.json', '--worker-command', worker,
+    '--verifier-command', 'true', '--out', '.ai/harness/renew-test', '--json'], { cwd: f.worktree, env: f.env, stdout: 'pipe', stderr: 'pipe' });
+  const runningOutput = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  let renewedWhileAlive = false;
+  const observationDeadline = Date.now() + 10_000;
+  while (child.exitCode === null && Date.now() < observationDeadline) {
+    try {
+      if (readLeaseLiveness(f.root, f.result.envelope.task_id).renewal.sequence >= 2) { renewedWhileAlive = child.exitCode === null; break; }
+    } catch (error) { if (!(error instanceof LeaseLivenessStoreError) || error.code !== 'liveness_not_found') throw error; }
+    await Bun.sleep(20);
+  }
+  const status = await child.exited; const [stdout, stderr] = await runningOutput;
+  expect(status, stdout + stderr).toBe(0);
+  expect(renewedWhileAlive).toBe(true);
+  const current = readLeaseLiveness(f.root, f.result.envelope.task_id);
+  expect(current.renewal.sequence).toBeGreaterThanOrEqual(4);
+  expect(current.current.lease_generation).toBe(f.result.envelope.generation);
+  const observed = readPlanningRecord<{ observation: { process_group_quiescence: { scope: string; state: string } } }>(f.root, f.intent,
+    canonicalMessageDigest({ dispatch: f.result.worker_handoff.dispatch_id, part: 'child-worker' }).slice(7))!;
+  expect(observed.observation.process_group_quiescence).toEqual(process.platform === 'win32'
+    ? { scope: 'unsupported', state: 'unknown' } : { scope: 'posix_process_group', state: 'quiescent' });
+}, 60_000);
+
+test('lost Lease during a real child cancels supervision and never starts its verifier', async () => {
+  const f = await acquired();
+  writeFileSync(join(f.worktree, 'selector.json'), JSON.stringify(f.result.worker_handoff));
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../../scripts/contract-run.ts'), 'run', '--repo', f.worktree,
+    '--contract', f.result.envelope.plan.contract_path, '--campaign-handoff', 'selector.json', '--worker-command', 'touch started; sleep 20',
+    '--verifier-command', 'touch verifier-started', '--out', '.ai/harness/lost-renew-test', '--json'], { cwd: f.worktree, env: f.env, stdout: 'pipe', stderr: 'pipe' });
+  const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  try {
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(join(f.worktree, 'started')) && Date.now() < deadline) await Bun.sleep(20);
+    expect(existsSync(join(f.worktree, 'started'))).toBe(true);
+    expect(releaseSprintCommand({ claimId: f.result.envelope.claim_id }, processSprintDependencies(f.root)).exitCode).toBe(0);
+    const status = await child.exited; const [stdout, stderr] = await output;
+    expect(status, stdout + stderr).not.toBe(0);
+    expect(stderr + stdout).toContain('renewal failed');
+    expect(existsSync(join(f.worktree, 'verifier-started'))).toBe(false);
+    const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+    expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
+    const observed = readPlanningRecord<{ observation: { renewal_failure: string } }>(f.root, f.intent,
+      canonicalMessageDigest({ dispatch: f.result.worker_handoff.dispatch_id, part: 'child-worker' }).slice(7))!;
+    expect(observed.observation.renewal_failure.length).toBeGreaterThan(0);
+  } finally { if (child.exitCode === null) { child.kill('SIGTERM'); await child.exited; } }
+}, 60_000);
+
+test('historical campaign grant remains readable but cannot acquire without explicit liveness policy', async () => {
+  const f = await readyFixture(false, false, undefined, false); roots.push(f.root, f.home);
+  expect(f.authorization.campaign?.liveness_policy).toBeUndefined();
+  let invoked = false;
+  expect(() => runCampaignAcquisition(f.executeInput, () => { invoked = true; throw new Error('must not acquire'); })).toThrow('explicit controller liveness policy');
+  expect(invoked).toBe(false);
+}, 60_000);
 
 test('real acquired contract worker writes once and binds its explicit result to the existing attempt', async () => {
   const f = await acquired(); const selector = join(f.worktree, 'selector.json');

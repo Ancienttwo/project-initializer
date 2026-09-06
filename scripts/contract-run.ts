@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { createHash } from "crypto";
 
@@ -75,6 +75,8 @@ interface ChildResult {
   stderr_path: string;
   skipped?: boolean;
   timed_out?: boolean;
+  process_group_quiescence?: { scope: 'posix_process_group' | 'unsupported'; state: 'quiescent' | 'active' | 'unknown' };
+  renewal_failure?: string;
 }
 
 // Canonical anti-extras clause injected into every runner-reachable surface (worker
@@ -617,14 +619,15 @@ function runBriefPreflight(markdown: string, repo: string, contractPath: string)
 // "wall_time_minutes exceeded" in the manifest instead of a generic child failure.
 const BOUNDED_RUNNER_TIMEOUT_EXIT_CODE = 124;
 
-function runChild(
+async function runChild(
   role: "worker" | "verifier",
   command: string,
   repo: string,
   runDir: string,
   env: NodeJS.ProcessEnv,
   deadlineMs: number | null,
-): ChildResult {
+  renewal?: { interval_ms: number; renew: () => unknown },
+): Promise<ChildResult> {
   const stdoutPath = join(runDir, `${role}.stdout.log`);
   const stderrPath = join(runDir, `${role}.stderr.log`);
   const childEnv = { ...process.env, ...env, CONTRACT_RUN_ROLE: role };
@@ -636,7 +639,7 @@ function runChild(
     // stream), so stderr_path stays present but empty in this branch.
     const boundedResultPath = join(runDir, `${role}.bounded-result.json`);
     const boundedRunner = join(SCRIPT_DIR, "run-bounded-verifier-command.ts");
-    const wrapper = spawnSync(
+    const wrapper = spawn(
       process.execPath,
       [
         boundedRunner,
@@ -651,20 +654,37 @@ function runChild(
         "-c",
         command,
       ],
-      { cwd: repo, encoding: "utf-8", env: childEnv },
+      { cwd: repo, stdio: "ignore", env: childEnv },
     );
+    let renewalError: unknown = null;
+    const timer = renewal ? setInterval(() => {
+      if (renewalError) return;
+      try { renewal.renew(); }
+      catch (error) { renewalError = error; wrapper.kill("SIGTERM"); }
+    }, renewal.interval_ms) : null;
+    let wrapperExit: number | null;
+    try {
+      wrapperExit = await new Promise<number | null>((resolve, reject) => {
+        wrapper.once("error", reject);
+        wrapper.once("exit", resolve);
+      });
+    } finally { if (timer) clearInterval(timer); }
     if (!existsSync(stdoutPath)) writeFileSync(stdoutPath, "");
     writeFileSync(stderrPath, "");
-    let exitCode: number | null = wrapper.status;
+    let exitCode: number | null = wrapperExit;
     let timedOut = false;
+    let quiescence: ChildResult["process_group_quiescence"] = { scope: "unsupported", state: "unknown" };
     if (existsSync(boundedResultPath)) {
       try {
         const bounded = JSON.parse(readFileSync(boundedResultPath, "utf-8")) as {
           exit_code: number;
           timed_out: boolean;
+          process_group_quiescence?: ChildResult["process_group_quiescence"];
         };
         exitCode = bounded.exit_code;
         timedOut = bounded.timed_out === true;
+        const observed = bounded.process_group_quiescence;
+        if (observed && ["posix_process_group", "unsupported"].includes(observed.scope) && ["quiescent", "active", "unknown"].includes(observed.state)) quiescence = observed;
       } catch {
         // Keep the wrapper's own exit status if the result artifact is unreadable.
       }
@@ -676,6 +696,8 @@ function runChild(
       stdout_path: repoRelative(repo, stdoutPath),
       stderr_path: repoRelative(repo, stderrPath),
       timed_out: timedOut || exitCode === BOUNDED_RUNNER_TIMEOUT_EXIT_CODE,
+      process_group_quiescence: quiescence,
+      ...(renewalError ? { renewal_failure: renewalError instanceof Error ? renewalError.message : String(renewalError) } : {}),
     };
   }
 
@@ -878,13 +900,14 @@ async function buildRun(opts: Options) {
   if (opts.mode === "run" && briefPreflight.ok) {
     if (consume("worker")) {
       campaign?.beforeChild("worker", opts.workerCommand!);
-      const worker = runChild(
+      const worker = await runChild(
         "worker",
         opts.workerCommand!,
         repo,
         runDir,
         { ...baseEnv, CONTRACT_RUN_PROMPT: baseEnv.CONTRACT_RUN_WORKER_PROMPT },
         wallTimeDeadlineMs,
+        campaign?.renewal_interval_ms ? { interval_ms: campaign.renewal_interval_ms, renew: campaign.renew } : undefined,
       );
       children.push(worker);
       campaign?.afterChild(worker);
@@ -895,13 +918,14 @@ async function buildRun(opts: Options) {
     }
     if (status === "pass" && consume("verifier")) {
       campaign?.beforeChild("verifier", opts.verifierCommand!);
-      const verifier = runChild(
+      const verifier = await runChild(
         "verifier",
         opts.verifierCommand!,
         repo,
         runDir,
         { ...baseEnv, CONTRACT_RUN_PROMPT: baseEnv.CONTRACT_RUN_VERIFIER_PROMPT },
         wallTimeDeadlineMs,
+        campaign?.renewal_interval_ms ? { interval_ms: campaign.renewal_interval_ms, renew: campaign.renew } : undefined,
       );
       children.push(verifier);
       campaign?.afterChild(verifier);

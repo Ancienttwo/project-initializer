@@ -24,10 +24,11 @@ import { projectCanonicalTasks } from '../../src/core/state/coordination-identit
 import { resolveRepoIdentity } from '../../src/effects/state/coordination-canonical-source';
 import { claimSprintCommand, processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
 import { readLease, leaseOwnerPath } from '../../src/effects/state/coordination-lease-store';
+import { buildLeaseLivenessPolicy } from '../../src/core/state/lease-liveness';
 
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-export async function readyFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1) {
+export async function readyFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true) {
   const capability = 'capability.runtime-harness.fixture';
   const inventory = readFileSync(join(import.meta.dir, '../fixtures/repair-campaign/protected-capabilities.json'), 'utf8');
   const otherCapability = 'capability.runtime-harness.second';
@@ -37,7 +38,8 @@ export async function readyFixture(twoEngineers = false, requiredReview = false,
     files['src/second/index.ts'] = 'export {};';
     files['.archcontext/model/nodes/second.yaml'] = JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: otherCapability, kind: 'capability', name: 'Second', status: 'active', summary: 'Second fixture capability', responsibilities: ['Own second fixture'], source: { include: ['src/second/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } });
   }
-  const f = await createAdoptionRepository('active', 1, capability, {}, files, { max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}) });
+  const f = await createAdoptionRepository('active', 1, capability, {}, files, { max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
+    ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) });
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {
     const observations = snapshot.observations.map((o, index) => {
