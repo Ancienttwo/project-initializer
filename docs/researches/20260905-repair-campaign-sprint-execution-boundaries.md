@@ -97,3 +97,14 @@ Engineer acquire-next sends exact Task assertions to Fleet, so a full-campaign r
 
 
 BRC8 characterization control: Fleet admission returns an injected claim failure as a typed result. The prompt-is-not-Claim control must assert that result and the exact claim-call trace; exception propagation itself is not ownership authority. Frozen Task/Lease/Acceptance bytes, prompt-negative selection and no-write assertions remain unchanged. BRC8 CI 34022628870 identified this single obsolete control expectation; the complete characterization file is the regression boundary.
+
+
+### BRC9 #287 prerequisite: closed outcomes and mutation-side retry admission
+
+The Task attempt writer must enforce the same retry eligibility that Engineer scheduling observes. Before this prerequisite, a new identity could be persisted after user/permanent blockers or before transient backoff elapsed because `recordTaskAutomationAttemptStart` checked only unfinished attempts and the maximum count. The pre-fix regression captured 11 failures before production edits (`/tmp/brc9-attempt-before.txt`).
+
+The owning core module now supplies one closed outcome tuple to both attempt validation and Engineer offer validation, including non-retryable `not_reproducible`. Unknown outcomes and a `started` completion fail closed. The durable store preserves exact-identity replay, validates the existing WorkPackage retry policy before start/completion writes, and invokes `observeRetryEligibility` under its existing work-package lock before admitting a new identity. Refused writes preserve attempt, identity and current bytes. Existing valid records keep their format and digest calculation.
+
+Development evidence: 16 attempt regressions and 21 controller/acquire-next tests pass; TypeScript passes. Canonical acceptance is recorded in the linked workflow artifacts, not inferred from these development runs. Plan: `plans/plan-20260906-1743-brc9-attempt-prerequisite.md`.
+
+This is only the #287 prerequisite. BRC9 still needs the existing #282 authority to expose the necessary campaign limits and a pre-adoption attempt contract. A Task attempt continues to require real WorkPackage/Claim/Lease/dispatch identity. No campaign counter, authoring Task substitute, new store or lifecycle command was added.

@@ -1,5 +1,5 @@
 import { canonicalEngineerJson, engineerSha256 } from './profile-binding';
-import type { RetryEligibilityObservationV1, TaskAutomationAttemptOutcome } from './automation-attempt';
+import { AUTOMATION_ATTEMPT_OUTCOMES, type RetryEligibilityObservationV1, type TaskAutomationAttemptOutcome } from './automation-attempt';
 
 export const WORK_GRAPH_PROTOCOL = 1 as const;
 export const WORK_GRAPH_KIND = 'repo-harness-work-graph' as const;
@@ -16,7 +16,6 @@ const TASK_ID = /^[0-9a-f]{64}$/u;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SAFE_TOKEN = /^[a-z0-9][a-z0-9._:-]{0,127}$/u;
 const OPAQUE = /^[^\u0000-\u001f\u007f]{1,512}$/u;
-const AUTOMATION_ATTEMPT_OUTCOMES: readonly TaskAutomationAttemptOutcome[] = ['started','completed','user_blocked','external_blocked','transient_failure','permanent_failure','lease_lost','cancelled','reconciliation_required'];
 
 export type WorkGraphLane = 'generic-v1' | 'engineering-v2';
 export type WorkPackageDependencyState =

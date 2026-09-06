@@ -2,7 +2,11 @@ import { canonicalEngineerJson, engineerSha256 } from './profile-binding';
 import type { AutomationFailureClass, WorkPackageRetryPolicyV1 } from './scheduling';
 
 export const AUTOMATION_ATTEMPT_PROTOCOL = 1 as const;
-export type TaskAutomationAttemptOutcome = 'started' | 'completed' | 'user_blocked' | 'external_blocked' | 'transient_failure' | 'permanent_failure' | 'lease_lost' | 'cancelled' | 'reconciliation_required';
+export const AUTOMATION_ATTEMPT_OUTCOMES = Object.freeze([
+  'started', 'completed', 'not_reproducible', 'user_blocked', 'external_blocked',
+  'transient_failure', 'permanent_failure', 'lease_lost', 'cancelled', 'reconciliation_required',
+] as const);
+export type TaskAutomationAttemptOutcome = typeof AUTOMATION_ATTEMPT_OUTCOMES[number];
 export interface TaskAutomationAttemptV1 {
   readonly protocol: 1; readonly kind: 'repo-harness-task-automation-attempt';
   readonly repository_id: string; readonly sprint_path: string; readonly task_id: string; readonly task_revision: string;
@@ -28,6 +32,7 @@ function exact(value: Record<string, unknown>, keys: readonly string[], label: s
 export function attemptIdentity(input: Pick<TaskAutomationAttemptV1, 'claim_id' | 'lease_generation' | 'controller_run_id' | 'dispatch_id'>): string { return digest({ claim_id: input.claim_id, lease_generation: input.lease_generation, controller_run_id: input.controller_run_id, dispatch_id: input.dispatch_id }); }
 
 export function buildTaskAutomationAttempt(input: Omit<TaskAutomationAttemptV1, 'protocol' | 'kind' | 'attempt_sha256'>): TaskAutomationAttemptV1 {
+  if (!AUTOMATION_ATTEMPT_OUTCOMES.includes(input.outcome)) throw new Error('attempt outcome is invalid');
   positive(input.sequence, 'sequence'); positive(input.lease_generation, 'lease_generation'); positive(input.binding_generation, 'binding_generation'); iso(input.started_at, 'started_at');
   if (input.outcome === 'started' ? input.ended_at !== null || input.evidence_refs.length !== 0 : input.ended_at === null || input.evidence_refs.length === 0) throw new Error('attempt outcome, end timestamp and evidence are inconsistent');
   if (input.ended_at !== null && iso(input.ended_at, 'ended_at') < iso(input.started_at, 'started_at')) throw new Error('attempt ended before it started');
@@ -38,6 +43,7 @@ export function buildTaskAutomationAttempt(input: Omit<TaskAutomationAttemptV1, 
   return Object.freeze({ ...basis, attempt_sha256: digest(basis) });
 }
 export function completeTaskAutomationAttempt(start: TaskAutomationAttemptV1, input: { readonly outcome: Exclude<TaskAutomationAttemptOutcome, 'started'>; readonly ended_at: string; readonly runtime_effect_id: string | null; readonly evidence_refs: readonly string[] }): TaskAutomationAttemptV1 {
+  if ((input.outcome as TaskAutomationAttemptOutcome) === 'started') throw new Error('completion outcome cannot be started');
   if (start.outcome !== 'started') throw new Error('only a started attempt can complete');
   const { protocol: _protocol, kind: _kind, attempt_sha256: _attemptSha256, ...basis } = start;
   return buildTaskAutomationAttempt({ ...basis, outcome: input.outcome, ended_at: input.ended_at, runtime_effect_id: input.runtime_effect_id, evidence_refs: input.evidence_refs });
@@ -77,6 +83,7 @@ export function validateTaskAutomationAttemptCurrent(value: unknown): TaskAutoma
   const row = record(value, 'automation attempt current'); exact(row, CURRENT_KEYS, 'automation attempt current');
   if (row.protocol !== AUTOMATION_ATTEMPT_PROTOCOL || row.kind !== 'repo-harness-task-automation-attempt-current') throw new Error('automation attempt current protocol is invalid');
   if (!Number.isSafeInteger(row.attempt_count) || (row.attempt_count as number) < 0) throw new Error('attempt_count is invalid');
+  if (row.last_outcome !== null && !AUTOMATION_ATTEMPT_OUTCOMES.includes(row.last_outcome as TaskAutomationAttemptOutcome)) throw new Error('last_outcome is invalid');
   iso(row.first_eligible_at as string, 'first_eligible_at'); if (row.next_eligible_at !== null) iso(row.next_eligible_at as string, 'next_eligible_at');
   if (row.last_attempt_sha256 !== null) sha(row.last_attempt_sha256 as string, 'last_attempt_sha256');
   const { current_sha256, ...basis } = row; if (current_sha256 !== digest(basis)) throw new Error('automation attempt current digest is stale');
