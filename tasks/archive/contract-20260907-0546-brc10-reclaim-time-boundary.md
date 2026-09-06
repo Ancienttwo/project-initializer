@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-07 05:46
+> **Related Plan**: plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260907-0546
+> **Archive Projection V1**: `plans/plan-20260907-0507-brc10-reclaim-time-boundary.md` => `plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md`
+> **Archive Projection V1**: `tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md` => `tasks/archive/notes-20260907-0546-brc10-reclaim-time-boundary.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-0507-brc10-reclaim-time-boundary.contract.md` => `tasks/archive/contract-20260907-0546-brc10-reclaim-time-boundary.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-0507-brc10-reclaim-time-boundary.review.md` => `tasks/archive/review-20260907-0546-brc10-reclaim-time-boundary.md`
+
 # Task Contract: brc10-reclaim-time-boundary
 
-> **Status**: Active
-> **Plan**: plans/plan-20260907-0507-brc10-reclaim-time-boundary.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-07 05:07
-> **Review File**: `tasks/reviews/20260907-0507-brc10-reclaim-time-boundary.review.md`
-> **Notes File**: `tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md`
+> **Review File**: `tasks/archive/review-20260907-0546-brc10-reclaim-time-boundary.md`
+> **Notes File**: `tasks/archive/notes-20260907-0546-brc10-reclaim-time-boundary.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -44,10 +54,10 @@ A later valid consumption still refuses, or evidence/time/identity drift permits
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260907-0507-brc10-reclaim-time-boundary.md`
+- Source plan: `plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260907-0507-brc10-reclaim-time-boundary.review.md`
-- Notes file: `tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md`
+- Review file: `tasks/archive/review-20260907-0546-brc10-reclaim-time-boundary.md`
+- Notes file: `tasks/archive/notes-20260907-0546-brc10-reclaim-time-boundary.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -73,11 +83,11 @@ allowed_paths:
   - tests/unit/brc10-reclaim-time-boundary.test.ts
   - docs/researches/20260907-brc10-readiness.md
   - docs/architecture/.projection-manifest.json
-  - plans/plan-20260907-0507-brc10-reclaim-time-boundary.md
+  - plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md
   - tasks/todos.md
-  - tasks/contracts/20260907-0507-brc10-reclaim-time-boundary.contract.md
-  - tasks/reviews/20260907-0507-brc10-reclaim-time-boundary.review.md
-  - tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md
+  - tasks/archive/contract-20260907-0546-brc10-reclaim-time-boundary.md
+  - tasks/archive/review-20260907-0546-brc10-reclaim-time-boundary.md
+  - tasks/archive/notes-20260907-0546-brc10-reclaim-time-boundary.md
 ```
 
 ## Evidence Requirements
@@ -133,7 +143,7 @@ exit_criteria:
     - docs/spec.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md
+    - tasks/archive/notes-20260907-0546-brc10-reclaim-time-boundary.md
 ```
 
 ## Verification Plan

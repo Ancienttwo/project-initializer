@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-07 05:46
+> **Related Plan**: plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260907-0546
+> **Archive Projection V1**: `plans/plan-20260907-0507-brc10-reclaim-time-boundary.md` => `plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md`
+> **Archive Projection V1**: `tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md` => `tasks/archive/notes-20260907-0546-brc10-reclaim-time-boundary.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-0507-brc10-reclaim-time-boundary.contract.md` => `tasks/archive/contract-20260907-0546-brc10-reclaim-time-boundary.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-0507-brc10-reclaim-time-boundary.review.md` => `tasks/archive/review-20260907-0546-brc10-reclaim-time-boundary.md`
+
 # Implementation Notes: brc10-reclaim-time-boundary
 
 > **Status**: Active
-> **Plan**: plans/plan-20260907-0507-brc10-reclaim-time-boundary.md
-> **Contract**: tasks/contracts/20260907-0507-brc10-reclaim-time-boundary.contract.md
-> **Review**: tasks/reviews/20260907-0507-brc10-reclaim-time-boundary.review.md
+> **Plan**: plans/archive/plan-20260907-0507-brc10-reclaim-time-boundary.md
+> **Contract**: tasks/archive/contract-20260907-0546-brc10-reclaim-time-boundary.md
+> **Review**: tasks/archive/review-20260907-0546-brc10-reclaim-time-boundary.md
 > **Last Updated**: 2026-09-07 05:07
 > **Lifecycle**: notes
 
