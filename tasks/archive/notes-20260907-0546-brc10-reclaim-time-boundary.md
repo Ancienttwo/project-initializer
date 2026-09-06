@@ -35,3 +35,8 @@ This is an independently reviewable BRC10 prerequisite, not whole-row BRC10 comp
 User explicitly delegated acceptance and PR merge for BRC10–15. Real canary target/profile selection remains pending; this prerequisite has no external mutation other than its authorized PR delivery.
 
 Development checks: new regression plus existing #286 suites pass, 13 tests / 39 assertions. The real-process barrier proves competing consumers see the same receipt and exactly one succeeds.
+# Publication evidence
+
+> **Substantive Change SHA256**: `sha256:975390f95e44ab3987b5d7b18fd75c2f9ea99a1d12d290e58f2ef31a145ba020`
+
+Publication range: merge-base/direct `2b611fc93a9f2ab9e2ac1eec23599aefe1796e08` to the archived prerequisite package. This binding covers the unchanged accepted source and regression; it does not claim whole-BRC10 acceptance.
