@@ -45,3 +45,8 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 - Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
 - Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
 - Promote to harness asset files only after verification across more than one task or fixture.
+
+## Operator-approved verification schema migration
+
+- The verification-execution-lifecycle cutover migrated this Active contract using an explicit mapping, preserving its seven original executable inputs. Type/syntax/helper projections are preflight; behavior checks remain verification. No criterion was executed and no acceptance result is asserted by this migration.
+- Workflow acceptance must use the installed strict runtime: `env -u REPO_HARNESS_SOURCE_ROOT repo-harness run verification-plan validate --repo . --contract tasks/contracts/20260906-0323-context-map-drift-check.contract.md`, then the installed prepare/finish flow. Source-local CLI and direct old helper scripts belong to the older code under development and cannot supply strict acceptance evidence.

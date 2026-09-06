@@ -132,22 +132,7 @@ delegation:
 
 ## Exit Criteria (Machine Verifiable)
 
-Choose the smallest checks that cover the changed behavior. Add a full suite
-only for an explicit release requirement or an observed cross-module coverage
-gap; state that reason and expected cost in Acceptance Notes. Do not duplicate
-coverage between `tests_pass` and `commands_succeed`. Before the first run,
-list eligible deterministic criteria in `criterion_reuse`; eligibility requires
-all inputs to be bound by the frozen subject/toolchain context. Leave external
-or mutable-state criteria ineligible. The canonical acceptance runner owns the
-expensive execution; workers and reviewers consume its evidence.
-
-If a full suite already passed before a bounded follow-up edit, preserve its
-run identity as baseline evidence and choose focused checks for the actual delta.
-The parent revises these criteria and records the baseline plus coverage rationale
-in Acceptance Notes, unless an explicit user/release requirement still requires
-a full run on the new subject. A cache miss alone does not justify another full
-suite; never label the old subject's pass as a full pass for the new subject.
-
+Executable checks are authored only in the canonical `## Verification Plan` JSON block below. Each typed descriptor records its command or package-test path, phase, cost, evidence policy, necessity, and declared inputs. The YAML `exit_criteria` block contains non-executable assertions only; retired `tests_pass`, `commands_succeed`, and `criterion_reuse` lists are not valid authoring surfaces.
 ```yaml
 exit_criteria:
   files_exist:
@@ -156,25 +141,108 @@ exit_criteria:
   artifacts_exist:
     - .ai/harness/checks/latest.json
     - tasks/notes/20260906-0323-context-map-drift-check.notes.md
-  tests_pass:
-    - path: tests/check-context-map.test.ts
-    - path: tests/architecture-event.test.ts
-    - path: tests/hook-contracts.test.ts
-  commands_succeed:
-    - bun run check:context-map
-    - bun run check:helpers
-    - bash -n scripts/check-ci.sh
-    - bun run check:type
-criterion_reuse:
-  tests_pass:
-    - path: tests/check-context-map.test.ts
-    - path: tests/architecture-event.test.ts
-    - path: tests/hook-contracts.test.ts
-  commands_succeed:
-    - bun run check:context-map
-    - bun run check:helpers
-    - bash -n scripts/check-ci.sh
-    - bun run check:type
+```
+
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "context-map",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies context-map validation and repair behavior.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/check-context-map.test.ts"
+    },
+    {
+      "id": "architecture-event",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies architecture-event writer root-path guard behavior.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/architecture-event.test.ts"
+    },
+    {
+      "id": "hook-contracts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies hook contract writer behavior.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/hook-contracts.test.ts"
+    },
+    {
+      "id": "check-context-map",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Runs the context-map invariant check.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bun run check:context-map"
+    },
+    {
+      "id": "helper-check",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Checks distributed helper projections.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bun run check:helpers"
+    },
+    {
+      "id": "check-ci-syntax",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Checks check-ci shell syntax.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bash -n scripts/check-ci.sh"
+    },
+    {
+      "id": "typecheck",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Checks the typed implementation boundary.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bun run check:type"
+    }
+  ]
+}
 ```
 
 ## Acceptance Notes (Human Review)
