@@ -4,7 +4,7 @@ This repository self-hosts the `repo-harness` contract; the former `repo-harness
 
 ## Canonical Workflow Files
 
-- `tasks/current.md` for the tracked current-status snapshot derived from workflow artifacts
+- `tasks/current.md` for the ignored local current-status read model derived from workflow artifacts
 - `tasks/todos.md` for deferred medium/long-term goals, not active execution checklists
 - `plans/prds/` for upper-layer PRDs; `plans/sprints/` for ordered sprint backlogs operated through `repo-harness run sprint-backlog`; task contracts stay the execution slices
 - `.archcontext/model/nodes/*.yaml` for the capability nodes and longest-prefix context boundaries, selected by `.ai/harness/policy.json#context.capability_source`
@@ -133,6 +133,6 @@ explicit requirement for that new subject; a cache miss alone is not a trigger.
 ## Current Session Projection
 
 - Durable progress lives under `tasks/workstreams/runtime-harness/global-runtime-reconciliation`.
-- `tasks/current.md` is the tracked derived status snapshot; it is not a live lock or task source.
+- `tasks/current.md` is the ignored local derived status read model; it is not a live lock or task source.
 - `tasks/todos.md` is the deferred-goal ledger; current execution slices stay in the active plan's `## Task Breakdown`.
 <!-- END ARCHITECTURE CONTRACT -->

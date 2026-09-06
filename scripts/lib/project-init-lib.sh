@@ -55,6 +55,7 @@ PI_DEFAULT_RUNTIME_ENTRIES=$(cat <<'EOF_RUNTIME'
 .claude/*.bak.*
 .claude/*.backup-*
 tasks/.current.md.tmp.*
+tasks/current.md
 .ai/harness/checks/latest.json
 .ai/harness/checks/*.latest.json
 .ai/harness/checks/*.latest.md

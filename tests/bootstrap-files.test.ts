@@ -321,7 +321,10 @@ describe("Bootstrap Script Contracts", () => {
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/capture-plan.sh");
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/refresh-current-status.sh");
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/sync-brain-docs.sh");
-    expect(contract.artifacts.requiredFiles).toContain("tasks/current.md");
+    expect(contract.artifacts.requiredFiles).not.toContain("tasks/current.md");
+    // ignored local read model: same list membership as .ai/harness/handoff/current.md
+    expect(contract.artifacts.runtimeFiles).toContain("tasks/current.md");
+    expect(contract.artifacts.runtimeFiles).toContain(".ai/harness/handoff/current.md");
     expect(contract.artifacts.requiredFiles).not.toContain("scripts/capability-config.ts");
     expect(contract.artifacts.requiredFiles).toContain(".ai/harness/workflow-contract.json");
     expect(contract.artifacts.requiredFiles).not.toContain(".codex/hooks.json");
