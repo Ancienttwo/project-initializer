@@ -32,3 +32,15 @@
 - One semantic review is allowed per work-package. After remediation and final valid evidence, an explicit owner acceptance is required; no second external review or synthetic external_pass is authorized by the parent.
 
 > **Substantive Change SHA256**: `sha256:f0c749d602bc1d28299e4eb7f5184644b4bb392720b1bdbb36abceda684dcb46`
+
+## Publication diff binding
+
+Canonical finish published 5944cf7e95f87d5cba3e6257e704e4947e0fd85f onto 2cf1dd5b8bdd3c5004f9b8fb8c0c0a23f7ff6f57. CI run 34032789645 stopped at task-sync before the Test suite because the archived artifacts lacked the publication diff identity. The same direct-base check reproduced that refusal locally. This annotation binds the exact substantive diff; it changes no production bytes and does not rebind prior verification or acceptance to a new subject. The separate Windows controller assignment timeout is not resolved by this documentation change.
+
+> **Substantive Change SHA256**: `sha256:5e55520e53dcdc1772da1211b0e0cd9ade91a18524cdd3d38df136cd05b8687e`
+
+## Protected inventory consumer correction
+
+CI run 34033421338 on 55be427a passed all MCP platforms but exposed the BRC0 inventory closure omission: the two new artifact-repair modules were absent from the state-directory inventory. The characterization suite reproduced the failure before the fixture change. Both modules issue or validate contract-only repair admission, so the correction lists them as protected unmapped surfaces, not exemptions. The closure and campaign planning/acquisition consumers verify this bounded correction; no production implementation or dependency changes are involved. The earlier Windows timeout did not recur in that run, which does not establish its root cause.
+
+Validation: the three named characterization/planning/acquisition suites pass with the repository's 60-second per-test timeout (67 pass, 0 fail, 799 assertions). An initial run using Bun's default 5-second timeout exhausted six acquisition tests; the successful run exercised those same tests in 7-18 seconds. All six required repository-integrity checks and diff hygiene pass. No local full suite was repeated; required CI remains the final integration gate.

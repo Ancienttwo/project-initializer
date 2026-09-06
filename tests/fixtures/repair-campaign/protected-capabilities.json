@@ -1,7 +1,7 @@
 {
   "protocol": 1,
   "kind": "repo-harness-repair-campaign-protected-capabilities",
-  "source": "plans/prds/20260902-2238-gpt-pro-seeded-repair-campaign.prd.md#module-1--campaign-授权与-policy",
+  "source": "plans/prds/20260902-2238-gpt-pro-seeded-repair-campaign.prd.md#module-1--campaign-\u6388\u6743\u4e0e-policy",
   "rule": "A repair campaign may open an Issue and author a Plan against a protected surface, but it must never route that surface into automated planning, acquisition, execution, publication or closure. Protection is checked before dispatch, and a hit is a hard stop, never a warning.",
   "capabilities": [
     {
@@ -71,6 +71,14 @@
         "scripts/acceptance-receipt.ts"
       ],
       "reason": "The protected helper that mints AcceptanceReceipt bytes. src/cli/runtime/helper-runner.ts already lists it in PROTECTED_HELPERS, but no capability include glob owns the file."
+    },
+    {
+      "surface": "Artifact repair admission authority",
+      "paths": [
+        "src/core/state/artifact-repair.ts",
+        "src/effects/state/artifact-repair-store.ts"
+      ],
+      "reason": "Validates and issues the receipt that permits contract-only repair after invalid verification artifacts. A campaign must not automate edits to its own repair admission authority; no capability include glob currently owns these files."
     }
   ],
   "unmapped_closure": {
