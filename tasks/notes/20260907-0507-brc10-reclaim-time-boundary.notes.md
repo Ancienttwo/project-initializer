@@ -20,6 +20,8 @@ The input receipt is historical evidence; its observation timestamp must stay im
 
 ## Acceptance boundary
 
-This is an independently reviewable BRC10 prerequisite, not whole-row BRC10 completion. Product implementation waits for BRC9 final CI handoff. Later campaign wiring must establish actual liveness policy and process quiescence authority; command exit, PID or prompt identity is not proof that descendants stopped.
+This is an independently reviewable BRC10 prerequisite, not whole-row BRC10 completion. BRC9 final CI 34059698519 passed on 2b611fc9 before this product correction. Later campaign wiring must establish actual liveness policy and process quiescence authority; command exit, PID or prompt identity is not proof that descendants stopped.
 
 User explicitly delegated acceptance and PR merge for BRC10–15. Real canary target/profile selection remains pending; this prerequisite has no external mutation other than its authorized PR delivery.
+
+Development checks: new regression plus existing #286 suites pass, 13 tests / 39 assertions. The real-process barrier proves competing consumers see the same receipt and exactly one succeeds.

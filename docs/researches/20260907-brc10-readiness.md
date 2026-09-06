@@ -1,13 +1,13 @@
 # BRC10 readiness and prerequisite boundary
 
-Status: discovery complete for the #286 substrate; campaign execution remains blocked by Sprint BRC9. Observed base: `484c529a` on 2026-09-07. This is a readiness assessment, not an approved execution contract or a completion claim. The owning Sprint is `plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md`, rows 11–12 and Execution Dependencies Requiring Resolution.
+Status: BRC9 publication `2b611fc9` passed CI 34059698519. BRC10 remains incomplete; its first prerequisite fixes reclaim receipt consumption across observation time. This document does not claim full campaign lifecycle acceptance. The owning Sprint is `plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md`, rows 11–12 and Execution Dependencies Requiring Resolution.
 
 ## P1 — Existing authority and ownership
 
 - `src/effects/state/coordination-lease-liveness-store.ts:54` owns generation-bound renewal under the existing Task lock, immutable renewal records and current projection. Its current production caller is the generic automation `controller-run.ts`; campaign code does not call it.
 - `src/core/state/lease-liveness.ts:169` classifies current liveness. Expiry alone cannot authorize reclaim; unknown evidence requires operator attention, active effects block reclaim, and completing/reviewing require publication recovery.
 - `src/effects/state/coordination-lease-reclaim.ts:30` re-observes evidence under the Task lock and consumes the existing generation-incrementing steal transition. The source tree currently contains no production caller of this entrypoint or `observeLeaseReclaimEligibility`.
-- Campaign heartbeat budget consumption is published, but is explicitly a partial BRC9 package. Acquisition accounting, writable dispatch/attempt identity, per-task repair accounting, transient retry policy and adoption terminal ordering remain unaccepted. Do not infer BRC9 completion from #282/#287 or heartbeat acceptance.
+- BRC9 final acceptance now covers the real standalone contract worker, complete attempt reservation, acquisition/provider accounting and transient retry consumers. Their authoritative interfaces are recorded in `docs/researches/20260907-brc9-writable-dispatch-attempt.md` and `docs/researches/20260907-brc9-transient-retry-consumption.md`. Their completion does not cover BRC10 process supervision or reclaim.
 
 ## P2 — Required evidence flow
 
@@ -21,7 +21,7 @@ After full BRC9 acceptance, freeze the exact producer contracts and add campaign
 
 At 10x tasks, the first concern to measure is serial evidence reads and lock hold time; unknown or incomplete evidence must still refuse takeover. Performance does not justify cached ownership authority.
 
-The implementation plan cannot yet be decision-complete: the real campaign writable execution/effect producer and its terminal/attempt evidence remain BRC9 dependencies. Do not fabricate these values in order to implement BRC10 ahead of the producer.
+The next campaign plan must add an explicit liveness policy source and truthful process-group supervision evidence to the now-published worker path. Its current synchronous child runner and exit/output observations do not by themselves supply live renewal or descendant quiescence authority. Do not fabricate those values from a PID or final result.
 
 ## Acceptance work to carry forward
 
@@ -32,8 +32,12 @@ The implementation plan cannot yet be decision-complete: the real campaign writa
 - Exercise observation and reclaim at different real timestamps. The current reclaim API compares a fresh full receipt digest, including `classified_at`, with the prior receipt; current unit fixtures inject the same fixed timestamp. This is a consumer timing risk to reproduce before implementation, not a verified runtime fix or a reason to bypass the receipt fence.
 - Exercise the finalized campaign path end to end with real local Lease/budget/journal stores and bounded fake external effects. Reuse upstream tests as substrate evidence, not whole-BRC10 acceptance.
 
-## Verification performed
+## Reclaim timing prerequisite
 
-`bun test --timeout 60000 tests/unit/lease-liveness.test.ts tests/unit/lease-liveness-store.test.ts tests/unit/lease-reclaim.test.ts`: 8 pass, 0 fail, 23 assertions. These checks validate the existing #286 substrate only. No product source was edited, no external effect was invoked, and no full suite was run.
+The pre-fix regression reproduced three failures: later consumption of unchanged evidence, competing real processes, and crash after durable owner write. Both API calls previously had to share the same injected clock because the effect compared the new full receipt digest against the historical receipt, including classified_at.
 
-Coordination: BRC9 owner pane %14 is investigating the writable dispatch/attempt bridge and explicitly retains row 11 as pending. This document is isolated from the shared campaign-boundary research file. Main/push and CI are outside this readiness package; CI for the subsequent #334 target is owned by pane %6. `check-task-sync` reports no substantive changes and `check-task-workflow --strict` passes for this documentation-only package.
+The consumer now validates the input receipt, reconstructs its historical observation against current owner/evidence under the Task lock, and independently classifies eligibility at actual consumption time. It rejects clock regression, receipt tampering, changed evidence, generation drift and publication recovery before calling the unchanged steal transition. No schema, store or dependency was added. Concurrent consumers produce one new generation; replay after a durable write cannot produce another.
+
+Verification: the new regression plus the three existing #286 suites pass (13 tests, 39 assertions). The pre-fix artifact records 2 pass / 3 fail and nonzero exit. These checks validate the substrate correction, not full BRC10. Canonical acceptance and PR evidence live in the package workflow artifacts.
+
+Coordination: BRC9 owner pane %14 completed its final CI handoff; BRC10–15 delivery is delegated to this session. Real canary target/profile authorization and BRC6a provider revision evidence are separate unmet boundaries. This document remains independent of the shared campaign-boundary research file.

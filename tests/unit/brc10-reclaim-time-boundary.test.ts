@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import { buildLeaseOwnerRecord } from '../../src/core/state/coordination-identity';
 import { buildLeaseLivenessPolicy } from '../../src/core/state/lease-liveness';
 import { createLeaseDirectory, readLease, writeLeaseOwnerDurably } from '../../src/effects/state/coordination-lease-store';
@@ -51,7 +52,7 @@ describe('BRC10 reclaim receipt time boundary', () => {
   });
   test('two independent reclaimers consume the same receipt exactly once', async () => {
     const { root, receipt } = setup();
-    const effect = new URL('../../src/effects/state/coordination-lease-reclaim.ts', import.meta.url).pathname;
+    const effect = fileURLToPath(new URL('../../src/effects/state/coordination-lease-reclaim.ts', import.meta.url));
     const script = `import { existsSync, writeFileSync } from 'fs';
       import { automaticReclaimLease } from ${JSON.stringify(effect)};
       const [root, receiptText, evidenceText, name] = process.argv.slice(1);
