@@ -237,7 +237,16 @@ Policy resolution:
 - target movement invalidates grant/eligibility;
 - candidate changes cannot apply to itself.
 ### ProgramAuthorizationV1
+
+Campaign `transient_retry` is explicitly authored by the grant owner and required before new campaign effects. Absence preserves historical grant inspection and reconciliation but grants no new execution; no runtime default or automatic grant rewrite is permitted. The existing usage ledger owns the consecutive transient failure count. Verified completed work resets it; successful reads, acquisitions and bookkeeping do not. Admission enforces capped exponential backoff and returns `campaign_retry_exhausted` at the authorized limit. Per-Task user/permanent blockers remain governed by #287.
+
 ```ts
+interface CampaignTransientRetryPolicyV1 {
+  max_consecutive_failures: number;
+  initial_backoff_ms: number;
+  maximum_backoff_ms: number;
+}
+
 interface ProgramAuthorizationCampaignV1 {
   campaign_id: string;
   group_count: 1 | 2 | 3;
@@ -247,6 +256,7 @@ interface ProgramAuthorizationCampaignV1 {
   max_authoring_rounds_per_group: number;
   max_controller_steps: number;
   max_provider_calls: number;
+  transient_retry?: CampaignTransientRetryPolicyV1;
   chrome_profile_directory: string;
   issue_author: "gpt_pro";
   local_parent_host: "claude" | "codex";
@@ -342,6 +352,7 @@ interface ProgramBudgetEventV1 {
     | "progress"
     | "no_progress"
     | "provider_failure"
+    | "transient_failure"
     | "completed";
   observed_at: string;
   event_sha256: string;

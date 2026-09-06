@@ -71,7 +71,7 @@ describe('issue #282 — the PRD schema and the implemented type cannot drift', 
       campaign_id: 'campaign-schema', group_count: 1, issues_per_group: 10,
       allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 1,
       max_authoring_rounds_per_group: 3, max_controller_steps: 8, max_provider_calls: 16,
-      issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Default', require_fresh_main_audit: true,
+      transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Default', require_fresh_main_audit: true,
     };
     expect([...prdInterfaceFields(markdown, 'ProgramAuthorizationCampaignV1')].sort()).toEqual(Object.keys(campaign).sort());
   });

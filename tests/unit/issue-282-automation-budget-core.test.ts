@@ -760,3 +760,10 @@ describe('issue #282 — operator projection', () => {
     expect(slice.slice_sha256).toMatch(/^[0-9a-f]{64}$/u);
   });
 });
+
+
+test('a complete campaign attempt reserves both children and exactly one repair for later attempts', () => {
+  const unverified = { input_tokens: null, output_tokens: null, cost_micros: null };
+  expect(automationOperationReservation('dispatch_attempt', unverified)).toMatchObject({ agent_turns: 2, runner_invocations: 2, repair_cycles: 0, provider_failures: 1 });
+  expect(automationOperationReservation('retry_attempt', unverified)).toMatchObject({ agent_turns: 2, runner_invocations: 2, repair_cycles: 1, provider_failures: 1 });
+});

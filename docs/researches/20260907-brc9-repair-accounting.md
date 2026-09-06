@@ -1,0 +1,11 @@
+# BRC9 per-task repair accounting
+
+The canonical Engineer offer carries attempt_count and the Work Package retry policy. The campaign worker reserves its complete worker/verifier attempt before either child starts: dispatch_attempt reserves two turns and two invocations; retry_attempt additionally reserves exactly one repair cycle. Both use the existing budget ledger and lock. One closed attempt failure reserves at most one provider-failure count. The verifier consumes its already admitted capacity, checks the exact current open reservation and deadline, and cannot authorize another attempt.
+
+Settlement follows both successful process observations and the explicit verified final result. The immutable final stores the exact attempt reservation before usage and Task attempt completion. Consequently, the final allowed repair can finish verification before its consumption seals the budget. A later attempt is refused; exact final replay finishes any interrupted settlement without another child or charge. Unknown child/final results retain the reservation for reconciliation. Historical finals without this complete reservation binding fail closed for reconciliation rather than acquiring inferred authority.
+
+TaskAutomationAttempt admission still enforces authored maximum attempts, retryable classes and deterministic backoff. No automatic cleanup or reclaim is added. Tests use explicit operator cleanup only inside disposable fixtures. The existing global acquisition cap remains unchanged; retry fixtures explicitly authorize spare acquisition capacity so that cap does not mask the repair boundary.
+
+The regression covers ordinary headroom, exactly one remaining repair, and exhausted headroom through a real failed Task, release, fresh acquisition and another worker/verifier pair. The final-slot red test failed at verifier admission; the corrected pair completes and replays without charging twice. Core tests bind two invocations and one repair to the complete attempt operation.
+
+This package does not establish the campaign-wide transient streak policy. Its independent acceptance preserves the original external FAIL and the corrected current verification. Whole BRC9 remains pending until the final transient-policy integration is accepted.

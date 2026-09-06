@@ -1023,7 +1023,8 @@ describe('BRC0 re-baseline: the campaign sprint kept its pre-migration identitie
     expect(byRow.get('1')).toBe(ROW_1_ID);
     expect(byRow.get('5')).toBe(ROW_5_ID);
 
-    // And the sprint on disk agrees with the receipt, row for row.
+    // Later insertions do not rewrite the migration receipt. Its original
+    // identities must still occur exactly once and in their original order.
     const projected = projectCanonicalTasks({
       repoIdentity: 'repo_00000000000000c0',
       sprintPath: CAMPAIGN_SPRINT,
@@ -1031,7 +1032,10 @@ describe('BRC0 re-baseline: the campaign sprint kept its pre-migration identitie
     });
     expect(projected[0]!.task_id).toBe(ROW_1_ID);
     expect(projected[4]!.task_id).toBe(ROW_5_ID);
-    expect(projected.map((task) => task.task_id))
-      .toEqual(receipt.tasks.map((task) => task.task_id));
+    const currentIds = projected.map((task) => task.task_id);
+    const migratedIds = receipt.tasks.map((task) => task.task_id);
+    expect(new Set(currentIds).size).toBe(currentIds.length);
+    const migrated = new Set(migratedIds);
+    expect(currentIds.filter(id => migrated.has(id))).toEqual(migratedIds);
   });
 });

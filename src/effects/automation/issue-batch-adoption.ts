@@ -1,3 +1,5 @@
+import { observeShadowAdoption } from './issue-batch-shadow-adoption';
+import type { GithubCommandRunner } from '../external-sources/github';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
 import { capabilityRegistryFromArchcontextNodes } from '../../core/capabilities/registry';
@@ -17,6 +19,11 @@ import type { IssueAuthoringBrowserInput, IssueAuthoringBrowserResult, IssueAuth
 import { listProviderIssueObservations } from '../external-sources/store';
 import type { CampaignStepReceiptV1, CampaignMutationReservationV1, CampaignMutationResultV1 } from './campaign-step';
 import { publishIssueBatch, type CampaignPublicationPolicy } from './issue-batch-publication';
+import { beginCampaignBudgetStep, completeCampaignBudgetStep, readAutomationBudgetStatus, readCampaignBudgetLedger } from './budget-store';
+import { readCampaignAuthoringReadonlyContinuation, verifyCampaignAuthoringReadonlyContinuation } from './budget-store';
+import { createCampaignProviderExecutor } from './campaign-provider-execution';
+import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
+import type { CampaignBudgetStepAdmissionV1 } from '../../core/automation/budget';
 
 export interface AdoptIssueBatchInput {
   readonly repo_root: string;
@@ -38,6 +45,7 @@ export interface IssueBatchAdoptionDependencies {
     readonly model: { readonly verified: boolean }; readonly browser: { readonly profileDirectory?: string };
   } };
   readonly observe?: typeof observeIssueBatch;
+  readonly runner?: GithubCommandRunner;
   readonly now?: () => Date;
 }
 function fail(message: string): never { throw new IssueBatchAdoptionError('issue_adoption_reconciliation_required', message); }
@@ -111,6 +119,58 @@ function publicationPolicyAt(root: string, intent: IssueBatchIntentV1, path: str
 
 interface ResponseEvidence { readonly response: string; readonly response_session_ref: string; readonly model_verified: boolean; readonly status: IssueAuthoringBrowserResult['status']; readonly reservation: Parameters<typeof appendAutomationUsage>[0]['reservation'] }
 
+interface AdoptionObservationEvidence {
+  readonly admission_sha256: string;
+  readonly phase: 'pre-seal' | 'post-seal' | 'publication-recovery';
+  readonly snapshot: IssueBatchObservationSnapshotV1 | null;
+  readonly failure: string | null;
+}
+
+const observationKey = (admission: CampaignBudgetStepAdmissionV1) => canonicalMessageDigest({ operation: 'adoption-observation', admission: admission.event_sha256 }).slice(7);
+function completeObservation(input: AdoptIssueBatchInput, admission: CampaignBudgetStepAdmissionV1, evidence: AdoptionObservationEvidence) {
+  if (evidence.admission_sha256 !== admission.event_sha256
+    || !['pre-seal', 'post-seal', 'publication-recovery'].includes(evidence.phase)
+    || (evidence.snapshot === null) === (evidence.failure === null)) fail('adoption observation admission or result is invalid');
+  return completeCampaignBudgetStep({ repo_root: input.repo_root, admission, env: input.env,
+    outcome: evidence.snapshot?.receipt.outcome === 'complete' ? 'progress' : 'no_progress',
+    evidence_refs: [{ ref: `adoption-observation:${observationKey(admission)}`, sha256: automationDigest(evidence) }] });
+}
+function recoverObservation(input: AdoptIssueBatchInput, intent: IssueBatchIntentV1, runId: string) {
+  const active = readCampaignBudgetLedger(input.repo_root, runId, input.env).active_step;
+  if (!active) return;
+  if (active.campaign_id !== intent.campaign_id || active.group_number !== intent.group_number || active.intent_sha256 !== intent.intent_sha256) fail('another campaign step requires reconciliation');
+  const evidence = readPlanningRecord<AdoptionObservationEvidence>(input.repo_root, intent, observationKey(active));
+  if (!evidence) fail('adoption observation requires reconciliation before another provider call');
+  completeObservation(input, active, evidence);
+}
+
+function observeAdoption(input: AdoptIssueBatchInput, intent: IssueBatchIntentV1, deps: IssueBatchAdoptionDependencies,
+  budget: { readonly automation_run_id: string; readonly budget_sha256: string }, phase: AdoptionObservationEvidence['phase']): IssueBatchObservationSnapshotV1 {
+  const root = input.repo_root;
+  const binding = { repo_root: root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
+    campaign_id: intent.campaign_id, group_number: intent.group_number as 1 | 2 | 3, intent_sha256: intent.intent_sha256, env: input.env };
+  recoverObservation(input, intent, budget.automation_run_id);
+  // Recover old bookkeeping first, then perform the fresh probe required by this invocation.
+  const current = readAutomationBudgetStatus(root, budget.automation_run_id, input.env).current;
+  const idempotency_key = canonicalMessageDigest({ operation: 'adoption-observation', phase, intent: intent.intent_sha256, ledger: current.ledger_sha256 });
+  const admission = beginCampaignBudgetStep({ ...binding, idempotency_key }).admission;
+  const provider = createCampaignProviderExecutor({ ...binding, idempotency_key, step_admission_sha256: admission.event_sha256 }, deps.runner);
+  const persist = (evidence: AdoptionObservationEvidence) => withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, observationKey(admission), evidence));
+  let snapshot: IssueBatchObservationSnapshotV1;
+  try {
+    snapshot = (deps.observe ?? observeIssueBatch)({ repo_root: root, intent, env: input.env, now: deps.now, runner: provider.read });
+  } catch (error) {
+    const evidence = { admission_sha256: admission.event_sha256, phase, snapshot: null, failure: error instanceof Error ? error.message : String(error) };
+    persist(evidence);
+    completeObservation(input, admission, evidence); // An unresolved external leaf still refuses completion.
+    throw error;
+  }
+  const evidence = { admission_sha256: admission.event_sha256, phase, snapshot, failure: null };
+  persist(evidence);
+  completeObservation(input, admission, evidence);
+  return snapshot;
+}
+
 export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBatchAdoptionDependencies) {
   const now = deps.now ?? (() => new Date());
   const intent = readIssueBatchIntent(input.repo_root, input.campaign_id, input.group_number, input.intent_sha256);
@@ -120,13 +180,23 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   if (mode === 'off' || (mode === 'shadow' && !input.dry_run)) fail('campaign mode forbids materialization');
   const existing = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption');
   if (existing) {
-    const stored = existing as unknown as { input: IssueBatchAdoptionInput; sprint_path: string; publication_policy: CampaignPublicationPolicy };
+    const stored = existing as unknown as { input: IssueBatchAdoptionInput; sprint_path: string; publication_policy: CampaignPublicationPolicy; shadow_budget_artifact?: `shadow-${string}` };
     if (stored.sprint_path !== input.sprint_path || canonicalMessageBytes({ ...stored.publication_policy }) !== canonicalMessageBytes({ ...publicationPolicy })) fail('replay target differs from stored adoption');
     const authorization = readStoredProgramAuthorization(input.repo_root, status.campaign.authorization_sha256, input.env);
     if (stored.input.authorization_sha256 !== authorization.authorization_sha256 || canonicalMessageBytes({ ...stored.input.intent }) !== canonicalMessageBytes({ ...intent })) fail('replay authority differs');
-    verifyCampaignAuthoringBudgetTerminal({ repo_root: input.repo_root, automation_run_id: stored.input.terminal.automation_run_id,
+    const terminalBinding = { repo_root: input.repo_root, automation_run_id: stored.input.terminal.automation_run_id,
       expected_budget_sha256: stored.input.terminal.budget_sha256, campaign_id: intent.campaign_id, group_number: intent.group_number as 1 | 2 | 3,
-      intent_sha256: intent.intent_sha256, env: input.env, terminal: stored.input.terminal });
+      intent_sha256: intent.intent_sha256, env: input.env, terminal: stored.input.terminal };
+    if (mode === 'shadow') verifyCampaignAuthoringBudgetTerminal(terminalBinding);
+    else {
+      recoverObservation(input, intent, stored.input.terminal.automation_run_id);
+      verifyCampaignAuthoringReadonlyContinuation(terminalBinding);
+    }
+    if (mode === 'shadow') {
+      if (!stored.shadow_budget_artifact) fail('shadow adoption has no budgeted observation evidence');
+      const outcome = readIssueBatchAdoptionArtifact(input.repo_root, intent, stored.shadow_budget_artifact);
+      if (!outcome || outcome.outcome !== 'progress' || canonicalMessageBytes(outcome.final_snapshot as Record<string, unknown>) !== canonicalMessageBytes({ receipt: stored.input.snapshot.snapshot_receipt, observations: stored.input.snapshot.observations })) fail('shadow adoption observation evidence differs');
+    }
     const adopted = buildIssueBatchAdoption(stored.input);
     const publication = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'publication');
     let visible = false;
@@ -137,11 +207,12 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
       }
     }
     if (!input.dry_run && !visible) {
-      const fresh = (deps.observe ?? observeIssueBatch)({ repo_root: input.repo_root, intent, env: input.env, now });
+      const fresh = observeAdoption(input, intent, deps, stored.input.terminal, 'publication-recovery');
       reconcileIssueBatchSlots({ intent, snapshot_receipt: fresh.receipt, observations: fresh.observations,
         prior_observations: stored.input.snapshot.observations, repair_exhausted_slots: stored.input.snapshot.repair_exhausted_slots, current_main_sha: intent.base_main_sha });
       const expected = stored.input.snapshot.observations.map(o => o.source_revision).sort();
       if (JSON.stringify(fresh.observations.map(o => o.source_revision).sort()) !== JSON.stringify(expected)) fail('provider sources changed before publication recovery');
+      verifyCampaignAuthoringReadonlyContinuation(terminalBinding);
     }
     return { ...adopted, publication: input.dry_run ? null : publishIssueBatch({ ...input, intent, receipt: adopted.receipt, policy: publicationPolicy,
       evidence: { terminal_sha256: stored.input.terminal.terminal_sha256, challenge_receipt_sha256: adopted.challenge_receipt.receipt_sha256 } }) };
@@ -189,7 +260,28 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   verifyConnectorChallenge({ challenge, response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified });
   requireIssueBatchAuthority({ repo_root: input.repo_root, intent, env: input.env, now: now() });
   const prior = priorReconciliation(input.repo_root, intent);
-  const snapshot: IssueBatchObservationSnapshotV1 = (deps.observe ?? observeIssueBatch)({ repo_root: input.repo_root, intent, env: input.env, now });
+  if (mode === 'shadow') {
+    const capabilities = capabilityIds(input.repo_root, intent);
+    const observed = observeShadowAdoption({ binding, intent, prior, observe: deps.observe, runner: deps.runner, now, validate: snapshot => {
+      const reconciliation = reconcileIssueBatchSlots({ intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, ...prior, current_main_sha: intent.base_main_sha });
+      if (reconciliation.invalid_slots.length || reconciliation.unexpected_issue_ids.length) fail('invalid or unexpected slots require BRC5 reconciliation before adoption');
+      for (const slot of reconciliation.slots.filter(s => s.state === 'complete')) {
+        const observation = snapshot.observations.find(o => o.observation_sha256 === slot.observation_sha256)!;
+        const metadata = parseIssueBatchMetadata(observation.body);
+        if (!metadata || !capabilities.includes(metadata.primary_capability)) fail('adoption metadata references an unavailable capability');
+      }
+      return reconciliation.outcome === 'complete' ? 'complete' : 'partial';
+    } });
+    verifyCampaignAuthoringBudgetTerminal({ ...binding, terminal: observed.terminal });
+    const adoptionInput: IssueBatchAdoptionInput = { intent, session, snapshot: { snapshot_receipt: observed.finalSnapshot.receipt,
+      observations: observed.finalSnapshot.observations, prior_observations: observed.snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots },
+      capability_ids: capabilities, authorization_sha256: authorization.authorization_sha256, terminal: observed.terminal, challenge,
+      challenge_response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified };
+    const adopted = buildIssueBatchAdoption(adoptionInput);
+    persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy, shadow_budget_artifact: observed.artifact });
+    return { ...adopted, publication: null };
+  }
+  const snapshot = observeAdoption(input, intent, deps, budget.budget, 'pre-seal');
   const reconciliation = reconcileIssueBatchSlots({ intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, ...prior, current_main_sha: intent.base_main_sha });
   if (reconciliation.invalid_slots.length || reconciliation.unexpected_issue_ids.length) fail('invalid or unexpected slots require BRC5 reconciliation before adoption');
   const capabilities = capabilityIds(input.repo_root, intent);
@@ -199,16 +291,18 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
     if (!metadata || !capabilities.includes(metadata.primary_capability)) fail('adoption metadata references an unavailable capability');
   }
   const sealSources = { source_revisions: snapshot.observations.map(o => o.source_revision).sort() };
-  const terminal = withIssueBatchSealSources(input.repo_root, intent, sealSources, () => readCampaignAuthoringBudgetTerminal(binding),
+  const terminal = withIssueBatchSealSources(input.repo_root, intent, sealSources, () => readCampaignAuthoringReadonlyContinuation(binding)?.terminal ?? null,
     () => sealCampaignAuthoringBudget({ ...binding, reason: reconciliation.outcome === 'complete' ? 'authoring_completed' : 'authoring_exhausted' }));
-  verifyCampaignAuthoringBudgetTerminal({ ...binding, terminal });
-  const finalSnapshot = (deps.observe ?? observeIssueBatch)({ repo_root: input.repo_root, intent, env: input.env, now });
+  verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal });
+  const finalSnapshot = observeAdoption(input, intent, deps, budget.budget, 'post-seal');
   reconcileIssueBatchSlots({ intent, snapshot_receipt: finalSnapshot.receipt, observations: finalSnapshot.observations, prior_observations: snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots, current_main_sha: intent.base_main_sha });
   if (JSON.stringify(finalSnapshot.observations.map(o => o.source_revision).sort()) !== JSON.stringify(sealSources.source_revisions)) fail('provider sources changed after authoring seal');
+  const readonlyContinuation = verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal });
   const adoptionInput: IssueBatchAdoptionInput = { intent, session, snapshot: { snapshot_receipt: finalSnapshot.receipt, observations: finalSnapshot.observations, prior_observations: snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots }, capability_ids: capabilities,
     authorization_sha256: authorization.authorization_sha256, terminal, challenge, challenge_response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified };
   const adopted = buildIssueBatchAdoption(adoptionInput);
-  persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy });
+  persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy,
+    readonly_continuation: readonlyContinuation });
   return { ...adopted, publication: input.dry_run ? null : publishIssueBatch({ ...input, intent, receipt: adopted.receipt, policy: publicationPolicy,
     evidence: { terminal_sha256: terminal.terminal_sha256, challenge_receipt_sha256: adopted.challenge_receipt.receipt_sha256 } }) };
 }

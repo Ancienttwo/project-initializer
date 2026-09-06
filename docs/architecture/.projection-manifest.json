@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:66ad6663cca3979e934f41c42543fca8f757db8271c19e65d94319184594cf97",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
-    "worktreeDigest": "sha256:cba4158b43ee0465d00f0d7f8b6e1c39528236bc93d18548172eaf6f8575490c",
-    "sourceTreeDigest": "sha256:998e3fd353e3429e740d72ebb3b70ee872dad330f4bd31be75ef1876596b9090",
+    "baseHeadSha": "871eaa676b6d502ba5b53a402ddc5460d822b976",
+    "worktreeDigest": "sha256:c6d6921236a5d27a6a3659a3e7c96af7c1ea1a8250a946ec523e8badc38c5d53",
+    "sourceTreeDigest": "sha256:b1bbfa2babb589d6faea07ea7702fb0a3eb08dc31d1535981c18de5456133755",
     "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-    "codeGraphDigest": "sha256:233c701c33562bca07986c58ea36b4553fcd5329dc4016495b10175150bce85d",
-    "indexedWorktreeDigest": "sha256:80d611564d883ed60fb7f41305ca60d3a6a41e479105f881ee5b8bbfb4191f28",
+    "codeGraphDigest": "sha256:6c13e0010cb969367feaf6d2666f54e1131d8d4d21022858e3debe0c24c18572",
+    "indexedWorktreeDigest": "sha256:3c43302d9f68392be9cec2ab51e9a5da2b3ea0dc6933103904f9f7411a526650",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:9ed057eaffd1ebb79545310e6386002aab82e40c289865521f3c5bc4f49a9e9e"
+    "projectionInputDigest": "sha256:fdc395997e4837fd8fe9e22d56500ba3c7bb5e97dadd742b6682f7c3bfff571a"
   },
-  "projectionDigest": "sha256:a5ff77b2025ce00ad279402436afd338cbb0def06e57b27c850258fd4eda91a4",
+  "projectionDigest": "sha256:73029e96bbb2650856b0b915412e97b9df0548e0d4ee01e71e9321ca704d27b2",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-      "sourceTreeDigest": "sha256:998e3fd353e3429e740d72ebb3b70ee872dad330f4bd31be75ef1876596b9090",
+      "sourceTreeDigest": "sha256:b1bbfa2babb589d6faea07ea7702fb0a3eb08dc31d1535981c18de5456133755",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:a5ff77b2025ce00ad279402436afd338cbb0def06e57b27c850258fd4eda91a4"
+      "projectionDigest": "sha256:73029e96bbb2650856b0b915412e97b9df0548e0d4ee01e71e9321ca704d27b2"
     }
   },
-  "receiptDigest": "sha256:1e98e9cdcf446f8fb8b66334381725824c5568e7c036d4ad6da12528cad07c58",
+  "receiptDigest": "sha256:0152f3590600fbb701bf80a006885ae8ef703a63cac02df22ec497053fd27973",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -824,12 +824,12 @@
       "ownership": "mixed",
       "rendererVersion": "archcontext.docs-renderer/v4",
       "format": "markdown",
-      "sourceDigest": "sha256:088fe69fea2cbedab6b94393077a36962836f953a6584f1d02a7e6c84eef4bf5",
-      "outputDigest": "sha256:c1e5b229aebf173d9e8bbc5f0a987437bff389b987a40047ad056122c24f8de7",
+      "sourceDigest": "sha256:1494a3f41b8a3ac362f3a647e38262857c3c70ec83058bf70c1df68a6f246103",
+      "outputDigest": "sha256:93a824fb8d2d33de1b45acfc16783a53193c6ef1bb4843b5c3dcf3c6ae5524f2",
       "verifiedAgainst": {
-        "branch": "codex/brc9-heartbeat-budget-consumption",
-        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
-        "committedAt": "2026-09-06T23:47:34+08:00"
+        "branch": "codex/brc9-transient-retry-consumption",
+        "commit": "871eaa676b6d502ba5b53a402ddc5460d822b976",
+        "committedAt": "2026-09-07T04:53:54+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:d2978b298f0d4b17384710fa7adaae35d607c110a397819f082535610196f48e",
       "outputDigest": "sha256:ac50386fcb0ff83c9679ec2c36e5da425efb999b5d791bb052eb90b5ec924a6b",
       "verifiedAgainst": {
-        "branch": "codex/brc9-heartbeat-budget-consumption",
-        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
-        "committedAt": "2026-09-06T23:47:34+08:00"
+        "branch": "codex/brc9-adoption-provider-accounting",
+        "commit": "3f9464db88fce488852cc45c24f352d93eb63dc4",
+        "committedAt": "2026-09-07T02:42:07+08:00"
       }
     },
     {
@@ -927,9 +927,9 @@
       "sourceDigest": "sha256:cdf567032caddaaed39c7205a7243dbf1f35ced90d92af584cfececc9ffd3a4d",
       "outputDigest": "sha256:5b8d7ca0d2bfe132fa3c68512637adcf53e5864f762cb12553fbecccf7d49b5b",
       "verifiedAgainst": {
-        "branch": "codex/brc9-attempt-prerequisite",
-        "commit": "1e2072bc65514c5cc68b0eb76da6de7ed2ee49ab",
-        "committedAt": "2026-09-06T18:26:34+08:00"
+        "branch": "codex/brc9-acquisition-accounting",
+        "commit": "d764cb521e0d52fc49eae9af7c1a258258167e9d",
+        "committedAt": "2026-09-07T03:24:28+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc9-heartbeat-budget-consumption",
-        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
-        "committedAt": "2026-09-06T23:47:34+08:00"
+        "branch": "codex/brc9-transient-retry-consumption",
+        "commit": "871eaa676b6d502ba5b53a402ddc5460d822b976",
+        "committedAt": "2026-09-07T04:53:54+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:dc2faa5abe1e85c162bcc9a126ee79a0178c75d03c20ff97519b8b463cc2ee44",
       "outputDigest": "sha256:aa5aac73ff819f8ad0c053a57d5b1627faf2fc5bdbc18e8ab4722de0ab085d59",
       "verifiedAgainst": {
-        "branch": "codex/brc9-campaign-budget-prerequisite",
-        "commit": "126aa7f23afb3a081228e929d74024a36cafcfb1",
-        "committedAt": "2026-09-06T22:23:40+08:00"
+        "branch": "codex/brc9-writable-dispatch-attempt",
+        "commit": "82a12c63a16d550e50c5fa3b704e7b912a5d7c29",
+        "committedAt": "2026-09-07T00:50:54+08:00"
       }
     },
     {
