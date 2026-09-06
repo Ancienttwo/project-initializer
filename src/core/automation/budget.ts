@@ -96,7 +96,7 @@ export const AUTOMATION_CONTRACT_SCOPES = ['task_contract', 'contract_less'] as 
 
 export type AutomationContractScope = typeof AUTOMATION_CONTRACT_SCOPES[number];
 
-export type AutomationOperationKind = 'acquisition' | 'dispatch' | 'retry' | 'provider_invocation';
+export type AutomationOperationKind = 'acquisition' | 'dispatch' | 'retry' | 'provider_invocation' | 'dispatch_attempt' | 'retry_attempt';
 
 export type AutomationOutcome = 'progress' | 'no_progress' | 'provider_failure' | 'completed';
 
@@ -945,7 +945,8 @@ export function validateAutomationMetricVector(
 }
 
 /**
- * Every controller operation costs one step. The rest of the vector is the
+ * Single invocations cost one turn; a worker/verifier attempt reserves both
+ * children before either starts. The rest of the vector is the
  * upper bound the operation may spend, so a refusal happens before the
  * operation runs rather than after its cost is already real.
  */
@@ -968,6 +969,9 @@ export function automationOperationReservation(
       return Object.freeze({ ...base, runner_invocations: 1, provider_failures: 1 });
     case 'retry':
       return Object.freeze({ ...base, runner_invocations: 1, provider_failures: 1, repair_cycles: 1 });
+    case 'dispatch_attempt':
+    case 'retry_attempt':
+      return Object.freeze({ ...base, agent_turns: 2, runner_invocations: 2, provider_failures: 1, repair_cycles: operation === 'retry_attempt' ? 1 : 0 });
     default:
       return invalid(`unsupported automation operation kind: ${String(operation)}`);
   }
@@ -1041,7 +1045,7 @@ export type AutomationBudgetReservationV1 =
   | CampaignAutomationBudgetReservationV1;
 
 const UNIT_KINDS: readonly ProgramUnitKind[] = Object.freeze(['execute', 'review', 'verify', 'integrate', 'merge']);
-const OPERATION_KINDS: readonly AutomationOperationKind[] = Object.freeze(['acquisition', 'dispatch', 'retry', 'provider_invocation']);
+const OPERATION_KINDS: readonly AutomationOperationKind[] = Object.freeze(['acquisition', 'dispatch', 'retry', 'provider_invocation', 'dispatch_attempt', 'retry_attempt']);
 const OUTCOMES: readonly AutomationOutcome[] = Object.freeze(['progress', 'no_progress', 'provider_failure', 'completed']);
 
 export type CampaignAuthoringOperation = 'initial' | 'fill_missing' | 'edit_issue';

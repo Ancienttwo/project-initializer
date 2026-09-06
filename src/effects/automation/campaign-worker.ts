@@ -11,7 +11,8 @@ import { validateFleetWorkEnvelope } from '../fleet/acquire';
 import { readIssueBatchIntent } from './issue-batch-store';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
-import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage } from './budget-store';
+import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, readAutomationBudgetStatus } from './budget-store';
+import { automationStoreNow } from './clock';
 import type { CampaignAcquisitionInput } from './campaign-acquisition';
 
 type Acquisition = Extract<ScheduledEngineerAcquireResult, { ok: true }>;
@@ -96,7 +97,7 @@ export function bindCampaignWorker(input: {
   const persist = (part: string, value: unknown) => withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, key(selector.dispatch_id, part), value));
   const priorLaunch = read<{ request: typeof request; started_at: string }>('launch');
   if (priorLaunch && !exact(priorLaunch.request, request)) throw new Error('campaign worker replay changes its launch request');
-  const priorFinal = read<{ contract_run: CampaignContractRunResult; outcome: Exclude<TaskAutomationAttemptOutcome, 'started'>; ended_at: string; runtime_effect_id: string; evidence_refs: string[]; result_sha256: string; evidence: { path: string; sha256: string }[] }>('final');
+  const priorFinal = read<{ contract_run: CampaignContractRunResult; outcome: Exclude<TaskAutomationAttemptOutcome, 'started'>; ended_at: string; runtime_effect_id: string; evidence_refs: string[]; result_sha256: string; reservation: ReturnType<typeof reserveAutomationBudget>; evidence: { path: string; sha256: string }[] }>('final');
   if (priorLaunch && !priorFinal) throw new Error('campaign worker launch requires reconciliation; replay cannot spawn again');
   const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env: input.env }).budget;
   const controllerRun = `sha256:${budget.automation_run_id}`;
@@ -104,8 +105,14 @@ export function bindCampaignWorker(input: {
   const finishAttempt = (final: NonNullable<typeof priorFinal>) => recordTaskAutomationAttemptOutcome({ repo_root: root,
     work_package_id: offer.work_package_id, work_package_revision: offer.work_package_revision, policy: offer.retry_policy,
     identity_sha256: identity, outcome: final.outcome, ended_at: final.ended_at, runtime_effect_id: final.runtime_effect_id, evidence_refs: final.evidence_refs });
+  const settleFinal = (final: NonNullable<typeof priorFinal>) => {
+    if (!final.reservation) throw new Error('campaign worker final lacks its complete attempt reservation; reconciliation required');
+    appendAutomationUsage({ repo_root: root, reservation: final.reservation, outcome: 'no_progress',
+      evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env: input.env });
+    finishAttempt(final);
+  };
   if (priorFinal) {
-    finishAttempt(priorFinal);
+    settleFinal(priorFinal);
     return { replay: priorFinal, selector, deadline_at: budget.deadline_at, beforeChild: () => { throw new Error('completed campaign worker cannot spawn'); }, afterChild: (_observation: CampaignWorkerChildObservation) => {}, finish: (_resultPath: string, _contractRun: CampaignContractRunResult) => priorFinal };
   }
   const launch = { request, started_at: new Date().toISOString() };
@@ -115,16 +122,26 @@ export function bindCampaignWorker(input: {
     persistPlanningRecord(root, intent, key(selector.dispatch_id, 'launch'), launch);
   });
   let attemptStarted = false;
-  const reservations = new Map<string, ReturnType<typeof reserveAutomationBudget>>();
+  let reservation: ReturnType<typeof reserveAutomationBudget> | null = null;
+  const admittedRoles = new Set<'worker' | 'verifier'>();
   const observations: CampaignWorkerChildObservation[] = [];
   return {
     replay: null, selector, deadline_at: budget.deadline_at,
     beforeChild(role: 'worker' | 'verifier', command: string) {
       validate();
-      if (reservations.has(role) || command !== (role === 'worker' ? request.worker_command : request.verifier_command)) throw new Error('campaign worker child identity differs');
-      const reservation = reserveAutomationBudget({ repo_root: root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
-        idempotency_key: key(selector.dispatch_id, role), operation: 'dispatch', unit_kind: 'execute', unit_id: offer.work_package_id, attempt: offer.attempt_count + 1, provider: null, env: input.env });
-      reservations.set(role, reservation);
+      if (admittedRoles.has(role) || command !== (role === 'worker' ? request.worker_command : request.verifier_command)) throw new Error('campaign worker child identity differs');
+      if (role === 'worker') {
+        reservation = reserveAutomationBudget({ repo_root: root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
+          idempotency_key: key(selector.dispatch_id, 'attempt'), operation: offer.attempt_count > 0 ? 'retry_attempt' : 'dispatch_attempt',
+          unit_kind: 'execute', unit_id: offer.work_package_id, attempt: offer.attempt_count + 1, provider: null, env: input.env });
+      } else if (!reservation || observations.length !== 1 || observations[0]?.role !== 'worker' || observations[0].exit_code !== 0) {
+        throw new Error('campaign verifier requires its admitted and observed worker');
+      }
+      const current = readAutomationBudgetStatus(root, budget.automation_run_id, input.env);
+      if (!reservation || current.budget.budget_sha256 !== reservation.budget_sha256
+        || !current.current.open_reservation_sha256s.includes(reservation.reservation_sha256)) throw new Error('campaign attempt reservation is no longer current and open');
+      if (Date.parse(automationStoreNow()) >= Date.parse(reservation.deadline_at)) throw new Error('campaign attempt deadline expired before child');
+      admittedRoles.add(role);
       if (!attemptStarted) {
         recordTaskAutomationAttemptStart({ repo_root: root, repository_id: offer.repository_id, sprint_path: offer.sprint_path,
           task_id: work.task_id, task_revision: work.task_revision, work_package_id: offer.work_package_id, work_package_revision: offer.work_package_revision,
@@ -135,13 +152,12 @@ export function bindCampaignWorker(input: {
       }
     },
     afterChild(observation: CampaignWorkerChildObservation) {
-      const reservation = reservations.get(observation.role);
-      if (!reservation) throw new Error('campaign child has no invocation reservation');
+      if (!reservation || !admittedRoles.has(observation.role)) throw new Error('campaign child has no invocation reservation');
       const evidence = { observation, stdout_sha256: digest(file(work.worktree_path, observation.stdout_path)), stderr_sha256: digest(file(work.worktree_path, observation.stderr_path)) };
       persist(`child-${observation.role}`, evidence);
       observations.push(observation);
       if (observation.exit_code === null || observation.timed_out === true) throw new Error('campaign child process outcome is unknown; reservation remains unresolved');
-      appendAutomationUsage({ repo_root: root, reservation, outcome: 'no_progress', evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:${observation.role}`, sha256: canonicalMessageDigest(evidence).slice(7) }], env: input.env });
+
     },
     finish(resultPath: string, contractRun: CampaignContractRunResult) {
       validate();
@@ -155,11 +171,12 @@ export function bindCampaignWorker(input: {
         || result.evidence_paths.some(path => typeof path !== 'string')) throw new Error('campaign worker requires an explicit closed attempt result with evidence');
       if (observations.length !== 2 || observations.some(item => item.exit_code !== 0)) throw new Error('campaign worker result lacks successful worker and verifier process evidence');
       const evidence = result.evidence_paths.map(path => ({ path, sha256: digest(file(work.worktree_path, path)) }));
-      const final = { contract_run: { ...contractRun }, outcome: result.outcome, ended_at: new Date().toISOString(), result_sha256: digest(resultBytes), evidence,
+      if (!reservation) throw new Error('campaign final lacks its admitted attempt');
+      const final = { reservation, contract_run: { ...contractRun }, outcome: result.outcome, ended_at: new Date().toISOString(), result_sha256: digest(resultBytes), evidence,
         runtime_effect_id: canonicalMessageDigest({ request, contract_run: contractRun, worker: read('child-worker'), verifier: read('child-verifier'), result_sha256: digest(resultBytes) }),
         evidence_refs: [canonicalMessageDigest({ result_sha256: digest(resultBytes), evidence }), ...observations.map(item => canonicalMessageDigest({ ...item }))] };
       persist('final', final);
-      finishAttempt(final);
+      settleFinal(final);
       return final;
     },
   };

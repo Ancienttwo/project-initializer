@@ -1,7 +1,8 @@
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
 import { runCampaignPlanningStep } from '../../src/effects/automation/campaign-planning';
 import { runCampaignPlanningPreflight } from '../../src/cli/commands/campaign';
-import { makeSnapshot } from '../helpers/issue-batch-adoption-fixture';
+import { makeSnapshot, policy as publicationPolicy } from '../helpers/issue-batch-adoption-fixture';
+import type { WorkPackageRetryPolicyV1 } from '../../src/core/engineers/scheduling';
 import { buildExternalSourceProjection } from '../../src/core/external-sources/projection';
 import { writeProviderIssueObservation, writeExternalSourceRefreshReceipt } from '../../src/effects/external-sources/store';
 import { bindEngineer, readEngineerBindingStatus } from '../../src/effects/engineers/binding-store';
@@ -26,16 +27,17 @@ import { readLease, leaseOwnerPath } from '../../src/effects/state/coordination-
 
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-export async function readyFixture(twoEngineers = false, requiredReview = false) {
+export async function readyFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1) {
   const capability = 'capability.runtime-harness.fixture';
   const inventory = readFileSync(join(import.meta.dir, '../fixtures/repair-campaign/protected-capabilities.json'), 'utf8');
   const otherCapability = 'capability.runtime-harness.second';
   const files: Record<string, string> = { 'tests/fixtures/repair-campaign/protected-capabilities.json': inventory };
+  if (retryPolicy) files['plans/policies/publication.json'] = JSON.stringify({ ...publicationPolicy, retry_policy: retryPolicy });
   if (twoEngineers) {
     files['src/second/index.ts'] = 'export {};';
     files['.archcontext/model/nodes/second.yaml'] = JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: otherCapability, kind: 'capability', name: 'Second', status: 'active', summary: 'Second fixture capability', responsibilities: ['Own second fixture'], source: { include: ['src/second/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } });
   }
-  const f = await createAdoptionRepository('active', 1, capability, {}, files, { max_parallel_tasks: twoEngineers ? 1 : 2 });
+  const f = await createAdoptionRepository('active', 1, capability, {}, files, { max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}) });
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {
     const observations = snapshot.observations.map((o, index) => {
@@ -97,4 +99,3 @@ export async function readyFixture(twoEngineers = false, requiredReview = false)
   git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'ready plans']);
   return { ...f, executeInput: input, secondAuthorization };
 }
-
