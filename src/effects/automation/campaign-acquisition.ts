@@ -79,6 +79,7 @@ export function runCampaignAcquisition(input: CampaignAcquisitionInput, acquire 
   if (authority.policy.mode === 'shadow') return { action: 'idle' as const, reason: 'shadow campaign cannot acquire workers' };
   const parent = readPlanningRecord<{ host: string; session_id: string }>(root, intent, 'parent');
   if (!parent || parent.host !== input.host || parent.session_id !== input.session_id) throw new CampaignPlanningError('human_attention_required', 'execution session does not own this group planning');
+  if (!authority.grant.campaign?.liveness_policy || authority.grant.campaign.liveness_policy.renewal_actor_kind !== 'controller') throw new CampaignPlanningError('human_attention_required', 'campaign execution requires an explicit controller liveness policy');
   const principal = resolveEngineerPrincipal({ repo_root: root, authorization_id: input.authorization_id, env: input.env });
   const validateHandoff = (acquired: Extract<ScheduledEngineerAcquireResult, { ok: true }>) => {
     const currentPrincipal = resolveEngineerPrincipal({ repo_root: root, authorization_id: input.authorization_id, env: input.env });

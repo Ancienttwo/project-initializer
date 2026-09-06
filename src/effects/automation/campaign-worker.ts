@@ -14,6 +14,8 @@ import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } f
 import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, readAutomationUsageForResult, readAutomationBudgetStatus } from './budget-store';
 import { automationStoreNow } from './clock';
 import type { CampaignAcquisitionInput } from './campaign-acquisition';
+import { readLease } from '../state/coordination-lease-store';
+import { LeaseLivenessStoreError, readLeaseLiveness, renewLeaseLiveness } from '../state/coordination-lease-liveness-store';
 
 type Acquisition = Extract<ScheduledEngineerAcquireResult, { ok: true }>;
 export interface CampaignWorkerSelector {
@@ -42,6 +44,8 @@ export interface CampaignWorkerChildObservation {
   readonly stdout_path: string;
   readonly stderr_path: string;
   readonly timed_out?: boolean;
+  readonly process_group_quiescence?: { readonly scope: 'posix_process_group' | 'unsupported'; readonly state: 'quiescent' | 'active' | 'unknown' };
+  readonly renewal_failure?: string;
 }
 function digest(bytes: string | Buffer): string { return createHash('sha256').update(bytes).digest('hex'); }
 function key(dispatch: string, part: string): string { return canonicalMessageDigest({ dispatch, part }).slice(7); }
@@ -92,6 +96,7 @@ export function bindCampaignWorker(input: {
     return authority;
   };
   const authority = validate();
+  const livenessPolicy = authority.grant.campaign?.liveness_policy;
   const request = { dispatch_id: selector.dispatch_id, contract_sha256: handoff.contract_sha256, worker_command: input.worker_command, verifier_command: input.verifier_command };
   const read = <T>(part: string) => readPlanningRecord<T>(root, intent, key(selector.dispatch_id, part));
   const persist = (part: string, value: unknown) => withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, key(selector.dispatch_id, part), value));
@@ -99,6 +104,7 @@ export function bindCampaignWorker(input: {
   if (priorLaunch && !exact(priorLaunch.request, request)) throw new Error('campaign worker replay changes its launch request');
   const priorFinal = read<{ contract_run: CampaignContractRunResult; outcome: Exclude<TaskAutomationAttemptOutcome, 'started'>; ended_at: string; runtime_effect_id: string; evidence_refs: string[]; result_sha256: string; reservation: ReturnType<typeof reserveAutomationBudget>; evidence: { path: string; sha256: string }[] }>('final');
   if (priorLaunch && !priorFinal) throw new Error('campaign worker launch requires reconciliation; replay cannot spawn again');
+  if (!priorFinal && (!livenessPolicy || livenessPolicy.renewal_actor_kind !== 'controller')) throw new Error('campaign dispatch requires an explicit controller liveness policy');
   const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env: input.env }).budget;
   const controllerRun = `sha256:${budget.automation_run_id}`;
   const identity = attemptIdentity({ claim_id: work.claim_id, lease_generation: work.generation, controller_run_id: controllerRun, dispatch_id: selector.dispatch_id });
@@ -117,15 +123,29 @@ export function bindCampaignWorker(input: {
   };
   if (priorFinal) {
     settleFinal(priorFinal);
-    return { replay: priorFinal, selector, deadline_at: budget.deadline_at, beforeChild: () => { throw new Error('completed campaign worker cannot spawn'); }, afterChild: (_observation: CampaignWorkerChildObservation) => {}, finish: (_resultPath: string, _contractRun: CampaignContractRunResult) => priorFinal };
+    return { replay: priorFinal, selector, deadline_at: budget.deadline_at, renewal_interval_ms: null, renew: () => { throw new Error('completed campaign worker cannot renew'); }, beforeChild: () => { throw new Error('completed campaign worker cannot spawn'); }, afterChild: (_observation: CampaignWorkerChildObservation) => {}, finish: (_resultPath: string, _contractRun: CampaignContractRunResult) => priorFinal };
   }
+  if (!livenessPolicy || livenessPolicy.renewal_actor_kind !== 'controller') throw new Error('campaign dispatch requires an explicit controller liveness policy');
   const launch = { request, started_at: new Date().toISOString() };
   let attemptStarted = false;
   let reservation: ReturnType<typeof reserveAutomationBudget> | null = null;
   const admittedRoles = new Set<'worker' | 'verifier'>();
   const observations: CampaignWorkerChildObservation[] = [];
+  let activeRole: 'worker' | 'verifier' | null = null;
+  const renew = () => {
+    validate();
+    if (!activeRole || !admittedRoles.has(activeRole)) throw new Error('campaign renewal requires its admitted child');
+    const owner = readLease(root, work.task_id).record;
+    if (!owner || owner.claim_id !== work.claim_id || owner.generation !== work.generation) throw new Error('campaign renewal lost its Lease generation');
+    let currentSha: string | null = null;
+    try { currentSha = readLeaseLiveness(root, work.task_id, { claim_id: work.claim_id, lease_generation: work.generation }).current.current_sha256; }
+    catch (error) { if (!(error instanceof LeaseLivenessStoreError) || error.code !== 'liveness_not_found') throw error; }
+    return renewLeaseLiveness({ repo_root: root, owner, policy: livenessPolicy, owner_id: selector.dispatch_id,
+      observed_at: new Date().toISOString(), requested_ttl_ms: livenessPolicy.maximum_ttl_ms,
+      binding_generation: offer.binding_generation, runtime_effect_id: canonicalMessageDigest({ dispatch_id: selector.dispatch_id, role: activeRole }), expected_current_sha256: currentSha });
+  };
   return {
-    replay: null, selector, deadline_at: budget.deadline_at,
+    replay: null, selector, deadline_at: budget.deadline_at, renewal_interval_ms: livenessPolicy.renewal_interval_ms, renew,
     beforeChild(role: 'worker' | 'verifier', command: string) {
       validate();
       if (admittedRoles.has(role) || command !== (role === 'worker' ? request.worker_command : request.verifier_command)) throw new Error('campaign worker child identity differs');
@@ -146,6 +166,8 @@ export function bindCampaignWorker(input: {
         || !current.current.open_reservation_sha256s.includes(reservation.reservation_sha256)) throw new Error('campaign attempt reservation is no longer current and open');
       if (Date.parse(automationStoreNow()) >= Date.parse(reservation.deadline_at)) throw new Error('campaign attempt deadline expired before child');
       admittedRoles.add(role);
+      activeRole = role;
+      persist(`runtime-${role}`, { dispatch_id: selector.dispatch_id, role, runtime_effect_id: canonicalMessageDigest({ dispatch_id: selector.dispatch_id, role }), claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation });
       if (!attemptStarted) {
         recordTaskAutomationAttemptStart({ repo_root: root, repository_id: offer.repository_id, sprint_path: offer.sprint_path,
           task_id: work.task_id, task_revision: work.task_revision, work_package_id: offer.work_package_id, work_package_revision: offer.work_package_revision,
@@ -154,12 +176,15 @@ export function bindCampaignWorker(input: {
           policy: offer.retry_policy, first_eligible_at: offer.eligible_since, started_at: launch.started_at });
         attemptStarted = true;
       }
+      renew();
     },
     afterChild(observation: CampaignWorkerChildObservation) {
       if (!reservation || !admittedRoles.has(observation.role)) throw new Error('campaign child has no invocation reservation');
       const evidence = { observation, stdout_sha256: digest(file(work.worktree_path, observation.stdout_path)), stderr_sha256: digest(file(work.worktree_path, observation.stderr_path)) };
       persist(`child-${observation.role}`, evidence);
       observations.push(observation);
+      activeRole = null;
+      if (observation.renewal_failure) throw new Error(`campaign Lease renewal failed; reconciliation required: ${observation.renewal_failure}`);
       if (observation.exit_code === null || observation.timed_out === true) throw new Error('campaign child process outcome is unknown; reservation remains unresolved');
 
     },

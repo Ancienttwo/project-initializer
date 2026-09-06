@@ -13,6 +13,7 @@
  * and reconciliation live in `src/effects/automation/budget-store.ts`.
  */
 import { createHash } from 'crypto';
+import { validateLeaseLivenessPolicy, type LeaseLivenessPolicyV1 } from '../state/lease-liveness';
 
 export const AUTOMATION_BUDGET_PROTOCOL = 1 as const;
 
@@ -302,6 +303,7 @@ export interface ProgramAuthorizationCampaignV1 {
   readonly max_controller_steps: number;
   readonly max_provider_calls: number;
   readonly transient_retry?: CampaignTransientRetryPolicyV1;
+  readonly liveness_policy?: LeaseLivenessPolicyV1;
   readonly issue_author: 'gpt_pro';
   readonly local_parent_host: 'claude' | 'codex';
   readonly chrome_profile_directory: string;
@@ -314,6 +316,7 @@ function validateProgramAuthorizationCampaign(value: unknown): ProgramAuthorizat
   const campaign = value as Record<string, unknown>;
   const expected = ['allowed_issue_kinds', 'campaign_id', 'chrome_profile_directory', 'group_count', 'issue_author', 'issues_per_group', 'local_parent_host', 'max_authoring_rounds_per_group', 'max_controller_steps', 'max_parallel_tasks', 'max_provider_calls', 'require_fresh_main_audit'];
   if (Object.hasOwn(campaign, 'transient_retry')) expected.push('transient_retry');
+  if (Object.hasOwn(campaign, 'liveness_policy')) expected.push('liveness_policy');
   expected.sort();
   if (JSON.stringify(Object.keys(campaign).sort()) !== JSON.stringify(expected)) invalid('program authorization campaign fields are invalid');
   if (![1, 2, 3].includes(campaign.group_count as number)) invalid('program authorization campaign group_count must be 1, 2, or 3');
@@ -332,6 +335,7 @@ function validateProgramAuthorizationCampaign(value: unknown): ProgramAuthorizat
   if (campaign.require_fresh_main_audit !== true) invalid('program authorization campaign require_fresh_main_audit must be true');
   return Object.freeze({
     ...(Object.hasOwn(campaign, 'transient_retry') ? { transient_retry: validateCampaignTransientRetryPolicy(campaign.transient_retry) } : {}),
+    ...(Object.hasOwn(campaign, 'liveness_policy') ? { liveness_policy: validateLeaseLivenessPolicy(campaign.liveness_policy) } : {}),
     campaign_id: assertIdentifier(campaign.campaign_id, 'campaign_id'),
     group_count: campaign.group_count as 1 | 2 | 3,
     issues_per_group: campaign.issues_per_group as number,

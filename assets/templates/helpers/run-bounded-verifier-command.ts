@@ -7,6 +7,7 @@ type Result = {
   timed_out: boolean;
   exit_code: number;
   signal: NodeJS.Signals | null;
+  process_group_quiescence: { scope: 'posix_process_group' | 'unsupported'; state: 'quiescent' | 'active' | 'unknown' };
 };
 
 function usage(): never {
@@ -149,6 +150,9 @@ const result: Result = {
   timed_out: timedOut,
   exit_code: timedOut ? 124 : completion.code ?? 1,
   signal: completion.signal,
+  process_group_quiescence: process.platform === 'win32' || !child.pid
+    ? { scope: 'unsupported', state: 'unknown' }
+    : { scope: 'posix_process_group', state: processGroupExists() ? 'active' : 'quiescent' },
 };
 writeFileSync(resultPath, `${JSON.stringify(result)}\n`);
 process.exit(result.exit_code);

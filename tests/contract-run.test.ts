@@ -15,6 +15,21 @@ import { ROOT_CAUSE_FIXTURE_CASES } from "./fixtures/root-cause/expected-results
 
 const ROOT = join(import.meta.dir, "..");
 
+(process.platform === 'win32' ? test.skip : test)('a killed supervisor cannot reuse an earlier quiescence receipt from the same output directory', () => {
+  const repo = makeRepo('contract-stale-supervisor-');
+  try {
+    writePilotContract(repo);
+    const out = '.ai/harness/runs/stale-supervisor';
+    mkdirSync(join(repo, out), { recursive: true });
+    writeFileSync(join(repo, out, 'worker.bounded-result.json'), JSON.stringify({ exit_code: 0, timed_out: false, process_group_quiescence: { scope: 'posix_process_group', state: 'quiescent' } }));
+    const result = runContractRun(repo, ['run', '--repo', repo, '--contract', 'tasks/contracts/pilot.contract.md', '--worker-command', 'kill -KILL "$PPID"', '--verifier-command', 'touch verifier-started', '--out', out, '--json']);
+    expect(result.status, result.stderr + result.stdout).toBe(1);
+    const manifest = JSON.parse(result.stdout);
+    expect(manifest.children[0].process_group_quiescence).toEqual({ scope: 'unsupported', state: 'unknown' });
+    expect(existsSync(join(repo, 'verifier-started'))).toBe(false);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}, 30_000);
+
 function makeRepo(prefix = "contract-run-"): string {
   const repo = mkdtempSync(join(tmpdir(), prefix));
   mkdirSync(join(repo, "plans"), { recursive: true });
