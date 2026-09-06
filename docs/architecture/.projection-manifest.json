@@ -827,9 +827,9 @@
       "sourceDigest": "sha256:088fe69fea2cbedab6b94393077a36962836f953a6584f1d02a7e6c84eef4bf5",
       "outputDigest": "sha256:c1e5b229aebf173d9e8bbc5f0a987437bff389b987a40047ad056122c24f8de7",
       "verifiedAgainst": {
-        "branch": "codex/brc9-writable-dispatch-attempt",
-        "commit": "82a12c63a16d550e50c5fa3b704e7b912a5d7c29",
-        "committedAt": "2026-09-07T00:50:54+08:00"
+        "branch": "codex/brc15a-shadow-provider-budget",
+        "commit": "54c6e8164e6a86badaf37475123854d2172b106f",
+        "committedAt": "2026-09-07T02:01:16+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:d2978b298f0d4b17384710fa7adaae35d607c110a397819f082535610196f48e",
       "outputDigest": "sha256:ac50386fcb0ff83c9679ec2c36e5da425efb999b5d791bb052eb90b5ec924a6b",
       "verifiedAgainst": {
-        "branch": "codex/brc9-heartbeat-budget-consumption",
-        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
-        "committedAt": "2026-09-06T23:47:34+08:00"
+        "branch": "codex/brc15a-shadow-provider-budget",
+        "commit": "54c6e8164e6a86badaf37475123854d2172b106f",
+        "committedAt": "2026-09-07T02:01:16+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc9-writable-dispatch-attempt",
-        "commit": "82a12c63a16d550e50c5fa3b704e7b912a5d7c29",
-        "committedAt": "2026-09-07T00:50:54+08:00"
+        "branch": "codex/brc15a-shadow-provider-budget",
+        "commit": "54c6e8164e6a86badaf37475123854d2172b106f",
+        "committedAt": "2026-09-07T02:01:16+08:00"
       }
     },
     {

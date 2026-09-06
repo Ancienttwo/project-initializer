@@ -1,16 +1,16 @@
 # Task Review: brc15a-shadow-provider-budget
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260907-0149-brc15a-shadow-provider-budget.md
 > **Contract**: tasks/contracts/20260907-0149-brc15a-shadow-provider-budget.contract.md
 > **Notes File**: tasks/notes/20260907-0149-brc15a-shadow-provider-budget.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-07 01:49
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:559e4b606308e8bc6fbb6235ecde5850745df47b73d1c3f8c83b9a19caa87a79
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: cea2225e0ada0c9fdc383ab19974253724e3a41d
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:559e4b606308e8bc6fbb6235ecde5850745df47b73d1c3f8c83b9a19caa87a79
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: cea2225e0ada0c9fdc383ab19974253724e3a41d
+> **Verification Evidence SHA256**: sha256:91d91340e14f563de5b5685b86962e3025bbfedc45933c5801cebc605db5f7be
+> **Issued At**: 2026-09-06T18:05:06.474Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Shadow provider admission, exact terminal completion, zero-I/O replay, partial-fill and crash recovery verified. All 14 executable criteria and 19 contract requirements pass. Active publication, real canary and BRC6a remain outside this prerequisite.
 - Findings: none
 
 ## Behavior Diff Notes
