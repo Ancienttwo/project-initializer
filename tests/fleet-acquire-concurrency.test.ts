@@ -138,6 +138,12 @@ function raceContract(planPath: string): string {
     '  - src/',
     '```',
     '',
+    '## Verification Plan',
+    '',
+    '```json',
+    '{"protocol":1,"checks":[]}',
+    '```',
+    '',
   ].join('\n');
 }
 
@@ -161,10 +167,12 @@ function createFleetRaceFixture(): FleetRaceFixture {
   const planPath = 'plans/plan-20260823-0202-process-race.md';
   const contractPath = 'tasks/contracts/20260823-0202-process-race.contract.md';
   mkdirSync(join(repo, '.ai/harness/sprint'), { recursive: true });
+  mkdirSync(join(repo, '.claude/templates'), { recursive: true });
   mkdirSync(join(repo, 'plans/sprints'), { recursive: true });
   mkdirSync(join(repo, 'tasks/contracts'), { recursive: true });
   mkdirSync(home, { recursive: true });
   cpSync(join(ROOT, 'assets/templates/helpers'), join(repo, 'scripts'), { recursive: true });
+  cpSync(join(ROOT, '.claude/templates/contract.template.md'), join(repo, '.claude/templates/contract.template.md'));
   chmodSync(join(repo, 'scripts/contract-worktree.sh'), 0o755);
   chmodSync(join(repo, 'scripts/plan-to-todo.sh'), 0o755);
   writeFileSync(join(repo, '.ai/harness/policy.json'), JSON.stringify({

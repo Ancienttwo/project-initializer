@@ -110,7 +110,7 @@ exit 7
   return { claude: claudePath, codex: codexPath, fail: failPath };
 }
 
-function writeEvalManifest(path: string, pattern = "skill"): void {
+function writeEvalManifest(path: string, pattern = "skill", commands: string[] = []): void {
   writeFileSync(
     path,
     JSON.stringify(
@@ -126,6 +126,7 @@ function writeEvalManifest(path: string, pattern = "skill"): void {
             graders: {
               files_exist: ["final-response.md"],
               files_contain: [{ path: "final-response.md", pattern }],
+              commands_succeed: commands,
             },
             expectations: ["Mentions task-sync expectations."],
           },
@@ -595,7 +596,7 @@ describe("run-skill-evals execution", () => {
     const evalsPath = join(tempDir, "evals.json");
     const stubs = createStubCommands(stubDir);
 
-    writeEvalManifest(evalsPath);
+    writeEvalManifest(evalsPath, "skill", ["test -f final-response.md"]);
 
     writeFileSync(
       configPath,
@@ -651,6 +652,7 @@ describe("run-skill-evals execution", () => {
       expect(claudeWithSkill?.changedFiles.length).toBeGreaterThan(0);
       expect(claudeWithSkill?.graderStatus).toBe("passed");
       expect(claudeWithSkill?.graderSummary.total).toBeGreaterThan(0);
+      expect(claudeWithSkill?.graderResults.some((result) => result.kind === "command" && result.passed)).toBe(true);
       expect(claudeWithSkill?.graderReportPath).not.toBeNull();
       expect(claudeWithSkill?.usageAuthority).toBe("structured_cli");
       expect(claudeWithSkill?.inputTokens).toBe(101);
@@ -778,7 +780,7 @@ printf 'not-json\\n'
     const evalsPath = join(tempDir, "evals.json");
     const stubs = createStubCommands(stubDir);
 
-    writeEvalManifest(evalsPath, "this-pattern-will-not-match");
+    writeEvalManifest(evalsPath, "this-pattern-will-not-match", ["false"]);
 
     writeFileSync(
       configPath,
@@ -817,6 +819,7 @@ printf 'not-json\\n'
       expect(report.records[0].exitCode).toBe(0);
       expect(report.records[0].graderStatus).toBe("failed");
       expect(report.records[0].graderSummary.failed).toBeGreaterThan(0);
+      expect(report.records[0].graderResults.some((result) => result.kind === "command" && !result.passed)).toBe(true);
       expect(readFileSync(report.records[0].metadataPath, "utf-8")).toContain('"graderStatus": "failed"');
 
       const rendered = buildBenchmarkSummary(report, ROOT);

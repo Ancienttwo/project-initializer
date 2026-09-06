@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { listHelperIds, listHelpers, runHelper } from '../runtime/helper-runner';
 
 export const RUN_HELP_MAX_HELPERS = 60;
-export const RUN_HELP_MAX_LINES = 81;
+export const RUN_HELP_MAX_LINES = 83;
 
 export const RUN_HELP_GROUPS = [
   {
@@ -52,6 +52,8 @@ export const RUN_HELP_GROUPS = [
   {
     label: 'Verification & maintenance',
     helpers: [
+      'verification-plan',
+      'migrate-verification-plan',
       'run-bounded-verifier-command',
       'validate-harness-profile-benchmark',
       'summarize-failures',

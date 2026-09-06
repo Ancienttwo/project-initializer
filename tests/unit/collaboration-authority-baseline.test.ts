@@ -445,6 +445,11 @@ const DELIBERATELY_EXCLUDED: readonly ExcludedModule[] = [
     evidence: 'release/verification plane (D12); exports no *_KIND at all and has one consumer, src/effects/release/runtime-evidence.ts',
   },
   {
+    module: 'src/core/evidence/verification-plan.ts',
+    fails: ['C-1'],
+    evidence: 'verification contract plane: AcceptanceReceipt validation reads the declared plan through verification-execution, but the plan owns no Task/Claim, Lease, Publication, Acceptance, or Delegation wire identity',
+  },
+  {
     module: 'src/core/review/change-assessment.ts',
     fails: ['C-1'],
     evidence: 'review plane (D12); one consumer, src/effects/review/change-assessment.ts',

@@ -15,6 +15,7 @@ import {
 
 const CLI = join(import.meta.dir, "..", "..", "scripts", "verification-plan.ts");
 const PROJECTED_CLI = join(import.meta.dir, "..", "..", "assets", "templates", "helpers", "verification-plan.ts");
+const LONG_CHECK_ID = "verification-execution-lifecycle-full-suite-check";
 
 function git(repoRoot: string, ...args: string[]): string {
   return execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" }).trim();
@@ -124,6 +125,76 @@ describe("Git virtual tree snapshot", () => {
 });
 
 describe("verification execution lifecycle", () => {
+  test("an admitted long check id reuses one exact expensive execution", () => {
+    withRepo("verification-long-id-reuse", (repoRoot, contractPath, counterPath) => {
+      writeFileSync(join(repoRoot, contractPath), contract({
+        protocol: 1,
+        checks: [commandCheck({ id: LONG_CHECK_ID })],
+      }));
+      const env = { ...process.env, COUNTER_PATH: counterPath };
+      const first = executeVerificationContract({ repoRoot, contractPath, env });
+      const second = executeVerificationContract({ repoRoot, contractPath, env });
+      const evaluated = evaluateVerificationContract({ repoRoot, contractPath, env });
+
+      expect(first.results[0]!.execution).toBe("executed");
+      expect(second.results[0]!.execution).toBe("reused");
+      expect(second.results[0]!.execution_id).toBe(first.results[0]!.execution_id);
+      expect(evaluated.status).toBe("passed");
+      expect(evaluated.results[0]!.execution_id).toBe(first.results[0]!.execution_id);
+      expect(readFileSync(counterPath, "utf8").trim().split("\n")).toHaveLength(1);
+    });
+  }, 30_000);
+
+  test("renaming a check id does not authorize another expensive execution", () => {
+    withRepo("verification-renamed-id", (repoRoot, contractPath, counterPath) => {
+      writeFileSync(join(repoRoot, contractPath), contract({
+        protocol: 1,
+        checks: [commandCheck({ id: LONG_CHECK_ID })],
+      }));
+      const env = { ...process.env, COUNTER_PATH: counterPath };
+      const first = executeVerificationContract({ repoRoot, contractPath, env });
+      expect(first.status).toBe("passed");
+
+      writeFileSync(join(repoRoot, contractPath), contract({
+        protocol: 1,
+        checks: [commandCheck({ id: `${LONG_CHECK_ID}-renamed` })],
+      }, "renamed display id"));
+      const renamed = executeVerificationContract({ repoRoot, contractPath, env });
+      expect(renamed.status).toBe("needs_verification_plan");
+      expect(renamed.results[0]!.execution).toBe("missing");
+      expect(readFileSync(counterPath, "utf8").trim().split("\n")).toHaveLength(1);
+    });
+  }, 30_000);
+
+  test("a newer execution under a different display id cannot revive an older pass", () => {
+    withRepo("verification-latest-different-id", (repoRoot, contractPath, counterPath) => {
+      const renamedId = `${LONG_CHECK_ID}-renamed`;
+      writeFileSync(join(repoRoot, contractPath), contract({
+        protocol: 1,
+        checks: [
+          commandCheck({ id: LONG_CHECK_ID }),
+          commandCheck({ id: renamedId }),
+        ],
+      }));
+      const env = { ...process.env, COUNTER_PATH: counterPath };
+      expect(executeVerificationContract({
+        repoRoot,
+        contractPath,
+        env,
+        forceReason: "record two explicitly authorized same-input identities",
+      }).status).toBe("passed");
+
+      const evaluated = evaluateVerificationContract({ repoRoot, contractPath, env });
+      expect(evaluated.status).toBe("missing");
+      expect(evaluated.results.find((result) => result.id === LONG_CHECK_ID)?.execution).toBe("missing");
+      expect(evaluated.results.find((result) => result.id === renamedId)?.execution).toBe("reused");
+      const originalAgain = executeVerificationContract({ repoRoot, contractPath, env });
+      expect(originalAgain.status).toBe("needs_verification_plan");
+      expect(originalAgain.results.find((result) => result.id === LONG_CHECK_ID)?.execution).toBe("missing");
+      expect(readFileSync(counterPath, "utf8").trim().split("\n")).toHaveLength(2);
+    });
+  }, 30_000);
+
   test("an explicit empty executable plan evaluates as a bound vacuous pass", () => {
     withRepo("verification-empty", (repoRoot, contractPath) => {
       writeFileSync(join(repoRoot, contractPath), contract({ protocol: 1, checks: [] }, "artifact-only contract"));
@@ -323,6 +394,7 @@ describe("verification execution lifecycle", () => {
         writeFileSync(join(repoRoot, contractPath), contract({
           protocol: 1,
           checks: [commandCheck({
+            id: LONG_CHECK_ID,
             command: "if [[ -e \"$COUNTER_PATH.fail\" ]]; then exit 7; fi; printf 'x\\n' >> \"$COUNTER_PATH\"",
             cost: "normal",
           })],
@@ -399,6 +471,10 @@ describe("verification execution lifecycle", () => {
 
   test("a missing latest same-key run record cannot revive an older pass", () => {
     withRepo("verification-latest-record-missing", (repoRoot, contractPath, counterPath) => {
+      writeFileSync(join(repoRoot, contractPath), contract({
+        protocol: 1,
+        checks: [commandCheck({ id: LONG_CHECK_ID })],
+      }));
       const env = { ...process.env, COUNTER_PATH: counterPath };
       const first = executeVerificationContract({ repoRoot, contractPath, env });
       const latest = executeVerificationContract({
@@ -415,6 +491,7 @@ describe("verification execution lifecycle", () => {
       const firstResult = first.results[0]!;
       const delta = commandCheck({ id: "delta", command: "true", cost: "normal", inputs: { env: [] } });
       const baseline = commandCheck({
+        id: LONG_CHECK_ID,
         evidence_policy: "baseline_with_delta",
         baseline: { run_file: firstResult.run_file, execution_id: firstResult.execution_id },
         delta_checks: ["delta"],
@@ -422,7 +499,7 @@ describe("verification execution lifecycle", () => {
       writeFileSync(join(repoRoot, contractPath), contract({ protocol: 1, checks: [delta, baseline] }, "baseline after missing record"));
       const baselineReport = executeVerificationContract({ repoRoot, contractPath, env });
       expect(baselineReport.status).toBe("missing");
-      expect(baselineReport.results.find((result) => result.id === "full")?.message).toContain("newer execution failed or is invalid");
+      expect(baselineReport.results.find((result) => result.id === LONG_CHECK_ID)?.message).toContain("newer execution failed or is invalid");
     });
   }, 30_000);
 
@@ -474,6 +551,27 @@ describe("verification execution lifecycle", () => {
       };
       expect(() => validateMaterializedVerificationExecutionReport({ repoRoot, contractPath, report: tampered }))
         .toThrow("not backed by immutable evidence");
+    });
+  }, 30_000);
+
+  test("binds a writer-projected long result id to the declared check", () => {
+    withRepo("verification-redacted-id", (repoRoot, contractPath, counterPath) => {
+      writeFileSync(join(repoRoot, contractPath), contract({
+        protocol: 1,
+        checks: [commandCheck({ id: LONG_CHECK_ID, cost: "normal" })],
+      }));
+      const env = { ...process.env, COUNTER_PATH: counterPath };
+      const report = executeVerificationContract({ repoRoot, contractPath, env });
+      const projected = projectReportThroughEvidenceWriter(repoRoot, report);
+
+      expect(projected.results[0]!.id).not.toBe(LONG_CHECK_ID);
+      expect(validateMaterializedVerificationExecutionReport({ repoRoot, contractPath, report: projected, env }).valid).toBe(true);
+      const tampered = {
+        ...projected,
+        results: projected.results.map((result) => ({ ...result, id: `${result.id}-tampered` })),
+      };
+      expect(() => validateMaterializedVerificationExecutionReport({ repoRoot, contractPath, report: tampered, env }))
+        .toThrow("result id is unknown");
     });
   }, 30_000);
 
@@ -648,6 +746,33 @@ describe("verification execution lifecycle", () => {
       const rejected = executeVerificationContract({ repoRoot, contractPath, env });
       expect(rejected.status).toBe("missing");
       expect(rejected.results.find((result) => result.id === "full")?.message).toContain("missing, failed, forged, or stale");
+    });
+  }, 30_000);
+
+  test("evaluates a historical baseline with a reusable long-id delta", () => {
+    withRepo("verification-baseline-long-delta", (repoRoot, contractPath, counterPath) => {
+      const env = { ...process.env, COUNTER_PATH: counterPath };
+      const first = executeVerificationContract({ repoRoot, contractPath, env });
+      const full = first.results[0]!;
+      const delta = commandCheck({
+        id: LONG_CHECK_ID,
+        command: "true",
+        cost: "normal",
+        inputs: { env: [] },
+      });
+      const baseline = commandCheck({
+        evidence_policy: "baseline_with_delta",
+        baseline: { run_file: full.run_file, execution_id: full.execution_id },
+        delta_checks: [LONG_CHECK_ID],
+      });
+      writeFileSync(join(repoRoot, contractPath), contract({ protocol: 1, checks: [delta, baseline] }, "long id delta"));
+
+      expect(executeVerificationContract({ repoRoot, contractPath, env }).status).toBe("passed");
+      const evaluated = evaluateVerificationContract({ repoRoot, contractPath, env });
+      expect(evaluated.status).toBe("passed");
+      expect(evaluated.results.find((result) => result.id === LONG_CHECK_ID)?.execution).toBe("reused");
+      expect(evaluated.results.find((result) => result.id === "full")?.execution).toBe("baseline");
+      expect(readFileSync(counterPath, "utf8").trim().split("\n")).toHaveLength(1);
     });
   }, 30_000);
 

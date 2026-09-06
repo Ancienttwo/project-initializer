@@ -141,10 +141,6 @@ exit_criteria:
 
 ## Verification Plan
 
-This is the sole executable verification authority. Use `baseline_with_delta`
-only when a referenced immutable baseline plus named current delta checks prove
-the intended coverage; do not infer that choice from paths or command text.
-
 ```json
 {
   "protocol": 1,
@@ -174,6 +170,10 @@ the intended coverage; do not infer that choice from paths or command text.
   ]
 }
 ```
+
+This is the sole executable verification authority. Use `baseline_with_delta`
+only when a referenced immutable baseline plus named current delta checks prove
+the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
 

@@ -241,6 +241,7 @@ function installFixture(container: string): Fixture {
     '.ai/harness/sprint',
     'plans/sprints',
     'plans/archive',
+    '.claude/templates',
     'tasks/contracts',
     'tasks/reviews',
     'tasks/notes',
@@ -259,6 +260,10 @@ function installFixture(container: string): Fixture {
     copyFileSync(join(ROOT, 'scripts', helper), join(primary, 'scripts', helper));
     chmodSync(join(primary, 'scripts', helper), 0o755);
   }
+  copyFileSync(
+    join(ROOT, '.claude/templates/contract.template.md'),
+    join(primary, '.claude/templates/contract.template.md'),
+  );
   copyFileSync(
     join(ROOT, 'assets/hooks/lib/workflow-state.sh'),
     join(primary, '.ai/hooks/lib/workflow-state.sh'),

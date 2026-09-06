@@ -1,6 +1,6 @@
 # 全量测试执行与验收数据流审计
 
-状态：重构已在 `codex/verification-execution-lifecycle` 实施，最终验收尚未完成，未发布到全局运行时。前半部分保留固定版本的诊断证据；当前实现与验收边界见“批准后的实现边界”。
+本报告记录固定版本诊断、重构设计与验证边界。前半部分属于历史取证；实现和后续纠正见“批准后的实现边界”及其附录。具体提交的验收、部署状态以对应 workflow receipt 和安装读回为准。
 
 ## 取证边界
 
@@ -202,3 +202,17 @@ Independent review found a pass-selection defect in the first implementation: fi
 ### Receipt projection boundary
 
 Immutable execution runs preserve raw facts; the ledger writer applies canonical redaction before materialization. `validateMaterializedVerificationExecutionReport` validates that projected representation against a single writer projection of the immutable result. This explicit boundary prevents embedded commit SHAs in commands from invalidating otherwise authentic evidence. Raw entropy-bearing reports are not receipt inputs. No second parser, raw fallback, or history rewrite is admitted.
+
+### Display IDs cannot own execution identity
+
+Installed verification of publication `879c9bfd` admitted `verification-execution-lifecycle-full-suite-check`, executed the same expensive command twice (counter 1 → 2), and then evaluated as missing. Both events had the same cache key; the writer had redacted their `check_id` display string. Raw/display ID lookup therefore bypassed both reuse and the expensive prior-execution guard.
+
+Execution decisions must use the existing executable/cache fingerprints. Exact reuse selects the newest same-key event before validating the immutable run and its original declared ID; failed or invalid later facts cannot expose an older success. Prior expensive execution uses the executable fingerprint independently of display naming, so renaming does not authorize another launch. Baseline counterevidence follows the same-key execution stream.
+
+Receipt matching already binds the complete check fingerprint. Its materialized input IDs are compared with one canonical writer projection of declared IDs before being mapped to internal raw contract keys. There is no second ID authority, arbitrary length cap, raw/projected fallback, or change to the secret redactor.
+
+### Canonical authoring and CI consumer closure
+
+The first cutover publication `879c9bfd` failed Required CI run `34025058232`. The failures demonstrate that executable authority removal must cover both runtime readers and every producer: disposable fleet/campaign contracts, continuation template installation, skill-evaluation grader contracts, and canonical contract templates. A missing plan remains an error; artifact-only contracts must explicitly declare an empty plan.
+
+The canonical template originally placed prose between the Verification Plan heading and its JSON fence, outside the parser's admitted syntax. Moving the guidance after the JSON restores valid generated contracts without relaxing parsing. A regression parses the actual source template and verifies the installed template is byte-identical. New helper IDs must also appear in the CLI help groups; otherwise the strict inventory equality prevents even `run --help` from rendering.

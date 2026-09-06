@@ -668,6 +668,7 @@ export function initBenchmarkGitRepo(workspacePath: string, home?: string): void
   const content =
     "\n# benchmark artifacts\n" +
     ARTIFACT_FILES.map((entry) => `/${entry}`).join("\n") +
+    "\n/.ai/harness/evidence/\n/.ai/harness/runs/" +
     "\n";
   writeFileSync(excludePath, readFileSync(excludePath, "utf-8") + content, "utf-8");
 }
@@ -946,6 +947,22 @@ function escapeYamlSingleQuoted(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+function renderEvalVerificationPlan(evalEntry: EvalEntry): string {
+  // Eval grader command policy is explicit and fixed; never infer it from command text.
+  const checks = (evalEntry.graders.commands_succeed ?? []).map((command, index) => ({
+    id: `eval-command-${index + 1}`,
+    kind: "command" as const,
+    command,
+    cwd: ".",
+    phase: "verification" as const,
+    cost: "normal" as const,
+    evidence_policy: "current_exact" as const,
+    necessity: `Eval grader command ${index + 1} must succeed for ${evalEntry.slug}.`,
+    inputs: { env: [] as string[] },
+  }));
+  return JSON.stringify({ protocol: 1, checks }, null, 2);
+}
+
 function renderEvalContract(evalEntry: EvalEntry): string {
   const lines: string[] = [
     `# Eval Contract: ${evalEntry.slug}`,
@@ -977,12 +994,20 @@ function renderEvalContract(evalEntry: EvalEntry): string {
   };
 
   appendList("files_exist", evalEntry.graders.files_exist);
-  appendList("commands_succeed", evalEntry.graders.commands_succeed);
   appendPathPatterns("files_contain", evalEntry.graders.files_contain);
   appendList("files_not_exist", evalEntry.anti_graders?.files_not_exist);
   appendPathPatterns("files_not_contain", evalEntry.anti_graders?.files_not_contain);
 
-  lines.push("```", "");
+  lines.push(
+    "```",
+    "",
+    "## Verification Plan",
+    "",
+    "```json",
+    renderEvalVerificationPlan(evalEntry),
+    "```",
+    "",
+  );
 
   lines.push(
     "## Evidence Requirements",
@@ -1015,6 +1040,7 @@ function runEvalGraders(repoRoot: string, workspacePath: string, evalEntry: Eval
       contractPath,
       "--strict",
       "--quiet",
+      "--read-only",
       "--report-file",
       reportPath,
     ],

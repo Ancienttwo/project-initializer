@@ -528,18 +528,16 @@ function readValidRunResult(context: PreparedContext, payload: ExecutionPayload)
 
 function reusableResult(context: PreparedContext, check: VerificationCheck): VerificationExecutionResult | null {
   const key = cacheKey(context, check);
-  const matches = executionEvents(context).filter(({ payload }) =>
-    payload.check_id === check.id
-      && payload.cache_key === key);
+  const matches = executionEvents(context).filter(({ payload }) => payload.cache_key === key);
   const winner = matches[matches.length - 1];
   if (!winner || !winner.payload.passed) return null;
-  const result = winner ? readValidRunResult(context, winner.payload) : null;
-  return result?.passed ? { ...result, execution: "reused" } : null;
+  const result = readValidRunResult(context, winner.payload);
+  return result?.passed && result.id === check.id ? { ...result, execution: "reused" } : null;
 }
 
 function priorExecutionExists(context: PreparedContext, check: VerificationCheck): boolean {
   return executionEvents(context).some(({ payload }) =>
-    payload.check_id === check.id && payload.execution_spec_hash === fingerprintVerificationCheckExecution(check));
+    payload.execution_spec_hash === fingerprintVerificationCheckExecution(check));
 }
 
 function baselineResult(
@@ -580,9 +578,7 @@ function baselineResult(
       && payload.passed
       && readValidRunResult(context, payload)?.passed === true);
   if (!eventMatch) return { ...base, passed: false, message: "baseline execution is missing, failed, forged, or stale" };
-  const sameInput = events.filter(({ payload }) =>
-    payload.check_id === eventMatch.payload.check_id
-      && payload.cache_key === eventMatch.payload.cache_key);
+  const sameInput = events.filter(({ payload }) => payload.cache_key === eventMatch.payload.cache_key);
   const latest = sameInput[sameInput.length - 1];
   if (!latest?.payload.passed || readValidRunResult(context, latest.payload)?.passed !== true) {
     return { ...base, passed: false, message: "baseline is superseded because a newer execution failed or is invalid" };
@@ -675,6 +671,15 @@ function stringValue(value: unknown, field: string): string {
   return value;
 }
 
+function materializedVerificationCheckId(id: string): string {
+  const projected = redactPayloadStrings({
+    execution_evaluation: { results: [{ id }] },
+  } as unknown as JsonValue, collectDenylistSecretValues()) as {
+    readonly execution_evaluation: { readonly results: readonly [{ readonly id: string }] };
+  };
+  return projected.execution_evaluation.results[0].id;
+}
+
 function matchingImmutableExecution(
   context: PreparedContext,
   check: VerificationCheck,
@@ -682,7 +687,6 @@ function matchingImmutableExecution(
 ): boolean {
   return executionEvents(context).some(({ event, payload }) => {
     if (payload.plan_hash !== context.planHash
-      || payload.check_id !== check.id
       || payload.check_fingerprint !== fingerprintVerificationCheck(check)
       || payload.execution_spec_hash !== fingerprintVerificationCheckExecution(check)
       || payload.snapshot_hash !== context.snapshot.snapshot_hash
@@ -773,11 +777,25 @@ export function validateMaterializedVerificationExecutionReport(input: {
   if (!Array.isArray(reportObject.results) || reportObject.results.length !== plan.checks.length) {
     throw new Error("verification report results do not cover the plan exactly");
   }
+  const expectedByMaterializedId = new Map<string, VerificationCheck>();
+  for (const check of plan.checks) {
+    const materializedId = materializedVerificationCheckId(check.id);
+    if (expectedByMaterializedId.has(materializedId)) {
+      throw new Error("verification report result ids are ambiguous after materialization");
+    }
+    expectedByMaterializedId.set(materializedId, check);
+  }
   const supplied = new Map<string, VerificationExecutionResult>();
   for (const raw of reportObject.results) {
     const candidate = objectValue(raw, "verification report result") as unknown as VerificationExecutionResult;
-    if (typeof candidate.id !== "string" || supplied.has(candidate.id)) throw new Error("verification report result ids are missing or duplicated");
-    supplied.set(candidate.id, candidate);
+    if (typeof candidate.id !== "string") throw new Error("verification report result ids are missing or invalid");
+    const check = expectedByMaterializedId.get(candidate.id);
+    if (!check) throw new Error(`verification report result id is unknown: ${candidate.id}`);
+    if (supplied.has(check.id)) throw new Error("verification report result ids are duplicated");
+    supplied.set(check.id, candidate);
+  }
+  if (supplied.size !== plan.checks.length) {
+    throw new Error("verification report result ids do not cover the plan exactly");
   }
   for (const check of plan.checks) {
     const result = supplied.get(check.id);

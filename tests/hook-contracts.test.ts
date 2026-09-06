@@ -144,7 +144,7 @@ describe("Hook contracts", () => {
     expect(script).toContain("ContractGuard");
     expect(script).toContain("ResearchGate");
     expect(script).toContain("done");
-    expect(script).toContain("'run', 'verify-contract'");
+    expect(script).toContain("'run', 'acceptance-receipt', 'verify'");
     expect(script).toContain("[ExternalAcceptance]");
     expect(script).toContain("AcceptanceReceipt");
     expect(script).toContain("[CrossReview]");
@@ -244,7 +244,8 @@ describe("Hook contracts", () => {
     expect(read("assets/templates/helpers/archive-architecture-request.sh")).toContain("[ArchitectureArchive]");
     expect(read("assets/templates/helpers/workstream-sync.sh")).toContain("tasks/workstreams");
     expect(script).toContain("tasks/todos.md");
-    expect(script).toContain("--quiet");
+    expect(script).toContain("'verification-plan'");
+    expect(script).toContain("'evaluate'");
     expect(script).toContain("contract_references_path");
   });
 
