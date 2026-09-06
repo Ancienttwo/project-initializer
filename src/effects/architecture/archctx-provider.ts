@@ -40,7 +40,28 @@ export interface ArchctxProviderOptions {
 
 export type ProjectionSnapshotIdentityField = 'repositoryId' | 'workspaceId' | 'headSha' | 'worktreeDigest';
 
+interface ProjectionInputFile { path: string; size: number; digest: string }
+interface ProjectionSnapshotObservation {
+  snapshot: ProjectionRequestV1['expected'];
+  files: ProjectionInputFile[];
+}
+
+// Request-local diagnostic evidence stays off the wire and cannot outlive its snapshot.
+const snapshotObservations = new WeakMap<ProjectionRequestV1['expected'], ProjectionSnapshotObservation>();
+
 export type ArchitectureProjectionProviderDiagnostic =
+  | {
+      code: 'snapshot-drift';
+      phase: 'before-provider' | 'after-provider';
+      baseline: 'request-capture' | 'provider-entry' | 'unavailable';
+      mismatchedFields: ProjectionSnapshotIdentityField[];
+      expected: ProjectionRequestV1['expected'];
+      actual: ProjectionRequestV1['expected'];
+      changes: Array<{ path: string; change: 'added' | 'modified' | 'deleted'; before: Omit<ProjectionInputFile, 'path'> | null; after: Omit<ProjectionInputFile, 'path'> | null }> | null;
+      totalChanges: number | null;
+      truncated: boolean;
+      message: string;
+    }
   | {
       code: 'post-apply-reconciliation-required';
       status: 'applied-reconcile-required';
@@ -297,6 +318,10 @@ export function runArchitectureProjection(request: ProjectionRequestV1, repoRoot
   if ((request.mode === 'apply' || request.mode === 'adopt') && policy.applyMode === 'disabled') throw new Error('architecture projection apply is disabled');
   const { resolved } = archctxCapabilities(repoRoot, { ...options, policy });
   const args = ['projection', 'run', '--request-json', JSON.stringify(request)];
+  const before = captureProjectionSnapshotObservation(repoRoot);
+  const captured = snapshotObservations.get(request.expected);
+  const baseline = captured && snapshotMismatches(captured.snapshot, request.expected).length === 0 ? captured : undefined;
+  reportSnapshotDrift(options, 'before-provider', request.expected, before, baseline);
   const processResult = runArchctxProcess(
     resolved,
     args,
@@ -304,6 +329,8 @@ export function runArchitectureProjection(request: ProjectionRequestV1, repoRoot
     repoRoot,
     remainingTimeout(options, policy.timeoutMs, 'projection'),
   );
+  const after = captureProjectionSnapshotObservation(repoRoot);
+  reportSnapshotDrift(options, 'after-provider', before.snapshot, after, before);
   if (processResult.status !== 0 || processResult.signal || processResult.error) throw new Error(`archctx projection failed: ${processFailure(processResult)}`);
   const envelope = parseJson(processResult.stdout, 'archctx projection') as Record<string, unknown>;
   if (envelope.schemaVersion !== 'archcontext.envelope/v1' || envelope.ok !== true || !isRecord(envelope.data)) throw new Error(`archctx projection returned an invalid envelope: ${safeError(envelope)}`);
@@ -312,7 +339,7 @@ export function runArchitectureProjection(request: ProjectionRequestV1, repoRoot
   const receiptDelivery = inputMismatches.length > 0 && isCorrelatedApplyReceiptDelivery(request, result);
   if (!receiptDelivery) assertExpectedSnapshot(request.expected, result.inputSnapshot, 'in provider result input');
   assertProjectionResultAuthority(request, result, repoRoot, policy, receiptDelivery);
-  const actualSnapshot = captureArchitectureProjectionSnapshot(repoRoot);
+  const actualSnapshot = after.snapshot;
   if (result.status === 'applied-reconcile-required') {
     const mismatchedFields = snapshotMismatches(result.outputSnapshot, actualSnapshot);
     const providerStderr = processResult.stderr.trim().slice(0, 600) || null;
@@ -364,6 +391,13 @@ function remainingTimeout(options: Pick<ArchctxProviderOptions, 'deadlineMs' | '
  * against the same fixed point before and after the ChangeSet write.
  */
 export function captureArchitectureProjectionSnapshot(repoRoot: string): ProjectionRequestV1['expected'] {
+  const observation = captureProjectionSnapshotObservation(repoRoot);
+  const snapshot = { ...observation.snapshot };
+  snapshotObservations.set(snapshot, observation);
+  return snapshot;
+}
+
+function captureProjectionSnapshotObservation(repoRoot: string): ProjectionSnapshotObservation {
   const root = realpathSync(resolve(repoRoot));
   const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const headSha = head.status === 0 ? (head.stdout ?? '').trim() : '';
@@ -378,12 +412,48 @@ export function captureArchitectureProjectionSnapshot(repoRoot: string): Project
       digest: createHash('sha256').update(readFileSync(absolute)).digest('hex'),
     };
   });
-  return {
+  const snapshot = {
     repositoryId: `repo.${createHash('sha256').update(root).digest('hex').slice(0, 16)}`,
     workspaceId: `workspace.${digestProjectionJson({ root }).replace(/^sha256:/, '').slice(0, 16)}`,
     headSha,
     worktreeDigest: digestProjectionJson(files),
   };
+  return { snapshot, files };
+}
+
+function reportSnapshotDrift(
+  options: ArchctxProviderOptions,
+  phase: 'before-provider' | 'after-provider',
+  expected: ProjectionRequestV1['expected'],
+  actual: ProjectionSnapshotObservation,
+  baseline?: ProjectionSnapshotObservation,
+): void {
+  const mismatchedFields = snapshotMismatches(expected, actual.snapshot);
+  if (mismatchedFields.length === 0) return;
+  const changes: Extract<ArchitectureProjectionProviderDiagnostic, { code: 'snapshot-drift' }>['changes'] = baseline ? [] : null;
+  let totalChanges: number | null = baseline ? 0 : null;
+  if (baseline && changes) {
+    const before = new Map(baseline.files.map(({ path, ...file }) => [path, file]));
+    const after = new Map(actual.files.map(({ path, ...file }) => [path, file]));
+    for (const path of [...new Set([...before.keys(), ...after.keys()])].sort()) {
+      const previous = before.get(path) ?? null;
+      const current = after.get(path) ?? null;
+      if (previous?.digest === current?.digest && previous?.size === current?.size) continue;
+      totalChanges!++;
+      if (changes.length < 20) changes.push({ path, change: previous === null ? 'added' : current === null ? 'deleted' : 'modified', before: previous, after: current });
+    }
+  }
+  const detail = {
+    phase,
+    baseline: baseline ? phase === 'before-provider' ? 'request-capture' as const : 'provider-entry' as const : 'unavailable' as const,
+    mismatchedFields,
+    expected: { ...expected },
+    actual: { ...actual.snapshot },
+    changes,
+    totalChanges,
+    truncated: totalChanges !== null && totalChanges > (changes?.length ?? 0),
+  };
+  emitProviderDiagnostic(options, { code: 'snapshot-drift', ...detail, message: `snapshot drift ${JSON.stringify(detail)}` });
 }
 
 export function architectureProjectionOwnedPaths(repoRoot: string): string[] {
