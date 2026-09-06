@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-07 06:45
+> **Related Plan**: plans/archive/plan-20260907-0557-brc10-supervised-renewal.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260907-0645
+> **Archive Projection V1**: `plans/plan-20260907-0557-brc10-supervised-renewal.md` => `plans/archive/plan-20260907-0557-brc10-supervised-renewal.md`
+> **Archive Projection V1**: `tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md` => `tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-0557-brc10-supervised-renewal.contract.md` => `tasks/archive/contract-20260907-0645-brc10-supervised-renewal.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-0557-brc10-supervised-renewal.review.md` => `tasks/archive/review-20260907-0645-brc10-supervised-renewal.md`
+
 # Task Review: brc10-supervised-renewal
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260907-0557-brc10-supervised-renewal.md
-> **Contract**: tasks/contracts/20260907-0557-brc10-supervised-renewal.contract.md
-> **Notes File**: tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md
+> **Plan**: plans/archive/plan-20260907-0557-brc10-supervised-renewal.md
+> **Contract**: tasks/archive/contract-20260907-0645-brc10-supervised-renewal.md
+> **Notes File**: tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-07 05:57
 > **Recommendation**: pass

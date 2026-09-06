@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-07 06:45
+> **Related Plan**: plans/archive/plan-20260907-0557-brc10-supervised-renewal.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260907-0645
+> **Archive Projection V1**: `plans/plan-20260907-0557-brc10-supervised-renewal.md` => `plans/archive/plan-20260907-0557-brc10-supervised-renewal.md`
+> **Archive Projection V1**: `tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md` => `tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-0557-brc10-supervised-renewal.contract.md` => `tasks/archive/contract-20260907-0645-brc10-supervised-renewal.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-0557-brc10-supervised-renewal.review.md` => `tasks/archive/review-20260907-0645-brc10-supervised-renewal.md`
+
 # Task Contract: brc10-supervised-renewal
 
-> **Status**: Active
-> **Plan**: plans/plan-20260907-0557-brc10-supervised-renewal.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260907-0557-brc10-supervised-renewal.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-07 05:57
-> **Review File**: `tasks/reviews/20260907-0557-brc10-supervised-renewal.review.md`
-> **Notes File**: `tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md`
+> **Review File**: `tasks/archive/review-20260907-0645-brc10-supervised-renewal.md`
+> **Notes File**: `tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -41,10 +51,10 @@ This code-change package includes one directly blocking policy transport correct
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260907-0557-brc10-supervised-renewal.md`
+- Source plan: `plans/archive/plan-20260907-0557-brc10-supervised-renewal.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260907-0557-brc10-supervised-renewal.review.md`
-- Notes file: `tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md`
+- Review file: `tasks/archive/review-20260907-0645-brc10-supervised-renewal.md`
+- Notes file: `tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -83,11 +93,11 @@ allowed_paths:
   - docs/researches/20260907-brc10-supervised-renewal.md
   - docs/architecture/.projection-manifest.json
   - plans/plan-20260907-0554-brc10-lifecycle.md
-  - plans/plan-20260907-0557-brc10-supervised-renewal.md
+  - plans/archive/plan-20260907-0557-brc10-supervised-renewal.md
   - tasks/todos.md
-  - tasks/contracts/20260907-0557-brc10-supervised-renewal.contract.md
-  - tasks/reviews/20260907-0557-brc10-supervised-renewal.review.md
-  - tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md
+  - tasks/archive/contract-20260907-0645-brc10-supervised-renewal.md
+  - tasks/archive/review-20260907-0645-brc10-supervised-renewal.md
+  - tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md
 ```
 
 ## Evidence Requirements
@@ -143,7 +153,7 @@ exit_criteria:
     - docs/spec.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260907-0557-brc10-supervised-renewal.notes.md
+    - tasks/archive/notes-20260907-0645-brc10-supervised-renewal.md
 ```
 
 ## Verification Plan
