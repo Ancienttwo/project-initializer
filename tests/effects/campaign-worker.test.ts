@@ -15,6 +15,7 @@ import { canonicalMessageDigest } from '../../src/core/messages/mechanics';
 import { processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
 import type { WorkPackageRetryPolicyV1 } from '../../src/core/engineers/scheduling';
 import { LeaseLivenessStoreError, readLeaseLiveness } from '../../src/effects/state/coordination-lease-liveness-store';
+import { withTaskLock } from '../../src/effects/state/coordination-lease-store';
 
 const roots: string[] = [];
 afterEach(() => { roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); });
@@ -39,7 +40,7 @@ test('real supervised campaign child renews while alive and persists scoped quie
   const observationDeadline = Date.now() + 10_000;
   while (child.exitCode === null && Date.now() < observationDeadline) {
     try {
-      if (readLeaseLiveness(f.root, f.result.envelope.task_id).renewal.sequence >= 2) { renewedWhileAlive = child.exitCode === null; break; }
+      if (withTaskLock(f.root, f.result.envelope.task_id, () => readLeaseLiveness(f.root, f.result.envelope.task_id)).renewal.sequence >= 2) { renewedWhileAlive = child.exitCode === null; break; }
     } catch (error) { if (!(error instanceof LeaseLivenessStoreError) || error.code !== 'liveness_not_found') throw error; }
     await Bun.sleep(20);
   }

@@ -47,3 +47,19 @@ This is the first directly blocking out-of-scope correction. Exact field validat
 > **Substantive Change SHA256**: `sha256:c961204e64ded2134d1ecbbafa5919948ae461597f133b1276ffdf8c674c401c`
 
 The archived package is bound to the direct/merge-base publication range from `188ae3529695623022c015c0cae0f7ec0b1304a4`. Source and tests are unchanged from the accepted subject; this metadata does not claim full BRC10 completion.
+
+## PR CI observation correction
+
+PR #337 CI `34065120741`, subject `22e009e6fd401d0fc51fe79c041c5f5a4e42ca65`, failed only the new `real supervised campaign child renews while alive and persists scoped quiescence` test. All three MCP platforms passed. The Test log reported `LeaseLivenessStoreError: lease liveness pointer is stale` at the concurrent polling read in `tests/effects/campaign-worker.test.ts`; the remaining test files passed. This is failed CI evidence, not a full-suite pass for that subject.
+
+Root Cause Evidence:
+- `root_cause`: The test read the generation projection and task pointer without the Task lock while the real child updated them under that lock. The store intentionally rejects a pointer/current mismatch; the observer could straddle a valid renewal.
+- `regression_guard`: The existing real-child renewal test retains its while-alive observation, minimum renewal sequence, generation and scoped quiescence assertions. Its polling read now shares the writer's Task lock, making the multi-file snapshot coherent without swallowing conflict errors.
+- `pre_fix_failure_artifact`: GitHub Actions run `34065120741`, Test/CI gate, `2026-09-06T22:58:12Z`, `tests/effects/campaign-worker.test.ts:42` (local copy `/tmp/brc10-renew-ci-failed.log`).
+- `behavioral_delta`: Test-only snapshot synchronization; no production behavior or provider/Lease authority change.
+
+Targeted verification: `bun test tests/effects/campaign-worker.test.ts --test-name-pattern 'real supervised campaign child renews' --timeout 60000` passed (1 test, 7 assertions). The earlier semantic review and canonical acceptance remain evidence for their original subject. This post-acceptance CI correction is limited to the polling observer; required repository integrity checks and subsequent PR CI validate the corrected publication subject. No local full suite is warranted for the test-only lock correction.
+
+> **Substantive Change SHA256**: `sha256:2c35eeb1c742ae55dffed660dba8058fe35814b148a548d65279fea978a02e1b`
+
+The correction is bound to the complete PR publication range from `188ae3529695623022c015c0cae0f7ec0b1304a4`. Existing archived evidence is eligible in that range because this package adds it; an incremental working-tree check does not admit an edit to an already archived artifact as new workflow evidence.
