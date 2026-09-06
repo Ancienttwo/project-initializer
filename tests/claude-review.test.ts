@@ -214,8 +214,8 @@ function unstartedSession() {
 test('pre-spawn cancel fences a delayed real tmux host and preserves a sentinel', async () => {
   const f = unstartedSession();
   const sentinel = `sentinel-${randomUUID()}`;
-  execFileSync('tmux', ['-L', 'repo-harness-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
-  const before = execFileSync('tmux', ['-L', 'repo-harness-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
+  execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
+  const before = execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
   const lock = acquireExclusiveDirectoryLock(f.root, join('.ai/harness/runs/claude-review', f.dir.split('/').at(-1)!, 'startup.lock'));
   try { await expect(closeClaudeReview(f.options, true)).rejects.toThrow('exclusive lock'); }
   finally { lock.release(); }
@@ -223,17 +223,17 @@ test('pre-spawn cancel fences a delayed real tmux host and preserves a sentinel'
   await closeClaudeReview(f.options, true);
   const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
   const host = fileURLToPath(new URL('../src/effects/review/claude-review-host.ts', import.meta.url));
-  execFileSync('tmux', ['-L', 'repo-harness-review', 'new-session', '-d', '-s', f.session.tmux_session,
+  execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'new-session', '-d', '-s', f.session.tmux_session,
     [process.execPath, host, f.dir].map(quote).join(' ')]);
-  const live = () => { try { execFileSync('tmux', ['-L', 'repo-harness-review', 'has-session', '-t', f.session.tmux_session], { stdio: 'ignore' }); return true; } catch { return false; } };
+  const live = () => { try { execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'has-session', '-t', f.session.tmux_session], { stdio: 'ignore' }); return true; } catch { return false; } };
   try {
     for (let i = 0; i < 30 && live(); i++) await Bun.sleep(100);
     expect(live()).toBe(false);
     expect(existsSync(join(f.dir, 'spawn-intent.json'))).toBe(false);
     expect(existsSync(join(f.dir, 'processes.json'))).toBe(false);
     expect(existsSync(join(f.dir, 'accepted-1.json'))).toBe(false);
-    expect(execFileSync('tmux', ['-L', 'repo-harness-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' })).toBe(before);
-  } finally { if (live()) execFileSync('tmux', ['-L', 'repo-harness-review', 'kill-session', '-t', f.session.tmux_session]); }
+    expect(execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' })).toBe(before);
+  } finally { if (live()) execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'kill-session', '-t', f.session.tmux_session]); }
 }, 10_000);
 
 test('pre-metadata cancel refuses ambiguous spawn intent and mismatched no-child proof', async () => {

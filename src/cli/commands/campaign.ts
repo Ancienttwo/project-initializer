@@ -8,6 +8,7 @@ import { runBrowserConsult, runBrowserFollowup, readSession } from '../chatgpt-b
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { runHelper } from '../runtime/helper-runner';
+import { runCampaignAcquisition } from '../../effects/automation/campaign-acquisition';
 import { runCampaignPlanningStep } from '../../effects/automation/campaign-planning';
 import { CampaignPlanningError } from '../../core/automation/campaign-planning';
 import { readIssueBatchIntent, readIssueBatchAdoptionArtifact } from '../../effects/automation/issue-batch-store';
@@ -141,16 +142,25 @@ export function runCampaignPlanningPreflight(repo: string, contract: string) {
 
 }
 
-export async function runCampaignHeartbeatStep(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly intentSha256?: string; readonly idempotencyKey?: string; readonly host?: string; readonly sessionId?: string; readonly planningResult?: string }): Promise<void> {
+export async function runCampaignHeartbeatStep(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly intentSha256?: string; readonly idempotencyKey?: string; readonly host?: string; readonly sessionId?: string; readonly planningResult?: string; readonly authorizationId?: string }): Promise<void> {
   const root = raw.repo?.trim() || process.cwd();
+  if (raw.authorizationId !== undefined && raw.planningResult !== undefined) throw new CampaignArgumentError('--authorization-id and --planning-result are mutually exclusive');
   const intent = readIssueBatchIntent(root, required(raw.campaignId, '--campaign-id'), groupNumber(raw.groupNumber), required(raw.intentSha256, '--intent-sha256'));
   if (readIssueBatchAdoptionArtifact(root, intent, 'publication')) {
     if (raw.host !== 'claude' && raw.host !== 'codex') throw new CampaignArgumentError('post-adoption step requires --host claude|codex');
+    if (raw.authorizationId !== undefined) {
+      const acquired = runCampaignAcquisition({ repo_root: root, campaign_id: intent.campaign_id, group_number: intent.group_number, intent_sha256: intent.intent_sha256,
+        host: raw.host, session_id: required(raw.sessionId, '--session-id'), idempotency_key: required(raw.idempotencyKey, '--idempotency-key'), authorization_id: required(raw.authorizationId, '--authorization-id') });
+      output(acquired);
+      if ('ok' in acquired && !acquired.ok) process.exitCode = 1;
+      return;
+    }
     output(runCampaignPlanningStep({ repo_root: root, campaign_id: intent.campaign_id, group_number: intent.group_number, intent_sha256: intent.intent_sha256,
       host: raw.host, session_id: required(raw.sessionId, '--session-id'), idempotency_key: required(raw.idempotencyKey, '--idempotency-key'), ...(raw.planningResult ? { result: requestJson(raw.planningResult) } : {}),
     }, { preflight: runCampaignPlanningPreflight }));
     return;
   }
+  if (raw.authorizationId !== undefined) throw new CampaignArgumentError('execution requires canonical campaign adoption');
   output(await runCampaignStep({
     repo_root: raw.repo?.trim() || process.cwd(),
     campaign_id: required(raw.campaignId, '--campaign-id'),
@@ -208,6 +218,7 @@ export function buildCampaignCommand(): Command {
     .option('--host <host>', 'Authorized local planning host: claude or codex')
     .option('--session-id <id>', 'Exact local parent session owning adopted group planning')
     .option('--planning-result <path>', 'Closed local planning outcome and evidence JSON')
+    .option('--authorization-id <id>', 'Issued Engineer authorization for one acquired worker handoff')
     .action(async (options) => { try { await runCampaignHeartbeatStep(options); } catch (error) { outputError(error); } });
   command.command('adopt')
     .description('Verify exact-SHA readback, seal authoring and publish an atomic repair batch candidate')

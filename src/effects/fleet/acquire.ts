@@ -10,6 +10,7 @@
 
 import { execFileSync } from 'child_process';
 import { randomUUID } from 'crypto';
+import { realpathSync } from 'fs';
 import { join } from 'path';
 import {
   lookupCanonicalTask,
@@ -67,6 +68,7 @@ import {
 import { readLease, type LeaseRead } from '../state/coordination-lease-store';
 import { resolveBoard } from '../state/resolve-board';
 import { campaignTaskPlanProof } from '../automation/campaign-planning-proof';
+import { CampaignCapacityError, withCampaignCapacity } from '../automation/campaign-capacity';
 
 type TaskOfferPlanFailure = NonNullable<ClassifyTaskOfferInput['plan_failure']>;
 
@@ -340,6 +342,8 @@ export interface FleetAcquireFailure {
   readonly ok: false;
   readonly error: FleetAcquireErrorCode;
   readonly message: string;
+  /** A transient capacity refusal is distinct from an unavailable asserted Task. */
+  readonly reason?: 'campaign_capacity_full';
   /** Present only when release of this call's own claim also failed. */
   readonly cause?: Exclude<FleetAcquireErrorCode, 'rollback_failed'>;
 }
@@ -390,6 +394,7 @@ export interface FleetAcquireDependencies {
   }) => CanonicalSprintRead;
   readonly readPlanProof: typeof readCanonicalTaskPlanProof;
   readonly campaignPlanProof: typeof campaignTaskPlanProof;
+  readonly withCampaignCapacity: typeof withCampaignCapacity;
   readonly repoIdentity: typeof resolveRepoIdentity;
 }
 
@@ -455,6 +460,7 @@ function acquisitionDependencies(overrides: Partial<FleetAcquireDependencies> = 
     readCanonicalSprint,
     readPlanProof: readCanonicalTaskPlanProof,
     campaignPlanProof: campaignTaskPlanProof,
+    withCampaignCapacity,
     repoIdentity: resolveRepoIdentity,
     ...overrides,
   };
@@ -564,7 +570,7 @@ function collectOptions(
 
 function registeredWritableRepo(
   registry: RepoHarnessRegistrySnapshot,
-  offer: TaskOfferV1,
+  offer: Pick<TaskOfferV1, 'repo_id'>,
   expected: RepoHarnessRegisteredRepo | null = null,
 ): RepoHarnessRegisteredRepo | null {
   const repo = registry.repos.find((candidate) => candidate.id === offer.repo_id) ?? null;
@@ -633,7 +639,7 @@ type ClaimAuthorityRevalidation =
   | { readonly ok: false; readonly result: FleetAcquireFailure };
 
 function revalidateClaimAuthority(
-  offer: TaskOfferV1,
+  offer: Pick<TaskOfferV1, 'repo_id' | 'authorization_revision' | 'canonical_target' | 'plan' | 'sprint_path' | 'task_id' | 'task_revision'>,
   repo: RepoHarnessRegisteredRepo,
   options: FleetAcquireOptions,
   deps: FleetAcquireDependencies,
@@ -748,13 +754,16 @@ export function acquireFleetTask(options: FleetAcquireOptions = {}): FleetAcquir
   const deps = acquisitionDependencies(options.dependencies);
   const attempts = validateAttempts(options.max_attempts);
   const sessionId = options.session_id ?? `fleet-acquire-${randomUUID()}`;
+  const fullCandidates = new Set<string>();
+  let capacityScanLimit: number | undefined;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const initialRegistry = attempt === 0 && options.registry_snapshot !== undefined
+    const initialRegistry = capacityScanLimit === undefined && options.registry_snapshot !== undefined
       ? options.registry_snapshot
       : deps.readRegistry({ env: options.env, adoptedOnly: true });
     const initial = deps.collectOffers(collectOptions(options, initialRegistry));
-    const selected = selectOffer(initial, options);
+    capacityScanLimit ??= initial.offers.length;
+    const selected = selectOffer({ ...initial, offers: initial.offers.filter(offer => !fullCandidates.has(`${offer.repo_id}:${offer.task_id}`)) }, options);
     if (!selected.ok) return selected.result;
     const offer = selected.offer;
     if (offer.canonical_target === null || offer.plan === null) {
@@ -765,15 +774,36 @@ export function acquireFleetTask(options: FleetAcquireOptions = {}): FleetAcquir
       return failure('authorization_stale', 'selected offer no longer has write authorization');
     }
 
-    const revalidated = revalidateOffer(offer, originalRepo, options, deps);
-    if (!revalidated.ok) return revalidated.result;
-    const claim = deps.claim({
-      taskId: offer.task_id,
-      expectedTaskRevision: offer.task_revision,
-      targetRef: offer.canonical_target.ref,
-      sprintPath: offer.sprint_path,
-      sessionId,
-    }, deps.sprintDependencies(revalidated.repo.path));
+    const claimCurrentOffer = () => {
+      const revalidated = revalidateOffer(offer, originalRepo, options, deps);
+      if (!revalidated.ok) return { failure: revalidated.result };
+      const claim = deps.claim({
+        taskId: offer.task_id,
+        expectedTaskRevision: offer.task_revision,
+        targetRef: offer.canonical_target!.ref,
+        sprintPath: offer.sprint_path,
+        sessionId,
+      }, deps.sprintDependencies(revalidated.repo.path));
+      return { revalidated, claim };
+    };
+    let admission: ReturnType<typeof claimCurrentOffer>;
+    try {
+      admission = deps.withCampaignCapacity(originalRepo.path, offer.task_id, offer.canonical_target.ref, options.env, claimCurrentOffer);
+    } catch (error) {
+      if (error instanceof CampaignCapacityError && error.code === 'campaign_capacity_full' && options.assertion?.task_id === undefined) {
+        fullCandidates.add(`${offer.repo_id}:${offer.task_id}`);
+        if (fullCandidates.size >= capacityScanLimit) return failure('no_eligible_task', 'campaign capacity scan exhausted the initial offer count');
+        // Capacity skips do not spend claim-race retries; the first snapshot bounds this scan.
+        attempt -= 1;
+        continue;
+      }
+      if (error instanceof CampaignCapacityError && error.code === 'campaign_capacity_full') {
+        return Object.freeze({ ...failure('no_eligible_task', error.message), reason: 'campaign_capacity_full' });
+      }
+      return failure('authorization_stale', error instanceof Error ? error.message : String(error));
+    }
+    if (admission.failure) return admission.failure;
+    const { revalidated, claim } = admission;
     if (claim.exitCode !== 0) {
       // Losing an election is expected under concurrency. Re-read the offer on
       // the next bounded attempt; no lease exists that this caller may release.
@@ -877,4 +907,14 @@ export function acquireFleetTask(options: FleetAcquireOptions = {}): FleetAcquir
   }
 
   return failure('no_eligible_task', 'no execution-ready task is available after bounded claim retries');
+}
+
+/** A replayed envelope must pass the same post-claim authorities as a fresh acquisition. */
+export function validateFleetWorkEnvelope(root: string, work: WorkEnvelopeV1, env?: NodeJS.ProcessEnv): void {
+  const deps = acquisitionDependencies();
+  const registry = deps.readRegistry({ env, adoptedOnly: true });
+  const repo = registeredWritableRepo(registry, work);
+  if (!repo || realpathSync(repo.path) !== realpathSync(root)) throw new Error('WorkEnvelope repository authorization is no longer current');
+  const authority = revalidateClaimAuthority(work, repo, { env }, deps);
+  if (!authority.ok) throw new Error(authority.result.message);
 }

@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-06 16:25
+> **Related Plan**: plans/archive/plan-20260906-0401-brc8-bounded-worker-acquisition.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260906-1625
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-06 04:16
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.

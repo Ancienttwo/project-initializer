@@ -107,3 +107,68 @@ describe('issue #280 canonical acquire-next', () => {
     } })).toThrow('modified');
   });
 });
+
+
+describe('campaign exact Task selection', () => {
+  test('capacity skips preserve order beyond selection retry count and do not acquire a blocked task', () => {
+    const repo = root();
+    const blocked = ['a', 'b', 'c', 'd'].map(id => ({ ...offer(id, 100), task_id: id.repeat(64) }));
+    const ready = { ...offer('ready', 1), task_id: 'f'.repeat(64) };
+    const visited: string[] = [];
+    const result = acquireNextScheduledEngineerTask({ repo_root: repo, principal, idempotency_key: 'capacity-scan', dependencies: {
+      collectOffers: () => document([...blocked, ready]),
+      acquire: input => {
+        visited.push(input.assertion.task_id);
+        return input.assertion.task_id === ready.task_id ? success(ready) : { ok: false, error: 'fleet_acquire_failed', message: 'full', fleet: {
+          ok: false, error: 'fleet_acquire_failed', message: 'full', fleet: { ok: false, error: 'no_eligible_task', reason: 'campaign_capacity_full', message: 'full' },
+        } };
+      },
+    } });
+    expect(result.ok).toBe(true);
+    expect(visited).toEqual([...blocked.map(o => o.task_id), ready.task_id]);
+  });
+
+  test('capacity-only idle can retry the same key after capacity becomes available', () => {
+    const repo = root(); const selected = offer('first', 10); let full = true;
+    const input = { repo_root: repo, principal, idempotency_key: 'temporary-capacity', dependencies: {
+      collectOffers: () => document([selected]),
+      acquire: (): any => full ? { ok: false, error: 'fleet_acquire_failed', message: 'full', fleet: {
+        ok: false, error: 'fleet_acquire_failed', message: 'full', fleet: { ok: false, error: 'no_eligible_task', reason: 'campaign_capacity_full', message: 'full' },
+      } } : success(selected),
+    } };
+    expect(acquireNextScheduledEngineerTask(input)).toMatchObject({ ok: false, error: 'engineer_no_eligible_offer' });
+    full = false;
+    expect(acquireNextScheduledEngineerTask(input).ok).toBe(true);
+  });
+
+  test('filters membership without reordering and binds normalized membership to replay', () => {
+    const repo = root(); let mutations = 0;
+    const outside = { ...offer('outside', 100), task_id: 'a'.repeat(64) };
+    const first = { ...offer('first', 10), task_id: 'b'.repeat(64) };
+    const second = { ...offer('second', 90), task_id: 'c'.repeat(64) };
+    const input = { repo_root: repo, principal, idempotency_key: 'membership', dependencies: {
+      collectOffers: () => document([outside, first, second]),
+      acquire: (request: any) => { mutations++; expect(request.assertion.task_id).toBe(first.task_id); return success(first); },
+    } };
+    const result = acquireNextScheduledEngineerTask({ ...input, filters: { task_ids: [second.task_id, first.task_id] } });
+    expect(result.ok).toBe(true);
+    expect(acquireNextScheduledEngineerTask({ ...input, filters: { task_ids: [first.task_id, second.task_id, first.task_id] } })).toEqual(result);
+    expect(mutations).toBe(1);
+    expect(acquireNextScheduledEngineerTask({ ...input, filters: { task_ids: [outside.task_id] } })).toMatchObject({ error: 'engineer_acquire_next_conflict' });
+  });
+
+  test('empty membership selects nothing and malformed membership fails before offer reads', () => {
+    const repo = root(); let reads = 0;
+    const input = { repo_root: repo, principal, idempotency_key: 'empty', dependencies: {
+      collectOffers: () => { reads++; return document([offer('first', 10)]); },
+      acquire: () => { throw new Error('must not acquire'); },
+    } };
+    expect(acquireNextScheduledEngineerTask({ ...input, filters: { task_ids: [] } })).toMatchObject({ error: 'engineer_no_eligible_offer' });
+    expect(reads).toBe(1);
+    for (const task_ids of [null, 'all', ['not-a-task'], [null]]) {
+      expect(() => acquireNextScheduledEngineerTask({ ...input, filters: { task_ids } as any })).toThrow('canonical Task IDs');
+    }
+    expect(() => acquireNextScheduledEngineerTask({ ...input, filters: { task_id: 'a'.repeat(64) } as any })).toThrow('unknown field');
+    expect(reads).toBe(1);
+  });
+});

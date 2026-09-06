@@ -6,7 +6,7 @@ test('existing campaign step exposes explicit local-host handoff without a new e
   const command = buildCampaignCommand();
   expect(command.commands.map(c => c.name())).toEqual(['start', 'transition', 'status', 'author', 'author-followup', 'step', 'adopt']);
   const step = command.commands.find(c => c.name() === 'step')!;
-  for (const option of ['--host', '--session-id', '--planning-result']) expect(step.options.some(o => o.long === option)).toBe(true);
+  for (const option of ['--host', '--session-id', '--planning-result', '--authorization-id']) expect(step.options.some(o => o.long === option)).toBe(true);
   const rendered = spawnSync('bun', [resolve(import.meta.dir, '../../src/cli/index.ts'), 'campaign', 'step', '--help'], { encoding: 'utf8' });
   expect(rendered.status).toBe(0); expect(rendered.stdout).toContain('--planning-result'); expect(rendered.stdout.replace(/\s+/g, ' ')).toContain('local planning session');
 });
@@ -41,4 +41,11 @@ test('relative repository path reaches the real planning preflight contract', as
     expect(run.status, run.stderr || run.stdout).toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({ ok: true, task_profile: 'code-change', evidence: [] });
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('campaign step rejects combined execution and planning before reading either authority', () => {
+  const run = spawnSync('bun', [resolve(import.meta.dir, '../../src/cli/index.ts'), 'campaign', 'step', '--campaign-id', 'missing', '--group-number', '1', '--intent-sha256', 'missing', '--idempotency-key', 'one', '--authorization-id', 'unissued', '--planning-result', 'missing.json'], { encoding: 'utf8' });
+  expect(run.status).toBe(2);
+  expect(JSON.parse(run.stderr)).toMatchObject({ message: '--authorization-id and --planning-result are mutually exclusive' });
 });

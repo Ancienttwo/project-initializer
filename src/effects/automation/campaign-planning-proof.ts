@@ -102,40 +102,45 @@ export function validateAdmissionEvidence(root: string, admission: PlanningAdmis
   if (admission.job.issue_kind === 'test_gap' && !result.characterization) throw new CampaignPlanningError('planning_failed', 'test_gap requires characterization and old-test falsifier evidence');
   for (const artifact of admission.evidence) if (messageSha256(planningArtifactBytes(root, artifact.path)) !== artifact.sha256) throw new CampaignPlanningError('source_stale', 'planning evidence bytes changed');
 }
-/** Campaign-only admission gate; existing TaskOffer remains the readiness authority. */
-export function campaignTaskPlanProof(root: string, taskId: string, taskRevision: string, proof: CanonicalTaskPlanProofResult, env: NodeJS.ProcessEnv = process.env, targetRef = 'main'): CanonicalTaskPlanProofResult {
-  const intents = storedPlanningIntents(root);
-  for (const intent of intents) {
+/** Membership is shared by readiness and acquisition; canonical members cannot lose their gate by deleting local authority. */
+export function campaignTaskIntent(root: string, taskId: string, targetRef = 'main') {
+  const matches = storedPlanningIntents(root).filter(intent => {
     const publication = readIssueBatchAdoptionArtifact(root, intent, 'publication') as unknown as CampaignPublicationV1 | null;
-    if (!publication?.task_ids.includes(taskId)) continue;
-    try {
-      const authority = requireCampaignPlanningAuthority(root, intent, env);
-      if (planningGit(root, ['rev-parse', '--symbolic-full-name', targetRef]) !== planningGit(root, ['rev-parse', '--symbolic-full-name', intent.target_ref]) || planningGit(root, ['rev-parse', `${targetRef}^{commit}`]) !== authority.target) throw new CampaignPlanningError('source_stale', 'offer target differs from campaign authority');
-      if (authority.policy.mode !== 'active') throw new CampaignPlanningError('human_attention_required', 'shadow planning cannot authorize execution');
-      const admission = readPlanningRecord<PlanningAdmission>(root, intent, planningResultKey(taskId));
-      if (!proof.ok || !admission || !admission.proof || canonicalMessageBytes({ ...admission.proof }) !== canonicalMessageBytes({ ...proof.proof }) || admission.job.task_revision !== taskRevision || admission.job.protection_sha256 !== planningProtectionDigest(root, authority.target)) throw new CampaignPlanningError('planning_failed', 'campaign plan has no current admission');
-      validateAdmissionEvidence(root, admission);
-      const slot = authority.manifest.slots.find(s => s.task_id === taskId);
-      const issue = authority.manifest.receipt.issues.find(i => i.slot === slot?.slot);
-      if (!issue) throw new CampaignPlanningError('source_stale', 'campaign task is absent from adoption');
-      rejectProtectedPlanning(root, authority.target, issue.primary_capability, [...issue.suspected_paths, ...admission.result.surfaces!.paths]);
-      const binding = listExternalSourceBindings(intent.repository_id, env).bindings.find(b => b.receipt.binding_id === admission.binding_id);
-      if (!binding || binding.receipt.canonical_target_ref !== intent.target_ref || binding.attention !== 'none' || binding.receipt.observation_sha256 !== admission.job.observation_sha256 || binding.receipt.task_id !== taskId || binding.receipt.task_revision !== taskRevision || binding.receipt.source_revision !== admission.job.source_revision) throw new CampaignPlanningError('source_stale', 'campaign source/task binding is stale');
-      planningGit(root, ['merge-base', '--is-ancestor', binding.receipt.canonical_target_commit, authority.target]);
-      const refresh = listExternalSourceProjection(root, intent.repository_id).latest_attempt;
-      if (!refresh || refresh.outcome !== 'complete' || !refresh.source_revisions.includes(admission.job.source_revision)) throw new CampaignPlanningError('source_stale', 'latest provider readback does not contain the admitted source');
-      const observation = listProviderIssueObservations(root).find(o => o.observation_sha256 === admission.job.observation_sha256);
-      if (!observation || observation.observation_sha256 !== issue.source_observation_sha256) throw new CampaignPlanningError('source_stale', 'planning source differs from adopted Issue');
-      return proof;
-    } catch (error) {
-      return { ok: false, code: 'plan_not_projectable', error: error instanceof Error ? error.message : String(error), candidates: proof.ok ? [proof.proof.plan_path] : [] };
-    }
-  }
-  // A canonical manifest without the local immutable authority must also fail closed.
+    return publication?.task_ids.includes(taskId);
+  });
+  if (matches.length > 1) throw new CampaignPlanningError('source_stale', 'Task belongs to multiple campaign publications');
   const manifests = planningGit(root, ['ls-tree', '-r', '--name-only', targetRef, 'tasks/campaigns']).split('\n').filter(p => p.endsWith('.issues.json'));
   for (const path of manifests) {
     const manifest = JSON.parse(at(root, targetRef, path));
-    if (manifest.slots?.some((s: { task_id: string }) => s.task_id === taskId)) return { ok: false, code: 'plan_not_projectable', error: 'campaign intent authority is unavailable', candidates: [] };
+    if (manifest.slots?.some((s: { task_id: string }) => s.task_id === taskId) && !matches.length) throw new CampaignPlanningError('source_stale', 'campaign intent authority is unavailable');
   }
-  return proof;
+  return matches[0] ?? null;
+}
+
+/** Campaign-only admission gate; existing TaskOffer remains the readiness authority. */
+export function campaignTaskPlanProof(root: string, taskId: string, taskRevision: string, proof: CanonicalTaskPlanProofResult, env: NodeJS.ProcessEnv = process.env, targetRef = 'main'): CanonicalTaskPlanProofResult {
+  try {
+    const intent = campaignTaskIntent(root, taskId, targetRef);
+    if (!intent) return proof;
+    const authority = requireCampaignPlanningAuthority(root, intent, env);
+    if (planningGit(root, ['rev-parse', '--symbolic-full-name', targetRef]) !== planningGit(root, ['rev-parse', '--symbolic-full-name', intent.target_ref]) || planningGit(root, ['rev-parse', `${targetRef}^{commit}`]) !== authority.target) throw new CampaignPlanningError('source_stale', 'offer target differs from campaign authority');
+    if (authority.policy.mode !== 'active') throw new CampaignPlanningError('human_attention_required', 'shadow planning cannot authorize execution');
+    const admission = readPlanningRecord<PlanningAdmission>(root, intent, planningResultKey(taskId));
+    if (!proof.ok || !admission || !admission.proof || canonicalMessageBytes({ ...admission.proof }) !== canonicalMessageBytes({ ...proof.proof }) || admission.job.task_revision !== taskRevision || admission.job.protection_sha256 !== planningProtectionDigest(root, authority.target)) throw new CampaignPlanningError('planning_failed', 'campaign plan has no current admission');
+    validateAdmissionEvidence(root, admission);
+    const slot = authority.manifest.slots.find(s => s.task_id === taskId);
+    const issue = authority.manifest.receipt.issues.find(i => i.slot === slot?.slot);
+    if (!issue) throw new CampaignPlanningError('source_stale', 'campaign task is absent from adoption');
+    rejectProtectedPlanning(root, authority.target, issue.primary_capability, [...issue.suspected_paths, ...admission.result.surfaces!.paths]);
+    const binding = listExternalSourceBindings(intent.repository_id, env).bindings.find(b => b.receipt.binding_id === admission.binding_id);
+    if (!binding || binding.receipt.canonical_target_ref !== intent.target_ref || binding.attention !== 'none' || binding.receipt.observation_sha256 !== admission.job.observation_sha256 || binding.receipt.task_id !== taskId || binding.receipt.task_revision !== taskRevision || binding.receipt.source_revision !== admission.job.source_revision) throw new CampaignPlanningError('source_stale', 'campaign source/task binding is stale');
+    planningGit(root, ['merge-base', '--is-ancestor', binding.receipt.canonical_target_commit, authority.target]);
+    const refresh = listExternalSourceProjection(root, intent.repository_id).latest_attempt;
+    if (!refresh || refresh.outcome !== 'complete' || !refresh.source_revisions.includes(admission.job.source_revision)) throw new CampaignPlanningError('source_stale', 'latest provider readback does not contain the admitted source');
+    const observation = listProviderIssueObservations(root).find(o => o.observation_sha256 === admission.job.observation_sha256);
+    if (!observation || observation.observation_sha256 !== issue.source_observation_sha256) throw new CampaignPlanningError('source_stale', 'planning source differs from adopted Issue');
+    return proof;
+  } catch (error) {
+    return { ok: false, code: 'plan_not_projectable', error: error instanceof Error ? error.message : String(error), candidates: proof.ok ? [proof.proof.plan_path] : [] };
+  }
 }

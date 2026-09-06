@@ -16,6 +16,7 @@ import { collectEngineerOffers } from './scheduling';
 export interface AcquireNextFiltersV1 {
   readonly capability_id?: string;
   readonly minimum_priority?: number;
+  readonly task_ids?: readonly string[];
 }
 
 export interface AcquireNextScheduledEngineerTaskOptions {
@@ -26,6 +27,8 @@ export interface AcquireNextScheduledEngineerTaskOptions {
   readonly max_selection_attempts?: number;
   readonly session_id?: string | null;
   readonly env?: NodeJS.ProcessEnv;
+  /** Reject a fresh handoff, including its own-claim compensation, before recording success. Never runs on replay. */
+  readonly accept_acquired?: (result: Extract<ScheduledEngineerAcquireResult, { ok: true }>) => Exclude<ScheduledEngineerAcquireResult, { ok: true }> | void;
   readonly dependencies?: Partial<AcquireNextDependencies>;
 }
 
@@ -61,7 +64,13 @@ function validateOptions(options: AcquireNextScheduledEngineerTaskOptions): { at
   const filters = options.filters ?? {};
   if (filters.capability_id !== undefined && !/^capability\.[a-z0-9][a-z0-9.-]*$/.test(filters.capability_id)) throw new Error('filters.capability_id is invalid');
   if (filters.minimum_priority !== undefined && (!Number.isSafeInteger(filters.minimum_priority) || filters.minimum_priority < 0 || filters.minimum_priority > 100)) throw new Error('filters.minimum_priority must be an integer from 0 through 100');
-  return { attempts, filters: Object.freeze({ ...filters }) };
+  if (Object.keys(filters).some(key => !['capability_id', 'minimum_priority', 'task_ids'].includes(key))) throw new Error('filters contains an unknown field');
+  if (filters.task_ids !== undefined && (!Array.isArray(filters.task_ids) || Array.from(filters.task_ids).some(id => typeof id !== 'string' || !/^[a-f0-9]{64}$/.test(id)))) throw new Error('filters.task_ids must contain canonical Task IDs');
+  return { attempts, filters: Object.freeze({
+    ...(filters.capability_id === undefined ? {} : { capability_id: filters.capability_id }),
+    ...(filters.minimum_priority === undefined ? {} : { minimum_priority: filters.minimum_priority }),
+    ...(filters.task_ids === undefined ? {} : { task_ids: Object.freeze([...new Set(filters.task_ids)].sort()) }),
+  }) };
 }
 
 function assertion(offer: EngineerOfferV1): ScheduledEngineerAcquireAssertionV1 {
@@ -106,7 +115,8 @@ function readReceipt(path: string): AcquireNextReceiptV1 {
 
 function eligible(offer: EngineerOfferV1, filters: AcquireNextFiltersV1): boolean {
   return (filters.capability_id === undefined || offer.primary_capability === filters.capability_id)
-    && (filters.minimum_priority === undefined || offer.priority >= filters.minimum_priority);
+    && (filters.minimum_priority === undefined || offer.priority >= filters.minimum_priority)
+    && (filters.task_ids === undefined || filters.task_ids.includes(offer.task_id));
 }
 
 function selectionMayBeRetried(result: AcquireNextScheduledEngineerTaskResult): boolean {
@@ -116,6 +126,12 @@ function selectionMayBeRetried(result: AcquireNextScheduledEngineerTaskResult): 
       && result.fleet.error === 'fleet_acquire_failed'
       && result.fleet.fleet?.ok === false
       && (result.fleet.fleet.error === 'offer_stale' || result.fleet.fleet.error === 'claim_failed')));
+}
+
+function campaignCapacityBlocked(result: AcquireNextScheduledEngineerTaskResult): boolean {
+  return !result.ok && result.error === 'fleet_acquire_failed' && result.fleet?.ok === false
+    && result.fleet.error === 'fleet_acquire_failed' && result.fleet.fleet?.ok === false
+    && result.fleet.fleet.error === 'no_eligible_task' && result.fleet.fleet.reason === 'campaign_capacity_full';
 }
 
 export function acquireNextScheduledEngineerTask(options: AcquireNextScheduledEngineerTaskOptions): AcquireNextScheduledEngineerTaskResult {
@@ -138,17 +154,35 @@ export function acquireNextScheduledEngineerTask(options: AcquireNextScheduledEn
       return receipt.result!;
     }
     writeReceipt(path, buildReceipt(requestSha256, 'pending', null));
-    let result: AcquireNextScheduledEngineerTaskResult = Object.freeze({ ok: false, error: 'engineer_no_eligible_offer', message: 'no eligible Engineer offer matches the closed filters' });
+    // Retry eligibility is a time-indexed snapshot; revalidation must use the same observation instant.
+    const observedAt = Date.now();
+    const noEligible = Object.freeze({ ok: false as const, error: 'engineer_no_eligible_offer' as const, message: 'no eligible Engineer offer matches the closed filters and current campaign capacity' });
+    let result: AcquireNextScheduledEngineerTaskResult = noEligible;
+    const fullCandidates = new Set<string>();
+    let capacityScanLimit: number | undefined;
     for (let index = 0; index < attempts; index += 1) {
-      const document = deps.collectOffers({ repo_root: options.repo_root, principal: options.principal, env: options.env });
-      const selected = document.offers.find((offer) => eligible(offer, filters));
+      const document = deps.collectOffers({ repo_root: options.repo_root, principal: options.principal, env: options.env, now_ms: observedAt });
+      capacityScanLimit ??= document.offers.length;
+      const selected = document.offers.find((offer) => eligible(offer, filters) && !fullCandidates.has(offer.task_id));
       if (!selected) {
         unlinkSync(path);
         return result;
       }
-      result = deps.acquire({ repo_root: options.repo_root, principal: options.principal, assertion: assertion(selected), session_id: options.session_id, env: options.env });
+      result = deps.acquire({ repo_root: options.repo_root, principal: options.principal, assertion: assertion(selected), session_id: options.session_id, env: options.env, offer_options: { now_ms: observedAt } });
+      if (campaignCapacityBlocked(result)) {
+        fullCandidates.add(selected.task_id);
+        result = noEligible;
+        if (fullCandidates.size >= capacityScanLimit) {
+          unlinkSync(path);
+          return result;
+        }
+        // Capacity refusals precede claim; scan the bounded snapshot without spending race retries.
+        index -= 1;
+        continue;
+      }
       if (!selectionMayBeRetried(result)) break;
     }
+    if (result.ok && options.accept_acquired) result = options.accept_acquired(result) ?? result;
     writeReceipt(path, buildReceipt(requestSha256, 'completed', result));
     return result;
   });
