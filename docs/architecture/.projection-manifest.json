@@ -828,8 +828,8 @@
       "outputDigest": "sha256:93a824fb8d2d33de1b45acfc16783a53193c6ef1bb4843b5c3dcf3c6ae5524f2",
       "verifiedAgainst": {
         "branch": "codex/brc10-lifecycle",
-        "commit": "25c129f876d9a951d7f0f462ae8a4bab38515fec",
-        "committedAt": "2026-09-07T06:13:22+08:00"
+        "commit": "67f9ea9d7da48893ae81b2ec314d283ff80213b3",
+        "committedAt": "2026-09-07T06:35:04+08:00"
       }
     },
     {
