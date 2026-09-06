@@ -7,39 +7,24 @@
 > **Last Updated**: 2026-09-07 05:57
 > **Lifecycle**: notes
 
-## Design Decisions
+## Decisions and boundaries
 
-- ...
+- The current campaign grant owns renewal policy; its absence refuses new execution without changing historical grants.
+- The runner observes only its owned process group. Provider terminal state remains unknown and no automatic reclaim consumes this slice.
+- A reused output directory is cleared of the previous bounded result before the next invocation, so a killed supervisor cannot supply stale quiescence evidence.
+- Parent ownership is validated before liveness policy, preserving the existing refusal boundary while both remain before acquisition effects.
 
-## Deviations From Plan Or Spec
+## Remaining BRC10 work
 
-- None recorded.
+Full provider terminal authority, journal-based recovery and reclaimed-worktree re-entry remain pending in `plans/plan-20260907-0554-brc10-lifecycle.md`. This slice does not close the Sprint row.
 
-## Tradeoffs Considered
+## Evidence and promotion
 
-| Option | Decision | Reason |
-|--------|----------|--------|
-| ... | ... | ... |
+The owning contract declares the canonical checks; `.ai/harness/checks/latest.json` is the materialized acceptance input. Durable behavior and limits are recorded in `docs/researches/20260907-brc10-supervised-renewal.md`.
 
-## Open Questions
+The missing-index proof candidate was reconciled through the existing deterministic command after indexing and materializing current projections; reconciliation receipt `sha256:da951802d4fd9ca7edf2950676ad2be74f657c8f61b489b2e383ec9f078337ec` records an empty noop proof. No architecture gate was changed.
 
-- None.
-
-## Evidence Links
-
-- Checks: `.ai/harness/checks/latest.json`
-- Run snapshots: `.ai/harness/runs/`
-
-## Promotion Filter
-
-Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset files only when all three hold: hard to reverse, surprising without local context, and a real trade-off existed. If any one is missing, keep it in this notes file instead.
-
-## Promotion Candidates
-
-- Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
-- Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
-- Promote to harness asset files only after verification across more than one task or fixture.
-# Blocking policy serialization correction
+## Blocking policy serialization correction
 
 - root_cause: `src/core/state/lease-liveness.ts:107` compared JSON property order with builder order; canonical grant storage sorts nested keys, so an unchanged authenticated policy failed on readback.
 - repro: `bun test --timeout 60000 tests/unit/brc10-supervised-renewal.test.ts`

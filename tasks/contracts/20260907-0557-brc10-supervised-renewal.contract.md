@@ -37,12 +37,7 @@ A long-running acquired child has no renewal progression, stale ownership renews
 
 ## Root Cause Evidence
 
-Required when Task Profile is `bugfix`; leave as-is otherwise.
-
-- root_cause: one sentence naming file:line/condition (testable, not "a state issue").
-- repro: the command or UI path that reproduces the symptom.
-- regression_guard: path to a test that fails on the unfixed code and passes after the fix (must also appear as a `package_test` check in Verification Plan).
-- pre_fix_failure_artifact: path to a captured run of regression_guard on the UNFIXED code. Capture with `bun test <regression_guard> > <artifact> 2>&1; echo "PRE_FIX_EXIT=$?" >> <artifact>` (no pipes — pipes swallow the exit status). The gate requires a non-zero `PRE_FIX_EXIT=` line plus the regression_guard path string in the artifact (see the Root Cause Evidence Gate section in docs/reference-configs/sprint-contracts.md).
+This code-change package includes one directly blocking policy transport correction. Its four-field pre-fix evidence and regression guard are recorded in the owning notes; the focused package test is part of the canonical Verification Plan.
 
 ## Workflow Inventory
 
@@ -297,11 +292,11 @@ the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
 
-- Functional behavior:
-- Edge cases:
-- Regression risks:
+- Functional behavior: current-owner renewal during a real child; cancellation and unresolved reservation on authority loss.
+- Edge cases: historical missing policy, stale owner, reordered policy JSON, descendants and a killed supervisor with reused output directory.
+- Regression risks: preserve existing campaign budget/retry settlement and generic contract-run behavior; no remote-provider terminal claim.
 
 ## Rollback Point
 
-- Commit / checkpoint:
-- Revert strategy:
+- Commit / checkpoint: main 188ae352.
+- Revert strategy: stop new campaign dispatch and revert source; preserve all grants, journals and existing worktrees.
