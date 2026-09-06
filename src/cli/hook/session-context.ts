@@ -338,27 +338,6 @@ function gitCurrentBranch(repoRoot: string): string {
   }
 }
 
-function gitRefExists(repoRoot: string, ref: string): boolean {
-  try {
-    execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], { cwd: repoRoot, stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function gitShowFileAtRef(repoRoot: string, ref: string, relPath: string): string | null {
-  try {
-    return execFileSync('git', ['show', `${ref}:${relPath}`], {
-      cwd: repoRoot,
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-  } catch {
-    return null;
-  }
-}
-
 /** `get_active_plan()` port -- verbatim duplicate of mutation-guard.ts's private `getActivePlan(ctx)` over this module's own (smaller) collector shape. */
 function getActivePlan(collector: SessionContextCollector): string | null {
   const ownership = collector.getWorktreeOwnership();
@@ -901,7 +880,7 @@ function currentStatusField(text: string, label: string): string {
   return '';
 }
 
-/** 5. `current_status_snapshot_context` -- two sequential bash heredocs with nothing between them; the "Target snapshot metadata" line directly follows "- Rule: ..." with no blank line. */
+/** 5. `current_status_snapshot_context` -- a single bash heredoc. `tasks/current.md` is an ignored local read model, so it is read only from this worktree: an absent or status-less file yields no section rather than a cross-branch fallback. */
 function currentStatusSnapshotContext(repoRoot: string): string | null {
   const target = workflowTargetBranch(repoRoot);
   const branch = gitCurrentBranch(repoRoot);
@@ -910,33 +889,15 @@ function currentStatusSnapshotContext(repoRoot: string): string | null {
   const updated = currentText ? currentStatusField(currentText, 'Updated At') : '';
   const sourceCommit = currentText ? currentStatusField(currentText, 'Source Commit') : '';
 
-  if (!status) {
-    const targetShowable =
-      branch !== target && gitRefExists(repoRoot, target) && gitShowFileAtRef(repoRoot, target, 'tasks/current.md') !== null;
-    if (!targetShowable) return null;
-  }
-  if (!status && branch === target) return null;
+  if (!status) return null;
   if (status === 'Idle' && branch === target) return null;
 
-  const lines = [
+  return [
     '# Current Status Snapshot',
     '',
-    `- Local snapshot: \`tasks/current.md\` status=${status || '(missing)'} updated=${updated || '(unknown)'} source_commit=${sourceCommit || '(unknown)'}`,
-    `- Target branch snapshot: \`git show ${target}:tasks/current.md\``,
-    '- Rule: this is a tracked read model only; verify stale or surprising state against plans, workstreams, handoff, and checks before acting.',
-  ];
-
-  if (branch !== target && gitRefExists(repoRoot, target)) {
-    const targetText = gitShowFileAtRef(repoRoot, target, 'tasks/current.md');
-    if (targetText !== null) {
-      const targetStatus = currentStatusField(targetText, 'Status');
-      const targetUpdated = currentStatusField(targetText, 'Updated At');
-      if (targetStatus) {
-        lines.push(`- Target snapshot metadata: status=${targetStatus} updated=${targetUpdated || '(unknown)'}`);
-      }
-    }
-  }
-  return lines.join('\n');
+    `- Local snapshot: \`tasks/current.md\` status=${status} updated=${updated || '(unknown)'} source_commit=${sourceCommit || '(unknown)'}`,
+    '- Rule: this is an ignored local read model only; verify stale or surprising state against plans, workstreams, handoff, and checks before acting.',
+  ].join('\n');
 }
 
 function activeSprintMarkerPath(repoRoot: string): string {

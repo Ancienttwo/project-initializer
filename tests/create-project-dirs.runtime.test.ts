@@ -112,6 +112,7 @@ describe("create-project-dirs runtime smoke", () => {
       expect(readFileSync(join(cwd, "AGENTS.md"), "utf-8")).toContain("re-derives an authority's semantics");
       const gitignore = readFileSync(join(cwd, ".gitignore"), "utf-8");
       expect(gitignore).toContain("tasks/.current.md.tmp.*");
+      expect(gitignore).toContain("tasks/current.md");
       expect(gitignore).toContain(".claude/.plan-state/");
       expect(gitignore).toContain(".ai/harness/checks/*.latest.json");
       expect(gitignore).toContain(".ai/harness/checks/*.latest.md");
@@ -279,7 +280,9 @@ describe("create-project-dirs runtime smoke", () => {
       expect(workflowContract.artifacts.runtimeFiles).toContain(".ai/harness/triage/inbox.md");
       expect(workflowContract.artifacts.runtimeFiles).not.toContain(".ai/harness/workstreams/events.jsonl");
       expect(workflowContract.artifacts.requiredFiles).toContain("docs/architecture/index.md");
-      expect(workflowContract.artifacts.requiredFiles).toContain("tasks/current.md");
+      expect(workflowContract.artifacts.requiredFiles).not.toContain("tasks/current.md");
+      // ignored local read model: same list membership as .ai/harness/handoff/current.md
+      expect(workflowContract.artifacts.runtimeFiles).toContain("tasks/current.md");
       expect(workflowContract.artifacts.requiredDirectories).toContain("plans/prds");
       expect(workflowContract.artifacts.requiredDirectories).toContain("plans/sprints");
       expect(workflowContract.artifacts.requiredFiles).not.toContain("scripts/refresh-current-status.sh");

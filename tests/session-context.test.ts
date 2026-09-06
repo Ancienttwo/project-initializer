@@ -431,7 +431,7 @@ describe("sessionStartMainContent — pending plan capture, current status, acti
     });
   });
 
-  test("current status snapshot: non-idle status on a non-target branch injects local + target metadata", () => {
+  test("current status snapshot: non-idle local status injects the local read model with no cross-branch lines", () => {
     withTmpRepo("main-current-status", (repoRoot) => {
       initGit(repoRoot);
       mkdirSync(join(repoRoot, "tasks"), { recursive: true });
@@ -439,14 +439,34 @@ describe("sessionStartMainContent — pending plan capture, current status, acti
         join(repoRoot, "tasks/current.md"),
         "> **Status**: Active\n> **Updated At**: 2026-03-04T16:00:00+0000\n> **Source Commit**: base\n",
       );
-      execFileSync("git", ["add", "tasks/current.md"], { cwd: repoRoot });
-      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "status"], { cwd: repoRoot });
+      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "base"], { cwd: repoRoot });
       execFileSync("git", ["checkout", "-q", "-b", "feature/x"], { cwd: repoRoot });
 
       const content = sessionStartMainContent(freshCollector(repoRoot), process.env, Date.now());
       expect(content).toContain("# Current Status Snapshot");
-      expect(content).toContain("git show main:tasks/current.md");
-      expect(content).toContain("Target snapshot metadata: status=Active");
+      expect(content).toContain("- Local snapshot: `tasks/current.md` status=Active");
+      expect(content).toContain("ignored local read model");
+      expect(content).not.toContain("git show");
+      expect(content).not.toContain("Target branch snapshot");
+      expect(content).not.toContain("Target snapshot metadata");
+    });
+  }, 30_000);
+
+  test("current status snapshot: no local snapshot -> omitted even when the target branch has one committed", () => {
+    withTmpRepo("main-current-status-absent", (repoRoot) => {
+      initGit(repoRoot);
+      mkdirSync(join(repoRoot, "tasks"), { recursive: true });
+      writeFileSync(
+        join(repoRoot, "tasks/current.md"),
+        "> **Status**: Active\n> **Updated At**: 2026-03-04T16:00:00+0000\n> **Source Commit**: base\n",
+      );
+      execFileSync("git", ["add", "-f", "tasks/current.md"], { cwd: repoRoot });
+      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "status"], { cwd: repoRoot });
+      execFileSync("git", ["checkout", "-q", "-b", "feature/x"], { cwd: repoRoot });
+      rmSync(join(repoRoot, "tasks/current.md"), { force: true });
+
+      const content = sessionStartMainContent(freshCollector(repoRoot), process.env, Date.now());
+      expect(content ?? "").not.toContain("# Current Status Snapshot");
     });
   }, 30_000);
 
@@ -520,8 +540,7 @@ describe("sessionStartMainSection — actionable header detection", () => {
       initGit(repoRoot);
       mkdirSync(join(repoRoot, "tasks"), { recursive: true });
       writeFileSync(join(repoRoot, "tasks/current.md"), "> **Status**: Active\n");
-      execFileSync("git", ["add", "tasks/current.md"], { cwd: repoRoot });
-      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "status"], { cwd: repoRoot });
+      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "base"], { cwd: repoRoot });
       execFileSync("git", ["checkout", "-q", "-b", "feature/x"], { cwd: repoRoot });
 
       const section = sessionStartMainSection(freshCollector(repoRoot), process.env, Date.now());

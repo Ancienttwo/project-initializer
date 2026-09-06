@@ -262,7 +262,6 @@
       ".claude/templates/contract.template.md",
       ".claude/templates/review.template.md",
       ".claude/templates/implementation-notes.template.md",
-      "tasks/current.md",
       "tasks/todos.md",
       "tasks/lessons.md",
       "docs/architecture/index.md",
@@ -292,6 +291,7 @@
       ".ai/harness/failures/latest.jsonl",
       ".ai/harness/handoff/current.md",
       ".ai/harness/handoff/resume.md",
+      "tasks/current.md",
       ".ai/harness/capability-context/",
       ".ai/harness/architecture-projection/",
       ".ai/harness/security/.gitkeep",
@@ -353,7 +353,7 @@
       },
       "currentStatus": {
         "document": "currentStatus",
-        "reason": "Create tracked current-status snapshot when missing",
+        "reason": "Create local current-status snapshot when missing",
         "lines": [
           "# Current Status Snapshot",
           "",
@@ -362,7 +362,7 @@
           "> **Status**: Idle",
           "> **Reason**: repo-harness adoption bootstrap",
           "",
-          "This file is a tracked mainline snapshot derived from repo artifacts. It is not a live lock, not a kanban board, and not an implementation gate.",
+          "This file is an ignored local read model derived from this worktree's artifacts. It is not tracked, not a live lock, not a kanban board, and not an implementation gate.",
           ""
         ]
       },

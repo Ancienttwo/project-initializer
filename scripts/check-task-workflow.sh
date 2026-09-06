@@ -1152,7 +1152,9 @@ check_required_file ".claude/templates/implementation-notes.template.md"
 check_required_file ".claude/templates/prd.template.md"
 check_helper_runtime_files
 check_required_file "$todo_file"
-check_required_file "$current_status_file"
+# $current_status_file is deliberately absent from this list: it is an ignored local
+# read model regenerated per worktree, so a fresh checkout legitimately has none.
+# When it does exist it is still validated below.
 check_required_file "$lessons_file"
 check_required_dir "$research_dir"
 check_required_file "$context_map_file"

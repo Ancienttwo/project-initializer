@@ -28,11 +28,11 @@ Handoffs make long-running work resumable without trusting chat history.
 3. Read source artifacts first: active plan, active contract, review file, latest checks trace, and any user-mentioned files.
 4. Read `.ai/harness/handoff/resume.md`.
 5. Read `.ai/harness/handoff/current.md`.
-6. Read `tasks/current.md` as an orientation snapshot only; in a non-target worktree, compare it with `git show <target>:tasks/current.md`.
+6. Read `tasks/current.md` as a local orientation snapshot only; it is ignored local state, so an absent or stale file is normal.
 7. Resume from the exact next step.
 
 ## Source Of Truth
 
 - Markdown, JSON, and JSONL files remain the canonical handoff surface.
 - SQLite, Codex thread state, and chat history are read models only.
-- `tasks/current.md` is a tracked derived snapshot. It helps branch/worktree orientation, but stale or surprising state must be checked against plans, workstreams, handoff, and checks.
+- `tasks/current.md` is an ignored local read model. It helps worktree orientation, but stale or surprising state must be checked against plans, workstreams, handoff, and checks.
