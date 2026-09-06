@@ -16,7 +16,7 @@ The input receipt is historical evidence; its observation timestamp must stay im
 - root_cause: automaticReclaimLease reclassifies with a fresh classified_at and compares the full digest against the historical receipt; elapsed time alone changes that digest.
 - repro: bun test --timeout 60000 tests/unit/brc10-reclaim-time-boundary.test.ts
 - regression_guard: tests/unit/brc10-reclaim-time-boundary.test.ts
-- pre_fix_failure_artifact: .ai/harness/checks/brc10-reclaim-time-boundary.pre-fix.log (2 pass, 3 fail, PRE_FIX_EXIT=1).
+- pre_fix_failure_artifact: .ai/harness/runs/brc10-reclaim-time-boundary.pre-fix.log (2 pass, 3 fail, PRE_FIX_EXIT=1).
 
 ## Acceptance boundary
 

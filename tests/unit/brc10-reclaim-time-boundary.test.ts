@@ -74,7 +74,7 @@ describe('BRC10 reclaim receipt time boundary', () => {
       writeFileSync(join(root, 'go'), 'go');
       expect((await Promise.all(children.map(child => child.exited))).sort()).toEqual([0, 2]);
       expect(readLease(root, task).record?.generation).toBe(2);
-      expect(['one', 'two']).toContain(readLease(root, task).record?.claim_id);
+      expect(['one', 'two'].includes(readLease(root, task).record?.claim_id ?? '')).toBe(true);
     } finally { for (const child of children) child.kill(); await Promise.all(children.map(child => child.exited)); rmSync(root, { recursive: true, force: true }); }
   });
   test('after durable owner write, crash replay cannot mint a third generation', () => {

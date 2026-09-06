@@ -40,7 +40,7 @@ A later valid consumption still refuses, or evidence/time/identity drift permits
 - root_cause: src/effects/state/coordination-lease-reclaim.ts compares a fresh receipt digest containing classified_at to the historical receipt, so elapsed time alone changes identity despite unchanged ownership and evidence.
 - repro: bun test --timeout 60000 tests/unit/brc10-reclaim-time-boundary.test.ts
 - regression_guard: tests/unit/brc10-reclaim-time-boundary.test.ts
-- pre_fix_failure_artifact: .ai/harness/checks/brc10-reclaim-time-boundary.pre-fix.log
+- pre_fix_failure_artifact: .ai/harness/runs/brc10-reclaim-time-boundary.pre-fix.log
 
 ## Workflow Inventory
 
