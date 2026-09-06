@@ -39,6 +39,12 @@
 
 ## Evidence Links
 
+Final publication `cae23fe4` against `7102269c` includes the generated automation-budget architecture size-band update as well as code/tests. The earlier pre-projection digest below remains baseline evidence only.
+
+> **Substantive Change SHA256**: `sha256:0e0dba3e9154aca67b006ec7ffbd15f0ee5716ddb29755a497ee168baad583ef`
+
+CI run 34054157236 stopped at task-sync before tests because this final digest was absent. The same direct-base check reproduced locally and passes with this evidence binding; no product code or acceptance subject was changed by the correction.
+
 Publication delta against ce5e42d3 (production and tests frozen):
 
 > **Substantive Change SHA256**: `sha256:ff9fb80e5c924721884103ea74345380829128ed3a8150e1c2bab63810a82c98`
