@@ -11,7 +11,7 @@
 > **Verification Boundary**: Commands named in the captured planning output plus `repo-harness run verify-contract --contract tasks/contracts/20260907-0554-brc10-lifecycle.contract.md --strict`.
 > **Rollback Surface**: Before execution remove `plans/plan-20260907-0554-brc10-lifecycle.md`; after execution revert branch `codex/brc10-lifecycle` or the explicitly reviewed diff.
 > **Spec**: `docs/spec.md`
-> **Research**: See `docs/researches/`
+> **Research**: `docs/researches/20260907-brc10-provider-terminal-readiness.md`; `docs/researches/20260907-brc10-readiness.md`
 > **Task Contract**: `tasks/contracts/20260907-0554-brc10-lifecycle.contract.md`
 > **Task Review**: `tasks/reviews/20260907-0554-brc10-lifecycle.review.md`
 > **Implementation Notes**: `tasks/notes/20260907-0554-brc10-lifecycle.notes.md`
