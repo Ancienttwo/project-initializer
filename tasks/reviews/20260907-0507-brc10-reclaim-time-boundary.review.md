@@ -1,16 +1,16 @@
 # Task Review: brc10-reclaim-time-boundary
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260907-0507-brc10-reclaim-time-boundary.md
 > **Contract**: tasks/contracts/20260907-0507-brc10-reclaim-time-boundary.contract.md
 > **Notes File**: tasks/notes/20260907-0507-brc10-reclaim-time-boundary.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-07 05:07
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:2d413f8558711d9ffe05e4fcd6505eff2a3a21e580ebf4daedff4bd788bf1c9e
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 2b611fc93a9f2ab9e2ac1eec23599aefe1796e08
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:2d413f8558711d9ffe05e4fcd6505eff2a3a21e580ebf4daedff4bd788bf1c9e
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 2b611fc93a9f2ab9e2ac1eec23599aefe1796e08
+> **Verification Evidence SHA256**: sha256:c4741789af1478cc1fc00ba31f18e8856ce03fd1c8c2ebdc17c398f9a4e239a5
+> **Issued At**: 2026-09-06T21:46:31.743Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: External review approved the frozen reclaim timing correction with no findings; canonical preparation passed 22 criteria. Evidence validates the prerequisite only, not full BRC10.
 - Findings: none
 
 ## Behavior Diff Notes
