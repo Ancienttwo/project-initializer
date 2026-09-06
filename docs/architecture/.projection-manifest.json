@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:66ad6663cca3979e934f41c42543fca8f757db8271c19e65d94319184594cf97",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "d9c85150ea1edd7dd3dad6e36947699bde107bac",
-    "worktreeDigest": "sha256:fc1f3896cece91611a496b202bfb1c28554cf2638db12f4d8b5d2001ecca3562",
-    "sourceTreeDigest": "sha256:1ff7c2a8d22d97bffe1214be4fc6d4d884c944c12e99cee60b1842e6b8eeaa72",
+    "baseHeadSha": "92bd33fef363184cb24b34047967a82aebe4fdbb",
+    "worktreeDigest": "sha256:fcb34a0f91a98773ed06ea118cb17acda9f21fd2812ba4bb33b2bacd524b8a7f",
+    "sourceTreeDigest": "sha256:4672363eca461bb0e341a951b2f85d77c85b1930ba0369359bff80eafa7f240d",
     "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-    "codeGraphDigest": "sha256:4acc5728631186096ecdf85005fd87355e9c9f13a49949c4df02025059c36d85",
-    "indexedWorktreeDigest": "sha256:dc9f8d7e388f24038b62cc401a8425bd16d5a46ea8b371b9376916047c2c619a",
+    "codeGraphDigest": "sha256:61b9ddf438f7c9b2162a28d32177c8653de27e824335c81679bf8bb2e42f0abb",
+    "indexedWorktreeDigest": "sha256:080b578896f5ef49357e70661d7d4ba0731735dd67864e3dc2e10bd706780ebc",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:32276d1f700e4921006f4e24949b4147c5f510cf0c7886c709595c8049887781"
+    "projectionInputDigest": "sha256:ba136907932e0370c933f371762d70c73e455bf9070f3d2dbd616f2574102da6"
   },
-  "projectionDigest": "sha256:937acedf54da131143ee5912214d3eb7151f7b4ea974a7df502a21c56cc794e3",
+  "projectionDigest": "sha256:1cf013d711934d177416fdb931b8ce937b1173cfcaaad8bb4f82ca8f16dfecb9",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-      "sourceTreeDigest": "sha256:1ff7c2a8d22d97bffe1214be4fc6d4d884c944c12e99cee60b1842e6b8eeaa72",
+      "sourceTreeDigest": "sha256:4672363eca461bb0e341a951b2f85d77c85b1930ba0369359bff80eafa7f240d",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:937acedf54da131143ee5912214d3eb7151f7b4ea974a7df502a21c56cc794e3"
+      "projectionDigest": "sha256:1cf013d711934d177416fdb931b8ce937b1173cfcaaad8bb4f82ca8f16dfecb9"
     }
   },
-  "receiptDigest": "sha256:e1018e9ea18acf6465e64e2406bbc3b3eabcfa57a3475b88f2c6346dd9bd3dc6",
+  "receiptDigest": "sha256:b4c184e8c7adcad1edc6945e3ca2c4b342320f668a610e7b47129c9bcd6a35a6",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -1027,9 +1027,9 @@
       "sourceDigest": "sha256:183d7a9ef531bb200e573b337911d503eac0d86741a87b02d5d0b60896930782",
       "outputDigest": "sha256:2e93a1f59017a07da7860cf0073e6911d9f75032b5af8be503c56087f394466a",
       "verifiedAgainst": {
-        "branch": "codex/verification-execution-lifecycle",
-        "commit": "88487d5752ea605a643fe3fd92331e6ac4284f68",
-        "committedAt": "2026-09-06T17:19:53+08:00"
+        "branch": "main",
+        "commit": "92bd33fef363184cb24b34047967a82aebe4fdbb",
+        "committedAt": "2026-09-06T22:18:20+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/release-todo-hardening",
-        "commit": "d9c85150ea1edd7dd3dad6e36947699bde107bac",
-        "committedAt": "2026-09-06T20:17:29+08:00"
+        "branch": "main",
+        "commit": "92bd33fef363184cb24b34047967a82aebe4fdbb",
+        "committedAt": "2026-09-06T22:18:20+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:dc2faa5abe1e85c162bcc9a126ee79a0178c75d03c20ff97519b8b463cc2ee44",
       "outputDigest": "sha256:aa5aac73ff819f8ad0c053a57d5b1627faf2fc5bdbc18e8ab4722de0ab085d59",
       "verifiedAgainst": {
-        "branch": "codex/release-todo-hardening",
-        "commit": "d9c85150ea1edd7dd3dad6e36947699bde107bac",
-        "committedAt": "2026-09-06T20:17:29+08:00"
+        "branch": "main",
+        "commit": "92bd33fef363184cb24b34047967a82aebe4fdbb",
+        "committedAt": "2026-09-06T22:18:20+08:00"
       }
     },
     {
