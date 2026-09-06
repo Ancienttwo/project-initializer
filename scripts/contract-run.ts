@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, isAbsolute, join, relative, resolve } from "path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
 import { spawnSync } from "child_process";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { createHash } from "crypto";
 
 // Sibling of the existing bounded process runner (scripts/run-bounded-verifier-command.ts,
@@ -16,6 +16,7 @@ interface Options {
   mode: Mode;
   repo: string;
   contract: string;
+  campaignHandoff?: string;
   workerCommand?: string;
   verifierCommand?: string;
   out?: string;
@@ -97,6 +98,8 @@ function usage(): string {
     "  bun scripts/contract-run.ts dry-run --contract <contract-file> [--repo <path>] [--out <dir>] [--runner <label>] [--effort <tier>] [--json]",
     "  bun scripts/contract-run.ts run --contract <contract-file> --worker-command <cmd> --verifier-command <cmd> [--repo <path>] [--out <dir>] [--max-runner-invocations <n>] [--runner <label>] [--effort <tier>] [--json]",
     "",
+    "--campaign-handoff <selector-json-file> binds run to an acquired campaign worker. The local parent supplies commands; exact ownership is checked before child execution.",
+    "",
     "preflight asserts the contract is a self-sufficient execution brief (Goal, Scope,",
     "Allowed Paths, Exit Criteria are filled in, not template placeholders) and exits",
     "non-zero otherwise. run enforces the same gate before dispatching the worker.",
@@ -147,6 +150,10 @@ function parseArgs(argv: string[]): Options {
         opts.contract = requireValue(argv, ++index, arg);
         index++;
         break;
+      case "--campaign-handoff":
+        opts.campaignHandoff = requireValue(argv, ++index, arg);
+        index++;
+        break;
       case "--worker-command":
         opts.workerCommand = requireValue(argv, ++index, arg);
         index++;
@@ -190,6 +197,7 @@ function parseArgs(argv: string[]): Options {
   if (opts.mode === "run" && (!opts.workerCommand || !opts.verifierCommand)) {
     throw new CliError("contract-run: run requires --worker-command and --verifier-command", 2);
   }
+  if (opts.campaignHandoff && opts.mode !== "run") throw new CliError("contract-run: --campaign-handoff requires run mode", 2);
   return opts;
 }
 
@@ -693,7 +701,7 @@ function writePrompt(path: string, title: string, lines: string[]) {
   writeFileSync(path, [`# ${title}`, "", ...lines, ""].join("\n"));
 }
 
-function buildRun(opts: Options) {
+async function buildRun(opts: Options) {
   const repo = resolve(opts.repo);
   const contractPath = repoPath(repo, opts.contract);
   if (!existsSync(contractPath)) {
@@ -731,7 +739,7 @@ function buildRun(opts: Options) {
   // wall_time_minutes rides the existing bounded process runner deadline (runChild),
   // shared across worker and verifier so it bounds the whole delegated task's wall clock,
   // matching how verify-contract.sh computes one verification_deadline_ms for its run.
-  const wallTimeDeadlineMs =
+  let wallTimeDeadlineMs =
     delegation.budget.wall_time_minutes !== null ? Date.now() + delegation.budget.wall_time_minutes * 60_000 : null;
   const slug = contractPath
     .split("/")
@@ -744,6 +752,23 @@ function buildRun(opts: Options) {
   );
   mkdirSync(runDir, { recursive: true });
 
+  const campaignResultPath = join(runDir, "campaign-attempt-result.json");
+  const packageRoot = basename(SCRIPT_DIR) === "helpers" && basename(dirname(SCRIPT_DIR)) === "templates" && basename(dirname(dirname(SCRIPT_DIR))) === "assets"
+    ? resolve(SCRIPT_DIR, "../../..") : resolve(SCRIPT_DIR, "..");
+  const campaign = opts.campaignHandoff && briefPreflight.ok
+    ? (await import(pathToFileURL(join(packageRoot, "src/effects/automation/campaign-worker.ts")).href)).bindCampaignWorker({
+      selector: JSON.parse(readFileSync(repoPath(repo, opts.campaignHandoff), "utf8")), worktree: repo, contract: repoRelative(repo, contractPath),
+      worker_command: opts.workerCommand!, verifier_command: opts.verifierCommand!, env: process.env,
+    }) as ReturnType<typeof import("../src/effects/automation/campaign-worker").bindCampaignWorker>
+    : null;
+  if (campaign) {
+    const campaignDeadline = Date.parse(campaign.deadline_at);
+    wallTimeDeadlineMs = wallTimeDeadlineMs === null ? campaignDeadline : Math.min(wallTimeDeadlineMs, campaignDeadline);
+  }
+  if (campaign?.replay) {
+    return { manifest: { version: 1, kind: "repo-harness-contract-run", status: campaign.replay.contract_run.status, contract: repoRelative(repo, contractPath), failure_class: campaign.replay.contract_run.failure_class, campaign_attempt: campaign.replay }, manifestPath: "" };
+  }
+  if (campaign && existsSync(campaignResultPath)) throw new CliError("contract-run: campaign attempt result already exists before this launch", 1);
   const workerPrompt = join(runDir, "worker-prompt.md");
   const verifierPrompt = join(runDir, "verifier-prompt.md");
   const stopCondLines = stopConds
@@ -753,6 +778,7 @@ function buildRun(opts: Options) {
     .map((line) => `  ${line}`);
   writePrompt(workerPrompt, "Contract Worker Task", [
     `Contract: ${repoRelative(repo, contractPath)}`,
+    ...(campaign ? [`Campaign attempt result: write ${repoRelative(repo, campaignResultPath)} as exact JSON {"outcome":"completed|not_reproducible|user_blocked|external_blocked|transient_failure|permanent_failure|lease_lost|cancelled|reconciliation_required","evidence_paths":["repository-relative regular evidence file"]}. Select exactly one outcome from the closed vocabulary. This reports execution only; it is not semantic acceptance.`] : []),
     `Plan: ${plan || "(none)"}`,
     `Notes: ${notesFile || "(none)"}`,
     ...(exemplar ? [`Exemplar: ${exemplar}`] : []),
@@ -818,6 +844,7 @@ function buildRun(opts: Options) {
     CONTRACT_RUN_PLAN: plan,
     CONTRACT_RUN_REVIEW: reviewFile,
     CONTRACT_RUN_NOTES: notesFile,
+    ...(campaign ? { CONTRACT_RUN_ATTEMPT_RESULT: repoRelative(repo, campaignResultPath), CONTRACT_RUN_DISPATCH_ID: campaign.selector.dispatch_id } : {}),
     CONTRACT_RUN_DIR: repoRelative(repo, runDir),
     CONTRACT_RUN_WORKER_PROMPT: repoRelative(repo, workerPrompt),
     CONTRACT_RUN_VERIFIER_PROMPT: repoRelative(repo, verifierPrompt),
@@ -850,6 +877,7 @@ function buildRun(opts: Options) {
 
   if (opts.mode === "run" && briefPreflight.ok) {
     if (consume("worker")) {
+      campaign?.beforeChild("worker", opts.workerCommand!);
       const worker = runChild(
         "worker",
         opts.workerCommand!,
@@ -859,12 +887,14 @@ function buildRun(opts: Options) {
         wallTimeDeadlineMs,
       );
       children.push(worker);
+      campaign?.afterChild(worker);
       if (worker.exit_code !== 0) {
         status = "fail";
         failureClass = worker.timed_out ? "wall_time_exceeded" : "worker_failed";
       }
     }
     if (status === "pass" && consume("verifier")) {
+      campaign?.beforeChild("verifier", opts.verifierCommand!);
       const verifier = runChild(
         "verifier",
         opts.verifierCommand!,
@@ -874,6 +904,7 @@ function buildRun(opts: Options) {
         wallTimeDeadlineMs,
       );
       children.push(verifier);
+      campaign?.afterChild(verifier);
       if (verifier.exit_code !== 0) {
         status = "fail";
         failureClass = verifier.timed_out ? "wall_time_exceeded" : "verifier_failed";
@@ -936,6 +967,7 @@ function buildRun(opts: Options) {
       runner_invocation_limit: runnerInvocationLimit,
     },
     children,
+    ...(campaign ? { campaign_attempt: campaign.finish(repoRelative(repo, campaignResultPath), { status, failure_class: failureClass || null }) } : {}),
   };
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   return { manifest, manifestPath };
@@ -943,7 +975,7 @@ function buildRun(opts: Options) {
 
 try {
   const opts = parseArgs(process.argv.slice(2));
-  const { manifest, manifestPath } = buildRun(opts);
+  const { manifest, manifestPath } = await buildRun(opts);
   if (opts.json) {
     console.log(JSON.stringify(manifest, null, 2));
   } else {

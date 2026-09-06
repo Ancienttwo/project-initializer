@@ -1,3 +1,4 @@
+import { createCampaignWorkerHandoff } from './campaign-worker';
 import { canonicalMessageBytes, canonicalMessageDigest } from '../../core/messages/mechanics';
 import { CampaignPlanningError } from '../../core/automation/campaign-planning';
 import { resolveEngineerPrincipal } from '../engineers/principal';
@@ -75,8 +76,9 @@ export function runCampaignAcquisition(input: CampaignAcquisitionInput, acquire 
   if (!acceptedFresh) validateHandoff(acquired);
   return {
     action: 'dispatch' as const, envelope: acquired.envelope, receipt: acquired.receipt,
+    worker_handoff: createCampaignWorkerHandoff(input, acquired),
     instructions: [
-      'The local host may start one worker with this WorkEnvelope and ClaimActorReceipt.',
+      'The local parent host starts the acquired worker through contract-run run --campaign-handoff <selector-json-file>; save worker_handoff as that selector. The selector only names the stored handoff.',
       'Use the envelope worktree and contract allowed_paths; preserve the admitted repair scope. Stop when claim authority is lost.',
       'Use the existing contract-worktree and ship-worktrees workflow for verification and manual publication. These instructions do not create task ownership.',
     ],
