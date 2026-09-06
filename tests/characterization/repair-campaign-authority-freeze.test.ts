@@ -731,11 +731,11 @@ describe('BRC0 negative freeze: a prompt is not a Claim', () => {
     // Control: the canonical path does reach the first ownership mutation.
     // This is what makes the two negatives below meaningful.
     calls.length = 0;
-    expect(() => acquireFleetTask({
+    expect(acquireFleetTask({
       registry_snapshot: registry,
       dependencies: dependencies(),
       session_id: 'brc0-control',
-    })).toThrow('__spy__claim');
+    })).toEqual({ ok: false, error: 'authorization_stale', message: '__spy__claim' });
     expect(calls).toEqual(['claim']);
 
     // Negative 1: the prompt names a task by its own words. The derived

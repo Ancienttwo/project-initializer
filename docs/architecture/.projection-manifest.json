@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:66ad6663cca3979e934f41c42543fca8f757db8271c19e65d94319184594cf97",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "d4bfc19224792bf149cf477b1312a91d1a7ca58e",
-    "worktreeDigest": "sha256:e7db927a301954bbbe7679c5323665f65023a68eb4da722071b54ce55711dd0c",
-    "sourceTreeDigest": "sha256:85fb1130643a43bab3ba704831fd6f688b0c09a4faf1b1206e6874900cb8061a",
+    "baseHeadSha": "b11760f8dfc24296cb37e6c11b057578593e8278",
+    "worktreeDigest": "sha256:115309073eb367096fd0ad6860aa5935a1186ced1076acd8310dcf1683d8a7d1",
+    "sourceTreeDigest": "sha256:f14573b7bf671071cda5913136ebf3dc57b4ee8e440630ae6b893c5d4bd88a19",
     "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-    "codeGraphDigest": "sha256:8ccfe339d6ca38f25d4f9012ec069d6f7319d1d150b296aedaa65bc44b55397b",
-    "indexedWorktreeDigest": "sha256:dfd2f133c6706c184d6451584456ef6abe17255f05906919205cdac8911937c8",
+    "codeGraphDigest": "sha256:853ad4ba3af8230642da5ada91e3eb5bc413d061a1c639a0d6e28bc8f18cfaa7",
+    "indexedWorktreeDigest": "sha256:1adecfa74edfa7c2d28a647c5674953199870daa224278d5b57e804969eec44e",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:a4d595fd93657931d836011ad97b7c98597307d686b7bfd3dfe38d444af382f0"
+    "projectionInputDigest": "sha256:186c9ca11e50b83308d5078dcda5cec9282c683bd4f26508e88a43fbbcf6637c"
   },
-  "projectionDigest": "sha256:77ab7b40a718beb2f9820bbd6173cea13c628bbef20a27a68be4d4b972a5aaa3",
+  "projectionDigest": "sha256:a01481c82f9bca7486c386f0f9cf1f4d5af436698429b481b62c90a1a3a4558f",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-      "sourceTreeDigest": "sha256:85fb1130643a43bab3ba704831fd6f688b0c09a4faf1b1206e6874900cb8061a",
+      "sourceTreeDigest": "sha256:f14573b7bf671071cda5913136ebf3dc57b4ee8e440630ae6b893c5d4bd88a19",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:77ab7b40a718beb2f9820bbd6173cea13c628bbef20a27a68be4d4b972a5aaa3"
+      "projectionDigest": "sha256:a01481c82f9bca7486c386f0f9cf1f4d5af436698429b481b62c90a1a3a4558f"
     }
   },
-  "receiptDigest": "sha256:7ee52b0d45f717da4d906229b99392af29ddb7c9efad8fda80d4091607007c30",
+  "receiptDigest": "sha256:a315582918dda28ca83c5cae4faa75d36487b0cc485b107d5b2b4ae238beb564",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -1027,9 +1027,9 @@
       "sourceDigest": "sha256:183d7a9ef531bb200e573b337911d503eac0d86741a87b02d5d0b60896930782",
       "outputDigest": "sha256:2e93a1f59017a07da7860cf0073e6911d9f75032b5af8be503c56087f394466a",
       "verifiedAgainst": {
-        "branch": "codex/persistent-claude-review",
-        "commit": "795b54151fd0b63d035ca83c7ab675e392ccc170",
-        "committedAt": "2026-09-06T04:18:03+08:00"
+        "branch": "codex/brc8-ci-characterization",
+        "commit": "b11760f8dfc24296cb37e6c11b057578593e8278",
+        "committedAt": "2026-09-06T17:21:24+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc8-bounded-worker-acquisition",
-        "commit": "d4bfc19224792bf149cf477b1312a91d1a7ca58e",
-        "committedAt": "2026-09-06T16:19:06+08:00"
+        "branch": "codex/brc8-ci-characterization",
+        "commit": "b11760f8dfc24296cb37e6c11b057578593e8278",
+        "committedAt": "2026-09-06T17:21:24+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:dc2faa5abe1e85c162bcc9a126ee79a0178c75d03c20ff97519b8b463cc2ee44",
       "outputDigest": "sha256:aa5aac73ff819f8ad0c053a57d5b1627faf2fc5bdbc18e8ab4722de0ab085d59",
       "verifiedAgainst": {
-        "branch": "codex/brc8-bounded-worker-acquisition",
-        "commit": "d4bfc19224792bf149cf477b1312a91d1a7ca58e",
-        "committedAt": "2026-09-06T16:19:06+08:00"
+        "branch": "codex/brc8-ci-characterization",
+        "commit": "b11760f8dfc24296cb37e6c11b057578593e8278",
+        "committedAt": "2026-09-06T17:21:24+08:00"
       }
     },
     {
