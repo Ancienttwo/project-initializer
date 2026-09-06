@@ -60,4 +60,6 @@ Root Cause Evidence:
 
 Targeted verification: `bun test tests/effects/campaign-worker.test.ts --test-name-pattern 'real supervised campaign child renews' --timeout 60000` passed (1 test, 7 assertions). The earlier semantic review and canonical acceptance remain evidence for their original subject. This post-acceptance CI correction is limited to the polling observer; required repository integrity checks and subsequent PR CI validate the corrected publication subject. No local full suite is warranted for the test-only lock correction.
 
-> **Substantive Change SHA256**: `sha256:b173f3fc00ee3468d13c0c10428ea09fdc2f7e43301466178253bca6abe48b44`
+> **Substantive Change SHA256**: `sha256:2c35eeb1c742ae55dffed660dba8058fe35814b148a548d65279fea978a02e1b`
+
+The correction is bound to the complete PR publication range from `188ae3529695623022c015c0cae0f7ec0b1304a4`. Existing archived evidence is eligible in that range because this package adds it; an incremental working-tree check does not admit an edit to an already archived artifact as new workflow evidence.
