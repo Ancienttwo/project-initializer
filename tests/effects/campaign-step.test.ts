@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { execFileSync } from 'child_process';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { sealProgramAuthorization, validateAutomationReservation, type ProgramBudgetLimitV1 } from '../../src/core/automation/budget';
+import { sealProgramAuthorization, validateAutomationReservation, CAMPAIGN_STEP_COMPLETION_KIND, type ProgramBudgetLimitV1 } from '../../src/core/automation/budget';
+import { campaignAutomationRunId } from '../../src/core/automation/campaign-authoring-budget';
 import { buildDevelopmentCampaignDefinition } from '../../src/core/automation/development-campaign';
 import { buildIssueBatchIntent, renderIssueBatchMarker, type IssueBatchIntentV1 } from '../../src/core/automation/issue-batch';
 import { buildExternalSourceRefreshReceipt, buildProviderIssueObservation } from '../../src/core/external-sources/issue-observation';
 import { readBrowserBinding } from '../../src/cli/chatgpt-browser/binding';
 import type { BrowserConsultInput, BrowserConsultResult } from '../../src/cli/chatgpt-browser/types';
-import { AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, reconcileAutomationReservation } from '../../src/effects/automation/budget-store';
+import { AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, reconcileAutomationReservation, readCampaignBudgetLedger } from '../../src/effects/automation/budget-store';
 import { mintProgramAuthorization } from '../../src/effects/automation/grant-store';
 import { appendDevelopmentCampaignEvent, createDevelopmentCampaign, readDevelopmentCampaignStatus } from '../../src/effects/automation/development-campaign-store';
 import { startIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
@@ -18,6 +19,7 @@ import { CampaignStepError, runCampaignStep as runCampaignStepEffect, type Campa
 import * as issueBatchStore from '../../src/effects/automation/issue-batch-store';
 import { issueBatchGroupStoreRoot, listIssueBatchJournalRecords, persistIssueBatchIntent } from '../../src/effects/automation/issue-batch-store';
 import type { IssueBatchObservationSnapshotV1 } from '../../src/effects/automation/issue-batch-observer';
+import { GithubAdapterError } from '../../src/effects/external-sources/github';
 import { writeProviderIssueObservation } from '../../src/effects/external-sources/store';
 
 const roots: string[] = [];
@@ -68,7 +70,7 @@ function browserResult(input: BrowserConsultInput, sessionId: string, status: Br
   };
 }
 
-async function fixture(status: BrowserConsultResult['status'] = 'completed') {
+async function fixture(status: BrowserConsultResult['status'] = 'completed', maxIssues = 20) {
   const root = mkdtempSync(join(tmpdir(), 'campaign-step-'));
   const home = mkdtempSync(join(tmpdir(), 'campaign-step-home-'));
   const profile = mkdtempSync(join(tmpdir(), 'campaign-step-profile-'));
@@ -79,7 +81,7 @@ async function fixture(status: BrowserConsultResult['status'] = 'completed') {
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
   writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
     development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: 2, maximum_parallel_tasks: 2 } },
-    external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: 20, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } },
+    external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: maxIssues, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } },
   })}\n`);
   mkdirSync(join(root, '.repo-harness'), { recursive: true });
   writeFileSync(join(root, '.repo-harness', 'chatgpt-browser.local.json'), `${JSON.stringify({ version: 1, product: 'chatgpt', profileDir: profile, profileDirectory: 'Profile 1', selectedProfilePath: join(profile, 'Profile 1'), browserChannel: 'chrome', chatgptUrl: 'https://chatgpt.com/', updatedAt: at })}\n`);
@@ -122,6 +124,87 @@ function input(f: Awaited<ReturnType<typeof fixture>>, key: string) {
 }
 
 describe('durable campaign heartbeat step', () => {
+  test('real observer counts identity and each page while replay performs no provider call', async () => {
+    const f = await fixture('completed', 120); let calls = 0;
+    const provider_command: NonNullable<CampaignStepDependencies['provider_command']> = () => {
+      calls++;
+      if (calls === 1) return { stdout: JSON.stringify({ id: 100, full_name: 'acme/widgets', html_url: 'https://github.com/acme/widgets' }) };
+      return { stdout: JSON.stringify(calls === 2 ? [...[1, 2].map(number => ({
+        id: 200 + number, number, html_url: `https://github.com/acme/widgets/issues/${number}`,
+        state: 'open', title: 'repair', body: body(f.intent, String(number).padStart(2, '0')),
+        labels: [{ name: 'campaign' }], assignees: [], created_at: null, updated_at: null,
+      })), ...Array.from({ length: 98 }, () => ({ pull_request: {} }))] : []) };
+    };
+    const args = input(f, 'actual-pages');
+    const result = await runCampaignStep(args, { now: () => new Date(later), provider_command });
+    expect(result.reconciliation?.outcome).toBe('complete');
+    expect(calls).toBe(3);
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    expect(readCampaignBudgetLedger(f.root, runId, f.env)).toMatchObject({ controller_steps: 1, provider_calls: 4, reserved_provider_calls: 0, active_step: null });
+    expect(await runCampaignStep(args, { now: () => new Date(later), provider_command })).toEqual(result);
+    expect(calls).toBe(3);
+  });
+
+  test('a settled read failure completes its heartbeat and a new key can observe successfully', async () => {
+    const f = await fixture(); let calls = 0;
+    const args = input(f, 'read-failure');
+    const failed = await runCampaignStep(args, { now: () => new Date(later), provider_command: () => {
+      calls++; throw new GithubAdapterError('network', 'connection failed');
+    } });
+    expect(failed.step_receipt).toMatchObject({ action: 'observe', outcome: 'no_progress', reconciliation: null });
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    expect(readCampaignBudgetLedger(f.root, runId, f.env)).toMatchObject({ controller_steps: 1, provider_calls: 2, reserved_provider_calls: 0, active_step: null });
+    expect(await runCampaignStep(args, { now: () => new Date(later), provider_command: () => { throw new Error('replay must not invoke'); } })).toEqual(failed);
+    const recovered = await runCampaignStep(input(f, 'read-recovered'), { now: () => new Date(later), provider_command: () => {
+      calls++;
+      if (calls === 2) return { stdout: JSON.stringify({ id: 100, full_name: 'acme/widgets', html_url: 'https://github.com/acme/widgets' }) };
+      return { stdout: JSON.stringify([1, 2].map(number => ({
+        id: 200 + number, number, html_url: `https://github.com/acme/widgets/issues/${number}`,
+        state: 'open', title: 'repair', body: body(f.intent, String(number).padStart(2, '0')),
+        labels: [{ name: 'campaign' }], assignees: [], created_at: null, updated_at: null,
+      }))) };
+    } });
+    expect(recovered.reconciliation?.outcome).toBe('complete');
+    expect(calls).toBe(3);
+    expect(readCampaignBudgetLedger(f.root, runId, f.env)).toMatchObject({ controller_steps: 2, provider_calls: 4, reserved_provider_calls: 0, active_step: null });
+  });
+
+  test('an unknown read outcome keeps its admission unresolved and creates no heartbeat receipt', async () => {
+    const f = await fixture(); let calls = 0;
+    await expect(runCampaignStep(input(f, 'unknown-read'), { now: () => new Date(later), provider_command: () => {
+      calls++; throw new Error('unknown command outcome');
+    } })).rejects.toThrow();
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    const ledger = readCampaignBudgetLedger(f.root, runId, f.env);
+    expect(ledger.active_step).not.toBeNull();
+    expect(ledger.reserved_provider_calls).toBe(1);
+    expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'receipts')).toHaveLength(0);
+    await expect(runCampaignStep(input(f, 'after-unknown-read'), { now: () => new Date(later), provider_command: () => {
+      calls++; return { stdout: '{}' };
+    } })).rejects.toThrow();
+    expect(calls).toBe(1);
+  });
+
+  test('a crash after the heartbeat receipt recovers completion without another observation', async () => {
+    const f = await fixture(); let calls = 0; let beforeCompletion = '';
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    const run = join(f.root, '.git', AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, 'runs', runId);
+    const observed = snapshot(f.intent, [{ id: '201', number: 1, slot: '01' }, { id: '202', number: 2, slot: '02' }]);
+    const deps = { now: () => new Date(later), observe: () => {
+      calls++; beforeCompletion = readFileSync(join(run, 'current.json'), 'utf8'); return observed;
+    } };
+    const args = input(f, 'receipt-before-completion');
+    const result = await runCampaignStep(args, deps);
+    // Restore the actual durable prefix from before completion, preserving the
+    // heartbeat receipt which was already persisted when a crash could occur.
+    const completion = readdirSync(join(run, 'events')).find(file => JSON.parse(readFileSync(join(run, 'events', file), 'utf8')).kind === CAMPAIGN_STEP_COMPLETION_KIND)!;
+    unlinkSync(join(run, 'events', completion));
+    writeFileSync(join(run, 'current.json'), beforeCompletion);
+    expect(await runCampaignStep(args, deps)).toEqual(result);
+    expect(calls).toBe(1);
+    expect(readCampaignBudgetLedger(f.root, runId, f.env)).toMatchObject({ controller_steps: 1, active_step: null });
+  });
+
   test('retries the same authoring request after a pre-invocation journal refusal is reconciled not started', async () => {
     const f = await fixture(); let calls = 0;
     const deps = {
@@ -300,6 +383,28 @@ describe('durable campaign heartbeat step', () => {
     expect(followups).toBe(1);
   });
 
+  test('refuses to backfill admission for a historical mutation result without a heartbeat receipt', async () => {
+    const f = await fixture(); let mutations = 0;
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    const run = join(f.root, '.git', AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, 'runs', runId);
+    const baseline = join(f.root, 'pre-heartbeat-budget');
+    cpSync(run, baseline, { recursive: true });
+    const observed = snapshot(f.intent, [{ id: '201', number: 1, slot: '01' }, { id: '202', number: 2, slot: '02' }, { id: '299', number: 99, slot: '99' }]);
+    const deps = { now: () => new Date(later), observe: () => observed, mutate_issue: async () => { mutations++; return { stdout: '{}' }; } };
+    const args = input(f, 'historical-result');
+    await runCampaignStep(args, deps);
+    // Preserve the real mutation journal, but restore the pre-admission ledger:
+    // this is the durable legacy state from before heartbeat budget integration.
+    const receipts = join(issueBatchGroupStoreRoot(f.root, 'campaign-1', 1), 'heartbeat', 'receipts');
+    for (const name of readdirSync(receipts)) unlinkSync(join(receipts, name));
+    rmSync(run, { recursive: true }); cpSync(baseline, run, { recursive: true });
+    const before = readCampaignBudgetLedger(f.root, runId, f.env);
+    await expect(runCampaignStep(args, { ...deps, observe: () => { throw new Error('recovery cannot observe'); } })).rejects.toThrow('no prior step admission');
+    expect(readCampaignBudgetLedger(f.root, runId, f.env)).toEqual(before);
+    expect(readdirSync(receipts)).toHaveLength(0);
+    expect(mutations).toBe(1);
+  });
+
   test('leaves an unknown mutation reserved and blocks any blind retry or new provider read', async () => {
     const f = await fixture();
     const observed = snapshot(f.intent, [{ id: '201', number: 1, slot: '01' }]);
@@ -325,31 +430,25 @@ describe('durable campaign heartbeat step', () => {
     expect(observations).toBe(0);
   });
 
-  test('CAS rejects a stale provider decision when another step advances the group journal', async () => {
-    const f = await fixture(); let followups = 0;
+  test('step admission rejects another key before it can advance the journal or observe the provider', async () => {
+    const f = await fixture(); let followups = 0; let competingReads = 0;
     const missing = snapshot(f.intent, [{ id: '201', number: 1, slot: '01' }]);
-    const complete = snapshot(f.intent, [{ id: '201', number: 1, slot: '01' }, { id: '202', number: 2, slot: '02' }]);
-    let raced = false;
-    try {
-      await runCampaignStep(input(f, 'stale-observer'), {
-        ...browserDependencies,
-        now: () => new Date(later),
-        observe: () => {
-          if (!raced) {
-            raced = true;
-            void runCampaignStep(input(f, 'winning-observer'), { now: () => new Date(later), observe: () => complete });
-          }
-          return missing;
-        },
-        followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => { followups += 1; return browserResult(browserInput, 'must-not-run', 'completed'); },
-      });
-      throw new Error('expected stale decision failure');
-    } catch (error) {
-      expect(error).toBeInstanceOf(CampaignStepError);
-      expect((error as CampaignStepError).code).toBe('campaign_reconciliation_required');
-    }
-    expect(followups).toBe(0);
-    expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'reservations')).toHaveLength(0);
+    let competing: Promise<unknown> | undefined;
+    const first = await runCampaignStep(input(f, 'admitted-observer'), {
+      ...browserDependencies, now: () => new Date(later),
+      observe: () => {
+        competing = runCampaignStep(input(f, 'competing-observer'), {
+          now: () => new Date(later), observe: () => { competingReads++; return missing; },
+        }).catch(error => error);
+        return missing;
+      },
+      followup: async browserInput => { followups++; return browserResult(browserInput, 'only-admitted-step', 'completed'); },
+    });
+    expect(first.step_receipt.action).toBe('fill_missing');
+    expect(await competing).toMatchObject({ code: 'automation_budget_refused' });
+    expect(competingReads).toBe(0);
+    expect(followups).toBe(1);
+    expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'reservations')).toHaveLength(1);
   });
 
   test('concurrent observation receipts with one idempotency key converge on the persisted receipt', async () => {

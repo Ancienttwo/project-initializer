@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:66ad6663cca3979e934f41c42543fca8f757db8271c19e65d94319184594cf97",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "126aa7f23afb3a081228e929d74024a36cafcfb1",
-    "worktreeDigest": "sha256:cd24e72b13c98dc1cd36866d754d2912afa4ab969bb4ad13f75db90a9f6acdfb",
-    "sourceTreeDigest": "sha256:814f8b9e748a1e57a8acef7c050f1ae1ba6f1118b8f43878af4d32c4a124dc24",
+    "baseHeadSha": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
+    "worktreeDigest": "sha256:cba4158b43ee0465d00f0d7f8b6e1c39528236bc93d18548172eaf6f8575490c",
+    "sourceTreeDigest": "sha256:998e3fd353e3429e740d72ebb3b70ee872dad330f4bd31be75ef1876596b9090",
     "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-    "codeGraphDigest": "sha256:cfbb8985376447927621a433d81b8de38f0ed00356d9999ba5319756c34b7677",
-    "indexedWorktreeDigest": "sha256:1ec12ffacbc2de3981f9bdf2324dee2e41d81581842fd944b0e79c12a5f5b53e",
+    "codeGraphDigest": "sha256:233c701c33562bca07986c58ea36b4553fcd5329dc4016495b10175150bce85d",
+    "indexedWorktreeDigest": "sha256:80d611564d883ed60fb7f41305ca60d3a6a41e479105f881ee5b8bbfb4191f28",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:2b2ec74e87557f603f487f1a5e385cb0ee5f790c31bb6f6aa61656c4b64f489d"
+    "projectionInputDigest": "sha256:9ed057eaffd1ebb79545310e6386002aab82e40c289865521f3c5bc4f49a9e9e"
   },
-  "projectionDigest": "sha256:53583346103bc0a3ee0f28b65b87c6c1c287d73df00b26994679ef69e29ca2fc",
+  "projectionDigest": "sha256:a5ff77b2025ce00ad279402436afd338cbb0def06e57b27c850258fd4eda91a4",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-      "sourceTreeDigest": "sha256:814f8b9e748a1e57a8acef7c050f1ae1ba6f1118b8f43878af4d32c4a124dc24",
+      "sourceTreeDigest": "sha256:998e3fd353e3429e740d72ebb3b70ee872dad330f4bd31be75ef1876596b9090",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:53583346103bc0a3ee0f28b65b87c6c1c287d73df00b26994679ef69e29ca2fc"
+      "projectionDigest": "sha256:a5ff77b2025ce00ad279402436afd338cbb0def06e57b27c850258fd4eda91a4"
     }
   },
-  "receiptDigest": "sha256:eaaf5d28c652c173ed2a652351fc1c5c5b9ea48e1e24080cfa7b1849ffeb402f",
+  "receiptDigest": "sha256:1e98e9cdcf446f8fb8b66334381725824c5568e7c036d4ad6da12528cad07c58",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -827,9 +827,9 @@
       "sourceDigest": "sha256:088fe69fea2cbedab6b94393077a36962836f953a6584f1d02a7e6c84eef4bf5",
       "outputDigest": "sha256:c1e5b229aebf173d9e8bbc5f0a987437bff389b987a40047ad056122c24f8de7",
       "verifiedAgainst": {
-        "branch": "codex/brc9-campaign-budget-prerequisite",
-        "commit": "12eda07c13980120461c15b83f00736309f0f5bd",
-        "committedAt": "2026-09-06T21:52:23+08:00"
+        "branch": "codex/brc9-heartbeat-budget-consumption",
+        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
+        "committedAt": "2026-09-06T23:47:34+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:d2978b298f0d4b17384710fa7adaae35d607c110a397819f082535610196f48e",
       "outputDigest": "sha256:ac50386fcb0ff83c9679ec2c36e5da425efb999b5d791bb052eb90b5ec924a6b",
       "verifiedAgainst": {
-        "branch": "codex/brc9-campaign-budget-prerequisite",
-        "commit": "4f2c5fee2382aadd019172b1feb441a1c63b24cd",
-        "committedAt": "2026-09-06T21:26:06+08:00"
+        "branch": "codex/brc9-heartbeat-budget-consumption",
+        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
+        "committedAt": "2026-09-06T23:47:34+08:00"
       }
     },
     {
@@ -1007,9 +1007,9 @@
       "sourceDigest": "sha256:9110cbd9bf052fe6fbbe39626d2fb63aa2897853f064c4039407bb1973974cc3",
       "outputDigest": "sha256:9583e5410a03e9fe02eb9d7b8acfedc4acd6cc6dae751b94c0f04a93d7daa8b7",
       "verifiedAgainst": {
-        "branch": "codex/brc7-local-planning-handoff",
-        "commit": "e4e20f6ada3a248aa4c188509ecd5619d2c7cfe8",
-        "committedAt": "2026-09-06T02:38:20+08:00"
+        "branch": "codex/brc9-heartbeat-budget-consumption",
+        "commit": "4cffbf5a3b3b94099564d065cb97cf5ce0243501",
+        "committedAt": "2026-09-06T23:32:09+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc9-campaign-budget-prerequisite",
-        "commit": "126aa7f23afb3a081228e929d74024a36cafcfb1",
-        "committedAt": "2026-09-06T22:23:40+08:00"
+        "branch": "codex/brc9-heartbeat-budget-consumption",
+        "commit": "65c0bad66cb7de9b181a054ba3a0365ff86a20f6",
+        "committedAt": "2026-09-06T23:47:34+08:00"
       }
     },
     {

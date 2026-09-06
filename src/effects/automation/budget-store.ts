@@ -1767,6 +1767,7 @@ export interface BeginCampaignBudgetStepInput extends CampaignBudgetStepIdentity
   readonly repo_root: string;
   readonly expected_budget_sha256: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly replay_only?: boolean;
 }
 
 function assertStepBudgetBinding(input: BeginCampaignBudgetStepInput, status: AutomationBudgetStatusV1): void {
@@ -1818,6 +1819,7 @@ export function beginCampaignBudgetStep(input: BeginCampaignBudgetStepInput): {
       if (prior.budget_sha256 !== input.expected_budget_sha256) fail('automation_budget_store_conflict', 'campaign step replay names a stale admission');
       return Object.freeze({ admission: prior, disposition: 'replayed' as const });
     }
+    if (input.replay_only) fail('automation_budget_store_conflict', 'campaign receipt has no prior step admission');
     const ledger = campaignLedger(paths, status.budget);
     if (ledger.active_step !== null || status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_refused', 'campaign step reconciliation_required before another admission');
     if (status.stop_receipt !== null || status.current.state === 'budget_exhausted') fail('automation_budget_refused', 'campaign budget_exhausted before step admission');
@@ -2347,6 +2349,63 @@ export function appendAutomationUsage(input: AppendAutomationUsageInput): Automa
     input.in_flight_authority ?? [],
     input.env,
   ), { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
+
+/** Persist the adapter observation before its usage event can close the call. */
+export function recordCampaignProviderOutcome(input: {
+  readonly repo_root: string;
+  readonly reservation: CampaignAutomationBudgetReservationV1;
+  readonly outcome: 'returned' | 'read_failed';
+  readonly result_sha256: string;
+  readonly env?: NodeJS.ProcessEnv;
+}): AutomationUsageCommitV1 {
+  const reservation = validateAutomationReservation(input.reservation);
+  if (reservation.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND
+    || !('request_sha256' in reservation.campaign_context)
+    || (input.outcome !== 'returned' && input.outcome !== 'read_failed')
+    || (input.outcome === 'read_failed' && reservation.campaign_context.operation !== 'github_read')
+    || typeof input.result_sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(input.result_sha256)) {
+    fail('automation_budget_store_invalid', 'provider outcome requires an exact GitHub reservation and result digest');
+  }
+  const repoRoot = resolve(input.repo_root);
+  const paths = runPaths(repoRoot, reservation.automation_run_id);
+  const requestDigest = reservation.campaign_context.request_sha256;
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    const now = automationStoreNow();
+    lockedStatus(repoRoot, paths, reservation.automation_run_id, now, input.env);
+    const stored = parse(readRaw(join(paths.reservationsByDigest, `${reservation.reservation_sha256}.json`), 'provider reservation'), validateAutomationReservation, 'provider reservation');
+    if (canonicalAutomationJson(stored) !== canonicalAutomationJson(reservation)
+      || !readLedgerReservations(paths).some(entry => entry.reservation_sha256 === reservation.reservation_sha256)) {
+      fail('automation_budget_store_conflict', 'provider outcome reservation differs from durable authority');
+    }
+    const basis = {
+      protocol: 1, kind: 'repo-harness-campaign-provider-outcome',
+      reservation_sha256: reservation.reservation_sha256,
+      request_sha256: requestDigest,
+      outcome: input.outcome, result_sha256: input.result_sha256,
+    };
+    const receipt = { ...basis, receipt_sha256: automationDigest(basis) };
+    const usageOutcome = input.outcome === 'read_failed' ? 'provider_failure' : 'no_progress';
+    const evidenceRefs = [evidenceRef('campaign-provider-outcome', receipt.receipt_sha256)];
+    const eventPath = join(paths.events, `${reservation.reservation_sha256}.json`);
+    if (existsSync(eventPath)) {
+      const event = parse(readRaw(eventPath, 'provider usage'), validateAutomationUsageEvent, 'provider usage');
+      if (event.outcome !== usageOutcome || event.resolution !== 'observed'
+        || canonicalAutomationJson(event.evidence_refs) !== canonicalAutomationJson(evidenceRefs)) {
+        fail('automation_budget_store_conflict', 'provider usage already binds a different observation');
+      }
+    }
+    const directory = join(paths.run, 'campaign-provider-outcomes');
+    ensureDirectory(paths.common, directory);
+    const path = join(directory, `${reservation.reservation_sha256}.json`);
+    if (!writeExclusive(path, bytes(receipt), 'campaign provider outcome')
+      && readRaw(path, 'campaign provider outcome') !== bytes(receipt)) {
+      fail('automation_budget_store_conflict', 'provider outcome replay changes its durable observation');
+    }
+    return commitUsage(repoRoot, paths, reservation, {
+      outcome: usageOutcome, evidence_refs: evidenceRefs,
+    }, now, 'observed', [], input.env);
+  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
 export type AutomationReconciliationResolution =

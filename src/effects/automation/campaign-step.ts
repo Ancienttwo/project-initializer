@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process';
 import { resolve } from 'path';
 
 import { canonicalMessageBytes, canonicalMessageDigest } from '../../core/messages/mechanics';
+import { automationDigest, type CampaignBudgetStepAdmissionV1, type ProgramAuthorizationV1 } from '../../core/automation/budget';
 import {
   reconcileIssueBatchSlots,
   type IssueBatchReconciliationV1,
@@ -21,7 +22,10 @@ import {
   readIssueBatchIntent,
 } from './issue-batch-store';
 import { IssueBatchObserverError, observeIssueBatch, requireIssueBatchAuthority, type IssueBatchObservationSnapshotV1, type ObserveIssueBatchInput } from './issue-batch-observer';
-import { withDevelopmentCampaignLock } from './development-campaign-store';
+import { readDevelopmentCampaignStatus, withDevelopmentCampaignLock } from './development-campaign-store';
+import { readStoredProgramAuthorization } from './grant-store';
+import { beginCampaignBudgetStep, completeCampaignBudgetStep, ensureCampaignAuthoringBudget, readAutomationBudgetStatus } from './budget-store';
+import { createCampaignProviderExecutor } from './campaign-provider-execution';
 
 const STEP_KIND = 'repo-harness-campaign-heartbeat-step' as const;
 const RESERVATION_KIND = 'repo-harness-campaign-provider-mutation-reservation' as const;
@@ -369,6 +373,28 @@ function slotObservation(reconciliation: IssueBatchReconciliationV1, slot: Issue
   return value;
 }
 
+function admitHeartbeat(input: RunCampaignStepInput, intent: IssueBatchIntentV1, authorization: ProgramAuthorizationV1, replayOnly = false) {
+  const budget = ensureCampaignAuthoringBudget({ repo_root: input.repo_root, authorization, env: input.env });
+  const binding = {
+    ...input, automation_run_id: budget.budget.automation_run_id, expected_budget_sha256: budget.budget.budget_sha256,
+    group_number: intent.group_number as 1 | 2 | 3,
+  };
+  const { admission } = beginCampaignBudgetStep({ ...binding, replay_only: replayOnly });
+  return { binding, admission };
+}
+
+function completeHeartbeat(input: RunCampaignStepInput, admission: CampaignBudgetStepAdmissionV1, result: CampaignStepResultV1): CampaignStepResultV1 {
+  if (result.step_receipt.outcome === 'reconciliation_required') {
+    throw new CampaignStepError('campaign_reconciliation_required', 'heartbeat outcome requires reconciliation before completion', result.step_receipt);
+  }
+  completeCampaignBudgetStep({
+    repo_root: input.repo_root, admission, env: input.env,
+    outcome: result.step_receipt.outcome === 'progress' ? 'progress' : 'no_progress',
+    evidence_refs: [{ ref: `campaign-step:${automationDigest({ key: input.idempotency_key })}`, sha256: result.step_receipt.step_receipt_sha256.slice(7) }],
+  });
+  return result;
+}
+
 export async function runCampaignStep(inputValue: RunCampaignStepInput, deps: CampaignStepDependencies): Promise<CampaignStepResultV1> {
   const input = { ...inputValue, repo_root: resolve(inputValue.repo_root) };
   const now = deps.now ?? (() => new Date());
@@ -376,7 +402,14 @@ export async function runCampaignStep(inputValue: RunCampaignStepInput, deps: Ca
   const intent = readIssueBatchIntent(input.repo_root, input.campaign_id, input.group_number, input.intent_sha256);
   const journal = readCampaignJournalSnapshot(input);
   const replay = journal.receipts.find((entry) => entry.idempotency_key === input.idempotency_key);
-  if (replay) return Object.freeze({ intent, step_receipt: replay, reconciliation: replay.reconciliation });
+  if (replay) {
+    const result = Object.freeze({ intent, step_receipt: replay, reconciliation: replay.reconciliation });
+    if (replay.action === 'campaign_no_progress' || replay.action === 'idle') return result;
+    const campaign = readDevelopmentCampaignStatus(input.repo_root, input.campaign_id, input.env).campaign;
+    const authorization = readStoredProgramAuthorization(input.repo_root, campaign.authorization_sha256, input.env);
+    const { admission } = admitHeartbeat(input, intent, authorization, true);
+    return completeHeartbeat(input, admission, result);
+  }
 
   const storedReservations = journal.reservations; const storedResults = journal.results;
   for (const result of storedResults) {
@@ -423,107 +456,129 @@ export async function runCampaignStep(inputValue: RunCampaignStepInput, deps: Ca
 
   const completedReplayReservation = storedReservations.find((entry) => entry.idempotency_key === input.idempotency_key);
   const completedReplayResult = completedReplayReservation ? storedResults.find((entry) => entry.reservation_sha256 === completedReplayReservation.reservation_sha256) : null;
-  if (completedReplayReservation && completedReplayResult) {
-    const stepReceipt = persistReceipt(input, {
-      action: completedReplayReservation.action, outcome: completedReplayResult.outcome === 'completed' ? 'progress' : 'no_progress',
-      observed_at: completedReplayReservation.reserved_at, next_check_at: nextCheck(new Date(completedReplayReservation.reserved_at)),
-      snapshot_receipt_sha256: completedReplayReservation.snapshot_receipt_sha256, reconciliation: completedReplayReservation.reconciliation,
-      mutation_reservation_sha256: completedReplayReservation.reservation_sha256,
-      evidence_refs: [completedReplayReservation.snapshot_receipt_sha256, completedReplayReservation.reconciliation.reconciliation_sha256, completedReplayReservation.reservation_sha256, completedReplayResult.result_sha256],
-    });
-    return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation: completedReplayReservation.reconciliation });
-  }
-  const expectedJournalSha256 = journal.journal_sha256;
-  const snapshot = (deps.observe ?? observeIssueBatch)({ repo_root: input.repo_root, intent, env: input.env, now });
-  const currentHashes = new Set(snapshot.observations.map((entry) => entry.observation_sha256));
-  const editedIssueIds = storedResults.filter((entry) => entry.action === 'edit_issue' && entry.provider_issue_id !== null).map((entry) => entry.provider_issue_id!);
-  const repairBaselines = new Map<string, { readonly observation_sha256: string; readonly observed_at: string }>();
-  for (const result of storedResults.filter((entry) => entry.action === 'edit_issue' && entry.provider_issue_id !== null)) {
-    const reservation = storedReservations.find((entry) => entry.reservation_sha256 === result.reservation_sha256)!;
-    const baselineReceipt = priorReceipts.filter((entry) => entry.reconciliation !== null && entry.snapshot_receipt_sha256 !== reservation.snapshot_receipt_sha256
-      && Date.parse(entry.observed_at) >= Date.parse(result.completed_at)).sort((left, right) => left.observed_at.localeCompare(right.observed_at))[0];
-    const baselineSlot = baselineReceipt?.reconciliation?.slots.find((slot) => slot.provider_issue_id === result.provider_issue_id && slot.observation_sha256 !== null);
-    if (baselineReceipt && baselineSlot?.observation_sha256) repairBaselines.set(result.provider_issue_id!, { observation_sha256: baselineSlot.observation_sha256, observed_at: baselineReceipt.observed_at });
-  }
-  const authorizedRepairIssueIds = editedIssueIds.filter((issueId) => !repairBaselines.has(issueId));
-  const priorObservations = listProviderIssueObservations(input.repo_root).filter((entry) => {
-    if (entry.registered_repository_id !== intent.repository_id || currentHashes.has(entry.observation_sha256)) return false;
-    const baseline = repairBaselines.get(entry.provider_issue_id);
-    return baseline === undefined || entry.observation_sha256 === baseline.observation_sha256 || Date.parse(entry.observed_at) > Date.parse(baseline.observed_at);
-  });
-  const exhaustedSlots = storedResults.filter((entry) => entry.action === 'edit_issue').flatMap((entry) => entry.requested_slots);
-  const reconciliation = reconcileIssueBatchSlots({
-    intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, prior_observations: priorObservations,
-    repaired_issue_ids: authorizedRepairIssueIds, repair_exhausted_slots: exhaustedSlots, current_main_sha: currentMain,
-  });
-
-  const completedComments = new Set(storedResults.filter((entry) => entry.action === 'comment_unexpected').map((entry) => entry.provider_issue_id));
-  const completedCloses = new Set(storedResults.filter((entry) => entry.action === 'close_unexpected').map((entry) => entry.provider_issue_id));
-  const openUnexpected = reconciliation.unexpected_issue_ids.map((id) => latestObservation(snapshot, id)).filter((entry) => entry.state === 'open');
-  let action: MutationAction | null = null; let requestedSlots: readonly IssueBatchSlot[] = []; let target: ProviderIssueObservationV1 | null = null;
-  if (openUnexpected.length > 0) {
-    target = openUnexpected[0]!;
-    if (!completedComments.has(target.provider_issue_id)) action = 'comment_unexpected';
-    else if (!completedCloses.has(target.provider_issue_id)) action = 'close_unexpected';
-  }
-  if (action === null && reconciliation.invalid_slots.length > 0) {
-    requestedSlots = [reconciliation.invalid_slots[0]!];
-    const issueId = slotObservation(reconciliation, requestedSlots[0]!).provider_issue_id;
-    if (issueId && !editedIssueIds.includes(issueId)) { action = 'edit_issue'; target = latestObservation(snapshot, issueId); }
-  }
-  if (action === null && reconciliation.missing_slots.length > 0) {
-    action = 'fill_missing'; requestedSlots = reconciliation.missing_slots;
-  }
-
-  if (action === null) {
-    const complete = reconciliation.slots.every((slot) => slot.state === 'complete') && openUnexpected.length === 0;
-    const settledNoProgress = openUnexpected.length === 0 && reconciliation.slots.every((slot) => slot.state === 'complete' || slot.state === 'unfilled');
-    const stepReceipt = persistReceipt(input, {
-      action: 'observe', outcome: complete ? 'progress' : 'no_progress', observed_at: observedAt,
-      next_check_at: complete || settledNoProgress ? null : nextCheck(observedDate), snapshot_receipt_sha256: snapshot.receipt.receipt_sha256,
-      reconciliation, mutation_reservation_sha256: null,
-      evidence_refs: [snapshot.receipt.receipt_sha256, reconciliation.reconciliation_sha256],
-    });
-    return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation: stepReceipt.reconciliation });
-  }
-
-  const sourceSessionRef = action === 'fill_missing' || action === 'edit_issue' ? latestSession?.session_ref ?? null : null;
-  if ((action === 'fill_missing' || action === 'edit_issue') && sourceSessionRef === null) {
-    throw new CampaignStepError('campaign_reconciliation_required', 'authoring follow-up requires a durable source session');
-  }
-  const targetIssueUrl = target?.url ?? null;
-  const targetIssueNumber = target === null ? null : issueNumber(target, intent.provider_repository);
-  if (action === 'fill_missing' || action === 'edit_issue') stepAuthority(input, intent, now());
-  const preparedAuthoring = action === 'fill_missing' || action === 'edit_issue' ? prepareIssueBatchAuthoringContinuation({
-        repo_root: input.repo_root, campaign_id: input.campaign_id, group_number: input.group_number,
-        intent_sha256: intent.intent_sha256, source_session_ref: sourceSessionRef!, operation: action,
-        requested_slots: requestedSlots, provider_issue_id: action === 'edit_issue' ? target!.provider_issue_id : undefined,
-        provider_issue_url: action === 'edit_issue' ? targetIssueUrl! : undefined, env: input.env,
-      }, { readBinding: deps.readBinding, followup: deps.followup }) : null;
-  const reservation = persistReservation(input, intent, action, requestedSlots, target?.provider_issue_id ?? null, sourceSessionRef, observedAt, expectedJournalSha256, snapshot, reconciliation, now);
-  let evidenceRefs: readonly string[]; let mutationOutcome: CampaignMutationResultV1['outcome'] = 'completed';
-  try {
-    if (action === 'fill_missing' || action === 'edit_issue') {
-      const authored = await preparedAuthoring!.execute();
-      evidenceRefs = [authored.session.session_sha256];
-      mutationOutcome = authored.session.browser_status === 'completed' && authored.session.verification === 'verified' ? 'completed' : 'no_progress';
-    } else {
-      const mutationAction = action === 'comment_unexpected' ? 'comment' : 'close';
-      const body = mutationAction === 'comment' ? `repo-harness campaign ${intent.campaign_id} group ${intent.group_number}: this Issue names an undeclared slot and is not planned for adoption.` : null;
-      const policy = requireManualGithubPolicy(readCampaignExternalSourcesPolicyAtRevision(input.repo_root, intent.base_main_sha));
-      const mutationInput = { repository: intent.provider_repository, issue_number: targetIssueNumber!, action: mutationAction, body } as const;
-      const result = deps.mutate_issue ? await deps.mutate_issue(mutationInput) : defaultMutate(mutationInput, policy.github.limits.deadline_ms, policy.github.limits.max_total_bytes + 1, deps.provider_command);
-      evidenceRefs = [snapshot.receipt.receipt_sha256, canonicalMessageDigest({ action: mutationAction, stdout: result.stdout })];
+  const { binding, admission } = admitHeartbeat(input, intent, authority.authorization, Boolean(completedReplayResult));
+  const provider = createCampaignProviderExecutor({ ...binding, step_admission_sha256: admission.event_sha256 }, deps.provider_command);
+  const result = await (async (): Promise<CampaignStepResultV1> => {
+    if (completedReplayReservation && completedReplayResult) {
+      const stepReceipt = persistReceipt(input, {
+        action: completedReplayReservation.action, outcome: completedReplayResult.outcome === 'completed' ? 'progress' : 'no_progress',
+        observed_at: completedReplayReservation.reserved_at, next_check_at: nextCheck(new Date(completedReplayReservation.reserved_at)),
+        snapshot_receipt_sha256: completedReplayReservation.snapshot_receipt_sha256, reconciliation: completedReplayReservation.reconciliation,
+        mutation_reservation_sha256: completedReplayReservation.reservation_sha256,
+        evidence_refs: [completedReplayReservation.snapshot_receipt_sha256, completedReplayReservation.reconciliation.reconciliation_sha256, completedReplayReservation.reservation_sha256, completedReplayResult.result_sha256],
+      });
+      return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation: completedReplayReservation.reconciliation });
     }
-  } catch (error) {
-    throw new CampaignStepError('campaign_step_mutation_failed', `provider mutation ${reservation.reservation_sha256} has an unknown result and requires reconciliation`, null, error);
-  }
-  const mutationResult = persistResult(input, reservation, mutationOutcome, evidenceRefs, now().toISOString());
-  const stepReceipt = persistReceipt(input, {
-    action, outcome: mutationOutcome === 'completed' ? 'progress' : 'no_progress', observed_at: observedAt, next_check_at: nextCheck(observedDate),
-    snapshot_receipt_sha256: snapshot.receipt.receipt_sha256, reconciliation,
-    mutation_reservation_sha256: reservation.reservation_sha256,
-    evidence_refs: [snapshot.receipt.receipt_sha256, reconciliation.reconciliation_sha256, reservation.reservation_sha256, mutationResult.result_sha256],
-  });
-  return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation });
+    const expectedJournalSha256 = journal.journal_sha256;
+    let snapshot: IssueBatchObservationSnapshotV1;
+    try {
+      snapshot = (deps.observe ?? observeIssueBatch)({ repo_root: input.repo_root, intent, env: input.env, now, runner: provider.read });
+    } catch (error) {
+      if (!(error instanceof IssueBatchObserverError) || error.receipt === null
+        || !['issue_provider_unavailable', 'issue_provider_snapshot_incomplete'].includes(error.code)) throw error;
+      // The observer can wrap unknown runner errors too. Only the budget store
+      // can prove that every admitted external invocation has been settled.
+      const budget = readAutomationBudgetStatus(input.repo_root, binding.automation_run_id, input.env);
+      if (budget.current.open_reservation_sha256s.length !== 0) throw error;
+      const stepReceipt = persistReceipt(input, {
+        action: 'observe', outcome: 'no_progress', observed_at: observedAt, next_check_at: nextCheck(observedDate),
+        snapshot_receipt_sha256: null, reconciliation: null, mutation_reservation_sha256: null,
+        evidence_refs: [error.receipt.receipt_sha256],
+      });
+      return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation: null });
+    }
+    const currentHashes = new Set(snapshot.observations.map((entry) => entry.observation_sha256));
+    const editedIssueIds = storedResults.filter((entry) => entry.action === 'edit_issue' && entry.provider_issue_id !== null).map((entry) => entry.provider_issue_id!);
+    const repairBaselines = new Map<string, { readonly observation_sha256: string; readonly observed_at: string }>();
+    for (const result of storedResults.filter((entry) => entry.action === 'edit_issue' && entry.provider_issue_id !== null)) {
+      const reservation = storedReservations.find((entry) => entry.reservation_sha256 === result.reservation_sha256)!;
+      const baselineReceipt = priorReceipts.filter((entry) => entry.reconciliation !== null && entry.snapshot_receipt_sha256 !== reservation.snapshot_receipt_sha256
+        && Date.parse(entry.observed_at) >= Date.parse(result.completed_at)).sort((left, right) => left.observed_at.localeCompare(right.observed_at))[0];
+      const baselineSlot = baselineReceipt?.reconciliation?.slots.find((slot) => slot.provider_issue_id === result.provider_issue_id && slot.observation_sha256 !== null);
+      if (baselineReceipt && baselineSlot?.observation_sha256) repairBaselines.set(result.provider_issue_id!, { observation_sha256: baselineSlot.observation_sha256, observed_at: baselineReceipt.observed_at });
+    }
+    const authorizedRepairIssueIds = editedIssueIds.filter((issueId) => !repairBaselines.has(issueId));
+    const priorObservations = listProviderIssueObservations(input.repo_root).filter((entry) => {
+      if (entry.registered_repository_id !== intent.repository_id || currentHashes.has(entry.observation_sha256)) return false;
+      const baseline = repairBaselines.get(entry.provider_issue_id);
+      return baseline === undefined || entry.observation_sha256 === baseline.observation_sha256 || Date.parse(entry.observed_at) > Date.parse(baseline.observed_at);
+    });
+    const exhaustedSlots = storedResults.filter((entry) => entry.action === 'edit_issue').flatMap((entry) => entry.requested_slots);
+    const reconciliation = reconcileIssueBatchSlots({
+      intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, prior_observations: priorObservations,
+      repaired_issue_ids: authorizedRepairIssueIds, repair_exhausted_slots: exhaustedSlots, current_main_sha: currentMain,
+    });
+
+    const completedComments = new Set(storedResults.filter((entry) => entry.action === 'comment_unexpected').map((entry) => entry.provider_issue_id));
+    const completedCloses = new Set(storedResults.filter((entry) => entry.action === 'close_unexpected').map((entry) => entry.provider_issue_id));
+    const openUnexpected = reconciliation.unexpected_issue_ids.map((id) => latestObservation(snapshot, id)).filter((entry) => entry.state === 'open');
+    let action: MutationAction | null = null; let requestedSlots: readonly IssueBatchSlot[] = []; let target: ProviderIssueObservationV1 | null = null;
+    if (openUnexpected.length > 0) {
+      target = openUnexpected[0]!;
+      if (!completedComments.has(target.provider_issue_id)) action = 'comment_unexpected';
+      else if (!completedCloses.has(target.provider_issue_id)) action = 'close_unexpected';
+    }
+    if (action === null && reconciliation.invalid_slots.length > 0) {
+      requestedSlots = [reconciliation.invalid_slots[0]!];
+      const issueId = slotObservation(reconciliation, requestedSlots[0]!).provider_issue_id;
+      if (issueId && !editedIssueIds.includes(issueId)) { action = 'edit_issue'; target = latestObservation(snapshot, issueId); }
+    }
+    if (action === null && reconciliation.missing_slots.length > 0) {
+      action = 'fill_missing'; requestedSlots = reconciliation.missing_slots;
+    }
+
+    if (action === null) {
+      const complete = reconciliation.slots.every((slot) => slot.state === 'complete') && openUnexpected.length === 0;
+      const settledNoProgress = openUnexpected.length === 0 && reconciliation.slots.every((slot) => slot.state === 'complete' || slot.state === 'unfilled');
+      const stepReceipt = persistReceipt(input, {
+        action: 'observe', outcome: complete ? 'progress' : 'no_progress', observed_at: observedAt,
+        next_check_at: complete || settledNoProgress ? null : nextCheck(observedDate), snapshot_receipt_sha256: snapshot.receipt.receipt_sha256,
+        reconciliation, mutation_reservation_sha256: null,
+        evidence_refs: [snapshot.receipt.receipt_sha256, reconciliation.reconciliation_sha256],
+      });
+      return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation: stepReceipt.reconciliation });
+    }
+
+    const sourceSessionRef = action === 'fill_missing' || action === 'edit_issue' ? latestSession?.session_ref ?? null : null;
+    if ((action === 'fill_missing' || action === 'edit_issue') && sourceSessionRef === null) {
+      throw new CampaignStepError('campaign_reconciliation_required', 'authoring follow-up requires a durable source session');
+    }
+    const targetIssueUrl = target?.url ?? null;
+    const targetIssueNumber = target === null ? null : issueNumber(target, intent.provider_repository);
+    if (action === 'fill_missing' || action === 'edit_issue') stepAuthority(input, intent, now());
+    const preparedAuthoring = action === 'fill_missing' || action === 'edit_issue' ? prepareIssueBatchAuthoringContinuation({
+          repo_root: input.repo_root, campaign_id: input.campaign_id, group_number: input.group_number,
+          intent_sha256: intent.intent_sha256, source_session_ref: sourceSessionRef!, operation: action,
+          requested_slots: requestedSlots, provider_issue_id: action === 'edit_issue' ? target!.provider_issue_id : undefined,
+          provider_issue_url: action === 'edit_issue' ? targetIssueUrl! : undefined, env: input.env,
+          step_admission_sha256: admission.event_sha256,
+        }, { readBinding: deps.readBinding, followup: deps.followup }) : null;
+    const reservation = persistReservation(input, intent, action, requestedSlots, target?.provider_issue_id ?? null, sourceSessionRef, observedAt, expectedJournalSha256, snapshot, reconciliation, now);
+    let evidenceRefs: readonly string[]; let mutationOutcome: CampaignMutationResultV1['outcome'] = 'completed';
+    try {
+      if (action === 'fill_missing' || action === 'edit_issue') {
+        const authored = await preparedAuthoring!.execute();
+        evidenceRefs = [authored.session.session_sha256];
+        mutationOutcome = authored.session.browser_status === 'completed' && authored.session.verification === 'verified' ? 'completed' : 'no_progress';
+      } else {
+        const mutationAction = action === 'comment_unexpected' ? 'comment' : 'close';
+        const body = mutationAction === 'comment' ? `repo-harness campaign ${intent.campaign_id} group ${intent.group_number}: this Issue names an undeclared slot and is not planned for adoption.` : null;
+        const policy = requireManualGithubPolicy(readCampaignExternalSourcesPolicyAtRevision(input.repo_root, intent.base_main_sha));
+        const mutationInput = { repository: intent.provider_repository, issue_number: targetIssueNumber!, action: mutationAction, body } as const;
+        const result = await provider.mutate(mutationInput, () => deps.mutate_issue ? deps.mutate_issue(mutationInput) : defaultMutate(mutationInput, policy.github.limits.deadline_ms, policy.github.limits.max_total_bytes + 1, deps.provider_command));
+        evidenceRefs = [snapshot.receipt.receipt_sha256, canonicalMessageDigest({ action: mutationAction, stdout: result.stdout })];
+      }
+    } catch (error) {
+      throw new CampaignStepError('campaign_step_mutation_failed', `provider mutation ${reservation.reservation_sha256} has an unknown result and requires reconciliation`, null, error);
+    }
+    const mutationResult = persistResult(input, reservation, mutationOutcome, evidenceRefs, now().toISOString());
+    const stepReceipt = persistReceipt(input, {
+      action, outcome: mutationOutcome === 'completed' ? 'progress' : 'no_progress', observed_at: observedAt, next_check_at: nextCheck(observedDate),
+      snapshot_receipt_sha256: snapshot.receipt.receipt_sha256, reconciliation,
+      mutation_reservation_sha256: reservation.reservation_sha256,
+      evidence_refs: [snapshot.receipt.receipt_sha256, reconciliation.reconciliation_sha256, reservation.reservation_sha256, mutationResult.result_sha256],
+    });
+    return Object.freeze({ intent, step_receipt: stepReceipt, reconciliation });
+  })();
+  return completeHeartbeat(input, admission, result);
 }

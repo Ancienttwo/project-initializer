@@ -50,7 +50,7 @@ export class GithubAdapterError extends Error {
   }
 }
 
-function defaultRunner(args: readonly string[], options: { readonly timeout_ms: number; readonly max_buffer: number }): GithubCommandResult {
+export function runGithubCommand(args: readonly string[], options: { readonly timeout_ms: number; readonly max_buffer: number }): GithubCommandResult {
   try {
     return { stdout: execFileSync('gh', args, { encoding: 'utf8', timeout: options.timeout_ms, maxBuffer: options.max_buffer, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (error) {
@@ -156,7 +156,7 @@ export function evaluateGithubEligibility(issue: GithubIssueV1, policy: External
 
 export function fetchGithubIssues(
   policy: ExternalSourcesManualGithubPolicyV1,
-  runner: GithubCommandRunner = defaultRunner,
+  runner: GithubCommandRunner = runGithubCommand,
   nowMs: () => number = Date.now,
 ): GithubFetchSnapshotV1 {
   const { repository, limits } = policy.github;
