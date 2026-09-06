@@ -14,19 +14,16 @@ how to interpret findings, and the boundaries below.
 
 ## Mode Selection
 
-- Inside Claude Code -> direct Codex outside opinion: `references/codex-mode.md`.
-- Inside Codex -> official `codex@openai-codex` plugin app-server outside opinion: `references/codex-plugin-mode.md`.
+- Inside Claude Code -> direct Codex: `references/codex-mode.md`.
+- Inside Codex -> official `codex@openai-codex` plugin app-server: `references/codex-plugin-mode.md`.
 - Explicit Claude acceptance review -> `references/claude-mode.md`.
-- An explicit provider name request always wins over the host default.
+- An explicit provider request wins over the host default.
 
 ## When to use
 
 - Before merging an important diff (last gate).
 - After writing a spec/tests -- find ambiguity and weak assertions.
 - A hard bug whose root cause is unclear (independent diagnosis).
-
-The following interpretation and boundaries apply to advisory Codex modes.
-Claude acceptance follows its typed receipt and lifecycle rules in `claude-mode.md`.
 
 ## Interpreting findings
 
@@ -36,6 +33,6 @@ Claude acceptance follows its typed receipt and lifecycle rules in `claude-mode.
 
 ## Boundaries
 
-- Read-only: direct Codex and the official plugin app-server both use a read-only sandbox.
+- Read-only: direct Codex and the plugin app-server both use a read-only sandbox.
 - Bounded: 2 provider attempts, then `SKIPPED` -- advisory, non-blocking (exit 0). Do not re-run it or narrow the diff to retry. `degraded_scope` and `stale_scope` block (exit 1). Never a synthesized pass.
 - Never produces or verifies a `merge-gate` receipt; that judge is separate.

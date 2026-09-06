@@ -369,7 +369,7 @@ Only Human authority may accept or reject a submitted demand. Acceptance freezes
 
 `repo-harness claude-review round/status/close/cancel` owns one reviewer session
 per canonical task contract and worktree. Both host profiles require usable
-tmux in readiness. A dedicated `repo-harness-review` tmux server hosts a readable
+tmux in readiness. A dedicated `repo-harness-claude-review` tmux server hosts a readable
 activity pane and one persistent Claude stream-json child; it does not parse a
 terminal screen or change user tmux configuration.
 

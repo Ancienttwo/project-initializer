@@ -1,5 +1,9 @@
 # Claude acceptance review
 
+SKILL.md's "Interpreting findings" and "Boundaries" describe the advisory
+Codex modes. Claude acceptance is not advisory: it follows the typed receipt
+and session lifecycle rules below instead.
+
 Use only for an explicit Claude acceptance request and a contract with the
 existing Claude Acceptance Policy (`protocol: 1`, `reviewer: "Claude"`).
 Do not change the selected reviewer policy implicitly.

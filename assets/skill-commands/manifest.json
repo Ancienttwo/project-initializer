@@ -505,11 +505,6 @@
       "note": "Consolidated into repo-harness-cross-review's codex-mode reference; installed on the Claude host."
     },
     {
-      "name": "claude-review",
-      "replacement": "repo-harness-cross-review",
-      "note": "Retired from active review. Codex hosts use repo-harness-cross-review's official codex-plugin mode."
-    },
-    {
       "name": "repo-harness-chatgpt-bridge",
       "replacement": "repo-harness-chatgpt",
       "note": "Consolidated into repo-harness-chatgpt's bridge reference. The installed runtime skill name repo-harness-chatgpt-bridge remains the canonical bridge.md-frontmatter-driven projection identity for the MCP connector, generated on demand rather than shipped as a static directory."
