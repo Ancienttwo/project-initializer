@@ -42,3 +42,8 @@ The missing-index proof candidate was reconciled through the existing determinis
 - pre_fix_failure_artifact: `.ai/harness/runs/brc10-liveness-policy-pre-fix.log` records 2 pass / 1 fail and `PRE_FIX_EXIT=1`.
 
 This is the first directly blocking out-of-scope correction. Exact field validation and the builder-owned digest remain authoritative; no stored policy is rewritten or inferred. A second out-of-scope discovery stops this package for disposition.
+## Publication evidence
+
+> **Substantive Change SHA256**: `sha256:c961204e64ded2134d1ecbbafa5919948ae461597f133b1276ffdf8c674c401c`
+
+The archived package is bound to the direct/merge-base publication range from `188ae3529695623022c015c0cae0f7ec0b1304a4`. Source and tests are unchanged from the accepted subject; this metadata does not claim full BRC10 completion.
