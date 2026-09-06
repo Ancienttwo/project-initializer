@@ -6,7 +6,8 @@ import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { prepareChangeAssessment } from '../src/effects/review/change-assessment';
-import { acceptanceAuthorityFingerprint, acceptanceReceiptPath, recordAcceptance, sealArchiveProjection } from '../scripts/acceptance-receipt';
+import { executeVerificationContract } from '../src/effects/evidence/verification-execution';
+import { acceptanceAuthorityFingerprint, acceptanceReceiptPath, recordAcceptance, sealArchiveProjection, verifyAcceptance } from '../scripts/acceptance-receipt';
 
 const ROOT = join(import.meta.dir, '..');
 const SCRIPT = join(ROOT, 'scripts', 'merge-gate.ts');
@@ -92,6 +93,12 @@ async function makeFixture(seedCandidate?: (cwd: string) => void) {
     '{"protocol":1,"oracles":[]}',
     '```',
     '',
+    '## Verification Plan',
+    '',
+    '```json',
+    '{"protocol":1,"checks":[]}',
+    '```',
+    '',
   ].join('\n'));
   writeFileSync(join(cwd, 'tasks', 'reviews', 'demo.review.md'), '# Review\n\n> **Recommendation**: pass\n');
   // Seeded before the candidate commit so the acceptance receipt covers the
@@ -100,6 +107,11 @@ async function makeFixture(seedCandidate?: (cwd: string) => void) {
   seedCandidate?.(cwd);
   commit(cwd, 'candidate');
   const subject = buildReviewSubject(cwd, { targetRef: 'main' });
+  const execution_evaluation = executeVerificationContract({
+    repoRoot: cwd,
+    contractPath: 'tasks/contracts/demo.contract.md',
+  });
+  expect(execution_evaluation.passed).toBe(true);
   writeFileSync(join(cwd, '.ai', 'harness', 'checks', 'latest.json'), `${JSON.stringify({
     schema: 'repo-harness-run-trace.v1',
     source: 'verify-sprint',
@@ -115,7 +127,7 @@ async function makeFixture(seedCandidate?: (cwd: string) => void) {
       { name: 'allowed_paths', status: 'pass' },
       { name: 'change_assessment', status: 'pass' },
     ],
-    contract: { file: 'tasks/contracts/demo.contract.md' },
+    contract: { file: 'tasks/contracts/demo.contract.md', execution_evaluation },
     review: { file: 'tasks/reviews/demo.review.md' },
     change_assessment: changeAssessmentEvidence(cwd),
   }, null, 2)}\n`);
@@ -244,16 +256,28 @@ describe('provider-free merge seal', () => {
     expect(readFileSync(fixture.providerCalls, 'utf-8').trim()).toBe('1');
   }, 30_000);
 
-  test('non-overlapping target movement invalidates exact-target Change Assessment evidence', async () => {
+  test('both non-overlapping and overlapping target movement require current integration evidence while preserving the historical receipt', async () => {
     const fixture = await makeFixture();
     git(fixture.cwd, 'checkout', 'main');
     writeFileSync(join(fixture.cwd, 'other.txt'), 'target advanced\n');
     commit(fixture.cwd, 'advance base');
     git(fixture.cwd, 'checkout', 'codex/demo');
+    expect((await verifyAcceptance({ root: fixture.cwd, authorityHome: fixture.home })).disposition).toBe('external_pass');
     const resealed = run('bun', [fixture.harness, 'run', '--base', 'main', '--format', 'sha'], fixture.cwd);
     expect(resealed.status).not.toBe(0);
-    expect(resealed.stderr).toContain('change assessment packet is stale');
+    expect(resealed.stderr).toContain('current integration evidence is required');
     expect(readFileSync(fixture.providerCalls, 'utf-8').trim()).toBe('1');
+
+    const overlap = await makeFixture();
+    git(overlap.cwd, 'checkout', 'main');
+    writeFileSync(join(overlap.cwd, 'feature.txt'), 'target overlap\n');
+    commit(overlap.cwd, 'advance overlapping base');
+    git(overlap.cwd, 'checkout', 'codex/demo');
+    expect((await verifyAcceptance({ root: overlap.cwd, authorityHome: overlap.home })).disposition).toBe('external_pass');
+    const overlapReseal = run('bun', [overlap.harness, 'run', '--base', 'main', '--format', 'sha'], overlap.cwd);
+    expect(overlapReseal.status).not.toBe(0);
+    expect(overlapReseal.stderr).toContain('current integration evidence is required');
+    expect(readFileSync(overlap.providerCalls, 'utf-8').trim()).toBe('1');
   }, 30_000);
 
   test('post-freeze lifecycle commit verifies against the sealed head without another provider call', async () => {

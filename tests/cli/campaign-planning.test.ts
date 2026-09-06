@@ -35,7 +35,7 @@ test('relative repository path reaches the real planning preflight contract', as
   try {
     const init = spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: root });
     expect(init.status).toBe(0);
-    writeFileSync(join(root, 'valid.contract.md'), '# Contract\n> **Task Profile**: code-change\n\n## Goal\nRepair input validation.\n\n## Why\nEmpty input fails.\n\n## Scope\n- In scope: input validation.\n- Out of scope: other behavior.\n\n## Allowed Paths\n```yaml\nallowed_paths:\n  - src/index.ts\n```\n\n## Exit Criteria\n```yaml\nexit_criteria:\n  commands_succeed:\n    - true\n```\n');
+    writeFileSync(join(root, 'valid.contract.md'), '# Contract\n> **Task Profile**: code-change\n\n## Goal\nRepair input validation.\n\n## Why\nEmpty input fails.\n\n## Scope\n- In scope: input validation.\n- Out of scope: other behavior.\n\n## Allowed Paths\n```yaml\nallowed_paths:\n  - src/index.ts\n```\n\n## Exit Criteria\n```yaml\nexit_criteria:\n  files_exist:\n    - src/index.ts\n```\n\n## Verification Plan\n```json\n{"protocol":1,"checks":[{"id":"validation","kind":"command","command":"true","cwd":".","phase":"verification","cost":"normal","evidence_policy":"current_exact","necessity":"Valid campaign fixture.","inputs":{"env":[]}}]}\n```\n');
     const entry = resolve(import.meta.dir, '../../src/cli/commands/campaign.ts');
     const run = spawnSync('bun', ['-e', `import { runCampaignPlanningPreflight } from ${JSON.stringify(entry)}; console.log(JSON.stringify(runCampaignPlanningPreflight(${JSON.stringify(`./${basename(root)}`)}, 'valid.contract.md')));`], { cwd: dirname(root), encoding: 'utf8' });
     expect(run.status, run.stderr || run.stdout).toBe(0);

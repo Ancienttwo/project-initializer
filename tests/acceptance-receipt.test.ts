@@ -6,6 +6,7 @@ import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { applyReviewerDisagreement, assessChange, buildReviewSelectionPacket } from '../src/core/review/change-assessment';
+import { executeVerificationContract } from '../src/effects/evidence/verification-execution';
 import {
   acceptanceAuthorityFingerprint,
   acceptanceContext,
@@ -79,6 +80,12 @@ function contract(waiver: 'allowed' | 'forbidden' = 'allowed'): string {
     '{"protocol":1,"oracles":[]}',
     '```',
     '',
+    '## Verification Plan',
+    '',
+    '```json',
+    '{"protocol":1,"checks":[]}',
+    '```',
+    '',
   ].join('\n');
 }
 
@@ -134,6 +141,11 @@ function replaceChangeAssessment(root: string, next: Record<string, unknown>): v
 function writePassingChecks(root: string): void {
   const subject = buildReviewSubject(root, { targetRef: 'main' });
   expect(subject.status).toBe('ok');
+  const execution_evaluation = executeVerificationContract({
+    repoRoot: root,
+    contractPath: 'tasks/contracts/demo.contract.md',
+  });
+  expect(execution_evaluation.passed).toBe(true);
   const checks = {
     schema: 'repo-harness-run-trace.v1',
     source: 'verify-sprint',
@@ -149,7 +161,7 @@ function writePassingChecks(root: string): void {
       { name: 'allowed_paths', status: 'pass' },
       { name: 'change_assessment', status: 'pass' },
     ],
-    contract: { file: 'tasks/contracts/demo.contract.md' },
+    contract: { file: 'tasks/contracts/demo.contract.md', execution_evaluation },
     review: { file: 'tasks/reviews/demo.review.md' },
     change_assessment: changeAssessmentEvidence(subject),
   };
@@ -521,20 +533,20 @@ describe('AcceptanceReceipt', () => {
     expect(externalReceipt.waiver_grant_sha256).toBeNull();
   }, 30_000);
 
-  test('any target revision movement invalidates a final-subject review packet', async () => {
+  test('historical acceptance stays bound to its recorded target through unrelated and overlapping target movement', async () => {
     const { root, home } = makeFixture();
     await externalPass(root, home);
     git(root, 'checkout', 'main');
     writeFileSync(join(root, 'other.txt'), 'unrelated target change\n');
     commit(root, 'advance target without overlap');
     git(root, 'checkout', 'codex/demo');
-    await expect(verifyAcceptance({ root, authorityHome: home })).rejects.toThrow('change assessment packet is stale');
+    expect((await verifyAcceptance({ root, authorityHome: home })).disposition).toBe('external_pass');
 
     git(root, 'checkout', 'main');
     writeFileSync(join(root, 'feature.txt'), 'target overlap\n');
     commit(root, 'advance target with overlap');
     git(root, 'checkout', 'codex/demo');
-    await expect(verifyAcceptance({ root, authorityHome: home })).rejects.toThrow('overlaps 1 reviewed path');
+    expect((await verifyAcceptance({ root, authorityHome: home })).disposition).toBe('external_pass');
   }, 30_000);
 
   test('strict archive envelopes preserve plan and contract receipt authority', async () => {

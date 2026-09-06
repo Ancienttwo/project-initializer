@@ -25,7 +25,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 - root_cause: `tests/fixtures/root-cause/regression-guard.test.ts:11` isNonEmptyLabel unconditionally returned true, so an empty label was treated as non-empty.
 - repro: `bun test tests/fixtures/root-cause/regression-guard.test.ts` failed on the unfixed code with `expect(isNonEmptyLabel("")).toBe(false)` receiving `true`.
-- regression_guard: path to a test that fails on the unfixed code and passes after the fix (must also appear under exit_criteria.tests_pass).
+- regression_guard: path to a test that fails on the unfixed code and passes after the fix (must also appear under the canonical Verification Plan).
 - pre_fix_failure_artifact: tests/fixtures/root-cause/pre-fix-failure.log
 
 ## Allowed Paths
@@ -39,6 +39,25 @@ allowed_paths:
 
 ```yaml
 exit_criteria:
-  tests_pass:
-    - path: tests/fixtures/root-cause/other-guard.test.ts
+```
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "fixture-regression-guard",
+      "kind": "package_test",
+      "path": "tests/fixtures/root-cause/other-guard.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "This fixture declares its root-cause regression guard explicitly.",
+      "inputs": { "env": [] }
+    }
+  ]
+}
 ```

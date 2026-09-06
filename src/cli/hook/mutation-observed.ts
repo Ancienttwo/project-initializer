@@ -11,8 +11,8 @@
  * (append-only, one file per event) carrying dirty bits. The deferred
  * consumers (`consumePendingPostEditEvents`, invoked at Stop by
  * `runtime.ts`, and `pendingPostEditJournalSection`, surfaced at
- * SessionStart) replay the SAME external commands/functions the retired
- * scripts used, just later. See
+ * SessionStart) consume deferred changes; contract verification reads execution
+ * evidence without starting contract commands. See
  * `tasks/notes/20260720-1146-hrd-05-post-edit-event-journal.notes.md` for
  * the condition-by-condition dirty-bit derivation table and the falsifier
  * record.
@@ -29,6 +29,7 @@
  */
 
 import { execFileSync, spawnSync } from 'child_process';
+import { parseVerificationPlanFromContractText } from '../../core/evidence/verification-plan';
 import {
   existsSync,
   mkdirSync,
@@ -349,15 +350,15 @@ function getActiveContractPath(repoRoot: string, activePlan: string): string | n
 // NOT mutation-guard.ts's contractAllowsPath (a different check over a
 // different YAML section -- see notes file "Design Decisions" for the
 // side-by-side verification). Scans the contract's `exit_criteria` YAML
-// block's files_exist/tests_pass/files_contain/files_not_exist/
+// block's files_exist/files_contain/files_not_exist/
 // files_not_contain sections for a literal path match.
 // ---------------------------------------------------------------------------
 
 const CONTRACT_REFERENCES_SECTION_HEADERS = new Set([
-  'files_exist:', 'tests_pass:', 'files_contain:', 'files_not_exist:', 'files_not_contain:',
+  'files_exist:', 'files_contain:', 'files_not_exist:', 'files_not_contain:',
 ]);
 const CONTRACT_REFERENCES_LIST_SECTIONS = new Set(['files_exist', 'files_not_exist']);
-const CONTRACT_REFERENCES_PATH_SECTIONS = new Set(['tests_pass', 'files_contain', 'files_not_contain']);
+const CONTRACT_REFERENCES_PATH_SECTIONS = new Set(['files_contain', 'files_not_contain']);
 
 function extractFirstYamlBlock(text: string): string {
   const lines = text.split('\n');
@@ -376,6 +377,13 @@ function extractFirstYamlBlock(text: string): string {
 
 function contractReferencesPath(contractText: string, contractFile: string, filePath: string): boolean {
   if (filePath === contractFile) return true;
+  try {
+    const plan = parseVerificationPlanFromContractText(contractText);
+    if (plan.checks.some((check) => check.kind === 'package_test' && check.path === filePath)) return true;
+  } catch {
+    // Invalid plans need a read-only evaluation so the diagnostic stays visible.
+    return true;
+  }
   const yamlBlock = extractFirstYamlBlock(contractText);
   let section = '';
   for (const rawLine of yamlBlock.split('\n')) {
@@ -405,25 +413,7 @@ interface ContractVerificationTarget {
   readonly checksFile: string;
 }
 
-/**
- * EPC-05 orchestrator ruling (residual finding 2b, closed in this same
- * package): continuous contract verification (this Stop-time cascade) is
- * telemetry about "is the active contract still passing", not acceptance
- * evidence -- it must never write to the policy's `harness.checks_file`
- * (`.ai/harness/checks/latest.json`), the file
- * `src/effects/evidence/checks-materializer.ts` now exclusively authors
- * from the evidence ledger. Writing continuous-verification telemetry to
- * that same path was exactly the last-writer-wins shadow authority the
- * audit called out: a Stop-time run could silently clobber a frozen
- * `--prepare-acceptance` evidence bundle, and the two schemas are not even
- * compatible (`verify-contract.sh`'s own `write_report()` has no
- * `source`/`status`/`exit_code` fields at all -- nothing downstream could
- * even tell the two apart by content). This report gets its own,
- * deliberately-namespaced file instead; already covered by the existing
- * `.ai/harness/checks/*.latest.json` gitignore pattern. The policy default
- * itself (`resolveChecksFile` below, `harness.checks_file`) is unchanged --
- * every OTHER consumer of the acceptance-evidence checks file is unaffected.
- */
+/** Read-only contract telemetry stays separate from authoritative checks/latest. */
 const CONTRACT_VERIFICATION_REPORT_RELATIVE = '.ai/harness/checks/contract-verify.latest.json';
 
 /** `run_continuous_contract_verification()`'s guard (post-edit-guard.sh:31-47), ported condition-for-condition. */
@@ -773,7 +763,7 @@ export function pendingPostEditJournalSection(repoRoot: string): SessionContextS
     // keeps this section (and the whole budgeted payload) from being
     // dropped.
     actionable: true,
-    reference: 'repo-harness run verify-contract',
+    reference: 'repo-harness run verification-plan evaluate',
   };
 }
 
@@ -895,7 +885,7 @@ export function processArchitectureCascade(
   return { ok: true };
 }
 
-/** `run_continuous_contract_verification()`'s durable action (post-edit-guard.sh:31-47). */
+/** Evaluate the current plan without starting missing verification commands. */
 function processContractVerification(
   repoRoot: string,
   env: NodeJS.ProcessEnv,
@@ -912,8 +902,8 @@ function processContractVerification(
   const result = runRepoHarnessHelper(
     repoRoot,
     env,
-    'verify-contract',
-    ['--contract', contractFile, '--quiet', '--report-file', checksFilePath],
+    'verification-plan',
+    ['evaluate', '--repo', repoRoot, '--contract', contractFile, '--report-file', checksFilePath],
     timeoutMs,
   );
   return { status: result.status, stderr: result.stderr, timedOut: result.timedOut };

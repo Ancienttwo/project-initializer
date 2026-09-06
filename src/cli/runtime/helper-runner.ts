@@ -146,15 +146,6 @@ export function helperTimeoutMs(helper: string): number {
   }
 }
 
-export function helperRequiresExpensiveRunLock(helper: string, args: readonly string[] = []): boolean {
-  const id = helperId(helper);
-  if (args.includes('--help') || args.includes('-h') || args.includes('--dry-run')) return false;
-  if (id === 'verify-contract' || id === 'verify-sprint') return true;
-  if (id === 'contract-worktree') return args[0] === 'finish';
-  if (id === 'ship-worktrees') return !args.includes('--cleanup-merged');
-  return false;
-}
-
 type HelperRuntime = {
   contractPath: string;
   helpersRoot: string;
@@ -441,24 +432,6 @@ export function runHelper(opts: RunHelperOptions): RunHelperResult {
     if (HOST_GH) childEnv.REPO_HARNESS_GH_BIN = HOST_GH;
     else delete childEnv.REPO_HARNESS_GH_BIN;
   }
-  let expensiveRunLock: { readonly cwd: string; readonly gitBin: string } | undefined;
-  try {
-    if (helperRequiresExpensiveRunLock(resolved.id, args)) {
-      expensiveRunLock = {
-        cwd: resolved.repoRoot,
-        gitBin: context.runtime?.gitBin ?? resolveProtectedHelperPlatform().gitBin,
-      };
-    }
-  } catch (error) {
-    return {
-      exitCode: 1,
-      reason: 'spawn-error',
-      helper: opts.helper,
-      resolved,
-      stderr: error instanceof Error ? error.message : String(error),
-    };
-  }
-
   const child = runBoundedProcess(command, [resolved.path, ...args], {
     cwd: resolved.repoRoot,
     env: childEnv,
@@ -468,7 +441,6 @@ export function runHelper(opts: RunHelperOptions): RunHelperResult {
     maxOutputBytes: opts.maxOutputBytes,
     processGroup: true,
     taskkillBin: context.runtime?.taskkillBin,
-    expensiveRunLock,
   });
 
   if (child.error) {

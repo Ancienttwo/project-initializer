@@ -153,22 +153,7 @@ delegation:
 
 ## Exit Criteria (Machine Verifiable)
 
-Choose the smallest checks that cover the changed behavior. Add a full suite
-only for an explicit release requirement or an observed cross-module coverage
-gap; state that reason and expected cost in Acceptance Notes. Do not duplicate
-coverage between `tests_pass` and `commands_succeed`. Before the first run,
-list eligible deterministic criteria in `criterion_reuse`; eligibility requires
-all inputs to be bound by the frozen subject/toolchain context. Leave external
-or mutable-state criteria ineligible. The canonical acceptance runner owns the
-expensive execution; workers and reviewers consume its evidence.
-
-If a full suite already passed before a bounded follow-up edit, preserve its
-run identity as baseline evidence and choose focused checks for the actual delta.
-The parent revises these criteria and records the baseline plus coverage rationale
-in Acceptance Notes, unless an explicit user/release requirement still requires
-a full run on the new subject. A cache miss alone does not justify another full
-suite; never label the old subject's pass as a full pass for the new subject.
-
+Executable checks are authored only in the canonical `## Verification Plan` JSON block below. Each typed descriptor records its command or package-test path, phase, cost, evidence policy, necessity, and declared inputs. The YAML `exit_criteria` block contains non-executable assertions only; retired `tests_pass`, `commands_succeed`, and `criterion_reuse` lists are not valid authoring surfaces.
 ```yaml
 exit_criteria:
   files_exist:
@@ -177,27 +162,134 @@ exit_criteria:
   artifacts_exist:
     - .ai/harness/checks/latest.json
     - tasks/notes/20260906-0415-untrack-current-status.notes.md
-  tests_pass:
-    - path: tests/scaffold-parity.test.ts
-    - path: tests/bootstrap-files.test.ts
-    - path: tests/evidence-projection-drift.test.ts
-    - path: tests/readme-dx.test.ts
-  commands_succeed:
-    - test -z "$(git ls-files tasks/current.md)"
-    - git check-ignore -q tasks/current.md
-    - bun run check:type
-    - bun run check:helpers
-    - bun run check:reference-configs
-criterion_reuse:
-  tests_pass:
-    - path: tests/scaffold-parity.test.ts
-    - path: tests/bootstrap-files.test.ts
-    - path: tests/evidence-projection-drift.test.ts
-    - path: tests/readme-dx.test.ts
-  commands_succeed:
-    - bun run check:type
-    - bun run check:helpers
-    - bun run check:reference-configs
+```
+
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "scaffold-parity",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies scaffold parity for the untracked current-status cutover.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/scaffold-parity.test.ts"
+    },
+    {
+      "id": "bootstrap-files",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies bootstrap files preserve the current-status policy.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/bootstrap-files.test.ts"
+    },
+    {
+      "id": "evidence-projection-drift",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies evidence projection drift behavior for the cutover.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/evidence-projection-drift.test.ts"
+    },
+    {
+      "id": "readme-dx",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Verifies documented user-facing current-status behavior.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "package_test",
+      "path": "tests/readme-dx.test.ts"
+    },
+    {
+      "id": "current-untracked",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Proves tasks/current.md is no longer tracked.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "test -z \"$(git ls-files tasks/current.md)\""
+    },
+    {
+      "id": "current-ignored",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Proves tasks/current.md is ignored.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "git check-ignore -q tasks/current.md"
+    },
+    {
+      "id": "typecheck",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Checks the typed implementation boundary.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bun run check:type"
+    },
+    {
+      "id": "helper-check",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Checks distributed helper projections.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bun run check:helpers"
+    },
+    {
+      "id": "reference-configs",
+      "cwd": ".",
+      "phase": "preflight",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Checks reference configuration projections.",
+      "inputs": {
+        "env": []
+      },
+      "kind": "command",
+      "command": "bun run check:reference-configs"
+    }
+  ]
+}
 ```
 
 ## Acceptance Notes (Human Review)

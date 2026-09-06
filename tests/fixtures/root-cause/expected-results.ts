@@ -34,10 +34,10 @@ export const ROOT_CAUSE_FIXTURE_CASES: RootCauseFixtureCase[] = [
     expectIssueSubstring: "regression_guard",
   },
   {
-    name: "bugfix contract whose regression_guard is not listed under tests_pass fails",
+    name: "bugfix contract whose regression_guard is not listed as a package_test fails",
     contractFile: "guard-not-in-tests-pass.contract.md",
     expectOk: false,
-    expectIssueSubstring: "tests_pass",
+    expectIssueSubstring: "not listed as package_test",
   },
   {
     name: "bugfix contract whose pre_fix_failure_artifact does not exist fails",

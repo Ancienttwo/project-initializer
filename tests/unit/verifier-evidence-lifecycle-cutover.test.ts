@@ -152,22 +152,29 @@ describe('verifier evidence lifecycle cutover', () => {
         '',
         '```yaml',
         'exit_criteria:',
-        '  commands_succeed:',
-        '    - bun run benchmark:harness --require-authoritative',
+        '  files_exist:',
+        '    - producer.contract.md',
+        '```',
+        '',
+        '## Verification Plan',
+        '```json',
+        JSON.stringify({ protocol: 1, checks: [{ id: 'producer', kind: 'command',
+          command: 'bun run benchmark:harness --require-authoritative', cwd: '.', phase: 'verification',
+          cost: 'expensive', evidence_policy: 'current_exact', necessity: 'Rejected provider execution fixture.', inputs: { env: [] } }] }),
         '```',
         '',
       ].join('\n'));
       const result = spawnSync('bash', [
         join(ROOT, 'scripts/verify-contract.sh'), '--contract', contract,
         '--strict', '--read-only', '--report-file', report,
-      ], { cwd: ROOT, encoding: 'utf-8' });
+      ], { cwd, encoding: 'utf-8' });
       expect(result.status).toBe(1);
       const evidence = JSON.parse(readFileSync(report, 'utf-8'));
-      const command = evidence.results.find((entry: { kind: string }) => entry.kind === 'commands_succeed');
-      expect(command.exit_code).toBe(126);
-      expect(command.duration_ms).toBe(0);
+      const command = evidence.results.find((entry: { kind: string }) => entry.kind === 'verification_plan');
+      expect(command.exit_code).toBeNull();
+      expect(command.duration_ms).toBeNull();
       expect(command.signal).toBeNull();
-      expect(command.message).toContain('forbidden evidence producer');
+      expect(command.message).toContain('evidence producer');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

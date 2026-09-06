@@ -290,28 +290,6 @@ function parseList(block: string, key: string): string[] {
   return values;
 }
 
-// Parses a list of nested objects shaped like `key:\n  - path: value` (for example
-// exit_criteria.tests_pass) and returns just the path values. Plain parseList cannot
-// decompose these: each list entry is a one-key object rather than a bare scalar, so it
-// would return the raw "path: value" string as a single item instead of the value alone.
-function parseNestedPathList(block: string, key: string): string[] {
-  const lines = block.split("\n");
-  const values: string[] = [];
-  let inList = false;
-  const keyPattern = new RegExp(`^\\s*${key}:\\s*$`);
-  for (const line of lines) {
-    if (keyPattern.test(line)) {
-      inList = true;
-      continue;
-    }
-    if (!inList) continue;
-    if (/^\S/.test(line) || /^\s+[a-zA-Z0-9_-]+:/.test(line)) break;
-    const match = line.match(/^\s*-\s*path:\s*(.+)$/);
-    if (match) values.push(match[1].trim().replace(/^["']|["']$/g, ""));
-  }
-  return values;
-}
-
 function parseRoles(block: string): Record<string, DelegationRole> {
   const roles: Record<string, DelegationRole> = {};
   let inRoles = false;
@@ -486,7 +464,7 @@ const ROOT_CAUSE_PLACEHOLDER: Record<RootCauseField, string> = {
   root_cause: 'one sentence naming file:line/condition (testable, not "a state issue").',
   repro: "the command or UI path that reproduces the symptom.",
   regression_guard:
-    "path to a test that fails on the unfixed code and passes after the fix (must also appear under exit_criteria.tests_pass).",
+    "path to a test that fails on the unfixed code and passes after the fix (must also appear as a `package_test` check in Verification Plan).",
   pre_fix_failure_artifact:
     'path to a captured run of regression_guard on the UNFIXED code. Capture with `bun test <regression_guard> > <artifact> 2>&1; echo "PRE_FIX_EXIT=$?" >> <artifact>` (no pipes — pipes swallow the exit status). The gate requires a non-zero `PRE_FIX_EXIT=` line plus the regression_guard path string in the artifact (see H2/H3).',
 };
@@ -503,11 +481,11 @@ function isConcreteRootCauseField(value: string, field: RootCauseField): boolean
 }
 
 // Evaluates the bugfix-only pre-fix failure evidence gate: all four fields must be
-// concrete, regression_guard must also be listed under exit_criteria.tests_pass, and
+// concrete, regression_guard must also be listed as a package_test in Verification Plan, and
 // pre_fix_failure_artifact must exist and show a genuine pre-fix failure (a non-zero
 // PRE_FIX_EXIT= line — not a "fail" substring match, since a passing bun run's own
 // summary text contains "0 fail") that references the regression_guard path.
-function checkRootCauseEvidence(markdown: string, repo: string): string[] {
+function checkRootCauseEvidence(markdown: string, repo: string, contractPath: string): string[] {
   const issues: string[] = [];
   const section = sectionBody(markdown, "Root Cause Evidence");
 
@@ -534,11 +512,14 @@ function checkRootCauseEvidence(markdown: string, repo: string): string[] {
   }
 
   if (regressionGuardConcrete) {
-    const testsPassPaths = parseNestedPathList(fencedYamlBlock(markdown, "exit_criteria"), "tests_pass");
-    if (!testsPassPaths.includes(regressionGuard)) {
-      issues.push(
-        `Root Cause Evidence: regression_guard ${regressionGuard} is not listed under exit_criteria.tests_pass`,
-      );
+    const validation = spawnSync(process.execPath, [join(SCRIPT_DIR, "verification-plan.ts"), "validate", "--repo", repo, "--contract", contractPath], { encoding: "utf-8" });
+    if (validation.status !== 0) {
+      issues.push(`Root Cause Evidence: Verification Plan is invalid: ${validation.stderr}`);
+    } else {
+      const plan = JSON.parse(validation.stdout).plan;
+      if (!plan.checks.some((check: { kind: string; path?: string }) => check.kind === "package_test" && check.path === regressionGuard)) {
+        issues.push(`Root Cause Evidence: regression_guard ${regressionGuard} is not listed as package_test in Verification Plan`);
+      }
     }
   }
 
@@ -565,7 +546,7 @@ function checkRootCauseEvidence(markdown: string, repo: string): string[] {
   return issues;
 }
 
-function runBriefPreflight(markdown: string, repo: string): BriefPreflight {
+function runBriefPreflight(markdown: string, repo: string, contractPath: string): BriefPreflight {
   const baseIssues: string[] = [];
   if (!isConcreteBrief(sectionBody(markdown, "Goal"))) {
     baseIssues.push("Goal section is empty or still a template placeholder");
@@ -588,7 +569,7 @@ function runBriefPreflight(markdown: string, repo: string): BriefPreflight {
   }
 
   const rootCauseIssues =
-    readHeader(markdown, "Task Profile") === "bugfix" ? checkRootCauseEvidence(markdown, repo) : [];
+    readHeader(markdown, "Task Profile") === "bugfix" ? checkRootCauseEvidence(markdown, repo, contractPath) : [];
 
   const legacyFieldIssues = hasLegacyToolCallsField(markdown)
     ? [
@@ -731,7 +712,7 @@ function buildRun(opts: Options) {
   const exitCriteria = fencedYamlBlock(contractText, "exit_criteria");
   const delegation = parseDelegation(contractText);
   const allowedPaths = parseList(fencedYamlBlock(contractText, "allowed_paths"), "allowed_paths");
-  const briefPreflight = runBriefPreflight(contractText, repo);
+  const briefPreflight = runBriefPreflight(contractText, repo, opts.contract);
 
   if (opts.mode === "preflight") {
     const manifest = {
@@ -788,7 +769,7 @@ function buildRun(opts: Options) {
     "",
     "## Before you finish (mandatory self-verification)",
     "",
-    "Use focused regression checks during implementation. If a full suite already passed and only a bounded follow-up edit remains, report its delta and proposed focused checks to the parent so the parent can revise final criteria before another acceptance run; do not rerun the old full-suite criterion merely because the subject changed. After freezing the implementation and final criteria, prepare final executable evidence once with repo-harness run verify-sprint --prepare-acceptance, setting --contract to the Contract path above. Do not separately execute every tests_pass and commands_succeed item before that canonical run. Eligible deterministic criteria must be declared in criterion_reuse by the contract owner before the run; never broaden reuse or amend acceptance criteria yourself. Report the exact command, exit status, immutable run artifact, and each executed or reused criterion. Report failed criteria and pending manual/QA observations explicitly; a partial run is not a passing acceptance. If executable evidence fails and cannot be repaired within scope, STOP and report it. If no executable criteria are declared, state that instead of inventing checks.",
+    "Use focused regression checks during implementation. If a full suite already passed and only a bounded follow-up edit remains, report its delta and proposed focused checks to the parent so the parent can revise final criteria before another acceptance run; do not rerun the old full-suite criterion merely because the subject changed. After freezing the implementation and final criteria, prepare final executable evidence once with repo-harness run verify-sprint --prepare-acceptance, setting --contract to the Contract path above. Do not separately execute every Verification Plan check before that canonical run. The contract owner declares cost and evidence_policy in Verification Plan before the run; never broaden reuse or amend acceptance criteria yourself. Report the exact command, exit status, immutable run artifact, and each executed or reused criterion. Report failed criteria and pending manual/QA observations explicitly; a partial run is not a passing acceptance. If executable evidence fails and cannot be repaired within scope, STOP and report it. If no executable criteria are declared, state that instead of inventing checks.",
     "",
     "## Record what you learned",
     "",

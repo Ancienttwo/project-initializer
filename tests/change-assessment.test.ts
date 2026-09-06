@@ -175,6 +175,34 @@ describe('ChangeAssessment v1', () => {
     expect(second.packet?.reasons.map((entry) => entry.code)).toEqual(['pattern_novelty']);
   });
 
+  test('pins Change Assessment Git observations to an explicit immutable target revision', () => {
+    const root = fixture();
+    git(root, 'checkout', '-b', 'codex/demo');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'candidate.ts'), 'export const candidate = true;\n');
+    commit(root, 'candidate');
+    const frozenTarget = git(root, 'rev-parse', 'main');
+    const beforeTargetMoves = prepareChangeAssessment({
+      repoRoot: root,
+      contractPath: 'tasks/contracts/demo.contract.md',
+      targetRevision: frozenTarget,
+    });
+    expect(beforeTargetMoves.packet?.target_revision).toBe(frozenTarget);
+
+    git(root, 'checkout', 'main');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'candidate.ts'), 'export const integrationChange = true;\n');
+    commit(root, 'advance target with overlap');
+    git(root, 'checkout', 'codex/demo');
+
+    const historical = prepareChangeAssessment({
+      repoRoot: root,
+      contractPath: 'tasks/contracts/demo.contract.md',
+      targetRevision: frozenTarget,
+    });
+    expect(historical).toEqual(beforeTargetMoves);
+  });
+
   test('routes only abstraction-shaped additions relative to the policy base', () => {
     const root = fixture();
     const source = join(root, 'src', 'adapter.ts');

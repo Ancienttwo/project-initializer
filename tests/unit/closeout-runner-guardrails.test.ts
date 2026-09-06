@@ -16,7 +16,6 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 import {
-  helperRequiresExpensiveRunLock,
   helperTimeoutMs,
   runHelper,
 } from '../../src/cli/runtime/helper-runner';
@@ -149,17 +148,6 @@ describe('closeout runner guardrails', () => {
     expect(helperTimeoutMs('contract-worktree')).toBe(900_000);
     expect(helperTimeoutMs('merge-gate')).toBe(900_000);
     expect(helperTimeoutMs('ship-worktrees')).toBe(900_000);
-  });
-
-  test('only canonical expensive helper modes acquire the shared Git lock', () => {
-    expect(helperRequiresExpensiveRunLock('verify-contract', [])).toBe(true);
-    expect(helperRequiresExpensiveRunLock('verify-sprint', [])).toBe(true);
-    expect(helperRequiresExpensiveRunLock('contract-worktree', ['finish'])).toBe(true);
-    expect(helperRequiresExpensiveRunLock('contract-worktree', ['start'])).toBe(false);
-    expect(helperRequiresExpensiveRunLock('ship-worktrees', ['--pr'])).toBe(true);
-    expect(helperRequiresExpensiveRunLock('ship-worktrees', ['--cleanup-merged'])).toBe(false);
-    expect(helperRequiresExpensiveRunLock('verify-sprint', ['--help'])).toBe(false);
-    expect(helperRequiresExpensiveRunLock('check-task-workflow', [])).toBe(false);
   });
 
   test('outer timeout terminates descendants that ignore TERM before they can publish a sentinel', async () => {
@@ -307,13 +295,12 @@ describe('closeout runner guardrails', () => {
     }
   }, 6_000);
 
-  test('expensive-lock wait consumes the helper deadline and reports timeout before target start', async () => {
+  test('expensive-lock wait consumes the command deadline and reports timeout before target start', async () => {
     const root = temporaryRoot('repo-harness-lock-wait-timeout-');
     initializeGitRepository(root);
     const holderStarted = join(root, 'holder-started');
     const targetStarted = join(root, 'target-started');
     const holderWorker = join(root, 'lock-holder.ts');
-    const sourceRoot = createVerifierRuntime(root, [`touch "${targetStarted}"`]);
     writeFileSync(holderWorker, [
       `import { acquireExpensiveRunLock } from ${JSON.stringify(join(ROOT, 'src/effects/expensive-run-lock.ts'))};`,
       "import { writeFileSync } from 'fs';",
@@ -328,18 +315,34 @@ describe('closeout runner guardrails', () => {
       cwd: root, stdout: 'pipe', stderr: 'pipe',
     });
     await waitForPath(holderStarted);
-    const result = runHelper({
-      helper: 'verify-sprint',
+    const result = runProcess('touch', [targetStarted], {
       cwd: root,
-      env: { REPO_HARNESS_SOURCE_ROOT: sourceRoot },
       stdio: 'pipe',
+      processGroup: true,
       timeoutMs: 50,
+      expensiveRunLock: { cwd: root, gitBin: 'git' },
     });
 
     expect(await holder.exited).toBe(0);
-    expect(result.reason).toBe('timeout');
+    expect(result.timedOut).toBe(true);
     expect(existsSync(targetStarted)).toBe(false);
   }, 30_000);
+
+  test('a read-only helper does not wait for the expensive command lane', () => {
+    const root = temporaryRoot('repo-harness-reader-lane-');
+    initializeGitRepository(root);
+    const started = join(root, 'reader-started');
+    const sourceRoot = createVerifierRuntime(root, [`touch "${started}"`]);
+    const holder = acquireExpensiveRunLock(root);
+    try {
+      const result = runHelper({ helper: 'verify-sprint', cwd: root,
+        env: { REPO_HARNESS_SOURCE_ROOT: sourceRoot }, stdio: 'pipe', timeoutMs: 1000 });
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(started)).toBe(true);
+    } finally {
+      holder.release();
+    }
+  });
 
   test('helper timeout releases the shared expensive-run token after group cleanup', async () => {
     if (process.platform === 'win32') return;
@@ -398,17 +401,16 @@ describe('closeout runner guardrails', () => {
     expect(existsSync(sentinel)).toBe(false);
   }, 10_000);
 
-  test('a caller killed while waiting for the expensive lane can never start its helper', async () => {
+  test('a caller killed while waiting for the expensive lane can never start its command', async () => {
     if (process.platform === 'win32') return;
     const root = temporaryRoot('repo-harness-waiting-parent-loss-');
     initializeGitRepository(root);
     const targetStarted = join(root, 'target-started');
-    const sourceRoot = createVerifierRuntime(root, [`touch "${targetStarted}"`]);
     const worker = join(root, 'waiting-helper-entrypoint.ts');
     writeFileSync(worker, [
-      `import { runHelper } from ${JSON.stringify(join(ROOT, 'src/cli/runtime/helper-runner.ts'))};`,
-      `runHelper({ helper: 'verify-sprint', cwd: ${JSON.stringify(root)},`,
-      `  env: { REPO_HARNESS_SOURCE_ROOT: ${JSON.stringify(sourceRoot)} }, stdio: 'pipe', timeoutMs: 10_000 });`,
+      `import { runProcess } from ${JSON.stringify(join(ROOT, 'src/effects/process-runner.ts'))};`,
+      `runProcess('touch', [${JSON.stringify(targetStarted)}], { cwd: ${JSON.stringify(root)},`,
+      `  expensiveRunLock: { cwd: ${JSON.stringify(root)}, gitBin: 'git' }, processGroup: true, stdio: 'pipe', timeoutMs: 10_000 });`,
       '',
     ].join('\n'));
     const holder = acquireExpensiveRunLock(root);

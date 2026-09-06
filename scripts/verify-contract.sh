@@ -32,8 +32,8 @@ Options:
   --contract <path>     Contract markdown file with a YAML exit_criteria block
   --strict              Exit with code 1 when any criteria fail
   --quiet               Suppress per-check logs; only print on failure or status change
-  --read-only           Do not rewrite the contract Status header; tests_pass and
-                        commands_succeed still execute for verification
+  --read-only           Do not rewrite the contract Status header; the Verification Plan
+                        still executes through the canonical executor
   --report-file <path>  Write structured JSON results for downstream tooling
   --force-expensive-rerun
                         Execute a cached expensive pass again instead of reusing it
@@ -243,7 +243,7 @@ root_cause_placeholder() {
       printf '%s' 'the command or UI path that reproduces the symptom.'
       ;;
     regression_guard)
-      printf '%s' 'path to a test that fails on the unfixed code and passes after the fix (must also appear under exit_criteria.tests_pass).'
+      printf '%s' 'path to a test that fails on the unfixed code and passes after the fix (must also appear as a `package_test` check in Verification Plan).'
       ;;
     pre_fix_failure_artifact)
       printf '%s' 'path to a captured run of regression_guard on the UNFIXED code. Capture with `bun test <regression_guard> > <artifact> 2>&1; echo "PRE_FIX_EXIT=$?" >> <artifact>` (no pipes — pipes swallow the exit status). The gate requires a non-zero `PRE_FIX_EXIT=` line plus the regression_guard path string in the artifact (see H2/H3).'
@@ -263,8 +263,8 @@ is_concrete_root_cause_field() {
 
 # Bugfix-only pre-fix failure evidence gate (see docs/reference-configs/sprint-contracts.md
 # "Root Cause Evidence Gate"). Mirrors contract-run.ts's checkRootCauseEvidence: all four
-# fields must be concrete, regression_guard must be listed under exit_criteria.tests_pass
-# (the already-populated $tests_pass array), and pre_fix_failure_artifact must exist and
+# fields must be concrete, regression_guard must be listed as package_test in Verification Plan
+# (the validated plan_test_paths projection), and pre_fix_failure_artifact must exist and
 # show a genuine failure via a non-zero PRE_FIX_EXIT= line plus the regression_guard path
 # string — never a "fail" substring match, since a passing bun run's own summary line
 # contains "0 fail".
@@ -308,16 +308,16 @@ check_root_cause_evidence() {
   if [[ "$regression_guard_concrete" -eq 1 ]]; then
     local found=0
     local tp
-    for tp in "${tests_pass[@]+"${tests_pass[@]}"}"; do
+    for tp in "${plan_test_paths[@]+"${plan_test_paths[@]}"}"; do
       if [[ "$tp" == "$regression_guard" ]]; then
         found=1
         break
       fi
     done
     if [[ "$found" -eq 1 ]]; then
-      pass "root_cause_evidence" "regression_guard_in_tests_pass" "Root Cause Evidence: regression_guard $regression_guard is listed under exit_criteria.tests_pass"
+      pass "root_cause_evidence" "regression_guard_in_verification_plan" "Root Cause Evidence: regression_guard $regression_guard is listed as package_test in Verification Plan"
     else
-      fail "root_cause_evidence" "regression_guard_in_tests_pass" "Root Cause Evidence: regression_guard $regression_guard is not listed under exit_criteria.tests_pass"
+      fail "root_cause_evidence" "regression_guard_in_verification_plan" "Root Cause Evidence: regression_guard $regression_guard is not listed as package_test in Verification Plan"
     fi
   fi
 
@@ -559,368 +559,9 @@ record_timed_result() {
   if [[ "$passed" == "true" ]]; then log_check "PASS" "$message"; else log_check "FAIL" "$message"; fi
 }
 
-is_evidence_producer_command() {
-  local cmd="$1"
-  case "$cmd" in
-    *benchmark:harness*|*run-harness-profile-benchmark*|*" codex exec "*|codex\ exec\ *|*" claude -p "*|claude\ -p\ *) return 0 ;;
-  esac
-  # Anchored to this CLI's own `init` subcommand (repo-harness init / bun .../index.ts init)
-  # so a bare word match doesn't misfire on git init, npm init, or codegraph init.
-  if [[ "$cmd" =~ (^|[[:space:]])(repo-harness|([^[:space:]]*/)?index\.ts)[[:space:]]+init([[:space:]]|$) && "$cmd" != *"--dry-run"* ]]; then return 0; fi
-  if [[ "$cmd" =~ (^|[[:space:]])install([[:space:]]|$) && "$cmd" != *"--dry-run"* ]]; then return 0; fi
-  return 1
-}
-
-# Bounded runner logs live in the round's mktemp dir, which the EXIT trap
-# destroys, so a failing criterion leaves only its exit_code in the report and
-# nothing that names WHICH test or command failed. Retain the log of a failing
-# criterion next to the run snapshot that shares this round's run id. Passing
-# criteria retain nothing: green rounds would otherwise fill runs/ with
-# multi-MB logs nobody reads.
-FAILURE_LOG_DIR=".ai/harness/runs"
-
-# Deterministic, filesystem-safe slug for a criterion (a test path or a whole
-# shell command), bounded in length so a long command line cannot produce an
-# unusable filename.
-criterion_slug() {
-  local slug
-  slug="$(printf '%s' "$1" | tr -C 'A-Za-z0-9._-' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')"
-  slug="${slug:-criterion}"
-  printf '%s' "${slug:0:80}"
-}
-
-# Diagnostic only: a retention failure is reported but never changes the
-# round's verdict, since losing a log must not turn a passing round red.
-retain_failure_log() {
-  local log_path="$1" criterion="$2" retained
-
-  [[ -f "$log_path" ]] || return 0
-  retained="$FAILURE_LOG_DIR/${run_id}-$(criterion_slug "$criterion").log"
-  if ! mkdir -p "$FAILURE_LOG_DIR" 2>/dev/null || ! cp "$log_path" "$retained" 2>/dev/null; then
-    echo "[ContractVerify] WARN: could not retain failure log for: $criterion" >&2
-    return 0
-  fi
-  log_check "LOG" "retained failure log: $retained"
-}
-
-run_bounded() {
-  local log_path="$1" result_path="$2"
-  shift 2
-  local runner="$SCRIPT_DIR/run-bounded-verifier-command.ts"
-  [[ -f "$runner" ]] || return 127
-  "$bun_bin" "$runner" \
-    --deadline-ms "$verification_deadline_ms" \
-    --log "$log_path" \
-    --result "$result_path" \
-    -- env \
-      -u BASH_ENV \
-      -u REPO_HARNESS_VERIFICATION_CONTEXT_FILE \
-      -u REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE \
-      "$@"
-}
-
-# tests_pass is intentionally owned by the nearest package manifest rather than
-# by the verifier's Bun invocation. This preserves package-local test runner
-# configuration (for example Vitest defines or Bun preloads) and keeps one
-# declared test authority for every criterion.
 repository_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)"
 repository_root="$(cd "$repository_root" && pwd -P)"
-resolved_test_owner=""
-resolved_test_path=""
-resolved_test_command=""
-test_owner_resolution_error=""
 
-path_is_within_repository() {
-  local candidate="$1"
-  [[ "$candidate" == "$repository_root" || "$candidate" == "$repository_root/"* ]]
-}
-
-canonicalize_tests_pass_path() {
-  local candidate="$1"
-  "$bun_bin" -e '
-    const { realpathSync } = require("node:fs");
-    try {
-      process.stdout.write(realpathSync(process.argv.at(-1)));
-    } catch {
-      process.exit(1);
-    }
-  ' -- "$candidate"
-}
-
-package_test_script_status() {
-  local manifest="$1"
-  "$bun_bin" -e '
-    const { readFileSync } = require("node:fs");
-    let manifest;
-    try {
-      manifest = JSON.parse(readFileSync(process.argv.at(-1), "utf8"));
-    } catch {
-      process.exit(10);
-    }
-    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) process.exit(10);
-    if (manifest.scripts !== undefined && (!manifest.scripts || typeof manifest.scripts !== "object" || Array.isArray(manifest.scripts))) process.exit(10);
-    if (typeof manifest.scripts?.test !== "string" || manifest.scripts.test.trim() === "") process.exit(11);
-  ' -- "$manifest" >/dev/null 2>&1
-}
-
-render_package_test_command() {
-  local owner="$1" test_path="$2"
-  printf 'bun run --cwd %q test -- %q' "$owner" "$test_path"
-}
-
-resolve_tests_pass_owner() {
-  local path="$1" candidate_path test_path ancestor manifest manifest_path manifest_status parent
-  resolved_test_owner=""
-  resolved_test_path=""
-  resolved_test_command=""
-  test_owner_resolution_error=""
-
-  if [[ "$path" == /* ]]; then
-    candidate_path="$path"
-  else
-    candidate_path="$repository_root/$path"
-  fi
-
-  if ! test_path="$(canonicalize_tests_pass_path "$candidate_path" 2>/dev/null)"; then
-    test_owner_resolution_error="tests_pass path is symlink-ambiguous: $path"
-    return 1
-  fi
-  if ! path_is_within_repository "$test_path"; then
-    test_owner_resolution_error="tests_pass path resolves outside repository: $path"
-    return 1
-  fi
-
-  ancestor="$(dirname "$test_path")"
-  while path_is_within_repository "$ancestor"; do
-    manifest="$ancestor/package.json"
-    if [[ -e "$manifest" || -L "$manifest" ]]; then
-      if ! manifest_path="$(canonicalize_tests_pass_path "$manifest" 2>/dev/null)"; then
-        test_owner_resolution_error="tests_pass package manifest is symlink-ambiguous: $path"
-        return 1
-      fi
-      if ! path_is_within_repository "$manifest_path"; then
-        test_owner_resolution_error="tests_pass package manifest resolves outside repository: $path"
-        return 1
-      fi
-      if [[ "$manifest_path" != "$manifest" ]]; then
-        test_owner_resolution_error="tests_pass package manifest is symlink-ambiguous: $path"
-        return 1
-      fi
-
-      if package_test_script_status "$manifest_path"; then
-        resolved_test_owner="${ancestor#"$repository_root"/}"
-        [[ "$ancestor" == "$repository_root" ]] && resolved_test_owner="."
-        resolved_test_path="${test_path#"$ancestor"/}"
-        resolved_test_command="$(render_package_test_command "$resolved_test_owner" "$resolved_test_path")"
-        return 0
-      else
-        manifest_status=$?
-      fi
-      if [[ "$manifest_status" -eq 11 ]]; then
-        test_owner_resolution_error="tests_pass package scripts.test is missing: $path"
-      else
-        test_owner_resolution_error="tests_pass package manifest is malformed: $path"
-      fi
-      return 1
-    fi
-
-    [[ "$ancestor" == "$repository_root" ]] && break
-    parent="$(dirname "$ancestor")"
-    [[ "$parent" == "$ancestor" ]] && break
-    ancestor="$parent"
-  done
-
-  test_owner_resolution_error="tests_pass package owner is missing: $path"
-  return 1
-}
-
-CRITERION_CACHE_ROOT=".ai/harness/runs/criteria"
-criterion_cache_enabled=0
-criterion_cache_key=""
-criterion_cache_record=""
-criterion_cache_command=""
-criterion_cache_reused_duration=0
-criterion_cache_reused_message=""
-criterion_cache_reused_signal="null"
-criterion_cache_force_reason=""
-criterion_cache_block_message=""
-EXPENSIVE_CRITERION_MS="${REPO_HARNESS_EXPENSIVE_CRITERION_MS:-30000}"
-
-sha256_text() {
-  "$bun_bin" -e 'const { createHash } = require("node:crypto"); process.stdout.write(createHash("sha256").update(process.argv.at(-1)).digest("hex"));' -- "$1"
-}
-
-initialize_criterion_cache() {
-  local cache_component
-  [[ -n "$criterion_context_file" ]] || return 0
-  [[ -n "$bun_bin" && -x "$bun_bin" ]] || { echo "verify-contract: criterion cache requires Bun" >&2; return 1; }
-  command -v jq >/dev/null 2>&1 || { echo "verify-contract: criterion cache requires jq" >&2; return 1; }
-  [[ "$EXPENSIVE_CRITERION_MS" =~ ^[0-9]+$ ]] || { echo "verify-contract: REPO_HARNESS_EXPENSIVE_CRITERION_MS must be a non-negative integer" >&2; return 1; }
-  [[ -f "$criterion_context_file" && ! -L "$criterion_context_file" ]] || { echo "verify-contract: criterion context is missing or symlinked: $criterion_context_file" >&2; return 1; }
-  if ! jq -e \
-    --arg root "$repository_root" \
-    '.schema == "repo-harness-criterion-context.v1"
-      and .repository_root == $root
-      and (.subject_sha256 | test("^sha256:[0-9a-f]{64}$"))
-      and (.target_revision | test("^[0-9a-f]{40}([0-9a-f]{24})?$"))
-      and (.contract_sha256 | test("^sha256:[0-9a-f]{64}$"))
-      and (.goal_sha256 | test("^sha256:[0-9a-f]{64}$"))
-      and (.toolchain_fingerprint | test("^sha256:[0-9a-f]{64}$"))
-      and (keys | sort == ["contract_sha256","goal_sha256","repository_root","schema","subject_sha256","target_revision","toolchain_fingerprint"])' \
-    "$criterion_context_file" >/dev/null 2>&1; then
-    echo "verify-contract: criterion context is malformed or stale for this repository" >&2
-    return 1
-  fi
-  for cache_component in ".ai" ".ai/harness" ".ai/harness/runs" "$CRITERION_CACHE_ROOT"; do
-    if [[ -L "$cache_component" || ( -e "$cache_component" && ! -d "$cache_component" ) ]]; then
-      echo "verify-contract: criterion cache path is not a trusted directory: $cache_component" >&2
-      return 1
-    fi
-  done
-  mkdir -p "$CRITERION_CACHE_ROOT" || return 1
-  for cache_component in ".ai" ".ai/harness" ".ai/harness/runs" "$CRITERION_CACHE_ROOT"; do
-    if [[ -L "$cache_component" || ! -d "$cache_component" ]]; then
-      echo "verify-contract: criterion cache path became unsafe: $cache_component" >&2
-      return 1
-    fi
-  done
-  criterion_cache_enabled=1
-}
-
-load_cached_pass() {
-  [[ -f "$criterion_cache_record" && ! -L "$criterion_cache_record" ]] || return 1
-  jq -e \
-    --slurpfile context "$criterion_context_file" \
-    --arg key "$criterion_cache_key" \
-    --arg kind "$1" \
-    --arg target "$2" \
-    --arg command "$3" \
-    '.schema == "repo-harness-criterion-result.v1"
-      and .key == $key
-      and .context == $context[0]
-      and .criterion == {kind:$kind,target:$target,command:$command}
-      and .result.passed == true
-      and .result.timed_out == false
-      and .result.exit_code == 0
-      and (.result.duration_ms | type == "number" and . >= 0)
-      and (.result.message | type == "string")
-      and ((.result.signal == null) or (.result.signal | type == "string"))
-      and (.expensive | type == "boolean")' \
-    "$criterion_cache_record" >/dev/null 2>&1 || return 1
-  criterion_cache_reused_duration="$(jq -r '.result.duration_ms' "$criterion_cache_record")"
-  criterion_cache_reused_message="$(jq -r '.result.message' "$criterion_cache_record")"
-  criterion_cache_reused_signal="$(jq -c '.result.signal // null' "$criterion_cache_record")"
-  cached_expensive="$(jq -r '.expensive' "$criterion_cache_record")"
-  return 0
-}
-
-release_criterion_cache_lock() {
-  if [[ -n "$active_cache_lock" ]]; then
-    rmdir "$active_cache_lock" 2>/dev/null || true
-    active_cache_lock=""
-  fi
-}
-
-# Return 0 to reuse, 1 to execute while holding the key lock, or 2 to fail
-# closed because another verifier already owns the exact-key execution slot.
-begin_criterion_cache_decision() {
-  local kind="$1" target="$2" command="$3" basis lock_path
-  criterion_cache_key=""
-  criterion_cache_record=""
-  criterion_cache_command="$command"
-  criterion_cache_force_reason=""
-  criterion_cache_block_message=""
-  [[ "$criterion_cache_enabled" -eq 1 ]] || return 1
-  criterion_reuse_enabled "$kind" "$target" || return 1
-
-  basis="$(jq -S -c --arg kind "$kind" --arg target "$target" --arg command "$command" '. + {criterion:{kind:$kind,target:$target,command:$command}}' "$criterion_context_file")"
-  criterion_cache_key="sha256:$(sha256_text "$basis")"
-  criterion_cache_record="$CRITERION_CACHE_ROOT/${criterion_cache_key#sha256:}.json"
-  lock_path="${criterion_cache_record}.lock"
-
-  if load_cached_pass "$kind" "$target" "$command"; then
-    if [[ "$force_expensive_rerun" -eq 0 || "$cached_expensive" != "true" ]]; then
-      return 0
-    fi
-  fi
-
-  if ! mkdir "$lock_path" 2>/dev/null; then
-    criterion_cache_block_message="criterion execution is already in progress for exact key $criterion_cache_key"
-    return 2
-  fi
-  active_cache_lock="$lock_path"
-
-  # A concurrent verifier may have published while this process was acquiring
-  # the lock. Recheck under the lock before permitting a process spawn.
-  if load_cached_pass "$kind" "$target" "$command"; then
-    if [[ "$force_expensive_rerun" -eq 0 || "$cached_expensive" != "true" ]]; then
-      release_criterion_cache_lock
-      return 0
-    fi
-    criterion_cache_force_reason="$force_reason"
-    if ! rm -f "$criterion_cache_record"; then
-      criterion_cache_block_message="cached pass could not be invalidated before forced execution"
-      release_criterion_cache_lock
-      return 2
-    fi
-  fi
-  return 1
-}
-
-persist_passing_criterion() {
-  local kind="$1" target="$2" command="$3" message="$4" duration_ms="$5" signal="$6"
-  local expensive=false recorded_at tmp_record
-  [[ "$criterion_cache_enabled" -eq 1 && -n "$criterion_cache_record" ]] || { release_criterion_cache_lock; return 0; }
-  if [[ "$duration_ms" -ge "$EXPENSIVE_CRITERION_MS" ]]; then
-    expensive=true
-  fi
-  recorded_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  tmp_record="$(mktemp "$CRITERION_CACHE_ROOT/.criterion.XXXXXX")"
-  active_cache_tmp="$tmp_record"
-  jq -n \
-    --slurpfile context "$criterion_context_file" \
-    --arg key "$criterion_cache_key" \
-    --arg kind "$kind" \
-    --arg target "$target" \
-    --arg command "$command" \
-    --arg message "$message" \
-    --argjson duration_ms "$duration_ms" \
-    --argjson signal "$signal" \
-    --argjson expensive "$expensive" \
-    --arg recorded_at "$recorded_at" \
-    --arg run_id "$run_id" \
-    '{
-      schema:"repo-harness-criterion-result.v1",
-      key:$key,
-      context:$context[0],
-      criterion:{kind:$kind,target:$target,command:$command},
-      result:{passed:true,message:$message,duration_ms:$duration_ms,timed_out:false,exit_code:0,signal:$signal},
-      expensive:$expensive,
-      recorded_at:$recorded_at,
-      run_id:$run_id
-    }' > "$tmp_record"
-  mv "$tmp_record" "$criterion_cache_record"
-  active_cache_tmp=""
-  release_criterion_cache_lock
-}
-
-is_preflight_command() {
-  case "$1" in
-    "bash scripts/check-task-sync.sh"|\
-    "bash scripts/check-architecture-sync.sh"|\
-    "bash scripts/check-deploy-sql-order.sh"|\
-    "repo-harness run check-task-workflow --strict"|\
-    "bash scripts/check-task-workflow.sh --strict")
-      return 0
-      ;;
-  esac
-  return 1
-}
-
-# A polluted `now_ms` stdout (a bare word instead of a millisecond timestamp)
-# makes the elapsed arithmetic fail under `set -u`, and the EXIT trap masks that
-# status, so the round would exit 0 with a truncated, unparseable report. Report
-# a null duration instead; no fallback timestamp is synthesized.
 report_total_duration_ms() {
   local ended_ms
   ended_ms="$(now_ms || true)"
@@ -955,6 +596,9 @@ write_report() {
     printf '  "timed_out": %s,\n' "$([[ "$verification_budget_exhausted" -eq 1 ]] && echo true || echo false)"
     printf '  "total": %s,\n' "$total"
     printf '  "failed": %s,\n' "$failed"
+    if [[ -n "${verification_plan_report:-}" && -f "$verification_plan_report" ]]; then
+      printf '  "verification_evaluation": %s,\n' "$(cat "$verification_plan_report")"
+    fi
     echo '  "results": ['
     for idx in "${!RESULT_KINDS[@]}"; do
       if [[ "$idx" -gt 0 ]]; then
@@ -978,6 +622,11 @@ write_report() {
     echo "  ]"
     echo "}"
   } > "$report_path"
+  if [[ -n "${verification_plan_report:-}" && -f "$verification_plan_report" ]]; then
+    jq '.results = ([.results[] | select(.kind != "command" and .kind != "package_test")] + .verification_evaluation.results)' \
+      "$report_path" > "$report_path.tmp"
+    mv "$report_path.tmp" "$report_path"
+  fi
 }
 
 contract_file=""
@@ -985,7 +634,7 @@ strict=0
 quiet=0
 read_only=0
 report_file=""
-criterion_context_file="${REPO_HARNESS_VERIFICATION_CONTEXT_FILE:-}"
+verification_plan_report=""
 verification_preflight_file="${REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE:-}"
 force_expensive_rerun=0
 force_reason=""
@@ -1054,15 +703,7 @@ if [[ -z "$contract_file" ]]; then
 fi
 
 tmp_dir="$(mktemp -d)"
-active_cache_lock=""
-active_cache_tmp=""
 cleanup_verify_contract() {
-  if [[ -n "$active_cache_lock" ]]; then
-    rmdir "$active_cache_lock" 2>/dev/null || true
-  fi
-  if [[ -n "$active_cache_tmp" ]]; then
-    rm -f "$active_cache_tmp"
-  fi
   rm -rf "$tmp_dir"
 }
 trap cleanup_verify_contract EXIT
@@ -1172,8 +813,7 @@ if [[ -z "$yaml_block" ]]; then
 fi
 
 declare -a files_exist=()
-declare -a tests_pass=()
-declare -a commands_succeed=()
+declare -a plan_test_paths=()
 declare -a artifacts_exist=()
 declare -a contain_paths=()
 declare -a contain_patterns=()
@@ -1183,11 +823,9 @@ declare -a not_contain_patterns=()
 declare -a qa_dimensions=()
 declare -a qa_mins=()
 declare -a manual_checks=()
-declare -a reusable_tests_pass=()
-declare -a reusable_commands_succeed=()
 declare -a parse_errors=()
 
-EXIT_CRITERIA_SECTION_KEYS="files_exist, tests_pass, commands_succeed, artifacts_exist, files_contain, files_not_exist, files_not_contain, qa_scores, manual_checks"
+EXIT_CRITERIA_SECTION_KEYS="files_exist, artifacts_exist, files_contain, files_not_exist, files_not_contain, qa_scores, manual_checks"
 
 section=""
 in_exit_criteria=0
@@ -1210,14 +848,6 @@ while IFS= read -r raw_line; do
 
   [[ -z "$trimmed" ]] && continue
   [[ "$trimmed" =~ ^# ]] && continue
-  # Rule A2: `criterion_reuse:` is a top-level sibling of `exit_criteria:`, and
-  # the reuse parser below only matches it at column 0. An indented copy used to
-  # leave reuse disabled while its nested sub-headers re-triggered the section
-  # dispatch and leaked reuse-only items into the executed criteria.
-  if [[ "$key_trimmed" == "criterion_reuse:" && "$key_line" != "criterion_reuse:" ]]; then
-    parse_errors+=("criterion_reuse: must start at column 0, found indented: '$line'")
-    continue
-  fi
   if [[ "$key_line" == "exit_criteria:" ]]; then
     in_exit_criteria=1
     section=""
@@ -1232,16 +862,6 @@ while IFS= read -r raw_line; do
   case "$key_trimmed" in
     files_exist:)
       section="files_exist"
-      pending_path=""
-      continue
-      ;;
-    tests_pass:)
-      section="tests_pass"
-      pending_path=""
-      continue
-      ;;
-    commands_succeed:)
-      section="commands_succeed"
       pending_path=""
       continue
       ;;
@@ -1289,14 +909,12 @@ while IFS= read -r raw_line; do
   fi
 
   case "$section" in
-    files_exist|commands_succeed|files_not_exist|artifacts_exist|manual_checks)
+    files_exist|files_not_exist|artifacts_exist|manual_checks)
       if [[ "$trimmed" =~ ^-[[:space:]]*(.+)$ ]]; then
         item="$(strip_quotes "${BASH_REMATCH[1]}")"
         [[ -n "$item" ]] || continue
         if [[ "$section" == "files_exist" ]]; then
           files_exist+=("$item")
-        elif [[ "$section" == "commands_succeed" ]]; then
-          commands_succeed+=("$item")
         elif [[ "$section" == "artifacts_exist" ]]; then
           artifacts_exist+=("$item")
         elif [[ "$section" == "manual_checks" ]]; then
@@ -1304,12 +922,6 @@ while IFS= read -r raw_line; do
         else
           files_not_exist+=("$item")
         fi
-      fi
-      ;;
-    tests_pass)
-      if [[ "$trimmed" =~ ^-[[:space:]]*path:[[:space:]]*(.+)$ ]]; then
-        item="$(strip_quotes "${BASH_REMATCH[1]}")"
-        [[ -n "$item" ]] && tests_pass+=("$item")
       fi
       ;;
     files_contain|files_not_contain)
@@ -1379,74 +991,6 @@ if ((${#parse_errors[@]})); then
   exit 0
 fi
 
-reuse_section=""
-in_criterion_reuse=0
-while IFS= read -r raw_line; do
-  line="$(printf '%s' "$raw_line" | sed -E 's/[[:space:]]+$//')"
-  key_line="$(normalize_yaml_key_line "$raw_line")"
-  if [[ "$key_line" == "criterion_reuse:" ]]; then
-    in_criterion_reuse=1
-    reuse_section=""
-    continue
-  fi
-  if [[ "$line" =~ ^[^[:space:]] ]]; then
-    in_criterion_reuse=0
-    reuse_section=""
-  fi
-  [[ "$in_criterion_reuse" -eq 1 ]] || continue
-  case "$key_line" in
-    "  tests_pass:")
-      reuse_section="tests_pass"
-      continue
-      ;;
-    "  commands_succeed:")
-      reuse_section="commands_succeed"
-      continue
-      ;;
-  esac
-  if [[ "$line" =~ ^[[:space:]]{4}-[[:space:]]*(.+)$ ]]; then
-    item="$(strip_quotes "${BASH_REMATCH[1]}")"
-    [[ -n "$item" ]] || continue
-    if [[ "$reuse_section" == "tests_pass" ]]; then
-      reusable_tests_pass+=("$item")
-    elif [[ "$reuse_section" == "commands_succeed" ]]; then
-      reusable_commands_succeed+=("$item")
-    fi
-  fi
-done <<< "$yaml_block"
-
-criterion_declared() {
-  local kind="$1" target="$2" candidate
-  if [[ "$kind" == "tests_pass" ]]; then
-    for candidate in "${tests_pass[@]+"${tests_pass[@]}"}"; do
-      [[ "$candidate" == "$target" ]] && return 0
-    done
-  else
-    for candidate in "${commands_succeed[@]+"${commands_succeed[@]}"}"; do
-      [[ "$candidate" == "$target" ]] && return 0
-    done
-  fi
-  return 1
-}
-
-criterion_reuse_enabled() {
-  local kind="$1" target="$2" candidate
-  if [[ "$kind" == "tests_pass" ]]; then
-    for candidate in "${reusable_tests_pass[@]+"${reusable_tests_pass[@]}"}"; do
-      [[ "$candidate" == "$target" ]] && return 0
-    done
-  else
-    for candidate in "${reusable_commands_succeed[@]+"${reusable_commands_succeed[@]}"}"; do
-      [[ "$candidate" == "$target" ]] && return 0
-    done
-  fi
-  return 1
-}
-
-if ((${#tests_pass[@]} || ${#commands_succeed[@]})); then
-  executes_contract_commands=1
-fi
-
 total=0
 failed=0
 RESULT_KINDS=()
@@ -1476,16 +1020,19 @@ esac
 
 check_evidence_requirements "$contract_file"
 
-for item in "${reusable_tests_pass[@]+"${reusable_tests_pass[@]}"}"; do
-  if ! criterion_declared "tests_pass" "$item"; then
-    fail "criterion_reuse" "$item" "criterion_reuse tests_pass target is not declared under exit_criteria"
-  fi
-done
-for item in "${reusable_commands_succeed[@]+"${reusable_commands_succeed[@]}"}"; do
-  if ! criterion_declared "commands_succeed" "$item"; then
-    fail "criterion_reuse" "$item" "criterion_reuse commands_succeed target is not declared under exit_criteria"
-  fi
-done
+bun_bin="$(resolve_bun_bin || true)"
+plan_validation="$tmp_dir/verification-plan.json"
+contract_plan_path="$contract_file"
+if [[ "$contract_file" == /* && -n "$bun_bin" ]]; then
+  contract_plan_path="$("$bun_bin" -e 'const fs=require("fs"),p=require("path"); const file=process.argv[2]; if(fs.lstatSync(file).isSymbolicLink()) throw Error("contract must not be a symlink"); const rel=p.relative(fs.realpathSync(process.argv[1]),fs.realpathSync(file)); if(!rel || rel===".." || rel.startsWith("../") || p.isAbsolute(rel)) throw Error("contract escapes repository"); process.stdout.write(rel);' "$repository_root" "$contract_file" 2> "$tmp_dir/plan-error")" || contract_plan_path=""
+fi
+if [[ -z "$bun_bin" ]] || ! "$bun_bin" "$SCRIPT_DIR/verification-plan.ts" validate --repo "$repository_root" --contract "$contract_plan_path" > "$plan_validation" 2> "$tmp_dir/plan-error"; then
+  fail "verification_plan" "$contract_file" "$(cat "$tmp_dir/plan-error" 2>/dev/null || true)"
+else
+  while IFS= read -r path; do
+    plan_test_paths+=("$path")
+  done < <(jq -r '.plan.checks[] | select(.kind == "package_test") | .path' "$plan_validation")
+fi
 
 if [[ "$task_profile" == "bugfix" ]]; then
   check_root_cause_evidence "$contract_file"
@@ -1557,165 +1104,34 @@ if [[ -n "$verification_preflight_file" ]]; then
   fi
 fi
 
-if [[ "$executes_contract_commands" -eq 1 && "$verification_preflight_ready" -eq 1 ]]; then
-  bun_bin="$(resolve_bun_bin || true)"
-else
-  bun_bin=""
-fi
-criterion_cache_ready=1
-if [[ "$verification_preflight_ready" -eq 0 ]]; then
-  criterion_cache_ready=0
-elif [[ "$executes_contract_commands" -eq 1 ]] && ! initialize_criterion_cache; then
-  criterion_cache_ready=0
-  fail "criterion_cache" "$criterion_context_file" "criterion cache context is unavailable or invalid"
-fi
-
-execute_test_criterion() {
-  local path="$1" index="$2" decision message execution
-  if [[ ! -f "$path" ]]; then
-    fail "tests_pass" "$path" "tests_pass file missing: $path"
-    return 0
+# Metadata and explicit preflight failures suppress all command execution.
+if [[ "$failed" -eq 0 && "$verification_preflight_ready" -eq 1 ]]; then
+  verification_plan_report="$tmp_dir/verification-execution.json"
+  execution_args=(execute --repo "$repository_root" --contract "$contract_plan_path" --report-file "$verification_plan_report")
+  if [[ "$force_expensive_rerun" -eq 1 ]]; then
+    execution_args+=(--force-reason "$force_reason")
   fi
-  if [[ -z "$bun_bin" ]]; then
-    fail "tests_pass" "$path" "tests_pass cannot run (bun not found): $path"
-    return 0
-  fi
-  if ! resolve_tests_pass_owner "$path"; then
-    fail "tests_pass" "$path" "$test_owner_resolution_error"
-    return 0
-  fi
-
   set +e
-  begin_criterion_cache_decision "tests_pass" "$path" "$resolved_test_command"
-  decision=$?
+  "$bun_bin" "$SCRIPT_DIR/verification-plan.ts" "${execution_args[@]}" > "$tmp_dir/execution-output" 2> "$tmp_dir/execution-error"
+  execution_exit=$?
   set -e
-  case "$decision" in
-    0)
-      record_timed_result "tests_pass" "$path" true "reused pass: $criterion_cache_reused_message" "$criterion_cache_reused_duration" false 0 "$criterion_cache_reused_signal" "reused" "$resolved_test_command" "$criterion_cache_key" ""
-      return 0
-      ;;
-    2)
-      record_timed_result "tests_pass" "$path" false "$criterion_cache_block_message" 0 false 75 null "blocked" "$resolved_test_command" "$criterion_cache_key" ""
-      return 0
-      ;;
-  esac
-  execution="executed"
-  [[ -z "$criterion_cache_force_reason" ]] || execution="forced"
-
-  result_path="$tmp_dir/test-${index}.json"
-  log_path="$tmp_dir/test-${index}.log"
-  set +e
-  run_bounded "$log_path" "$result_path" "$bun_bin" run --cwd "$resolved_test_owner" test -- "$resolved_test_path"
-  bounded_exit=$?
-  set -e
-  bounded_duration="$(sed -nE 's/.*"duration_ms":([0-9]+).*/\1/p' "$result_path" 2>/dev/null || true)"
-  bounded_timed_out="$(sed -nE 's/.*"timed_out":(true|false).*/\1/p' "$result_path" 2>/dev/null || true)"
-  bounded_signal="$(sed -nE 's/.*"signal":("[^"]*"|null).*/\1/p' "$result_path" 2>/dev/null || true)"
-  bounded_duration="${bounded_duration:-0}"
-  bounded_timed_out="${bounded_timed_out:-false}"
-  bounded_signal="${bounded_signal:-null}"
-  if [[ "$bounded_exit" -eq 0 ]]; then
-    message="tests_pass: $path via $resolved_test_command (${bounded_duration}ms)"
-    persist_passing_criterion "tests_pass" "$path" "$resolved_test_command" "$message" "$bounded_duration" "$bounded_signal"
-    record_timed_result "tests_pass" "$path" true "$message" "$bounded_duration" false 0 "$bounded_signal" "$execution" "$resolved_test_command" "$criterion_cache_key" "$criterion_cache_force_reason"
-  else
-    release_criterion_cache_lock
-    record_timed_result "tests_pass" "$path" false "tests_pass: $path via $resolved_test_command (${bounded_duration}ms, exit=$bounded_exit)" "$bounded_duration" "$bounded_timed_out" "$bounded_exit" "$bounded_signal" "$execution" "$resolved_test_command" "$criterion_cache_key" "$criterion_cache_force_reason"
-    retain_failure_log "$log_path" "$path"
-  fi
-  if [[ "$bounded_timed_out" == "true" ]]; then
-    verification_budget_exhausted=1
-  fi
-}
-
-execute_command_criterion() {
-  local cmd="$1" index="$2" decision message execution
-  if is_evidence_producer_command "$cmd"; then
-    record_timed_result "commands_succeed" "$cmd" false "commands_succeed forbidden evidence producer: $cmd" 0 false 126 null "rejected" "$cmd"
-    return 0
-  fi
-  if [[ -z "$bun_bin" ]]; then
-    fail "commands_succeed" "$cmd" "commands_succeed cannot run bounded (bun not found): $cmd"
-    return 0
-  fi
-
-  set +e
-  begin_criterion_cache_decision "commands_succeed" "$cmd" "$cmd"
-  decision=$?
-  set -e
-  case "$decision" in
-    0)
-      record_timed_result "commands_succeed" "$cmd" true "reused pass: $criterion_cache_reused_message" "$criterion_cache_reused_duration" false 0 "$criterion_cache_reused_signal" "reused" "$cmd" "$criterion_cache_key" ""
-      return 0
-      ;;
-    2)
-      record_timed_result "commands_succeed" "$cmd" false "$criterion_cache_block_message" 0 false 75 null "blocked" "$cmd" "$criterion_cache_key" ""
-      return 0
-      ;;
-  esac
-  execution="executed"
-  [[ -z "$criterion_cache_force_reason" ]] || execution="forced"
-
-  result_path="$tmp_dir/command-${index}.json"
-  log_path="$tmp_dir/command-${index}.log"
-  set +e
-  run_bounded "$log_path" "$result_path" bash --noprofile --norc -c "$cmd"
-  bounded_exit=$?
-  set -e
-  bounded_duration="$(sed -nE 's/.*"duration_ms":([0-9]+).*/\1/p' "$result_path" 2>/dev/null || true)"
-  bounded_timed_out="$(sed -nE 's/.*"timed_out":(true|false).*/\1/p' "$result_path" 2>/dev/null || true)"
-  bounded_signal="$(sed -nE 's/.*"signal":("[^"]*"|null).*/\1/p' "$result_path" 2>/dev/null || true)"
-  bounded_duration="${bounded_duration:-0}"
-  bounded_timed_out="${bounded_timed_out:-false}"
-  bounded_signal="${bounded_signal:-null}"
-  if [[ "$bounded_exit" -eq 0 ]]; then
-    message="commands_succeed: $cmd (${bounded_duration}ms)"
-    persist_passing_criterion "commands_succeed" "$cmd" "$cmd" "$message" "$bounded_duration" "$bounded_signal"
-    record_timed_result "commands_succeed" "$cmd" true "$message" "$bounded_duration" false 0 "$bounded_signal" "$execution" "$cmd" "$criterion_cache_key" "$criterion_cache_force_reason"
-  else
-    release_criterion_cache_lock
-    record_timed_result "commands_succeed" "$cmd" false "commands_succeed: $cmd (${bounded_duration}ms, exit=$bounded_exit)" "$bounded_duration" "$bounded_timed_out" "$bounded_exit" "$bounded_signal" "$execution" "$cmd" "$criterion_cache_key" "$criterion_cache_force_reason"
-    retain_failure_log "$log_path" "$cmd"
-  fi
-  if [[ "$bounded_timed_out" == "true" ]]; then
-    verification_budget_exhausted=1
-  fi
-}
-
-if [[ "$criterion_cache_ready" -eq 1 ]] && ((${#commands_succeed[@]})); then
-  command_index=0
-  for cmd in "${commands_succeed[@]}"; do
-    if is_preflight_command "$cmd"; then
-      execute_command_criterion "$cmd" "$command_index"
+  if [[ -f "$verification_plan_report" ]] && jq -e '.results | type == "array"' "$verification_plan_report" >/dev/null; then
+    while IFS= read -r result; do
+      record_timed_result \
+        "$(jq -r '.kind' <<< "$result")" "$(jq -r '.target' <<< "$result")" \
+        "$(jq -r '.passed' <<< "$result")" "$(jq -r '.message' <<< "$result")" \
+        "$(jq -r '.duration_ms' <<< "$result")" "$(jq -r '.timed_out' <<< "$result")" \
+        "$(jq -r '.exit_code' <<< "$result")" "$(jq -c '.signal' <<< "$result")" \
+        "$(jq -r '.execution' <<< "$result")" "$(jq -r '.command' <<< "$result")" \
+        "$(jq -r '.cache_key' <<< "$result")" "$(jq -r '.force_reason' <<< "$result")"
+    done < <(jq -c '.results[]' "$verification_plan_report")
+    executes_contract_commands="$(jq '[.results[] | select(.execution == "executed")] | if length > 0 then 1 else 0 end' "$verification_plan_report")"
+    if [[ "$execution_exit" -ne 0 && "$failed" -eq 0 ]]; then
+      fail "verification_plan" "$contract_file" "$(cat "$tmp_dir/execution-error")"
     fi
-    command_index=$((command_index + 1))
-    [[ "$verification_budget_exhausted" -eq 0 ]] || break
-  done
-fi
-
-criterion_execution_ready="$criterion_cache_ready"
-if [[ -n "$verification_preflight_file" && "$failed" -gt 0 ]]; then
-  criterion_execution_ready=0
-fi
-
-if [[ "$criterion_execution_ready" -eq 1 && "$verification_budget_exhausted" -eq 0 ]] && ((${#tests_pass[@]})); then
-  test_index=0
-  for path in "${tests_pass[@]}"; do
-    execute_test_criterion "$path" "$test_index"
-    test_index=$((test_index + 1))
-    [[ "$verification_budget_exhausted" -eq 0 ]] || break
-  done
-fi
-
-if [[ "$criterion_execution_ready" -eq 1 && "$verification_budget_exhausted" -eq 0 ]] && ((${#commands_succeed[@]})); then
-  command_index=0
-  for cmd in "${commands_succeed[@]}"; do
-    if ! is_preflight_command "$cmd"; then
-      execute_command_criterion "$cmd" "$command_index"
-    fi
-    command_index=$((command_index + 1))
-    [[ "$verification_budget_exhausted" -eq 0 ]] || break
-  done
+  else
+    fail "verification_plan" "$contract_file" "verification execution report unavailable: $(cat "$tmp_dir/execution-error")"
+  fi
 fi
 
 if ((${#qa_dimensions[@]})); then

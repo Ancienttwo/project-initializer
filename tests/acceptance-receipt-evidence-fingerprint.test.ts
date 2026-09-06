@@ -7,6 +7,7 @@ import { createHash } from 'crypto';
 import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { assessChange, buildReviewSelectionPacket } from '../src/core/review/change-assessment';
 import { recordAcceptance, verifyAcceptance } from '../scripts/acceptance-receipt';
+import { emptyVerificationEvaluation, withEmptyVerificationPlan } from './helpers/verification-plan-fixture';
 
 const tempDirs: string[] = [];
 afterEach(() => { for (const path of tempDirs.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -19,12 +20,12 @@ function git(cwd: string, ...args: string[]): string {
 function commit(cwd: string, message: string): void { git(cwd, 'add', '-A'); git(cwd, 'commit', '-m', message); }
 
 function contract(): string {
-  return [
+  return withEmptyVerificationPlan([
     '# Task Contract: demo', '', '> **Status**: Active', '> **Plan**: plans/plan-demo.md',
     '> **Owner**: kito', '', '## Acceptance Policy', '', '```json',
     '{"protocol":1,"reviewer":"Claude","user_waiver":"allowed"}', '```', '',
     '## Change Assessment', '', '```json', '{"protocol":1,"oracles":[]}', '```', '',
-  ].join('\n');
+  ].join('\n'));
 }
 
 /**
@@ -92,7 +93,10 @@ function passingChecks(root: string): Record<string, unknown> {
       { name: 'allowed_paths', status: 'pass' },
       { name: 'change_assessment', status: 'pass' },
     ],
-    contract: { file: 'tasks/contracts/demo.contract.md' },
+    contract: {
+      file: 'tasks/contracts/demo.contract.md',
+      execution_evaluation: emptyVerificationEvaluation(root, 'tasks/contracts/demo.contract.md'),
+    },
     review: { file: 'tasks/reviews/demo.review.md' },
     change_assessment: changeAssessmentEvidence(subject),
   };

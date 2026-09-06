@@ -499,12 +499,16 @@ function normalizedFinalContent(
 
 export function buildReviewSubject(
   repoRoot: string,
-  opts: { targetRef?: string } = {},
+  opts: { targetRef?: string; targetRevision?: string } = {},
 ): ReviewSubject {
   const targetRef = opts.targetRef ?? 'HEAD';
+  // The policy ref labels the review boundary, while a receipt may bind an
+  // immutable revision of that boundary. Every Git observation below must use
+  // the resolved revision so a moving branch name cannot rewrite history.
+  const targetSelector = opts.targetRevision ?? targetRef;
   const ctx: FingerprintCtx = { degraded: false };
   const headRes = gitRun(repoRoot, ['rev-parse', '--verify', 'HEAD']);
-  const targetRes = gitRun(repoRoot, ['rev-parse', '--verify', targetRef]);
+  const targetRes = gitRun(repoRoot, ['rev-parse', '--verify', `${targetSelector}^{commit}`]);
   const headRev = headRes.text.trim();
   const targetRev = targetRes.text.trim();
   if (!headRes.ok || !targetRes.ok || !headRev || !targetRev) {
@@ -520,17 +524,17 @@ export function buildReviewSubject(
   if (!statusRes.ok) ctx.degraded = true;
   const statusParsed = parseStatusZ(splitNul(statusRes.buf, ctx));
 
-  const branchRes = gitRunBuffer(repoRoot, ['diff', '--name-status', '--find-renames', '-z', `${targetRef}...HEAD`]);
+  const branchRes = gitRunBuffer(repoRoot, ['diff', '--name-status', '--find-renames', '-z', `${targetRev}...HEAD`]);
   if (!branchRes.ok) ctx.degraded = true;
   const branchPaths = parseNameStatusZ(splitNul(branchRes.buf, ctx));
 
   const allPaths = uniqueSorted([...branchPaths, ...statusParsed.all]);
   const excludedPaths = allPaths.filter(isOperationalReviewPath);
   const implementationPaths = allPaths.filter((path) => !isOperationalReviewPath(path));
-  const mergeBaseRes = gitRun(repoRoot, ['merge-base', 'HEAD', targetRef]);
+  const mergeBaseRes = gitRun(repoRoot, ['merge-base', 'HEAD', targetRev]);
   if (!mergeBaseRes.ok || !mergeBaseRes.text.trim()) ctx.degraded = true;
   const targetChangedRes = mergeBaseRes.ok
-    ? gitRunBuffer(repoRoot, ['diff', '--name-status', '--find-renames', '-z', `${mergeBaseRes.text.trim()}..${targetRef}`])
+    ? gitRunBuffer(repoRoot, ['diff', '--name-status', '--find-renames', '-z', `${mergeBaseRes.text.trim()}..${targetRev}`])
     : { ok: false, buf: Buffer.alloc(0) };
   if (!targetChangedRes.ok) ctx.degraded = true;
   const targetChangedPaths = parseNameStatusZ(splitNul(targetChangedRes.buf, ctx));
@@ -593,7 +597,7 @@ export function reviewSubjectAddedLines(repoRoot: string, subject: ReviewSubject
     }
   };
   const wholeDiff = spawnSync('git', [
-    '-C', repoRoot, '-c', 'core.quotepath=false', '--literal-pathspecs', 'diff', '--no-ext-diff', '--find-renames', '--no-color', '--unified=0', subject.target_ref, '--',
+    '-C', repoRoot, '-c', 'core.quotepath=false', '--literal-pathspecs', 'diff', '--no-ext-diff', '--find-renames', '--no-color', '--unified=0', subject.target_rev, '--',
   ], { encoding: 'utf-8', maxBuffer: PATCH_HASH_MAX_BUFFER });
   if (wholeDiff.error || wholeDiff.status !== 0) throw new Error('review subject rename-aware hunk observation failed');
   collectAddedLines(wholeDiff.stdout ?? '');

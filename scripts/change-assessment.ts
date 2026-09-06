@@ -120,7 +120,7 @@ async function prepare(root: string, values: Record<string, string>): Promise<nu
         disagreementSource = packetPath;
       }
     }
-    const prepared = effects.prepareChangeAssessment({ repoRoot: root, contractPath: contract, reviewerDisagreementPacket });
+    const prepared = effects.prepareChangeAssessment({ repoRoot: root, contractPath: contract, targetRevision: values['target-revision'], reviewerDisagreementPacket });
     const status = prepared.assessment.status === 'ready' && prepared.packet?.status === 'ready' ? 'pass' : 'fail';
     const evidence = envelope({ assessment: prepared.assessment, packet: prepared.packet, status });
     atomicWrite(output, evidence);

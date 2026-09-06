@@ -80,6 +80,8 @@ export interface VerifyProducerInput {
   readonly counts?: Readonly<Record<string, number>>;
   /** Frozen subject hash the caller expects; emission fails closed if the recomputed hash differs. */
   readonly expectedSubjectSha256?: string;
+  /** Immutable review base frozen by the prepare run. */
+  readonly targetRevision?: string;
   readonly correlationRunId?: string;
   /**
    * Repo-relative path to the contract already resolved by the caller (see
@@ -276,13 +278,22 @@ export function emitAuthoritativeVerifyEvidence(input: VerifyProducerInput): Ver
       message: `policy review base is unavailable: ${reviewBase.reason}`,
     };
   }
-  const subject = buildReviewSubject(repoRoot, { targetRef: reviewBase.targetRef });
+  const subject = buildReviewSubject(repoRoot, { targetRef: reviewBase.targetRef, targetRevision: input.targetRevision });
   if (subject.status !== "ok") {
     return {
       ok: false,
       reason: "subject_mismatch",
       message: `review subject could not be computed: ${subject.reason ?? "unknown"}`,
     };
+  }
+  if (input.runTrace && typeof input.runTrace === "object" && !Array.isArray(input.runTrace)) {
+    const assessment = (input.runTrace as Readonly<Record<string, JsonValue>>).change_assessment;
+    const packet = assessment && typeof assessment === "object" && !Array.isArray(assessment)
+      ? (assessment as Readonly<Record<string, JsonValue>>).selection_packet : undefined;
+    if (packet && typeof packet === "object" && !Array.isArray(packet)
+      && ((packet as Readonly<Record<string, JsonValue>>).target_revision !== subject.target_rev || (packet as Readonly<Record<string, JsonValue>>).target_ref !== reviewBase.targetRef)) {
+      return { ok: false, reason: "subject_mismatch", message: "run trace target differs from the frozen evidence target" };
+    }
   }
   if (input.expectedSubjectSha256 !== undefined && input.expectedSubjectSha256 !== subject.review_subject_sha256) {
     return {

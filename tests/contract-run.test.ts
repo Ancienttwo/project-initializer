@@ -28,6 +28,20 @@ function makeRepo(prefix = "contract-run-"): string {
   return repo;
 }
 
+function initGitRepo(repo: string): void {
+  writeFileSync(join(repo, ".gitignore"), ".ai/harness/runs/\n.ai/harness/checks/\n.ai/harness/evidence/\n");
+  for (const args of [
+    ["init", "-b", "main"],
+    ["config", "user.name", "Contract Run Fixture"],
+    ["config", "user.email", "contract-run@example.com"],
+    ["add", "."],
+    ["commit", "-m", "fixture"],
+  ]) {
+    const result = spawnSync("git", args, { cwd: repo, encoding: "utf-8" });
+    expect(result.status, result.stderr).toBe(0);
+  }
+}
+
 function writePilotContract(
   repo: string,
   runnerInvocations: string | number | null = 2,
@@ -121,8 +135,6 @@ function writePilotContract(
       "exit_criteria:",
       "  files_exist:",
       "    - src/pilot.txt",
-      "  commands_succeed:",
-      "    - test -f src/pilot.txt",
       "  files_contain:",
       "    - path: src/pilot.txt",
       "      pattern: worker-output",
@@ -131,6 +143,25 @@ function writePilotContract(
       "      min: 7",
       "  manual_checks:",
       '    - "Verifier observed src/pilot.txt contains worker-output"',
+      "```",
+      "",
+      "## Verification Plan",
+      "",
+      "```json",
+      JSON.stringify({
+        protocol: 1,
+        checks: [{
+          id: "pilot-file-present",
+          kind: "command",
+          command: "test -f src/pilot.txt",
+          cwd: ".",
+          phase: "verification",
+          cost: "normal",
+          evidence_policy: "current_exact",
+          necessity: "The worker must create the file that the non-executable exit criteria inspect.",
+          inputs: { env: [] },
+        }],
+      }, null, 2),
       "```",
       "",
     ].join("\n"),
@@ -318,7 +349,7 @@ describe("contract-run helper", () => {
       expect(workerPromptContent).toContain("## Why this task matters");
       expect(workerPromptContent).toContain("## Before you finish (mandatory self-verification)");
       expect(workerPromptContent).toContain("repo-harness run verify-sprint --prepare-acceptance");
-      expect(workerPromptContent).toContain("criterion_reuse");
+      expect(workerPromptContent).toContain("Verification Plan");
       expect(workerPromptContent).toContain("do not rerun the old full-suite criterion merely because the subject changed");
       expect(workerPromptContent).not.toContain("Run every command listed under exit_criteria.commands_succeed");
       expect(workerPromptContent).toContain("## Record what you learned");
@@ -449,6 +480,8 @@ describe("contract-run helper", () => {
       expect((manifest.children as unknown[])).toHaveLength(2);
       expect(readFileSync(join(repo, "src/pilot.txt"), "utf-8")).toContain("worker-output");
       expect(existsSync(join(repo, "tasks/reviews/pilot.review.md"))).toBe(true);
+
+      initGitRepo(repo);
 
       const verifyReport = ".ai/harness/runs/pilot/verify-report.json";
       const verify = spawnSync(

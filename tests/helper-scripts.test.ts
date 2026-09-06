@@ -77,6 +77,13 @@ function copyHelpers(cwd: string) {
   mkdirSync(join(cwd, ".ai", "harness"), { recursive: true });
   mkdirSync(join(cwd, ".ai", "harness", "triage"), { recursive: true });
   mkdirSync(join(cwd, "docs", "architecture"), { recursive: true });
+  mkdirSync(join(cwd, "src"), { recursive: true });
+  if (!existsSync(join(cwd, "src", "effects"))) {
+    symlinkSync(join(ROOT, "src", "effects"), join(cwd, "src", "effects"), "dir");
+  }
+  if (!existsSync(join(cwd, "src", "core"))) {
+    symlinkSync(join(ROOT, "src", "core"), join(cwd, "src", "core"), "dir");
+  }
 
   for (const file of readdirSync(HELPER_DIR).filter((name) => name.endsWith(".sh") || name.endsWith(".ts"))) {
     copyFileSync(join(HELPER_DIR, file), join(scriptsDir, file));
@@ -362,7 +369,9 @@ function installAutomaticProjectionVerifyFixture(
     "docs/architecture/modules",
   ]) mkdirSync(join(cwd, dir), { recursive: true });
   copyHelpers(cwd);
+  rmSync(join(cwd, "src"), { recursive: true, force: true });
   cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+  copyFileSync(join(ROOT, "package.json"), join(cwd, "package.json"));
   copyFileSync(
     join(ROOT, "assets/hooks/lib/workflow-state.sh"),
     join(cwd, ".ai/hooks/lib/workflow-state.sh"),
@@ -417,6 +426,7 @@ function installAutomaticProjectionVerifyFixture(
       "  benchmark: not_applicable",
       "```",
       "",
+      verificationPlan([]),
       "## Change Assessment",
       "",
       "```json",
@@ -478,20 +488,52 @@ function installAutomaticProjectionVerifyFixture(
   return fakeCli;
 }
 
-// Extracts the body of a bash heredoc (exclusive of its open/close marker lines) so
-// tests can assert on the seed contract template text embedded in plan-to-todo.sh,
-// ensure-task-workflow.sh, and project-init-lib.sh without hard-coding line numbers.
-function extractHeredocBody(source: string, openToken: string, closeToken: string): string {
-  const lines = source.split("\n");
-  const startIdx = lines.findIndex((line) => line.includes(openToken));
-  if (startIdx === -1) {
-    throw new Error(`heredoc open token not found: ${openToken}`);
-  }
-  const endIdx = lines.findIndex((line, i) => i > startIdx && line.trim() === closeToken);
-  if (endIdx === -1) {
-    throw new Error(`heredoc close token not found: ${closeToken}`);
-  }
-  return lines.slice(startIdx + 1, endIdx).join("\n");
+function verificationPlan(checks: unknown[]): string {
+  return [
+    "## Verification Plan",
+    "",
+    "```json",
+    JSON.stringify({ protocol: 1, checks }, null, 2),
+    "```",
+    "",
+  ].join("\n");
+}
+
+function verificationCheck(
+  id: string,
+  command: string,
+  phase: "preflight" | "verification",
+  cost: "normal" | "expensive",
+): Record<string, unknown> {
+  return {
+    id,
+    kind: "command",
+    command,
+    cwd: ".",
+    phase,
+    cost,
+    evidence_policy: "current_exact",
+    necessity: `${id} is required by this fixture.`,
+    inputs: { env: [] },
+  };
+}
+
+function replaceVerificationPlan(contract: string, checks: unknown[]): string {
+  return contract.replace(verificationPlan([]), verificationPlan(checks));
+}
+
+function commitVerificationFixture(cwd: string): void {
+  initGitRepo(cwd);
+  writeFileSync(
+    join(cwd, ".git/info/exclude"),
+    ".ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/evidence/\n",
+  );
+  commitAll(cwd, "verification fixture");
+}
+
+function installCanonicalContractTemplate(cwd: string): void {
+  mkdirSync(join(cwd, ".claude/templates"), { recursive: true });
+  copyFileSync(join(ROOT, ".claude/templates/contract.template.md"), join(cwd, ".claude/templates/contract.template.md"));
 }
 
 describe("Workflow helper scripts", () => {
@@ -737,73 +779,16 @@ describe("Workflow helper scripts", () => {
     }
   }, 30_000);
 
-  test("every contract template copy's ## section set is a superset of the standalone template", () => {
+  test("contract projection has a single canonical executable template authority", () => {
     const standalone = readFileSync(join(TEMPLATE_DIR, "contract.template.md"), "utf-8");
-    const headingsOf = (content: string) =>
-      new Set(content.split("\n").filter((line) => line.startsWith("## ")));
-    const standaloneHeadings = headingsOf(standalone);
-    expect(standaloneHeadings.size).toBeGreaterThan(0);
-
     const planToTodoSrc = readFileSync(join(ROOT, "scripts/plan-to-todo.sh"), "utf-8");
     const ensureTaskWorkflowSrc = readFileSync(join(ROOT, "scripts/ensure-task-workflow.sh"), "utf-8");
     const projectInitLibSrc = readFileSync(join(ROOT, "scripts/lib/project-init-lib.sh"), "utf-8");
-
-    const copies: Record<string, string> = {
-      ".claude/templates/contract.template.md": readFileSync(
-        join(ROOT, ".claude/templates/contract.template.md"),
-        "utf-8"
-      ),
-      "scripts/plan-to-todo.sh render_contract_file seed heredoc": extractHeredocBody(
-        planToTodoSrc,
-        "<<'CONTRACT_TEMPLATE_EOF'",
-        "CONTRACT_TEMPLATE_EOF"
-      ),
-      "scripts/ensure-task-workflow.sh seed heredoc": extractHeredocBody(
-        ensureTaskWorkflowSrc,
-        "<<'CONTRACT_TEMPLATE_EOF'",
-        "CONTRACT_TEMPLATE_EOF"
-      ),
-      // Explicit coverage for the project-init-lib.sh embedded copy: it has no
-      // assets/templates/helpers/ mirror file, so this test is its only structural guard.
-      "scripts/lib/project-init-lib.sh PI_TEMPLATE_CONTRACT": extractHeredocBody(
-        projectInitLibSrc,
-        "<<'EOF_TEMPLATE_CONTRACT'",
-        "EOF_TEMPLATE_CONTRACT"
-      ),
-    };
-
-    for (const [label, content] of Object.entries(copies)) {
-      const headings = headingsOf(content);
-      const missing = [...standaloneHeadings].filter((heading) => !headings.has(heading));
-      expect(missing, `${label} is missing sections present in the standalone template`).toEqual([]);
-      expect(content, `${label} restores an alternate fleet runner`).toContain(
-        "preferred:\n      - subagent\n    fallback: null",
-      );
-      expect(content, `${label} must default non-Codex sessions to direct Codex review`).toContain(
-        '{"protocol":2,"reviewer":"Codex","source":"codex-review","user_waiver":"allowed"}',
-      );
+    expect(readFileSync(join(ROOT, ".claude/templates/contract.template.md"), "utf-8")).toBe(standalone);
+    for (const [label, source] of Object.entries({ planToTodoSrc, ensureTaskWorkflowSrc, projectInitLibSrc })) {
+      expect(source, `${label} must not restore an executable contract fallback`).not.toContain("CONTRACT_TEMPLATE_EOF");
+      expect(source, `${label} must fail closed without its canonical template`).toContain("canonical contract template is required");
     }
-  });
-
-  test("PI_TEMPLATE_CONTRACT (project-init-lib.sh) stays byte-identical to the ensure-task-workflow.sh embedded contract seed", () => {
-    const ensureTaskWorkflowSrc = readFileSync(join(ROOT, "scripts/ensure-task-workflow.sh"), "utf-8");
-    const projectInitLibSrc = readFileSync(join(ROOT, "scripts/lib/project-init-lib.sh"), "utf-8");
-
-    const ensureTaskWorkflowSeed = extractHeredocBody(
-      ensureTaskWorkflowSrc,
-      "<<'CONTRACT_TEMPLATE_EOF'",
-      "CONTRACT_TEMPLATE_EOF"
-    );
-    const projectInitLibSeed = extractHeredocBody(
-      projectInitLibSrc,
-      "<<'EOF_TEMPLATE_CONTRACT'",
-      "EOF_TEMPLATE_CONTRACT"
-    );
-
-    // project-init-lib.sh ships no assets/templates/helpers/ mirror for this seed (it is
-    // not one of the top-level scripts distributed there), so its parity guarantee with
-    // the ensure-task-workflow.sh embedded copy must come from this direct comparison.
-    expect(projectInitLibSeed).toBe(ensureTaskWorkflowSeed);
   });
 
   test("direct helper tests ignore ambient repo-root env", () => {
@@ -823,7 +808,7 @@ describe("Workflow helper scripts", () => {
         },
       });
 
-      expect(res.status).toBe(0);
+      expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
       expect(existsSync(join(poisonRepo, "plans"))).toBe(false);
     } finally {
       rmSync(poisonRepo, { recursive: true, force: true });
@@ -1117,6 +1102,7 @@ describe("Workflow helper scripts", () => {
     try {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       writeFileSync(
         join(cwd, "approved.md"),
         [
@@ -1144,7 +1130,7 @@ describe("Workflow helper scripts", () => {
         "approved.md",
       ], cwd);
 
-      expect(res.status).toBe(0);
+      expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
       expect(res.stdout).toContain("Captured plan:");
       expect(res.stdout).toContain("Prepared sprint artifacts");
       const todo = readFileSync(join(cwd, "tasks/todos.md"), "utf-8");
@@ -1225,6 +1211,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       mkdirSync(join(cwd, "tasks"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       writeFileSync(
         join(cwd, ".ai/harness/policy.json"),
         JSON.stringify(
@@ -1454,6 +1441,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "tasks/archive"), { recursive: true });
       mkdirSync(join(cwd, ".ai/harness/planning"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       writeFileSync(join(cwd, ".ai/harness/planning/pending.json"), JSON.stringify({ version: 1, kind: "codex-plan", prompt_slug: "demo" }) + "\n");
 
       const planFile = join(cwd, "plans/plan-20260304-1400-demo.md");
@@ -1531,6 +1519,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       mkdirSync(join(cwd, "tasks/archive"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
 
       const planFile = join(cwd, "plans/plan-20260304-1401-carry.md");
       writeFileSync(
@@ -1582,6 +1571,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       mkdirSync(join(cwd, "tasks/archive"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
 
       const planFile = join(cwd, "plans/plan-20260304-1403-carry-nonscope.md");
       writeFileSync(
@@ -1626,6 +1616,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       mkdirSync(join(cwd, "tasks/archive"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
 
       const planFile = join(cwd, "plans/plan-20260304-1404-no-nonscope.md");
       writeFileSync(
@@ -1712,6 +1703,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "tasks"), { recursive: true });
       mkdirSync(join(cwd, "docs"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       writeFileSync(
         join(cwd, ".ai/harness/policy.json"),
         JSON.stringify(
@@ -2412,6 +2404,7 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "plans"), { recursive: true });
       mkdirSync(join(cwd, "tasks/archive"), { recursive: true });
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
 
       writeFileSync(
         join(cwd, "plans/plan-20260304-1420-meta.md"),
@@ -3095,15 +3088,25 @@ describe("Workflow helper scripts", () => {
           "exit_criteria:",
           "  files_exist:",
           "    - src/index.ts",
-          "  tests_pass:",
-          "    - path: tests/unit/contract-pass.test.ts",
-          "  commands_succeed:",
-          "    - test -f src/index.ts",
           "  files_contain:",
           "    - path: src/index.ts",
           "      pattern: \"export const value\"",
           "```",
           "",
+          verificationPlan([
+            {
+              id: "contract-pass-test",
+              kind: "package_test",
+              path: "tests/unit/contract-pass.test.ts",
+              cwd: ".",
+              phase: "verification",
+              cost: "normal",
+              evidence_policy: "current_exact",
+              necessity: "The package test covers the contract pass fixture.",
+              inputs: { env: [] },
+            },
+            verificationCheck("contract-source-present", "test -f src/index.ts", "verification", "normal"),
+          ]),
           "## Evidence Requirements",
           "",
           "```yaml",
@@ -3113,9 +3116,12 @@ describe("Workflow helper scripts", () => {
           "",
         ].join("\n")
       );
+      initGitRepo(cwd);
+      writeFileSync(join(cwd, ".git/info/exclude"), ".ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/evidence/\n");
+      commitAll(cwd, "verification fixture");
 
       const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
-      expect(res.status).toBe(0);
+      expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
       const updated = readFileSync(contractPath, "utf-8");
       expect(updated).toContain("> **Status**: Fulfilled");
     } finally {
@@ -3151,6 +3157,7 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
         ].join("\n")
       );
       writeFileSync(
@@ -3167,6 +3174,8 @@ describe("Workflow helper scripts", () => {
           "",
         ].join("\n")
       );
+
+      commitVerificationFixture(cwd);
 
       const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
       expect(res.status).toBe(0);
@@ -3205,6 +3214,7 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
         ].join("\n")
       );
       writeFileSync(
@@ -3222,6 +3232,8 @@ describe("Workflow helper scripts", () => {
           "",
         ].join("\n")
       );
+
+      commitVerificationFixture(cwd);
 
       const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
       expect(res.status).toBe(0);
@@ -3357,12 +3369,9 @@ describe("Workflow helper scripts", () => {
           "exit_criteria:",
           "  files_exist:",
           "    - src/does-not-exist.ts",
-          "  tests_pass:",
-          "    - path: tests/unit/missing.test.ts",
-          "  commands_succeed:",
-          "    - false",
           "```",
           "",
+          verificationPlan([verificationCheck("intentional-failure", "false", "verification", "normal")]),
         ].join("\n")
       );
 
@@ -3393,10 +3402,9 @@ describe("Workflow helper scripts", () => {
           "exit_criteria:",
           "  files_exist:",
           "    - src/does-not-exist.ts",
-          "  commands_succeed:",
-          "    - false",
           "```",
           "",
+          verificationPlan([verificationCheck("read-only-failure", "false", "verification", "normal")]),
         ].join("\n")
       );
       const originalContent = readFileSync(contractPath, "utf-8");
@@ -3444,8 +3452,10 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
         ].join("\n")
       );
+      commitVerificationFixture(cwd);
       const originalContent = readFileSync(contractPath, "utf-8");
 
       const res = run(
@@ -3478,10 +3488,10 @@ describe("Workflow helper scripts", () => {
           "",
           "```yaml",
           "exit_criteria:",
-          "  commands_succeed:",
-          "    - printf executed > command-ran.txt",
+          "  files_exist: []",
           "```",
           "",
+          verificationPlan([verificationCheck("read-only-command", "mkdir -p .ai/harness/runs && printf executed > .ai/harness/runs/command-ran.txt", "verification", "normal")]),
           "## Evidence Requirements",
           "",
           "```yaml",
@@ -3491,6 +3501,7 @@ describe("Workflow helper scripts", () => {
           "",
         ].join("\n")
       );
+      commitVerificationFixture(cwd);
       const originalContent = readFileSync(contractPath, "utf-8");
 
       const res = run(
@@ -3507,9 +3518,9 @@ describe("Workflow helper scripts", () => {
         cwd
       );
 
-      expect(res.status).toBe(0);
+      expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
       expect(readFileSync(contractPath, "utf-8")).toBe(originalContent);
-      expect(readFileSync(join(cwd, "command-ran.txt"), "utf-8")).toBe("executed");
+      expect(readFileSync(join(cwd, ".ai/harness/runs/command-ran.txt"), "utf-8")).toBe("executed");
       const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
       expect(report.read_only).toBe(true);
       expect(report.executes_contract_commands).toBe(true);
@@ -3518,514 +3529,110 @@ describe("Workflow helper scripts", () => {
     }
   }, 30_000);
 
-  test("verify-contract reuses a passing expensive criterion when only a cheap gate failed", () => {
-    const cwd = tmpWorkspace("helper-verify-contract-incremental-retry");
+  test("verify-contract rejects retired criterion_reuse executable YAML", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-retired-reuse");
     try {
-      mkdirSync(join(cwd, "scripts"), { recursive: true });
-      mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
       copyHelpers(cwd);
-      installHooks(cwd);
-
-      writeFileSync(
-        join(cwd, "scripts/expensive-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/expensive-count\ntest ! -f .ai/harness/force-fail\n",
-      );
-      writeFileSync(
-        join(cwd, "scripts/check-task-sync.sh"),
-        "#!/bin/bash\ntest -f .ai/harness/gate-ready\n",
-      );
-      chmodSync(join(cwd, "scripts/expensive-fixture.sh"), 0o755);
-      chmodSync(join(cwd, "scripts/check-task-sync.sh"), 0o755);
-      writeFileSync(
-        join(cwd, "task.contract.md"),
-        [
-          "# Task Contract: incremental-retry",
-          "",
-          "> **Status**: Active",
-          "> **Task Profile**: code-change",
-          "",
-          "```yaml",
-          "exit_criteria:",
-          "  commands_succeed:",
-          "    - bash scripts/expensive-fixture.sh",
-          "    - bash scripts/check-task-sync.sh",
-          "criterion_reuse:",
-          "  commands_succeed:",
-          "    - bash scripts/expensive-fixture.sh",
-          "    - bash scripts/check-task-sync.sh",
-          "```",
-          "",
-          "## Evidence Requirements",
-          "",
-          "```yaml",
-          "evidence_requirements:",
-          "  benchmark: not_applicable",
-          "```",
-          "",
-        ].join("\n"),
-      );
-      const contextPath = join(cwd, ".ai/harness/criterion-context.json");
-      writeFileSync(
-        contextPath,
-        `${JSON.stringify({
-          schema: "repo-harness-criterion-context.v1",
-          repository_root: realpathSync(cwd),
-          subject_sha256: `sha256:${"1".repeat(64)}`,
-          target_revision: "a".repeat(40),
-          contract_sha256: `sha256:${"2".repeat(64)}`,
-          goal_sha256: `sha256:${"3".repeat(64)}`,
-          toolchain_fingerprint: `sha256:${"4".repeat(64)}`,
-        }, null, 2)}\n`,
-      );
-      const env = {
-        REPO_HARNESS_VERIFICATION_CONTEXT_FILE: contextPath,
-        REPO_HARNESS_EXPENSIVE_CRITERION_MS: "0",
-      };
-
-      const first = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "first.json"],
-        cwd,
-        env,
-      );
-      expect(first.status).toBe(1);
-      writeFileSync(join(cwd, ".ai/harness/gate-ready"), "ready\n");
-      const second = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "second.json"],
-        cwd,
-        env,
-      );
-      expect(second.status, `${second.stdout}\n${second.stderr}`).toBe(0);
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(1);
-      const report = JSON.parse(readFileSync(join(cwd, "second.json"), "utf-8"));
-      const expensive = report.results.find((entry: any) => entry.target === "bash scripts/expensive-fixture.sh");
-      const cheap = report.results.find((entry: any) => entry.target === "bash scripts/check-task-sync.sh");
-      expect(expensive.execution).toBe("reused");
-      expect(cheap.execution).toBe("executed");
-      expect(report.results.indexOf(cheap)).toBeLessThan(report.results.indexOf(expensive));
-      expect(expensive.cache_key).toMatch(/^sha256:[0-9a-f]{64}$/);
-
-      const forced = run(
-        "bash",
-        [
-          "scripts/verify-contract.sh",
-          "--contract",
-          "task.contract.md",
-          "--strict",
-          "--read-only",
-          "--report-file",
-          "forced.json",
-          "--force-expensive-rerun",
-          "--reason",
-          "investigate deterministic flake",
-        ],
-        cwd,
-        env,
-      );
-      expect(forced.status, `${forced.stdout}\n${forced.stderr}`).toBe(0);
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(2);
-      const forcedReport = JSON.parse(readFileSync(join(cwd, "forced.json"), "utf-8"));
-      const forcedExpensive = forcedReport.results.find((entry: any) => entry.target === "bash scripts/expensive-fixture.sh");
-      expect(forcedExpensive.execution).toBe("forced");
-      expect(forcedExpensive.force_reason).toBe("investigate deterministic flake");
-
-      writeFileSync(join(cwd, ".ai/harness/force-fail"), "fail\n");
-      const forcedFailure = run(
-        "bash",
-        [
-          "scripts/verify-contract.sh",
-          "--contract",
-          "task.contract.md",
-          "--strict",
-          "--read-only",
-          "--report-file",
-          "forced-failure.json",
-          "--force-expensive-rerun",
-          "--reason",
-          "validate cached pass after forced failure",
-        ],
-        cwd,
-        env,
-      );
-      expect(forcedFailure.status).toBe(1);
-      const forcedFailureCriterion = JSON.parse(readFileSync(join(cwd, "forced-failure.json"), "utf-8")).results
-        .find((entry: any) => entry.target === "bash scripts/expensive-fixture.sh");
-      expect(forcedFailureCriterion.execution).toBe("forced");
-      rmSync(join(cwd, ".ai/harness/force-fail"));
-      const afterForcedFailure = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "after-forced-failure.json"],
-        cwd,
-        env,
-      );
-      expect(afterForcedFailure.status, `${afterForcedFailure.stdout}\n${afterForcedFailure.stderr}`).toBe(0);
-      const afterForcedFailureCriterion = JSON.parse(readFileSync(join(cwd, "after-forced-failure.json"), "utf-8")).results
-        .find((entry: any) => entry.target === "bash scripts/expensive-fixture.sh");
-      expect(afterForcedFailureCriterion.execution).toBe("executed");
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(4);
-
-      const baseContext = JSON.parse(readFileSync(contextPath, "utf-8"));
-      for (const [index, field] of [
-        "subject_sha256",
-        "target_revision",
-        "contract_sha256",
-        "goal_sha256",
-        "toolchain_fingerprint",
-      ].entries()) {
-        const next = { ...baseContext } as Record<string, string>;
-        next[field] = field === "target_revision"
-          ? String(index + 5).repeat(40)
-          : `sha256:${String(index + 5).repeat(64)}`;
-        writeFileSync(contextPath, `${JSON.stringify(next, null, 2)}\n`);
-        const invalidated = run(
-          "bash",
-          ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only"],
-          cwd,
-          env,
-        );
-        expect(invalidated.status, `${field}\n${invalidated.stdout}\n${invalidated.stderr}`).toBe(0);
-      }
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(9);
-
-      writeFileSync(contextPath, `${JSON.stringify(baseContext, null, 2)}\n`);
-      const malformedRepositoryContext = { ...baseContext, repository_root: join(cwd, "other") };
-      writeFileSync(contextPath, `${JSON.stringify(malformedRepositoryContext, null, 2)}\n`);
-      const crossRepository = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only"],
-        cwd,
-        env,
-      );
-      expect(crossRepository.status).toBe(1);
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(9);
-
-      writeFileSync(contextPath, `${JSON.stringify(baseContext, null, 2)}\n`);
-      const contract = readFileSync(join(cwd, "task.contract.md"), "utf-8")
-        .replaceAll("bash scripts/expensive-fixture.sh", "bash scripts/expensive-fixture.sh changed-command");
-      writeFileSync(join(cwd, "task.contract.md"), contract);
-      const commandChanged = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only"],
-        cwd,
-        env,
-      );
-      expect(commandChanged.status, `${commandChanged.stdout}\n${commandChanged.stderr}`).toBe(0);
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(10);
-
-      const missingReason = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--force-expensive-rerun"],
-        cwd,
-        env,
-      );
-      expect(missingReason.status).toBe(2);
-      expect(missingReason.stderr).toContain("requires --reason");
-      expect(readFileSync(join(cwd, ".ai/harness/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(10);
+      writeFileSync(join(cwd, "task.contract.md"), [
+        "# Task Contract: retired-reuse",
+        "",
+        "```yaml",
+        "exit_criteria:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "criterion_reuse:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "```",
+        "",
+      ].join("\n"));
+      const result = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "report.json"], cwd);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("commands_succeed");
+      const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
+      expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
 
-  test("verify-contract never reuses a failure or timeout", () => {
-    const cwd = tmpWorkspace("helper-verify-contract-nonpass-retry");
+  test("verify-contract rejects retired criterion_reuse YAML after a non-pass", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-retired-nonpass");
     try {
-      mkdirSync(join(cwd, "scripts"), { recursive: true });
-      mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
       copyHelpers(cwd);
-      installHooks(cwd);
-      writeFileSync(
-        join(cwd, "scripts/failing-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/failure-count\nexit 9\n",
-      );
-      chmodSync(join(cwd, "scripts/failing-fixture.sh"), 0o755);
-      const writeContract = (command: string) => writeFileSync(
-        join(cwd, "task.contract.md"),
-        [
-          "# Task Contract: nonpass-retry",
-          "",
-          "> **Status**: Active",
-          "> **Task Profile**: code-change",
-          "",
-          "```yaml",
-          "exit_criteria:",
-          "  commands_succeed:",
-          `    - ${command}`,
-          "criterion_reuse:",
-          "  commands_succeed:",
-          `    - ${command}`,
-          "```",
-          "",
-          "## Evidence Requirements",
-          "",
-          "```yaml",
-          "evidence_requirements:",
-          "  benchmark: not_applicable",
-          "```",
-          "",
-        ].join("\n"),
-      );
-      writeContract("bash scripts/failing-fixture.sh");
-      const contextPath = join(cwd, ".ai/harness/criterion-context.json");
-      writeFileSync(contextPath, `${JSON.stringify({
-        schema: "repo-harness-criterion-context.v1",
-        repository_root: realpathSync(cwd),
-        subject_sha256: `sha256:${"1".repeat(64)}`,
-        target_revision: "a".repeat(40),
-        contract_sha256: `sha256:${"2".repeat(64)}`,
-        goal_sha256: `sha256:${"3".repeat(64)}`,
-        toolchain_fingerprint: `sha256:${"4".repeat(64)}`,
-      }, null, 2)}\n`);
-      const env = { REPO_HARNESS_VERIFICATION_CONTEXT_FILE: contextPath };
-
-      for (const report of ["failure-one.json", "failure-two.json"]) {
-        const result = run(
-          "bash",
-          ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", report],
-          cwd,
-          env,
-        );
-        expect(result.status).toBe(1);
-        const criterion = JSON.parse(readFileSync(join(cwd, report), "utf-8")).results
-          .find((entry: any) => entry.target === "bash scripts/failing-fixture.sh");
-        expect(criterion.execution).toBe("executed");
-      }
-      expect(readFileSync(join(cwd, ".ai/harness/failure-count"), "utf-8").trim().split("\n")).toHaveLength(2);
-
-      writeFileSync(
-        join(cwd, "scripts/run-bounded-verifier-command.ts"),
-        [
-          'import { appendFileSync, writeFileSync } from "node:fs";',
-          'const args = process.argv.slice(2);',
-          'const resultPath = args[args.indexOf("--result") + 1];',
-          'const logPath = args[args.indexOf("--log") + 1];',
-          'appendFileSync(".ai/harness/timeout-count", "run\\n");',
-          'writeFileSync(logPath, "timed out\\n");',
-          'writeFileSync(resultPath, JSON.stringify({duration_ms:1,timed_out:true,exit_code:124,signal:"SIGTERM"}));',
-          'process.exit(124);',
-          '',
-        ].join("\n"),
-      );
-      writeContract("bash scripts/timeout-fixture.sh");
-      for (const report of ["timeout-one.json", "timeout-two.json"]) {
-        const result = run(
-          "bash",
-          ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", report],
-          cwd,
-          env,
-        );
-        expect(result.status).toBe(1);
-        const criterion = JSON.parse(readFileSync(join(cwd, report), "utf-8")).results
-          .find((entry: any) => entry.target === "bash scripts/timeout-fixture.sh");
-        expect(criterion.execution).toBe("executed");
-        expect(criterion.timed_out).toBe(true);
-      }
-      expect(readFileSync(join(cwd, ".ai/harness/timeout-count"), "utf-8").trim().split("\n")).toHaveLength(2);
+      writeFileSync(join(cwd, "task.contract.md"), [
+        "# Task Contract: retired-nonpass",
+        "",
+        "```yaml",
+        "exit_criteria:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "criterion_reuse:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "```",
+        "",
+      ].join("\n"));
+      const result = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "report.json"], cwd);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("commands_succeed");
+      const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
+      expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
 
-  test("verify-contract executes an unlisted criterion on every run", () => {
-    const cwd = tmpWorkspace("helper-verify-contract-reuse-opt-in");
+  test("verify-contract rejects retired criterion_reuse YAML with an unlisted command", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-retired-unlisted");
     try {
-      mkdirSync(join(cwd, "scripts"), { recursive: true });
-      mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
       copyHelpers(cwd);
-      installHooks(cwd);
-      writeFileSync(
-        join(cwd, "scripts/unlisted-fixture.sh"),
-        [
-          "#!/bin/bash",
-          "[[ -z \"${REPO_HARNESS_VERIFICATION_CONTEXT_FILE:-}\" ]] || exit 18",
-          "[[ -z \"${REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE:-}\" ]] || exit 19",
-          "printf 'run\\n' >> .ai/harness/unlisted-count",
-          "",
-        ].join("\n"),
-      );
-      chmodSync(join(cwd, "scripts/unlisted-fixture.sh"), 0o755);
-      writeFileSync(
-        join(cwd, "task.contract.md"),
-        [
-          "# Task Contract: reuse-opt-in",
-          "",
-          "> **Status**: Active",
-          "> **Task Profile**: code-change",
-          "",
-          "```yaml",
-          "exit_criteria:",
-          "  commands_succeed:",
-          "    - bash scripts/unlisted-fixture.sh",
-          "```",
-          "",
-          "## Evidence Requirements",
-          "",
-          "```yaml",
-          "evidence_requirements:",
-          "  benchmark: not_applicable",
-          "```",
-          "",
-        ].join("\n"),
-      );
-      const contextPath = join(cwd, ".ai/harness/criterion-context.json");
-      const preflightPath = join(cwd, ".ai/harness/preflight.json");
-      writeFileSync(preflightPath, '{"status":"pass"}\n');
-      writeFileSync(contextPath, `${JSON.stringify({
-        schema: "repo-harness-criterion-context.v1",
-        repository_root: realpathSync(cwd),
-        subject_sha256: `sha256:${"1".repeat(64)}`,
-        target_revision: "a".repeat(40),
-        contract_sha256: `sha256:${"2".repeat(64)}`,
-        goal_sha256: `sha256:${"3".repeat(64)}`,
-        toolchain_fingerprint: `sha256:${"4".repeat(64)}`,
-      }, null, 2)}\n`);
-      const env = {
-        REPO_HARNESS_VERIFICATION_CONTEXT_FILE: contextPath,
-        REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE: preflightPath,
-      };
-
-      for (const report of ["unlisted-first.json", "unlisted-second.json"]) {
-        const result = run(
-          "bash",
-          ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", report],
-          cwd,
-          env,
-        );
-        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-        const criterion = JSON.parse(readFileSync(join(cwd, report), "utf-8")).results
-          .find((entry: any) => entry.target === "bash scripts/unlisted-fixture.sh");
-        expect(criterion.execution).toBe("executed");
-        expect(criterion.cache_key).toBe("");
-      }
-      expect(readFileSync(join(cwd, ".ai/harness/unlisted-count"), "utf-8").trim().split("\n")).toHaveLength(2);
+      writeFileSync(join(cwd, "task.contract.md"), [
+        "# Task Contract: retired-unlisted",
+        "",
+        "```yaml",
+        "exit_criteria:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "criterion_reuse:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "```",
+        "",
+      ].join("\n"));
+      const result = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "report.json"], cwd);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("commands_succeed");
+      const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
+      expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
 
-  test("verify-contract rejects malformed cache records and concurrent exact-key execution", async () => {
-    const cwd = tmpWorkspace("helper-verify-contract-cache-guards");
-    let active: ReturnType<typeof spawn> | undefined;
+  test("verify-contract rejects retired criterion_reuse YAML instead of a cache record", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-retired-cache");
     try {
-      mkdirSync(join(cwd, "scripts"), { recursive: true });
-      mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
       copyHelpers(cwd);
-      installHooks(cwd);
-      writeFileSync(
-        join(cwd, "scripts/cache-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/cache-count\n",
-      );
-      chmodSync(join(cwd, "scripts/cache-fixture.sh"), 0o755);
-      writeFileSync(
-        join(cwd, "task.contract.md"),
-        [
-          "# Task Contract: cache-guards",
-          "",
-          "> **Status**: Active",
-          "> **Task Profile**: code-change",
-          "",
-          "```yaml",
-          "exit_criteria:",
-          "  commands_succeed:",
-          "    - bash scripts/cache-fixture.sh",
-          "criterion_reuse:",
-          "  commands_succeed:",
-          "    - bash scripts/cache-fixture.sh",
-          "```",
-          "",
-          "## Evidence Requirements",
-          "",
-          "```yaml",
-          "evidence_requirements:",
-          "  benchmark: not_applicable",
-          "```",
-          "",
-        ].join("\n"),
-      );
-      const contextPath = join(cwd, ".ai/harness/criterion-context.json");
-      writeFileSync(contextPath, `${JSON.stringify({
-        schema: "repo-harness-criterion-context.v1",
-        repository_root: realpathSync(cwd),
-        subject_sha256: `sha256:${"1".repeat(64)}`,
-        target_revision: "a".repeat(40),
-        contract_sha256: `sha256:${"2".repeat(64)}`,
-        goal_sha256: `sha256:${"3".repeat(64)}`,
-        toolchain_fingerprint: `sha256:${"4".repeat(64)}`,
-      }, null, 2)}\n`);
-      const env = { REPO_HARNESS_VERIFICATION_CONTEXT_FILE: contextPath };
-      const outsideCache = join(cwd, "outside-cache");
-      mkdirSync(join(cwd, ".ai/harness/runs"), { recursive: true });
-      mkdirSync(outsideCache, { recursive: true });
-      symlinkSync(outsideCache, join(cwd, ".ai/harness/runs/criteria"));
-      const unsafeCache = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "unsafe-cache.json"],
-        cwd,
-        env,
-      );
-      expect(unsafeCache.status).toBe(1);
-      expect(unsafeCache.stderr).toContain("criterion cache path is not a trusted directory");
-      expect(existsSync(join(cwd, ".ai/harness/cache-count"))).toBe(false);
-      expect(readdirSync(outsideCache)).toHaveLength(0);
-      rmSync(join(cwd, ".ai/harness/runs/criteria"));
-
-      const first = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "first.json"],
-        cwd,
-        env,
-      );
-      expect(first.status).toBe(0);
-      const firstCriterion = JSON.parse(readFileSync(join(cwd, "first.json"), "utf-8")).results
-        .find((entry: any) => entry.target === "bash scripts/cache-fixture.sh");
-      const cacheRecord = join(cwd, ".ai/harness/runs/criteria", `${firstCriterion.cache_key.slice("sha256:".length)}.json`);
-      writeFileSync(cacheRecord, "{}\n");
-      const malformed = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "malformed.json"],
-        cwd,
-        env,
-      );
-      expect(malformed.status).toBe(0);
-      expect(JSON.parse(readFileSync(join(cwd, "malformed.json"), "utf-8")).results
-        .find((entry: any) => entry.target === "bash scripts/cache-fixture.sh")?.execution).toBe("executed");
-      expect(readFileSync(join(cwd, ".ai/harness/cache-count"), "utf-8").trim().split("\n")).toHaveLength(2);
-
-      writeFileSync(
-        join(cwd, "scripts/concurrent-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/concurrent-count\ntouch .ai/harness/concurrent-started\nsleep 1\n",
-      );
-      chmodSync(join(cwd, "scripts/concurrent-fixture.sh"), 0o755);
-      writeFileSync(
-        join(cwd, "task.contract.md"),
-        readFileSync(join(cwd, "task.contract.md"), "utf-8")
-          .replaceAll("bash scripts/cache-fixture.sh", "bash scripts/concurrent-fixture.sh"),
-      );
-      active = spawn(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "concurrent-first.json"],
-        { cwd, env: sandboxEnv(env) },
-      );
-      for (let attempt = 0; attempt < 100 && !existsSync(join(cwd, ".ai/harness/concurrent-started")); attempt += 1) {
-        await Bun.sleep(20);
-      }
-      expect(existsSync(join(cwd, ".ai/harness/concurrent-started"))).toBe(true);
-      const concurrent = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "concurrent-second.json"],
-        cwd,
-        env,
-      );
-      expect(concurrent.status).toBe(1);
-      const concurrentCriterion = JSON.parse(readFileSync(join(cwd, "concurrent-second.json"), "utf-8")).results
-        .find((entry: any) => entry.target === "bash scripts/concurrent-fixture.sh");
-      expect(concurrentCriterion.execution).toBe("blocked");
-      expect(concurrentCriterion.message).toContain("already in progress");
-      const activeExit = await new Promise<number | null>((resolve) => active?.once("exit", resolve));
-      expect(activeExit).toBe(0);
-      expect(readFileSync(join(cwd, ".ai/harness/concurrent-count"), "utf-8").trim().split("\n")).toHaveLength(1);
+      writeFileSync(join(cwd, "task.contract.md"), [
+        "# Task Contract: retired-cache",
+        "",
+        "```yaml",
+        "exit_criteria:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "criterion_reuse:",
+        "  commands_succeed:",
+        "    - printf legacy",
+        "```",
+        "",
+      ].join("\n"));
+      const result = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "report.json"], cwd);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("commands_succeed");
+      const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
+      expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
     } finally {
-      active?.kill("SIGKILL");
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
@@ -4062,8 +3669,10 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
         ].join("\n")
       );
+      commitVerificationFixture(cwd);
 
       const res = run(
         "bash",
@@ -4083,7 +3692,7 @@ describe("Workflow helper scripts", () => {
       expect(res.stdout).toContain("[ContractVerify]");
       expect(res.stdout).not.toContain("[PASS]");
       expect(readFileSync(join(cwd, "report.json"), "utf-8")).toContain('"failed": 0');
-      expect(readFileSync(join(cwd, "report.json"), "utf-8")).toContain('"kind":"files_not_contain"');
+      expect(JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8")).results.some((entry: any) => entry.kind === "files_not_contain")).toBe(true);
       expect(readFileSync(join(cwd, "report.json"), "utf-8")).toContain('"run_id": "run-');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -4128,12 +3737,12 @@ describe("Workflow helper scripts", () => {
           "exit_criteria:",
           "  files_exist:",
           "    - src/index.ts",
-          "  commands_succeed:",
-          "    - test -f src/index.ts",
           "```",
           "",
+          verificationPlan([verificationCheck("allowed-path-source", "test -f src/index.ts", "verification", "normal")]),
         ].join("\n")
       );
+      commitVerificationFixture(cwd);
 
       const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
       expect(res.status).toBe(0);
@@ -4199,8 +3808,10 @@ describe("Workflow helper scripts", () => {
           "    - src/index.ts",
           "```",
           "",
+          verificationPlan([]),
         ].join("\n")
       );
+      commitVerificationFixture(cwd);
 
       const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
       expect(res.status).toBe(0);
@@ -4210,84 +3821,24 @@ describe("Workflow helper scripts", () => {
     }
   }, 30_000);
 
-  test("verify-contract accepts column-0 criterion_reuse and rejects the misindented copy", () => {
-    const cwd = tmpWorkspace("helper-verify-contract-reuse-indent");
-    const countPath = join(cwd, ".ai/harness/expensive-count");
+  test("verify-contract rejects retired criterion_reuse headers regardless of indentation", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-retired-reuse-indent");
     try {
-      mkdirSync(join(cwd, "scripts"), { recursive: true });
-      mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
       copyHelpers(cwd);
-      installHooks(cwd);
-
-      writeFileSync(
-        join(cwd, "scripts/expensive-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/expensive-count\n",
-      );
-      chmodSync(join(cwd, "scripts/expensive-fixture.sh"), 0o755);
-
-      const contract = (reuseIndent: string) =>
-        [
-          "# Task Contract: reuse-indent",
-          "",
-          "> **Status**: Active",
-          "> **Task Profile**: code-change",
-          "",
-          "```yaml",
-          "exit_criteria:",
-          "  commands_succeed:",
-          "    - bash scripts/expensive-fixture.sh",
-          `${reuseIndent}criterion_reuse:`,
-          `${reuseIndent}  commands_succeed:`,
-          `${reuseIndent}    - bash scripts/expensive-fixture.sh`,
-          "```",
-          "",
-          "## Evidence Requirements",
-          "",
-          "```yaml",
-          "evidence_requirements:",
-          "  benchmark: not_applicable",
-          "```",
-          "",
-        ].join("\n");
-
-      writeFileSync(join(cwd, "task.contract.md"), contract(""));
-      const accepted = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only"],
-        cwd,
-      );
-      expect(accepted.status, `${accepted.stdout}\n${accepted.stderr}`).toBe(0);
-      expect(readFileSync(countPath, "utf-8").trim().split("\n")).toHaveLength(1);
-
-      // One space of indent used to leak the reuse-only entry into the executed
-      // set (the same command ran twice) while leaving reuse disabled.
-      writeFileSync(join(cwd, "task.contract.md"), contract(" "));
-      const rejected = run(
-        "bash",
-        [
-          "scripts/verify-contract.sh",
-          "--contract",
-          "task.contract.md",
-          "--strict",
-          "--read-only",
-          "--report-file",
-          "rejected.json",
-        ],
-        cwd,
-      );
-      expect(rejected.status).toBe(1);
-      expect(rejected.stderr).toContain("criterion_reuse:");
-      expect(rejected.stderr).toContain("column 0");
-      expect(readFileSync(countPath, "utf-8").trim().split("\n")).toHaveLength(1);
-      const report = JSON.parse(readFileSync(join(cwd, "rejected.json"), "utf-8"));
-      expect(report.failure_class).toBe("missing_artifact");
-      expect(report.next_status).toBe("Pending");
+      writeFileSync(join(cwd, "task.contract.md"), [
+        "# Task Contract: retired-reuse-indent", "", "```yaml", "exit_criteria:",
+        "  commands_succeed:", "    - printf legacy", "criterion_reuse: # legacy metadata",
+        "  commands_succeed:", "    - printf legacy", "```", "",
+      ].join("\n"));
+      const result = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "report.json"], cwd);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("commands_succeed");
+      const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
       expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
-
   test("verify-contract fails closed on an unknown exit_criteria section key", () => {
     const cwd = tmpWorkspace("helper-verify-contract-unknown-section");
     try {
@@ -4338,7 +3889,7 @@ describe("Workflow helper scripts", () => {
       );
       expect(res.status).toBe(1);
       expect(res.stderr).toContain("comands_succeed");
-      expect(res.stderr).toContain("commands_succeed");
+      expect(res.stderr).toContain("unknown exit_criteria section key");
       const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
       expect(report.failure_class).toBe("missing_artifact");
       expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
@@ -4384,10 +3935,10 @@ describe("Workflow helper scripts", () => {
           "",
           "```yaml",
           "exit_criteria:",
-          "  commands_succeed:",
-          "    - touch .ai/harness/pollute-now",
+          "  files_exist: []",
           "```",
           "",
+          verificationPlan([verificationCheck("pollute-close-timestamp", "mkdir -p .ai/harness && touch .ai/harness/pollute-now", "verification", "normal")]),
           "## Evidence Requirements",
           "",
           "```yaml",
@@ -4397,6 +3948,8 @@ describe("Workflow helper scripts", () => {
           "",
         ].join("\n"),
       );
+      commitVerificationFixture(cwd);
+      writeFileSync(join(cwd, ".git/info/exclude"), ".ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/evidence/\n.ai/harness/pollute-now\n");
 
       const res = run(
         "bash",
@@ -4422,87 +3975,24 @@ describe("Workflow helper scripts", () => {
     }
   }, 30_000);
 
-  test("verify-contract normalizes trailing comments on criterion_reuse headers", () => {
-    const cwd = tmpWorkspace("helper-verify-contract-reuse-comment");
-    const countPath = join(cwd, ".ai/harness/expensive-count");
+  test("verify-contract rejects retired criterion_reuse headers carrying comments", () => {
+    const cwd = tmpWorkspace("helper-verify-contract-retired-reuse-comment");
     try {
-      mkdirSync(join(cwd, "scripts"), { recursive: true });
-      mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
       copyHelpers(cwd);
-      installHooks(cwd);
-
-      writeFileSync(
-        join(cwd, "scripts/expensive-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/expensive-count\n",
-      );
-      chmodSync(join(cwd, "scripts/expensive-fixture.sh"), 0o755);
-
-      const contract = (reuseIndent: string) =>
-        [
-          "# Task Contract: reuse-comment",
-          "",
-          "> **Status**: Active",
-          "> **Task Profile**: code-change",
-          "",
-          "```yaml",
-          "exit_criteria:",
-          "  commands_succeed:",
-          "    - bash scripts/expensive-fixture.sh",
-          `${reuseIndent}criterion_reuse: # reuse note`,
-          `${reuseIndent}  commands_succeed: # reuse note`,
-          `${reuseIndent}    - bash scripts/expensive-fixture.sh`,
-          "```",
-          "",
-          "## Evidence Requirements",
-          "",
-          "```yaml",
-          "evidence_requirements:",
-          "  benchmark: not_applicable",
-          "```",
-          "",
-        ].join("\n");
-
-      // A commented column-0 `criterion_reuse:` still enables reuse: the
-      // command is declared once and runs once.
-      writeFileSync(join(cwd, "task.contract.md"), contract(""));
-      const accepted = run(
-        "bash",
-        ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only"],
-        cwd,
-      );
-      expect(accepted.status, `${accepted.stdout}\n${accepted.stderr}`).toBe(0);
-      expect(readFileSync(countPath, "utf-8").trim().split("\n")).toHaveLength(1);
-
-      // The trailing comment used to hide the indented copy from both the
-      // column-0 rule and the section dispatch, re-leaking the reuse-only entry
-      // into the executed set.
-      writeFileSync(join(cwd, "task.contract.md"), contract(" "));
-      const rejected = run(
-        "bash",
-        [
-          "scripts/verify-contract.sh",
-          "--contract",
-          "task.contract.md",
-          "--strict",
-          "--read-only",
-          "--report-file",
-          "rejected.json",
-        ],
-        cwd,
-      );
-      expect(rejected.status).toBe(1);
-      expect(rejected.stderr).toContain("criterion_reuse:");
-      expect(rejected.stderr).toContain("column 0");
-      expect(readFileSync(countPath, "utf-8").trim().split("\n")).toHaveLength(1);
-      const report = JSON.parse(readFileSync(join(cwd, "rejected.json"), "utf-8"));
-      expect(report.failure_class).toBe("missing_artifact");
-      expect(report.next_status).toBe("Pending");
+      writeFileSync(join(cwd, "task.contract.md"), [
+        "# Task Contract: retired-reuse-comment", "", "```yaml", "exit_criteria:",
+        "  commands_succeed:", "    - printf legacy", "criterion_reuse: # legacy metadata",
+        "  commands_succeed:", "    - printf legacy", "```", "",
+      ].join("\n"));
+      const result = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict", "--read-only", "--report-file", "report.json"], cwd);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("commands_succeed");
+      const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
       expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
-
   test("verify-contract fails closed on an unknown exit_criteria section key carrying a trailing comment", () => {
     const cwd = tmpWorkspace("helper-verify-contract-unknown-section-comment");
     try {
@@ -4553,7 +4043,7 @@ describe("Workflow helper scripts", () => {
       );
       expect(res.status).toBe(1);
       expect(res.stderr).toContain("comands_succeed");
-      expect(res.stderr).toContain("commands_succeed");
+      expect(res.stderr).toContain("unknown exit_criteria section key");
       const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
       expect(report.failure_class).toBe("missing_artifact");
       expect(report.results.some((entry: any) => entry.kind === "exit_criteria_parse")).toBe(true);
@@ -4574,7 +4064,7 @@ describe("Workflow helper scripts", () => {
 
       writeFileSync(
         join(cwd, "scripts/expensive-fixture.sh"),
-        "#!/bin/bash\nprintf 'run\\n' >> .ai/harness/expensive-count\n",
+        "#!/bin/bash\nmkdir -p .ai/harness/runs\nprintf 'run\\n' >> .ai/harness/runs/expensive-count\n",
       );
       chmodSync(join(cwd, "scripts/expensive-fixture.sh"), 0o755);
 
@@ -4588,11 +4078,13 @@ describe("Workflow helper scripts", () => {
           "",
           "```yaml",
           "exit_criteria:",
-          "  commands_succeed: # still a real section header",
-          "    - bash scripts/expensive-fixture.sh",
-          `    - ${quotedCommand}`,
+          "  files_exist: []",
           "```",
           "",
+          verificationPlan([
+            verificationCheck("expensive-command", "bash scripts/expensive-fixture.sh", "verification", "expensive"),
+            verificationCheck("quoted-command", quotedCommand, "verification", "normal"),
+          ]),
           "## Evidence Requirements",
           "",
           "```yaml",
@@ -4603,6 +4095,7 @@ describe("Workflow helper scripts", () => {
         ].join("\n"),
       );
 
+      commitVerificationFixture(cwd);
       const res = run(
         "bash",
         [
@@ -4617,13 +4110,13 @@ describe("Workflow helper scripts", () => {
         cwd,
       );
       expect(res.status, `${res.stdout}\n${res.stderr}`).toBe(0);
-      expect(readFileSync(countPath, "utf-8").trim().split("\n")).toHaveLength(1);
+      expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(1);
       const report = JSON.parse(readFileSync(join(cwd, "report.json"), "utf-8"));
       expect(report.failed).toBe(0);
       // A `#` inside a quoted scalar is content, not a comment: a truncated
       // command would leave an unterminated quote and exit non-zero.
-      const quoted = report.results.find((entry: any) => entry.kind === "commands_succeed" && entry.command === quotedCommand);
-      expect(quoted, JSON.stringify(report.results)).toBeDefined();
+      const quoted = report.verification_evaluation.results.find((entry: any) => entry.id === "quoted-command");
+      expect(quoted, JSON.stringify(report.verification_evaluation.results)).toBeDefined();
       expect(quoted.passed).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -4654,10 +4147,10 @@ describe("Workflow helper scripts", () => {
           "",
           "```yaml",
           "exit_criteria:",
-          "  commands_succeed:",
-          "    - touch .ai/harness/should-not-run",
+          "  files_exist: []",
           "```",
           "",
+          verificationPlan([verificationCheck("opening-timestamp-guard", "touch .ai/harness/should-not-run", "verification", "normal")]),
           "## Evidence Requirements",
           "",
           "```yaml",
@@ -4877,6 +4370,7 @@ describe("Workflow helper scripts", () => {
           "    - docs/design/DESIGN-fixture.md",
           "```",
           "",
+          verificationPlan([]),
           "## Evidence Requirements",
           "",
           "```yaml",
@@ -4886,6 +4380,8 @@ describe("Workflow helper scripts", () => {
           "",
         ].join("\n")
       );
+
+      commitVerificationFixture(cwd);
 
       const res = run("bash", ["scripts/verify-contract.sh", "--contract", "task.contract.md", "--strict"], cwd);
       expect(res.status).toBe(0);
@@ -4975,6 +4471,7 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
           "## Change Assessment",
           "",
           "```json",
@@ -5048,8 +4545,8 @@ describe("Workflow helper scripts", () => {
       expect(checks.allowed_paths_check.status).toBe("pass");
       expect(checks.contract.allowed_paths).not.toContain("docs/architecture/.projection-manifest.json");
       expect(checks.review_subject_sha256).toBe(currentReviewBinding(cwd).subject);
-      expect(checks.contract.retry_context.subject_sha256).toBe(checks.review_subject_sha256);
-      expect(checks.contract.retry_context.target_revision).toBe(currentReviewBinding(cwd).targetRevision);
+      expect(checks.contract.execution_evaluation).toMatchObject({ status: "passed", passed: true });
+      expect(checks.contract.execution_evaluation.target.snapshot_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -5074,14 +4571,14 @@ describe("Workflow helper scripts", () => {
         ].join("\n"),
       );
       chmodSync(join(fakeBin, "bun"), 0o755);
-      writeFileSync(join(cwd, ".git/info/exclude"), ".ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/task-sync-ready\nfake-bin/\n");
+      writeFileSync(join(cwd, ".git/info/exclude"), ".ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/evidence/\n.ai/harness/task-sync-ready\nfake-bin/\n");
       const contractPath = join(cwd, "tasks/contracts/projection-fixture.contract.md");
       writeFileSync(
         contractPath,
-        readFileSync(contractPath, "utf-8").replace(
-          "  files_exist:\n    - docs/spec.md\n",
-          "  files_exist:\n    - docs/spec.md\n  commands_succeed:\n    - bun test --timeout 60000\n    - bash scripts/check-task-sync.sh\ncriterion_reuse:\n  commands_succeed:\n    - bun test --timeout 60000\n",
-        ),
+        replaceVerificationPlan(readFileSync(contractPath, "utf-8"), [
+          verificationCheck("task-sync", "bash scripts/check-task-sync.sh", "preflight", "normal"),
+          verificationCheck("full-suite", "bun test --timeout 60000", "verification", "expensive"),
+        ]),
       );
       const baseEnv = {
         PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
@@ -5089,6 +4586,7 @@ describe("Workflow helper scripts", () => {
         REPO_HARNESS_BUN_BIN: process.execPath,
         REPO_HARNESS_WORKFLOW_STATE_LIB: join(cwd, ".ai/hooks/lib/workflow-state.sh"),
         REPO_HARNESS_CLI_BIN: fakeCli,
+        REPO_HARNESS_SOURCE_ROOT: ROOT,
         REPO_HARNESS_EXPENSIVE_CRITERION_MS: "0",
         HOOK_HOST: "claude",
         REPO_HARNESS_HOOK_CLI: join(ROOT, "src/cli/hook-entry.ts"),
@@ -5101,8 +4599,8 @@ describe("Workflow helper scripts", () => {
       expect(first.status).toBe(1);
       expect(existsSync(join(cwd, ".ai/harness/runs/expensive-count"))).toBe(false);
       const firstChecks = runSnapshotById(cwd, "fixture-preflight-first", "projection-fixture").content;
-      expect(firstChecks.commands.some((entry: any) => entry.command === "bun test --timeout 60000")).toBe(false);
-      expect(firstChecks.commands.find((entry: any) => entry.command === "bash scripts/check-task-sync.sh")?.status).toBe("fail");
+      expect(firstChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "full-suite")?.execution).toBe("missing");
+      expect(firstChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "task-sync")?.passed).toBe(false);
 
       writeFileSync(join(cwd, ".ai/harness/task-sync-ready"), "ready\n");
       const second = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
@@ -5112,7 +4610,7 @@ describe("Workflow helper scripts", () => {
       expect(second.status, `${second.stdout}\n${second.stderr}`).toBe(0);
       expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(1);
       const secondChecks = runSnapshotById(cwd, "fixture-preflight-second", "projection-fixture").content;
-      expect(secondChecks.commands.find((entry: any) => entry.command === "bun test --timeout 60000")?.execution).toBe("executed");
+      expect(secondChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "full-suite")?.execution).toBe("executed");
       expect(secondChecks.review_subject_sha256).toBe(firstChecks.review_subject_sha256);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -5140,22 +4638,24 @@ describe("Workflow helper scripts", () => {
       chmodSync(join(fakeBin, "bun"), 0o755);
       writeFileSync(
         join(cwd, ".git/info/exclude"),
-        ".ai/harness/checks/\n.ai/harness/runs/\nfake-bin/\n",
+        ".ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/evidence/\nfake-bin/\n",
       );
       const contractPath = join(cwd, "tasks/contracts/projection-fixture.contract.md");
       writeFileSync(
         contractPath,
-        readFileSync(contractPath, "utf-8").replace(
-          "  files_exist:\n    - docs/spec.md\n",
-          "  files_exist:\n    - docs/spec.md\n  commands_succeed:\n    - bun test --timeout 60000\ncriterion_reuse:\n  commands_succeed:\n    - bun test --timeout 60000\n",
-        ),
+        replaceVerificationPlan(readFileSync(contractPath, "utf-8"), [
+          verificationCheck("full-suite", "bun test --timeout 60000", "verification", "expensive"),
+        ]),
       );
+      expect(run("git", ["add", "tasks/contracts/projection-fixture.contract.md"], cwd).status).toBe(0);
+      expect(run("git", ["commit", "-m", "freeze verification plan"], cwd).status).toBe(0);
       const baseEnv = {
         PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
         BUN_BIN: process.execPath,
         REPO_HARNESS_BUN_BIN: process.execPath,
         REPO_HARNESS_WORKFLOW_STATE_LIB: join(cwd, ".ai/hooks/lib/workflow-state.sh"),
         REPO_HARNESS_CLI_BIN: fakeCli,
+        REPO_HARNESS_SOURCE_ROOT: ROOT,
         REPO_HARNESS_EXPENSIVE_CRITERION_MS: "0",
         HOOK_HOST: "claude",
         REPO_HARNESS_HOOK_CLI: join(ROOT, "src/cli/hook-entry.ts"),
@@ -5165,15 +4665,15 @@ describe("Workflow helper scripts", () => {
         ...baseEnv,
         HOOK_RUN_ID: "fixture-criterion-first",
       });
-      expect(first.status, `${first.stdout}\n${first.stderr}`).toBe(0);
       const firstChecks = runSnapshotById(cwd, "fixture-criterion-first", "projection-fixture").content;
-      const firstCriterion = firstChecks.commands.find((entry: any) => entry.name.startsWith("criterion:commands_succeed:"));
+      expect(first.status, `${first.stdout}\n${first.stderr}\n${JSON.stringify(firstChecks, null, 2)}`).toBe(0);
+      const firstCriterion = firstChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "full-suite");
       expect(firstCriterion.execution).toBe("executed");
-      expect(firstChecks.contract.retry_context.subject_sha256).toBe(firstChecks.review_subject_sha256);
-      expect(firstChecks.contract.retry_context_guard).toEqual({
-        status: "pass",
-        message: "Frozen criterion retry identity remained unchanged through contract execution.",
-      });
+      expect(firstChecks.contract.execution_evaluation.passed).toBe(true);
+      expect(existsSync(join(cwd, ".ai/harness/checks/latest.json")), `${first.stdout}\n${first.stderr}`).toBe(true);
+      const latest = JSON.parse(readFileSync(join(cwd, ".ai/harness/checks/latest.json"), "utf-8"));
+      expect(latest.lifecycle.snapshot).toBe(firstChecks.run_file);
+      expect(latest.contract.execution_evaluation.results[0].run_file).toBe(firstCriterion.run_file);
 
       const second = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
         ...baseEnv,
@@ -5182,7 +4682,7 @@ describe("Workflow helper scripts", () => {
       const secondChecks = runSnapshotById(cwd, "fixture-criterion-second", "projection-fixture").content;
       expect(second.status, `${second.stdout}\n${second.stderr}\n${JSON.stringify(secondChecks, null, 2)}`).toBe(0);
       expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(1);
-      const secondCriterion = secondChecks.commands.find((entry: any) => entry.name.startsWith("criterion:commands_succeed:"));
+      const secondCriterion = secondChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "full-suite");
       expect(secondCriterion.execution).toBe("reused");
       expect(secondCriterion.cache_key).toBe(firstCriterion.cache_key);
 
@@ -5201,52 +4701,23 @@ describe("Workflow helper scripts", () => {
       expect(forced.status, `${forced.stdout}\n${forced.stderr}`).toBe(0);
       expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(2);
       const forcedChecks = runSnapshotById(cwd, "fixture-criterion-forced", "projection-fixture").content;
-      const forcedCriterion = forcedChecks.commands.find((entry: any) => entry.name.startsWith("criterion:commands_succeed:"));
-      expect(forcedCriterion.execution).toBe("forced");
+      const forcedCriterion = forcedChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "full-suite");
+      expect(forcedCriterion.execution).toBe("executed");
       expect(forcedCriterion.force_reason).toBe("reproduce provider flake");
       expect(forcedChecks.review_subject_sha256).toBe(secondChecks.review_subject_sha256);
-
-      const toolchainChanged = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
-        ...baseEnv,
-        REPO_HARNESS_VERIFICATION_TOOLCHAIN_FINGERPRINT: "fixture-toolchain-v2",
-        HOOK_RUN_ID: "fixture-criterion-toolchain",
-      });
-      expect(toolchainChanged.status, `${toolchainChanged.stdout}\n${toolchainChanged.stderr}`).toBe(0);
-      expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(3);
-      const toolchainChecks = runSnapshotById(cwd, "fixture-criterion-toolchain", "projection-fixture").content;
-      const toolchainCriterion = toolchainChecks.commands.find((entry: any) => entry.name.startsWith("criterion:commands_succeed:"));
-      expect(toolchainCriterion.execution).toBe("executed");
-      expect(toolchainCriterion.cache_key).not.toBe(forcedCriterion.cache_key);
 
       writeFileSync(join(cwd, "docs/spec.md"), "# Product Spec\n\nSource byte changed.\n");
       const sourceChanged = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
         ...baseEnv,
         HOOK_RUN_ID: "fixture-criterion-source",
       });
-      expect(sourceChanged.status, `${sourceChanged.stdout}\n${sourceChanged.stderr}`).toBe(0);
-      expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(4);
+      expect(sourceChanged.status).toBe(1);
+      expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(2);
       const sourceChecks = runSnapshotById(cwd, "fixture-criterion-source", "projection-fixture").content;
-      const sourceCriterion = sourceChecks.commands.find((entry: any) => entry.name.startsWith("criterion:commands_succeed:"));
-      expect(sourceCriterion.execution).toBe("executed");
+      const sourceCriterion = sourceChecks.contract.execution_evaluation.results.find((entry: any) => entry.id === "full-suite");
+      expect(sourceCriterion.execution).toBe("missing");
+      expect(sourceChecks.contract.execution_evaluation.status).toBe("needs_verification_plan");
       expect(sourceChecks.review_subject_sha256).not.toBe(secondChecks.review_subject_sha256);
-
-      // Narrowed acceptance is a new contract decision; the old full pass
-      // stays bound to its baseline rather than being reused on changed bytes.
-      writeFileSync(join(cwd, "docs/spec.md"), "# Product Spec\n\nBounded follow-up.\n");
-      const focusedCommand = "test -s docs/spec.md";
-      writeFileSync(contractPath, readFileSync(contractPath, "utf-8").replaceAll(
-        "bun test --timeout 60000", focusedCommand,
-      ));
-      const delta = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
-        ...baseEnv, HOOK_RUN_ID: "fixture-criterion-delta",
-      });
-      expect(delta.status, `${delta.stdout}\n${delta.stderr}`).toBe(0);
-      const deltaChecks = runSnapshotById(cwd, "fixture-criterion-delta", "projection-fixture").content;
-      expect(deltaChecks.review_subject_sha256).not.toBe(sourceChecks.review_subject_sha256);
-      expect(deltaChecks.commands.some((entry: any) => entry.command === "bun test --timeout 60000")).toBe(false);
-      expect(deltaChecks.commands.find((entry: any) => entry.command === focusedCommand).execution).toBe("executed");
-      expect(readFileSync(join(cwd, ".ai/harness/runs/expensive-count"), "utf-8").trim().split("\n")).toHaveLength(4);
-      expect(runSnapshotById(cwd, "fixture-criterion-source", "projection-fixture").content).toEqual(sourceChecks);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -5268,75 +4739,69 @@ describe("Workflow helper scripts", () => {
       mutation: "printf 'changed\\n' >> docs/spec.md && printf 'changed\\n' >> plans/plan-20260820-1605-projection-fixture.md",
       changedFields: ["goal_sha256", "subject_sha256"],
     },
-  ])("verify-sprint rejects a criterion that changes the frozen retry authority while it runs ($name)", ({ mutation, changedFields }) => {
+  ])("verify-sprint rejects a descriptor that changes its immutable execution subject ($name)", ({ mutation }) => {
     const cwd = tmpWorkspace("helper-verify-sprint-criterion-context-drift");
     try {
       const fakeCli = installAutomaticProjectionVerifyFixture(cwd);
       const contractPath = join(cwd, "tasks/contracts/projection-fixture.contract.md");
       writeFileSync(
         contractPath,
-        readFileSync(contractPath, "utf-8").replace(
-          "  files_exist:\n    - docs/spec.md\n",
-          `  files_exist:\n    - docs/spec.md\n  commands_succeed:\n    - ${mutation}\n`,
-        ),
+        replaceVerificationPlan(readFileSync(contractPath, "utf-8"), [
+          verificationCheck("context-mutation", mutation, "verification", "normal"),
+        ]),
       );
+      commitAll(cwd, "add context mutation verification");
 
       const result = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
         REPO_HARNESS_CLI_BIN: fakeCli,
         HOOK_RUN_ID: "fixture-criterion-context-drift",
         HOOK_HOST: "claude",
         REPO_HARNESS_HOOK_CLI: join(ROOT, "src/cli/hook-entry.ts"),
+        REPO_HARNESS_SOURCE_ROOT: ROOT,
       });
       const checks = runSnapshotById(cwd, "fixture-criterion-context-drift", "projection-fixture").content;
 
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("changed during contract execution");
-      expect(checks.contract.report.failed).toBe(0);
-      expect(checks.contract.retry_context_guard.status).toBe("fail");
-      expect(checks.guards.find((entry: any) => entry.name === "criterion_context")?.status).toBe("fail");
-      expect(checks.failure_class).toBe("criterion_context");
-      const before = checks.contract.retry_context;
-      const after = checks.contract.retry_context_guard.observed_context;
-      expect(checks.contract.retry_context_guard.changed_fields).toEqual(changedFields);
-      expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort());
-      for (const field of Object.keys(before)) {
-        if (changedFields.some((changedField) => changedField === field)) {
-          expect(after[field]).toMatch(/^sha256:[0-9a-f]{64}$/);
-          expect(after[field]).not.toBe(before[field]);
-        } else {
-          expect(after[field]).toBe(before[field]);
-        }
-      }
-      expect(result.stderr).toContain(`Changed fields: ${JSON.stringify(changedFields)}`);
+      expect(checks.contract.execution_evaluation, JSON.stringify(checks, null, 2)).toMatchObject({ status: "needs_verification_plan", passed: false });
+      expect(checks.contract.execution_evaluation.results).toHaveLength(1);
+      expect(checks.contract.execution_evaluation.results[0]).toMatchObject({
+        id: "context-mutation", passed: false, execution: "executed",
+      });
+      expect(checks.contract.execution_evaluation.results[0].execution_id).toMatch(/^vx-/);
+      expect(checks.contract.execution_evaluation.results[0].run_file).toMatch(/^\.ai\/harness\/runs\//);
+      expect(checks.contract.execution_evaluation.evaluation.snapshot_changed_during_execution).toBe(true);
+      expect(checks.guards.find((entry: any) => entry.name === "verification_evaluation")?.status).toBe("fail");
+      expect(checks.failure_class).toBe("contract_failure");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 30_000);
 
-  test("verify-sprint reports unavailable authority without inventing an observed context", () => {
+  test("verify-sprint rejects a descriptor that removes its immutable plan authority", () => {
     const cwd = tmpWorkspace("helper-verify-sprint-criterion-context-unavailable");
     try {
       const fakeCli = installAutomaticProjectionVerifyFixture(cwd);
       const contractPath = join(cwd, "tasks/contracts/projection-fixture.contract.md");
-      writeFileSync(contractPath, readFileSync(contractPath, "utf-8").replace(
-        "  files_exist:\n    - docs/spec.md\n",
-        "  files_exist:\n    - docs/spec.md\n  commands_succeed:\n    - rm plans/plan-20260820-1605-projection-fixture.md\n",
-      ));
+      writeFileSync(contractPath, replaceVerificationPlan(readFileSync(contractPath, "utf-8"), [
+        verificationCheck("remove-plan-authority", "rm plans/plan-20260820-1605-projection-fixture.md", "verification", "normal"),
+      ]));
+      commitAll(cwd, "add unavailable authority verification");
       const result = run("bash", ["scripts/verify-sprint.sh", "--prepare-acceptance"], cwd, {
         REPO_HARNESS_CLI_BIN: fakeCli,
         HOOK_RUN_ID: "fixture-criterion-context-unavailable",
         HOOK_HOST: "claude",
         REPO_HARNESS_HOOK_CLI: join(ROOT, "src/cli/hook-entry.ts"),
+        REPO_HARNESS_SOURCE_ROOT: ROOT,
       });
       const checks = runSnapshotById(cwd, "fixture-criterion-context-unavailable", "projection-fixture").content;
       expect(result.status).toBe(1);
-      expect(checks.contract.report.failed).toBe(0);
-      expect(checks.contract.retry_context.goal_sha256).toMatch(/^sha256:[0-9a-f]{64}$/);
-      expect(checks.contract.retry_context_guard.status).toBe("fail");
-      expect(checks.contract.retry_context_guard.message).toContain("became unavailable after contract execution");
-      expect(checks.contract.retry_context_guard).not.toHaveProperty("observed_context");
-      expect(checks.contract.retry_context_guard).not.toHaveProperty("changed_fields");
-      expect(checks.failure_class).toBe("criterion_context");
+      expect(checks.contract.execution_evaluation.results).toHaveLength(1);
+      expect(checks.contract.execution_evaluation.results[0]).toMatchObject({ id: "remove-plan-authority", passed: false, execution: "executed" });
+      expect(checks.contract.execution_evaluation).toMatchObject({ status: "needs_verification_plan", passed: false });
+      expect(checks.contract.execution_evaluation.evaluation.snapshot_changed_during_execution).toBe(true);
+      expect(existsSync(join(cwd, "plans/plan-20260820-1605-projection-fixture.md"))).toBe(false);
+      expect(checks.guards.find((entry: any) => entry.name === "verification_evaluation")?.status).toBe("fail");
+      expect(checks.failure_class).toBe("contract_failure");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -5479,7 +4944,10 @@ describe("Workflow helper scripts", () => {
         // The deployed helper resolves Change Assessment modules from its
         // package root. Mirror the package's published `src/` payload rather
         // than accidentally exercising an incomplete copied-helper fixture.
-        cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+
+      rmSync(join(cwd, "src"), { recursive: true, force: true });
+      cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+      copyFileSync(join(ROOT, "package.json"), join(cwd, "package.json"));
         copyFileSync(
           join(ROOT, "assets/hooks/lib/workflow-state.sh"),
           join(cwd, ".ai/hooks/lib/workflow-state.sh")
@@ -5514,6 +4982,7 @@ describe("Workflow helper scripts", () => {
             "  benchmark: not_applicable",
             "```",
             "",
+            verificationPlan([]),
             "## Change Assessment",
             "",
             "```json",
@@ -5595,7 +5064,10 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "tasks/reviews"), { recursive: true });
       mkdirSync(join(cwd, "docs"), { recursive: true });
       copyHelpers(cwd);
+
+      rmSync(join(cwd, "src"), { recursive: true, force: true });
       cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+      copyFileSync(join(ROOT, "package.json"), join(cwd, "package.json"));
       copyFileSync(
         join(ROOT, "assets/hooks/lib/workflow-state.sh"),
         join(cwd, ".ai/hooks/lib/workflow-state.sh")
@@ -5623,12 +5095,11 @@ describe("Workflow helper scripts", () => {
           "exit_criteria:",
           "  files_exist:",
           "    - docs/spec.md",
-          "  commands_succeed:",
-          "    - printf expensive-ran > .expensive-ran",
           "evidence_requirements:",
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
           "## Change Assessment",
           "",
           "```json",
@@ -5688,7 +5159,10 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "tasks/reviews"), { recursive: true });
       mkdirSync(join(cwd, "docs"), { recursive: true });
       copyHelpers(cwd);
+
+      rmSync(join(cwd, "src"), { recursive: true, force: true });
       cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+      copyFileSync(join(ROOT, "package.json"), join(cwd, "package.json"));
       copyFileSync(
         join(ROOT, "assets/hooks/lib/workflow-state.sh"),
         join(cwd, ".ai/hooks/lib/workflow-state.sh")
@@ -5726,6 +5200,7 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
           "## Change Assessment",
           "",
           "```json",
@@ -5870,7 +5345,10 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "tasks/reviews"), { recursive: true });
       mkdirSync(join(cwd, "docs"), { recursive: true });
       copyHelpers(cwd);
+
+      rmSync(join(cwd, "src"), { recursive: true, force: true });
       cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+      copyFileSync(join(ROOT, "package.json"), join(cwd, "package.json"));
       copyFileSync(
         join(ROOT, "assets/hooks/lib/workflow-state.sh"),
         join(cwd, ".ai/hooks/lib/workflow-state.sh")
@@ -5907,6 +5385,7 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
           "## Change Assessment",
           "",
           "```json",
@@ -5995,7 +5474,10 @@ describe("Workflow helper scripts", () => {
       mkdirSync(join(cwd, "tasks/reviews"), { recursive: true });
       mkdirSync(join(cwd, "docs"), { recursive: true });
       copyHelpers(cwd);
+
+      rmSync(join(cwd, "src"), { recursive: true, force: true });
       cpSync(join(ROOT, "src"), join(cwd, "src"), { recursive: true });
+      copyFileSync(join(ROOT, "package.json"), join(cwd, "package.json"));
       copyFileSync(
         join(ROOT, "assets/hooks/lib/workflow-state.sh"),
         join(cwd, ".ai/hooks/lib/workflow-state.sh")
@@ -6031,6 +5513,7 @@ describe("Workflow helper scripts", () => {
           "  benchmark: not_applicable",
           "```",
           "",
+          verificationPlan([]),
           "## Change Assessment",
           "",
           "```json",
@@ -6437,6 +5920,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-ensure-workflow");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
 
       const res = run(
         "bash",
@@ -6471,6 +5955,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-ensure-workflow-new-plan");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       mkdirSync(join(cwd, "plans"), { recursive: true });
       writeFileSync(
         join(cwd, "plans/plan-20260304-0900-old-draft.md"),
@@ -6998,6 +6483,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-legacy-terminology");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "terminology", "--title", "Terminology"], cwd)
           .status
@@ -7035,6 +6521,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-promotion-template");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "promotion-template", "--title", "Promotion Template"], cwd)
           .status
@@ -7071,6 +6558,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-legacy-sprint-dir");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "sprint-dir", "--title", "Sprint Dir"], cwd)
           .status
@@ -7092,6 +6580,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-handoff-resume");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "handoff-check", "--title", "Handoff Check"], cwd)
           .status
@@ -7118,6 +6607,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-current-newer-than-resume");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "resume-freshness", "--title", "Resume Freshness"], cwd)
           .status
@@ -7144,10 +6634,13 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-current-absent");
     try {
       copyHelpers(cwd);
-      expect(
-        run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "current-absent", "--title", "Current Absent"], cwd)
-          .status
-      ).toBe(0);
+      installCanonicalContractTemplate(cwd);
+      const initialized = run(
+        "bash",
+        ["scripts/ensure-task-workflow.sh", "--slug", "current-absent", "--title", "Current Absent"],
+        cwd,
+      );
+      expect(initialized.status, `${initialized.stdout}\n${initialized.stderr}`).toBe(0);
       writeWorkflowRequiredSurface(cwd);
 
       // Present: strict passes and the read-model content checks still apply.
@@ -7175,6 +6668,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-todo-source-plan");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "handoff-check", "--title", "Handoff Check"], cwd)
           .status
@@ -7203,6 +6697,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-contract-admission");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "admission", "--title", "Admission"], cwd).status).toBe(0);
       writeWorkflowRequiredSurface(cwd);
       const plan = "plans/plan-20260905-1446-admission.md";
@@ -7236,6 +6731,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-terminal-active");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "terminal-active", "--title", "Terminal Active"], cwd)
           .status
@@ -7265,6 +6761,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-terminal-policy");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "terminal-policy", "--title", "Terminal Policy"], cwd)
           .status
@@ -7299,6 +6796,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-tracked-runtime-cache");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "tracked-runtime", "--title", "Tracked Runtime"], cwd)
           .status
@@ -7356,6 +6854,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-delegation-dir");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "delegation-dir", "--title", "Delegation Dir"], cwd)
           .status
@@ -7385,6 +6884,7 @@ describe("Workflow helper scripts", () => {
     const cwd = tmpWorkspace("helper-check-workflow-package-helpers");
     try {
       copyHelpers(cwd);
+      installCanonicalContractTemplate(cwd);
       expect(
         run("bash", ["scripts/ensure-task-workflow.sh", "--slug", "package-helpers", "--title", "Package Helpers"], cwd)
           .status

@@ -565,6 +565,11 @@ if (!required) {
 
 const helper = helperFingerprint(root);
 const acceptance = await verifyAcceptance({ root, authorityHome: trustedHome });
+if (acceptance.target_revision !== current.baseSha) {
+  fail(
+    `current integration evidence is required: AcceptanceReceipt target_revision ${acceptance.target_revision} does not match candidate base ${current.baseSha}`,
+  );
+}
 if (args.command === "verify") {
   verifySeal(root, trustedHome, args.base, current, acceptance, helper);
   printResult(args.format, true, current);

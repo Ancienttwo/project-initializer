@@ -105,8 +105,27 @@ delegation:
 
 ```yaml
 exit_criteria:
-  tests_pass:
-    - path: tests/fixtures/root-cause/regression-guard.test.ts
+```
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "root-cause-regression-guard",
+      "kind": "package_test",
+      "path": "tests/fixtures/root-cause/regression-guard.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "The regression guard proves the documented empty-label defect remains fixed.",
+      "inputs": { "env": [] }
+    }
+  ]
+}
 ```
 
 ## Acceptance Notes (Human Review)
@@ -122,4 +141,4 @@ exit_criteria:
 
 ---
 
-> **What good looks like**: this is the `bugfix` counterpart to `contract-brief-example.md`. Every field under `## Root Cause Evidence` is concrete rather than the template's placeholder prose: `root_cause` names an exact file:line and condition, `repro` is a command that fails today, `regression_guard` is a real test file also listed under `exit_criteria.tests_pass`, and `pre_fix_failure_artifact` is a real captured run of that test against the unfixed code — produced with `bun test tests/fixtures/root-cause/regression-guard.test.ts > tests/fixtures/root-cause/pre-fix-failure.log 2>&1; echo "PRE_FIX_EXIT=$?" >> tests/fixtures/root-cause/pre-fix-failure.log` before the fix landed, showing a non-zero `PRE_FIX_EXIT=1` line. That is what the bugfix root-cause gate (`contract-run.ts` preflight and `verify-contract.sh`) checks for, and what a worker should be able to point to as pre-fix failure evidence before reporting a bugfix contract done.
+> **What good looks like**: this is the `bugfix` counterpart to `contract-brief-example.md`. Every field under `## Root Cause Evidence` is concrete rather than the template's placeholder prose: `root_cause` names an exact file:line and condition, `repro` is a command that fails today, `regression_guard` is a real test file also listed as a `package_test` in the canonical `Verification Plan`, and `pre_fix_failure_artifact` is a real captured run of that test against the unfixed code — produced with `bun test tests/fixtures/root-cause/regression-guard.test.ts > tests/fixtures/root-cause/pre-fix-failure.log 2>&1; echo "PRE_FIX_EXIT=$?" >> tests/fixtures/root-cause/pre-fix-failure.log` before the fix landed, showing a non-zero `PRE_FIX_EXIT=1` line. That is what the bugfix root-cause gate (`contract-run.ts` preflight and `verify-contract.sh`) checks for, and what a worker should be able to point to as pre-fix failure evidence before reporting a bugfix contract done.

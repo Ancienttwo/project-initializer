@@ -99,6 +99,12 @@ function writeContractWithExitCriteria(cwd: string, contractPath: string, target
       `    - ${targetPath}`,
       '```',
       '',
+      '## Verification Plan',
+      '',
+      '```json',
+      '{"protocol":1,"checks":[]}',
+      '```',
+      '',
     ].join('\n'),
   );
 }
@@ -499,6 +505,26 @@ describe('mutation-observed: crash-replay', () => {
 
       // A second SessionStart after Stop has consumed everything sees nothing pending.
       expect(pendingPostEditJournalSection(cwd)).toBeNull();
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test('Stop consumes verification evidence without dispatching an executor', () => {
+    const cwd = tmpWorkspace('mo-reader-only');
+    try {
+      initRepo(cwd);
+      const contractPath = 'tasks/contracts/demo.contract.md';
+      writeContractWithExitCriteria(cwd, contractPath, 'README.md');
+      const planPath = writeActivePlan(cwd, contractPath);
+      const cli = join(cwd, 'record-cli.ts');
+      writeFileSync(cli, String.raw`import { appendFileSync } from 'fs'; appendFileSync('calls.jsonl', JSON.stringify(process.argv.slice(2)) + '\n');`);
+      const env = { ...process.env, REPO_HARNESS_CLI: cli, HOOK_SESSION_ID: 'reader-only' };
+      runMutationObserved({ collector: collectorFor(cwd, planPath), input: editPayload(contractPath), env });
+      consumePendingPostEditEvents(cwd, env);
+      const calls = readFileSync(join(cwd, 'calls.jsonl'), 'utf-8').trim().split('\n').map((line) => JSON.parse(line) as string[]);
+      expect(calls.some((args) => args[1] === 'verify-contract')).toBe(false);
+      expect(calls.some((args) => args[1] === 'verification-plan' && args[2] === 'evaluate')).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

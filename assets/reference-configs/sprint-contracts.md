@@ -128,7 +128,7 @@ As of this revision, `repo-harness run verify-contract` (and the equivalent `con
 For a `bugfix` contract, the gate requires all four `## Root Cause Evidence` fields to be filled in with concrete (non-template) content:
 
 - `root_cause` and `repro` must be non-empty and not the template placeholder text.
-- `regression_guard` must name a test path that also appears under `exit_criteria.tests_pass`.
+- `regression_guard` must name a test path that also appears as a `package_test` check in `Verification Plan`.
 - `pre_fix_failure_artifact` must point to a file that exists, contains a non-zero `PRE_FIX_EXIT=` line, and contains the `regression_guard` path string. Capture it on the unfixed code with `bun test <regression_guard> > <artifact> 2>&1; echo "PRE_FIX_EXIT=$?" >> <artifact>` (no pipes — a pipe swallows the exit status). A passing run (for example one that only prints `0 fail`) does not satisfy this gate; the artifact must show the pre-fix failure with a nonzero recorded exit code.
 
 Both `verify-contract.sh` and `contract-run.ts` implement this check independently against the same fixture expectations so that a `bugfix` contract cannot pass one gate while failing the other.
@@ -180,16 +180,18 @@ recomputes the active policy/contract base assessment from the exact final
 subject before accepting an envelope; a self-hashed declared assessment or
 packet is not sufficient. It binds
 the packet through the canonical verification-evidence hash rather than adding
-duplicate receipt fields. Because the packet carries the exact policy target
-revision, any target movement requires fresh prepared verification before
-acceptance can validate, even if the movement is otherwise non-overlapping.
+duplicate receipt fields. Historical receipt verification recomputes the packet against its frozen target
+revision. Current publication separately requires an exact current-base
+integration decision; target movement does not erase historical test facts.
 
 - `not_applicable` preserves any existing benchmark report on disk and excludes it from this contract's acceptance and checks binding: the coupled review's `Benchmark Evidence SHA256` must read literally `not-applicable`, `.ai/harness/checks/latest.json`'s `benchmark_evidence.status` must read `not_applicable`, and report presence no longer fails the checks match.
 - `required` keeps byte-exact strictness: the current authoritative report's fingerprint and benchmark subject hash must resolve, and both the review's `Benchmark Evidence SHA256` and the recorded checks fingerprint/subject must match that current evidence exactly; a missing or drifted report fails.
 
 ## Verification Execution Boundary
 
-`verify-contract.sh --read-only` is read-only for contract state writes only: it does not rewrite the contract `> **Status**:` line. It executes `tests_pass` with Bun and `commands_succeed` in a non-login Bash with `BASH_ENV` unset. One fixed absolute 600-second budget covers the whole invocation; each command records duration, exit status, signal, and timeout state, and expiry terminates the command's process group before the verifier returns. The budget is not a policy or environment knob.
+`Verification Plan` JSON is the only executable contract authority. `verify-contract --read-only` suppresses contract header writes and delegates execution to `verification-plan execute`; `verification-plan evaluate`, automatic done/Stop hooks, receipt verification, and merge seals only consume evidence. Explicit preflight checks run before verification checks, and a failing preflight prevents expensive execution. Command checks use non-login Bash with `BASH_ENV` unset; package tests use the nearest package test script. The existing process supervisor owns timeout, process-group cleanup, and command-level expensive-run locking.
+
+Execution identity binds a complete Git-visible tree, the descriptor, cwd, toolchain, and declared environment. A changed tree may require `baseline_with_delta`: the author names an immutable successful baseline and current delta checks. It never means the new tree passed the old full suite. An expensive miss returns `needs_verification_plan` unless the operator supplies an explicit rerun reason. Legacy executable YAML is rejected; use `migrate-verification-plan --contract <path> --mapping <json> --write` for the one-shot, author-mapped migration.
 
 ### Long Gate Commands Belong to the Orchestrator
 
@@ -203,9 +205,9 @@ BLOCKED on its role's machine-readable first line (`RESULT:` / `VERDICT:` /
 standing advisory is injected at SubagentStart under the
 `[repo-harness:long-command-guardrail]` marker.
 
-Verification is an evidence consumer. `commands_succeed` must not launch profile benchmarks/providers, `init`, evidence-producer scripts, or substantive installs; the verifier rejects those command shapes before execution. Produce expensive evidence explicitly, validate its subject/provenance/bytes, then let `verify-sprint` consume that frozen artifact through `verify-contract --read-only`.
+Verification commands consume previously produced external evidence. Command checks must not launch profile benchmarks/providers, `init`, evidence-producer scripts, or substantive installs; the verifier rejects those command shapes before execution. Produce expensive evidence explicitly, validate its subject/provenance/bytes, then let `verify-sprint` consume that frozen artifact through `verify-contract --read-only`.
 
-A verifier consumes already-produced evidence; it must not become the producer of expensive, runtime-heavy evidence (for example, a full multi-provider/multi-profile benchmark matrix). An authoritative matrix or similarly expensive one-time evidence run belongs outside `commands_succeed`: the author runs it once on a clean checkout before merge and commits the resulting tracked report (for example `evals/harness/reports/profile-comparison.json`/`.md`); the contract then verifies that report's bytes and provenance, not a live re-run.
+A verifier consumes already-produced evidence; it must not become the producer of expensive, runtime-heavy evidence (for example, a full multi-provider/multi-profile benchmark matrix). An authoritative matrix or similarly expensive one-time evidence run belongs outside command checks: the author runs it once on a clean checkout before merge and commits the resulting tracked report (for example `evals/harness/reports/profile-comparison.json`/`.md`); the contract then verifies that report's bytes and provenance, not a live re-run.
 
 ## Profile Snapshots and Scope Changes
 
@@ -224,9 +226,9 @@ disabling guards or treating a cached lite profile as permission to edit.
 The parent selects final acceptance checks from the observed behavior and the
 project's risk-scoped required checks. A full suite needs an explicit acceptance
 or release requirement, or a named integration risk that focused checks cannot
-cover. Do not duplicate the same coverage in `tests_pass` and `commands_succeed`.
-Eligible deterministic criteria belong in `criterion_reuse` before execution;
-external/mutable-state criteria remain ineligible. The canonical producer is
+cover. Do not duplicate the same coverage in package-test checks and command checks.
+Each check declares its evidence policy and environment inputs before execution;
+mutable external inputs must be represented explicitly or verified by their owning producer. The canonical producer is
 `verify-sprint --prepare-acceptance`; workers and reviewers consume its evidence.
 
 After a full pass, a bounded follow-up edit uses baseline evidence plus focused
@@ -258,8 +260,8 @@ authority.
    the cutover. Require a full suite only when those focused checks cannot
    cover an observed cross-module risk or a release gate explicitly requires
    it. Prepare expensive criteria once through `verify-sprint --prepare-acceptance`
-   after freezing code; declare eligible deterministic criteria in
-   `criterion_reuse` before that run. Workers and reviewers consume its
+   after freezing code; declare each check once in the JSON
+   `Verification Plan` before that run. Workers and reviewers consume its
    subject-bound results rather than executing independent copies.
 4. **Composition fixtures.** Parity suites must include end-to-end cases
    through the production entrypoint (`runHook()` or equivalent) and

@@ -119,6 +119,7 @@ function main(argv: readonly string[]): number {
     counts,
     contractPath: args["contract"] || undefined,
     expectedSubjectSha256: args["subject-sha256"] || undefined,
+    targetRevision: args["target-revision"] || undefined,
     correlationRunId: args["correlation-run-id"] || undefined,
     runTrace,
   });

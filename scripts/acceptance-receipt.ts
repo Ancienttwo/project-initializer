@@ -380,10 +380,10 @@ export function acceptancePolicySource(policy: AcceptancePolicy): 'claude-review
   return policy.reviewer === 'Claude' ? 'claude-review' : 'codex-review';
 }
 
-async function currentSubject(root: string, targetRef?: string): Promise<ReviewSubject> {
+async function currentSubject(root: string, targetRef?: string, targetRevision?: string): Promise<ReviewSubject> {
   const modulePath = join(PACKAGE_ROOT, 'src', 'effects', 'review', 'diff-fingerprint.ts');
   const module = await import(pathToFileURL(modulePath).href) as {
-    buildReviewSubject: (repoRoot: string, opts: { targetRef: string }) => ReviewSubject;
+    buildReviewSubject: (repoRoot: string, opts: { targetRef: string; targetRevision?: string }) => ReviewSubject;
     resolvePolicyReviewBase: (repoRoot: string) => { ok: true; targetRef: string } | { ok: false; reason: string };
   };
   const reviewBase = module.resolvePolicyReviewBase(root);
@@ -391,7 +391,10 @@ async function currentSubject(root: string, targetRef?: string): Promise<ReviewS
   if (targetRef !== undefined && targetRef !== reviewBase.targetRef) {
     fail('AcceptanceReceipt target ref is stale against workflow policy');
   }
-  const subject = module.buildReviewSubject(root, { targetRef: targetRef ?? reviewBase.targetRef });
+  const subject = module.buildReviewSubject(root, {
+    targetRef: targetRef ?? reviewBase.targetRef,
+    targetRevision,
+  });
   if (subject.status !== 'ok' || !/^sha256:[0-9a-f]{64}$/.test(subject.review_subject_sha256)) {
     fail('current normalized review subject is unavailable');
   }
@@ -480,7 +483,7 @@ async function normalizedVerificationEvidence(content: string, subject: ReviewSu
   };
   const assessmentEffectsPath = join(PACKAGE_ROOT, 'src', 'effects', 'review', 'change-assessment.ts');
   const assessmentEffects = await import(pathToFileURL(assessmentEffectsPath).href) as {
-    prepareChangeAssessment: (args: { repoRoot: string; contractPath: string }) => {
+    prepareChangeAssessment: (args: { repoRoot: string; contractPath: string; targetRevision?: string }) => {
       assessment: { status: 'ready' | 'blocked' | 'degraded'; assessment_sha256?: string };
       packet: unknown;
     };
@@ -496,7 +499,11 @@ async function normalizedVerificationEvidence(content: string, subject: ReviewSu
     ) {
       fail('verification evidence change assessment packet is stale for the current subject');
     }
-    const recomputed = assessmentEffects.prepareChangeAssessment({ repoRoot: root, contractPath });
+    const recomputed = assessmentEffects.prepareChangeAssessment({
+      repoRoot: root,
+      contractPath,
+      targetRevision: subject.target_rev,
+    });
     if (recomputed.assessment.status === 'degraded' || !('assessment_sha256' in recomputed.assessment)) {
       fail('verification evidence Change Assessment base is unavailable');
     }
@@ -518,6 +525,26 @@ async function normalizedVerificationEvidence(content: string, subject: ReviewSu
     : isRecord(value.benchmark_evidence) && typeof value.benchmark_evidence.report_sha256 === 'string'
       ? value.benchmark_evidence.report_sha256
       : 'not-applicable';
+  const executionEvaluation = isRecord(value.contract) ? value.contract.execution_evaluation : undefined;
+  const executionModulePath = join(PACKAGE_ROOT, 'src', 'effects', 'evidence', 'verification-execution.ts');
+  const executionModule = await import(pathToFileURL(executionModulePath).href) as {
+    validateMaterializedVerificationExecutionReport: (input: {
+      repoRoot: string;
+      contractPath: string;
+      contractText: string;
+      report: unknown;
+    }) => { valid: true };
+  };
+  try {
+    executionModule.validateMaterializedVerificationExecutionReport({
+      repoRoot: root,
+      contractPath: declaredContractPath,
+      contractText: contractContent,
+      report: executionEvaluation,
+    });
+  } catch (error) {
+    fail(`verification execution evidence is invalid: ${(error as Error).message}`);
+  }
   const canonical = {
     schema: value.schema,
     active_plan: value.active_plan,
@@ -530,6 +557,7 @@ async function normalizedVerificationEvidence(content: string, subject: ReviewSu
     change_assessment: assessment,
     benchmark_evidence: value.benchmark_evidence,
     commands: value.commands,
+    execution_evaluation: executionEvaluation,
   };
   return { fingerprint: sha256(stableJson(canonical)), benchmark };
 }
@@ -1552,11 +1580,8 @@ export async function verifyAcceptance(args: {
   verifyArchiveProjectionAuthority({ root, authorityHome: args.authorityHome, acceptance: receipt, contract });
   const verificationPath = args.verification ?? receipt.verification_file;
   const verification = readRegular(root, verificationPath, 'verification evidence');
-  const subject = await currentSubject(root, receipt.target_ref);
+  const subject = await currentSubject(root, receipt.target_ref, receipt.target_revision);
   if (subject.review_subject_sha256 !== receipt.subject_sha256) fail('AcceptanceReceipt semantic subject is stale');
-  if (subject.target_rev !== receipt.target_revision && subject.target_overlap_count > 0) {
-    fail(`AcceptanceReceipt target overlaps ${subject.target_overlap_count} reviewed path(s)`);
-  }
   const evidence = await normalizedVerificationEvidence(verification.content, subject, root, contract.path, contract.content);
   if (evidence.fingerprint !== receipt.verification_evidence_sha256) fail('AcceptanceReceipt verification evidence is stale');
   // The gate's one synchronous rule set. Readers outside this module do not

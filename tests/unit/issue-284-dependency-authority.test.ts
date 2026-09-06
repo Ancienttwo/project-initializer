@@ -79,6 +79,7 @@ import {
   type AcceptanceVerificationObservationV1,
   type UserWaiverGrant,
 } from '../../scripts/acceptance-receipt';
+import { emptyVerificationEvaluation, withEmptyVerificationPlan } from '../helpers/verification-plan-fixture';
 
 const REPO_ID = 'repo_0123456789abcdef';
 const OTHER_REPO_ID = 'repo_fedcba9876543210';
@@ -89,7 +90,7 @@ const PRD_REF = 'plans/prds/product.md';
 const GOAL_REF = 'plans/plan-wp-a.md';
 const CONTRACT_NO_WAIVER_REF = 'tasks/contracts/wp-a-sealed.contract.md';
 const OWNER = 'ancienttwo';
-const CONTRACT_TEXT = [
+const CONTRACT_TEXT = withEmptyVerificationPlan([
   '# Task Contract: wp-a',
   '',
   '> **Status**: Active',
@@ -105,7 +106,7 @@ const CONTRACT_TEXT = [
   '{"protocol":2,"reviewer":"Codex","source":"codex-review","user_waiver":"allowed"}',
   '```',
   '',
-].join('\n');
+].join('\n'));
 const CONTRACT_NO_WAIVER_TEXT = CONTRACT_TEXT
   .replace('# Task Contract: wp-a', '# Task Contract: wp-a (sealed)')
   .replace('"user_waiver":"allowed"', '"user_waiver":"forbidden"');
@@ -597,7 +598,7 @@ interface RecordFixture {
 }
 
 function recordContractText(): string {
-  return [
+  return withEmptyVerificationPlan([
     '# Task Contract: demo',
     '',
     '> **Status**: Active',
@@ -616,7 +617,7 @@ function recordContractText(): string {
     '{"protocol":1,"oracles":[]}',
     '```',
     '',
-  ].join('\n');
+  ].join('\n'));
 }
 
 function recordChecks(root: string): void {
@@ -647,7 +648,10 @@ function recordChecks(root: string): void {
       { name: 'allowed_paths', status: 'pass' },
       { name: 'change_assessment', status: 'pass' },
     ],
-    contract: { file: RECORD_CONTRACT_REF },
+    contract: {
+      file: RECORD_CONTRACT_REF,
+      execution_evaluation: emptyVerificationEvaluation(root, RECORD_CONTRACT_REF),
+    },
     review: { file: 'tasks/reviews/demo.review.md' },
     change_assessment: { ...basis, sha256_placeholder: undefined },
   };

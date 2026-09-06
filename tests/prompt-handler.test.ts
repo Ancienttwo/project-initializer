@@ -243,6 +243,7 @@ describe('typed UserPromptSubmit.default handler', () => {
       expect(result.stdout).toContain('archived');
       expect(commands.filter((args) => args.includes('archive-workflow'))).toHaveLength(1);
       expect(commands.some((args) => args.includes('acceptance-receipt'))).toBe(true);
+      expect(commands.some((args) => args.includes('verify-contract'))).toBe(false);
     } finally {
       repo.cleanup();
     }
@@ -324,17 +325,17 @@ describe('typed UserPromptSubmit.default handler', () => {
     }
   }, 30_000);
 
-  test('done blocks when contract verification fails before archive', () => {
+  test('done blocks when acceptance evidence fails before archive', () => {
     const repo = fixture({ contract: true, checks: passingChecks() });
     try {
       const { result, commands } = invoke(repo.root, 'done', {
-        commands: (args) => args.includes('verify-contract')
-          ? { exitCode: 1, stdout: '', stderr: 'contract exit 1\n' }
+        commands: (args) => args.includes('acceptance-receipt')
+          ? { exitCode: 1, stdout: '', stderr: 'acceptance evidence invalid\n' }
           : { exitCode: 0, stdout: 'archived\n', stderr: '' },
       });
       expect(result.exitCode).toBe(2);
-      expect(result.stdout).toContain('ContractGuard');
-      expect(result.stdout).toContain('Contract verification failed');
+      expect(result.stdout).toContain('AcceptanceReceiptGuard');
+      expect(result.stdout).toContain('acceptance evidence invalid');
       expect(commands.some((args) => args.includes('archive-workflow'))).toBe(false);
     } finally {
       repo.cleanup();

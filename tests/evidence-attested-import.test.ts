@@ -18,6 +18,7 @@ import {
   runAcceptanceReceiptCli,
   sealArchiveProjection,
 } from "../scripts/acceptance-receipt";
+import { emptyVerificationEvaluation, withEmptyVerificationPlan } from "./helpers/verification-plan-fixture";
 
 function git(repoRoot: string, args: readonly string[]): string {
   return execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf-8" });
@@ -426,7 +427,10 @@ describe("scripts/acceptance-receipt.ts record: attested-import wiring", () => {
             { name: "allowed_paths", status: "pass" },
             { name: "change_assessment", status: "pass" },
           ],
-          contract: { file: "tasks/contracts/fixture-cli.contract.md" },
+          contract: {
+            file: "tasks/contracts/fixture-cli.contract.md",
+            execution_evaluation: emptyVerificationEvaluation(root, "tasks/contracts/fixture-cli.contract.md"),
+          },
           review: { file: "tasks/reviews/fixture-cli.review.md" },
           change_assessment: changeAssessmentEvidence(root),
         },
@@ -462,7 +466,7 @@ describe("scripts/acceptance-receipt.ts record: attested-import wiring", () => {
     writeFileSync(join(root, "plans", "plan-fixture.md"), "# Plan: fixture-cli\n\n> **Status**: Executing\n");
     writeFileSync(
       join(root, "tasks", "contracts", "fixture-cli.contract.md"),
-      [
+      withEmptyVerificationPlan([
         "# Task Contract: fixture-cli",
         "",
         "> **Status**: Active",
@@ -481,7 +485,7 @@ describe("scripts/acceptance-receipt.ts record: attested-import wiring", () => {
         '{"protocol":1,"oracles":[]}',
         "```",
         "",
-      ].join("\n"),
+      ].join("\n")),
     );
     writeFileSync(join(root, "tasks", "reviews", "fixture-cli.review.md"), "# Review\n\n> **Recommendation**: pass\n");
     git(root, ["add", "-A"]);

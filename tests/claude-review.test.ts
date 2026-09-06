@@ -10,6 +10,7 @@ import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { assessChange, buildReviewSelectionPacket } from '../src/core/review/change-assessment';
 import { claudeReviewStatus, closeClaudeReview, reviewSessionLocation, runClaudeReviewRound } from '../src/effects/review/claude-review-session';
 import { verifyAcceptance } from '../scripts/acceptance-receipt';
+import { emptyVerificationEvaluation, withEmptyVerificationPlan } from './helpers/verification-plan-fixture';
 import { reviewContextDigest, validateClaudeReviewResult, type ClaudeReviewRequest } from '../src/core/review/claude-review';
 
 const fixtures: { root: string; home: string }[] = [];
@@ -41,7 +42,7 @@ function prepare(root: string) {
     benchmark_evidence: { status: 'not_applicable', report_sha256: 'not-applicable' },
     commands: [{ name: 'fixture-unit-check', status: 'pass', exit_code: 0 }],
     guards: ['contract', 'review', 'allowed_paths', 'change_assessment'].map(name => ({ name, status: 'pass' })),
-    contract: { file: contract }, review: { file: 'tasks/reviews/review.review.md' },
+    contract: { file: contract, execution_evaluation: emptyVerificationEvaluation(root, contract) }, review: { file: 'tasks/reviews/review.review.md' },
     change_assessment: { ...basis, evidence_sha256: 'sha256:' + createHash('sha256').update(canonical(basis)).digest('hex') },
   }));
 }
@@ -57,7 +58,7 @@ function fixture(mode = 'normal') {
   writeFileSync(join(root, 'source.ts'), 'export const value = 0;\n');
   git(root, 'add', '.'); git(root, 'commit', '-m', 'base'); git(root, 'checkout', '-b', 'codex/review');
   writeFileSync(join(root, 'source.ts'), 'export const value = 1;\n');
-  writeFileSync(join(root, contract), '# Review contract\n\n> **Status**: Active\n> **Owner**: Codex\n> **Plan**: plans/plan-review.md\n> **Review File**: tasks/reviews/review.review.md\n\n## Acceptance Policy\n\n```json\n{"protocol":1,"reviewer":"Claude","user_waiver":"forbidden"}\n```\n\n## Change Assessment\n\n```json\n{"protocol":1,"oracles":[]}\n```\n');
+  writeFileSync(join(root, contract), withEmptyVerificationPlan('# Review contract\n\n> **Status**: Active\n> **Owner**: Codex\n> **Plan**: plans/plan-review.md\n> **Review File**: tasks/reviews/review.review.md\n\n## Acceptance Policy\n\n```json\n{"protocol":1,"reviewer":"Claude","user_waiver":"forbidden"}\n```\n\n## Change Assessment\n\n```json\n{"protocol":1,"oracles":[]}\n```\n'));
   writeFileSync(join(root, 'plans/plan-review.md'), '# Review test\n\n> **Status**: Executing\n');
   writeFileSync(join(root, 'tasks/reviews/review.review.md'), '# Review\n');
   git(root, 'add', '.'); git(root, 'commit', '-m', 'candidate');

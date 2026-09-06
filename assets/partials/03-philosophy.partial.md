@@ -31,9 +31,9 @@ Use the project's required checks and the active contract as the verification
 scope. A small code/test edit does not by itself require the full suite. Before
 adding a full-suite criterion, identify the cross-module risk that named focused
 checks cannot cover, or the explicit release requirement. Freeze code before
-expensive acceptance, declare eligible deterministic criteria in `criterion_reuse`,
+expensive acceptance, declare checks with explicit cost and evidence policy in the JSON `Verification Plan`,
 and consume current subject-bound evidence across worker, review, and closeout.
-Do not duplicate test coverage across `tests_pass` and `commands_succeed`.
+Declare each executable check once; a cache miss cannot authorize an expensive rerun.
 After a full pass, bounded follow-up edits use the recorded baseline plus focused
 delta checks. The parent revises final criteria when the full-suite trigger no
 longer applies; a cache miss or changed hash alone does not require another full

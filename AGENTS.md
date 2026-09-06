@@ -58,9 +58,9 @@ This repository self-hosts the `repo-harness` contract; the former `repo-harness
 
 ## Required Checks
 
-Verification is risk-scoped. The active task contract's `exit_criteria` is the
-source of truth for behavior-specific checks; run focused tests for every
-changed behavior. The following repository-integrity checks are required for
+Verification is risk-scoped. The active task contract's JSON `Verification Plan`
+owns executable checks; `exit_criteria` owns artifact requirements. Run focused
+tests for every changed behavior. The following repository-integrity checks are required for
 substantive repository changes:
 
 ```bash
@@ -84,9 +84,11 @@ adding a full-suite criterion; copying an unconditional command is not a risk
 assessment.
 
 Freeze the implementation before final acceptance. Execute required expensive
-criteria once through `verify-sprint --prepare-acceptance`; declare eligible
-deterministic criteria in `criterion_reuse` so unchanged retries consume the
-existing exact-context pass. Reviewers consume that evidence rather than
+criteria through `verify-sprint --prepare-acceptance`; declare each executable
+check once in the JSON `Verification Plan`, including phase, cost, evidence
+policy, necessity, and environment inputs. Unchanged retries consume recorded
+execution evidence. Expensive input drift requires an explicit new plan or
+rerun reason; a cache miss never grants permission to rerun. Reviewers consume that evidence rather than
 independently rerunning the suite. Do not list the same test coverage twice in
 the final contract; focused development runs are separate from final acceptance.
 Record changed paths, checks run or reused, and why that coverage is sufficient.

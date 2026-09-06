@@ -8,11 +8,11 @@
 
 Shared root-cause gate fixture (see tests/fixtures/root-cause/expected-results.ts): proves
 a bugfix contract whose regression_guard is concrete but not listed under
-exit_criteria.tests_pass is rejected by the gate.
+the canonical Verification Plan is rejected by the gate.
 
 ## Goal
 
-Exercise the root-cause gate's regression_guard/tests_pass membership check.
+Exercise the root-cause gate's regression_guard/package_test membership check.
 
 ## Scope
 
@@ -39,6 +39,25 @@ allowed_paths:
 
 ```yaml
 exit_criteria:
-  tests_pass:
-    - path: tests/fixtures/root-cause/other-guard.test.ts
+```
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "fixture-regression-guard",
+      "kind": "package_test",
+      "path": "tests/fixtures/root-cause/other-guard.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "This fixture declares its root-cause regression guard explicitly.",
+      "inputs": { "env": [] }
+    }
+  ]
+}
 ```

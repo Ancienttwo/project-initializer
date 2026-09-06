@@ -39,6 +39,25 @@ allowed_paths:
 
 ```yaml
 exit_criteria:
-  tests_pass:
-    - path: tests/fixtures/root-cause/regression-guard.test.ts
+```
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "fixture-regression-guard",
+      "kind": "package_test",
+      "path": "tests/fixtures/root-cause/regression-guard.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "This fixture declares its root-cause regression guard explicitly.",
+      "inputs": { "env": [] }
+    }
+  ]
+}
 ```

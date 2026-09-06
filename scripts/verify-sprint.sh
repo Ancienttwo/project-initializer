@@ -96,61 +96,6 @@ sha256_text() {
   "$BUN_BIN" -e 'const { createHash } = require("node:crypto"); process.stdout.write(`sha256:${createHash("sha256").update(process.argv.at(-1)).digest("hex")}`);' -- "$1"
 }
 
-verification_toolchain_fingerprint() {
-  local bun_version bash_version git_version jq_version repo_harness_version runner_sha platform explicit expensive_threshold basis
-  bun_version="$($BUN_BIN --version 2>/dev/null || true)"
-  bash_version="$(/bin/bash --version 2>/dev/null | sed -n '1p')"
-  git_version="$(git --version 2>/dev/null || true)"
-  jq_version="$(jq --version 2>/dev/null || true)"
-  repo_harness_version="$(repo-harness --version 2>/dev/null || true)"
-  runner_sha="$(sha256_file "$helper_dir/run-bounded-verifier-command.ts")"
-  platform="$(uname -srm 2>/dev/null || true)"
-  explicit="${REPO_HARNESS_VERIFICATION_TOOLCHAIN_FINGERPRINT:-}"
-  expensive_threshold="${REPO_HARNESS_EXPENSIVE_CRITERION_MS:-30000}"
-  basis="$(jq -S -c -n \
-    --arg bun_path "$(cd "$(dirname "$BUN_BIN")" && pwd -P)/$(basename "$BUN_BIN")" \
-    --arg bun_version "$bun_version" \
-    --arg bash_path "/bin/bash" \
-    --arg bash_version "$bash_version" \
-    --arg git_version "$git_version" \
-    --arg jq_version "$jq_version" \
-    --arg repo_harness_version "$repo_harness_version" \
-    --arg runner_sha "$runner_sha" \
-    --arg platform "$platform" \
-    --arg path_env "${PATH:-}" \
-    --arg expensive_threshold_ms "$expensive_threshold" \
-    --arg explicit "$explicit" \
-    '{bun_path:$bun_path,bun_version:$bun_version,bash_path:$bash_path,bash_version:$bash_version,git_version:$git_version,jq_version:$jq_version,repo_harness_version:$repo_harness_version,runner_sha256:$runner_sha,platform:$platform,path_env:$path_env,expensive_threshold_ms:$expensive_threshold_ms,explicit:$explicit}')"
-  sha256_text "$basis"
-}
-
-write_criterion_context() {
-  local output="$1"
-  local subject_sha256="$2"
-  local target_revision="$3"
-  local goal_authority="$4"
-  local contract_sha256 goal_sha256 toolchain_fingerprint
-  command -v jq >/dev/null 2>&1 || { echo "jq is unavailable" >&2; return 1; }
-  [[ -n "$BUN_BIN" && -x "$BUN_BIN" ]] || { echo "trusted Bun runtime is unavailable" >&2; return 1; }
-  [[ "$subject_sha256" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "normalized subject is unavailable after automatic projection" >&2; return 1; }
-  [[ "$target_revision" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || { echo "target revision is unavailable after automatic projection" >&2; return 1; }
-  [[ -n "$goal_authority" && -f "$goal_authority" && ! -L "$goal_authority" ]] || { echo "goal authority is missing or symlinked: ${goal_authority:-unset}" >&2; return 1; }
-  [[ -f "$contract_file" && ! -L "$contract_file" ]] || { echo "contract authority is missing or symlinked: $contract_file" >&2; return 1; }
-  contract_sha256="$(sha256_file "$contract_file")"
-  goal_sha256="$(sha256_file "$goal_authority")"
-  toolchain_fingerprint="$(verification_toolchain_fingerprint)"
-  jq -n \
-    --arg schema "repo-harness-criterion-context.v1" \
-    --arg repository_root "$(pwd -P)" \
-    --arg subject_sha256 "$subject_sha256" \
-    --arg target_revision "$target_revision" \
-    --arg contract_sha256 "$contract_sha256" \
-    --arg goal_sha256 "$goal_sha256" \
-    --arg toolchain_fingerprint "$toolchain_fingerprint" \
-    '{schema:$schema,repository_root:$repository_root,subject_sha256:$subject_sha256,target_revision:$target_revision,contract_sha256:$contract_sha256,goal_sha256:$goal_sha256,toolchain_fingerprint:$toolchain_fingerprint}' \
-    > "$output"
-}
-
 # Advisory only (Phase 3 C1): true when the notes file's "## Promotion
 # Candidates" section has at least one bullet beyond the three fixed
 # boilerplate lines shipped by implementation-notes.template.md. Never
@@ -840,15 +785,21 @@ emit_verify_evidence() {
   [[ -n "$BUN_BIN" && -x "$BUN_BIN" ]] || { echo "verify-sprint: trusted Bun runtime is unavailable for evidence emission" >&2; return 1; }
   command -v jq >/dev/null 2>&1 || { echo "verify-sprint: jq is required for evidence emission" >&2; return 1; }
   [[ -n "$run_trace_file" && -s "$run_trace_file" ]] || { echo "verify-sprint: run-trace file is missing for evidence emission: $run_trace_file" >&2; return 1; }
-  local subject_sha256 run_snapshot counts_json
+  local subject_sha256 run_snapshot counts_json frozen_target_revision
   subject_sha256="$(jq -r '.review_subject_sha256 // empty' "$run_trace_file" 2>/dev/null)"
+  frozen_target_revision="$(jq -r '.change_assessment.selection_packet.target_revision // empty' "$run_trace_file")"
   run_snapshot="$(jq -r '.lifecycle.snapshot // empty' "$run_trace_file" 2>/dev/null)"
   counts_json="$(jq -c '{guards_total: (.guards | length), guards_passed: ([.guards[] | select(.status=="pass")] | length)}' "$run_trace_file" 2>/dev/null)"
   [[ -n "$subject_sha256" && -n "$run_snapshot" ]] || { echo "verify-sprint: prepared evidence is missing subject or run snapshot; evidence emission needs a frozen --prepare-acceptance run" >&2; return 1; }
+  if [[ "$status" == "pass" && -z "$frozen_target_revision" ]]; then
+    echo "verify-sprint: passing evidence has no frozen target revision" >&2
+    return 1
+  fi
   "$BUN_BIN" "$emit_script" \
     --repo-root "$(pwd -P)" \
     --contract "$contract_file" \
     --subject-sha256 "$subject_sha256" \
+    --target-revision "$frozen_target_revision" \
     --command "$command_line" \
     --status "$status" \
     --run-snapshot "$run_snapshot" \
@@ -1061,10 +1012,9 @@ mkdir -p "$(dirname "$checks_file")"
 mkdir -p "$runs_dir"
 contract_report="$(mktemp)"
 checks_report="$(mktemp)"
-criterion_context="$(mktemp)"
-current_criterion_context="$(mktemp)"
+verification_evaluation="$(mktemp)"
 verification_preflight="$(mktemp)"
-trap 'rm -f "$contract_report" "$checks_report" "$criterion_context" "$current_criterion_context" "$verification_preflight"' EXIT
+trap 'rm -f "$contract_report" "$checks_report" "$verification_evaluation" "$verification_preflight"' EXIT
 task_profile="$(read_contract_task_profile "$contract_file" || true)"
 active_plan="$(read_active_plan || true)"
 worktree_path="$(pwd -P)"
@@ -1096,11 +1046,6 @@ review_subject_sha256="$(workflow_source_authority_call workflow_current_review_
 target_revision="$(workflow_source_authority_call workflow_current_review_target_revision 2>/dev/null || true)"
 goal_file="$(contract_declared_path "$contract_file" "Plan" || true)"
 [[ -n "$goal_file" ]] || goal_file="$active_plan"
-criterion_context_error=""
-if ! criterion_context_error="$(write_criterion_context "$criterion_context" "$review_subject_sha256" "$target_revision" "$goal_file" 2>&1)"; then
-  printf '{}\n' > "$criterion_context"
-  echo "verify-sprint: criterion retry identity unavailable: $criterion_context_error" >&2
-fi
 changed_files=()
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   while IFS= read -r changed_file; do
@@ -1126,7 +1071,7 @@ if [[ -f "$helper_dir/prepare-codex-handoff.sh" && ( -f ".ai/harness/handoff/cur
   bash "$helper_dir/prepare-codex-handoff.sh" --reason "repo-harness-verify-sprint" >/dev/null || true
 fi
 set +e
-contract_output="$(REPO_HARNESS_VERIFICATION_CONTEXT_FILE="$criterion_context" REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE="$verification_preflight" bash "$helper_dir/verify-contract.sh" --contract "$contract_file" --strict --read-only --report-file "$contract_report" "${contract_force_args[@]+"${contract_force_args[@]}"}" 2>&1)"
+contract_output="$(REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE="$verification_preflight" bash "$helper_dir/verify-contract.sh" --contract "$contract_file" --strict --read-only --report-file "$contract_report" "${contract_force_args[@]+"${contract_force_args[@]}"}" 2>&1)"
 contract_exit=$?
 set -e
 
@@ -1134,44 +1079,18 @@ if [[ -n "$contract_output" ]]; then
   printf '%s\n' "$contract_output"
 fi
 
-criterion_context_gate="unavailable"
-criterion_context_message="No executable contract criteria required a frozen retry identity."
-criterion_context_drift='{}'
-executes_contract_commands="false"
-if command -v jq >/dev/null 2>&1 && jq -e . "$contract_report" >/dev/null 2>&1; then
-  executes_contract_commands="$(jq -r '.executes_contract_commands // false' "$contract_report" 2>/dev/null || printf false)"
-fi
-if [[ -n "$criterion_context_error" ]]; then
-  if [[ "$executes_contract_commands" == "true" ]]; then
-    criterion_context_gate="fail"
-    criterion_context_message="Executable criteria ran without a valid frozen retry identity: $criterion_context_error"
+verification_evaluation_gate="fail"
+verification_evaluation_message="Verification Plan execution evidence is unavailable."
+if jq -e '.verification_evaluation | type == "object"' "$contract_report" >/dev/null 2>&1; then
+  jq '.verification_evaluation' "$contract_report" > "$verification_evaluation"
+  if jq -e '.passed == true' "$verification_evaluation" >/dev/null; then
+    verification_evaluation_gate="pass"
+    verification_evaluation_message="All declared checks have valid execution evidence."
+  else
+    verification_evaluation_message="Verification Plan requires current execution evidence or an explicit rerun decision."
   fi
 else
-  current_review_subject_sha256="$(workflow_source_authority_call workflow_current_review_subject_value 2>/dev/null || true)"
-  current_target_revision="$(workflow_source_authority_call workflow_current_review_target_revision 2>/dev/null || true)"
-  current_goal_file="$(contract_declared_path "$contract_file" "Plan" || true)"
-  [[ -n "$current_goal_file" ]] || current_goal_file="$(read_active_plan || true)"
-  current_criterion_context_error=""
-  if ! current_criterion_context_error="$(write_criterion_context "$current_criterion_context" "$current_review_subject_sha256" "$current_target_revision" "$current_goal_file" 2>&1)"; then
-    criterion_context_gate="fail"
-    criterion_context_message="Criterion retry identity became unavailable after contract execution: $current_criterion_context_error"
-  elif cmp -s "$criterion_context" "$current_criterion_context"; then
-    criterion_context_gate="pass"
-    criterion_context_message="Frozen criterion retry identity remained unchanged through contract execution."
-  else
-    criterion_context_gate="fail"
-    # Preserve the observed values before EXIT removes the temporary contexts.
-    criterion_context_drift="$(jq -n \
-      --slurpfile before "$criterion_context" \
-      --slurpfile after "$current_criterion_context" \
-      '{observed_context: $after[0], changed_fields: (
-        ($before[0] + $after[0]) | keys | map(. as $key | select($before[0][$key] != $after[0][$key]))
-      )}')"
-    criterion_context_message="Source, target, contract, goal, or toolchain authority changed during contract execution. Changed fields: $(jq -c '.changed_fields' <<< "$criterion_context_drift")."
-  fi
-fi
-if [[ "$criterion_context_gate" == "fail" ]]; then
-  echo "verify-sprint: $criterion_context_message" >&2
+  printf '{}\n' > "$verification_evaluation"
 fi
 
 benchmark_evidence_fingerprint=""
@@ -1234,9 +1153,9 @@ else
   fi
   set +e
   if [[ ${#change_assessment_packet_args[@]} -gt 0 ]]; then
-    change_assessment_output="$(REPO_HARNESS_TARGET_REPO_ROOT="$(pwd -P)" "$BUN_BIN" "$helper_dir/change-assessment.ts" prepare --contract "$contract_file" --output "$change_assessment_file" "${change_assessment_packet_args[@]}" 2>&1)"
+    change_assessment_output="$(REPO_HARNESS_TARGET_REPO_ROOT="$(pwd -P)" "$BUN_BIN" "$helper_dir/change-assessment.ts" prepare --contract "$contract_file" --target-revision "$target_revision" --output "$change_assessment_file" "${change_assessment_packet_args[@]}" 2>&1)"
   else
-    change_assessment_output="$(REPO_HARNESS_TARGET_REPO_ROOT="$(pwd -P)" "$BUN_BIN" "$helper_dir/change-assessment.ts" prepare --contract "$contract_file" --output "$change_assessment_file" 2>&1)"
+    change_assessment_output="$(REPO_HARNESS_TARGET_REPO_ROOT="$(pwd -P)" "$BUN_BIN" "$helper_dir/change-assessment.ts" prepare --contract "$contract_file" --target-revision "$target_revision" --output "$change_assessment_file" 2>&1)"
   fi
   change_assessment_exit=$?
   set -e
@@ -1305,7 +1224,7 @@ case "$acceptance_status" in
     acceptance_gate="fail"
     ;;
 esac
-if [[ "$contract_exit" -eq 0 && "$criterion_context_gate" != "fail" && "$review_status" == "pass" && "$change_assessment_status" == "pass" && "$acceptance_gate" == "pass" && "$allowed_paths_status" == "pass" ]]; then
+if [[ "$contract_exit" -eq 0 && "$verification_evaluation_gate" != "fail" && "$review_status" == "pass" && "$change_assessment_status" == "pass" && "$acceptance_gate" == "pass" && "$allowed_paths_status" == "pass" ]]; then
   status="pass"
   exit_code=0
 fi
@@ -1316,8 +1235,8 @@ fi
 if [[ -z "$failure_class" && "$status" != "pass" ]]; then
   if [[ "$contract_exit" -ne 0 ]]; then
     failure_class="contract"
-  elif [[ "$criterion_context_gate" == "fail" ]]; then
-    failure_class="criterion_context"
+  elif [[ "$verification_evaluation_gate" == "fail" ]]; then
+    failure_class="verification_evaluation"
   elif [[ "$review_status" != "pass" ]]; then
     failure_class="review"
   elif [[ "$change_assessment_status" != "pass" ]]; then
@@ -1356,9 +1275,8 @@ if command -v jq >/dev/null 2>&1 && jq -e . "$contract_report" >/dev/null 2>&1; 
     --arg contract_status "$([[ "$contract_exit" -eq 0 ]] && printf pass || printf fail)" \
     --arg contract_command "$contract_command" \
     --argjson contract_exit "$contract_exit" \
-    --arg criterion_context_gate "$criterion_context_gate" \
-    --arg criterion_context_message "$criterion_context_message" \
-    --argjson criterion_context_drift "$criterion_context_drift" \
+    --arg verification_evaluation_gate "$verification_evaluation_gate" \
+    --arg verification_evaluation_message "$verification_evaluation_message" \
     --arg review_file "${review_file:-}" \
     --arg review_status "$review_status" \
     --arg review_message "$review_message" \
@@ -1380,7 +1298,7 @@ if command -v jq >/dev/null 2>&1 && jq -e . "$contract_report" >/dev/null 2>&1; 
     --argjson files_changed "$(git_changed_files_json)" \
     --argjson allowed_paths_check "$allowed_paths_check" \
     --slurpfile change_assessment "$change_assessment_file" \
-    --slurpfile criterion_context "$criterion_context" \
+    --slurpfile verification_evaluation "$verification_evaluation" \
     --argjson allowed_paths "$(allowed_paths_json "$contract_file")" \
     --argjson handoff_current_exists "$handoff_current_exists" \
     --argjson handoff_resume_exists "$handoff_resume_exists" \
@@ -1413,7 +1331,7 @@ if command -v jq >/dev/null 2>&1 && jq -e . "$contract_report" >/dev/null 2>&1; 
       commands: ([
         {name: "verify-sprint", command: $command, status: $status, exit_code: $exit_code},
         {name: "verify-contract", command: $contract_command, status: $contract_status, exit_code: $contract_exit}
-      ] + (($contract_report[0].results // []) | map(select(.kind == "tests_pass" or .kind == "commands_succeed") | {
+      ] + (($contract_report[0].results // []) | map(select((.kind == "package_test" or .kind == "command") and .execution != "baseline") | {
         name: ("criterion:" + .kind + ":" + .target),
         command: .command,
         status: (if .passed then "pass" else "fail" end),
@@ -1425,7 +1343,7 @@ if command -v jq >/dev/null 2>&1 && jq -e . "$contract_report" >/dev/null 2>&1; 
       }))),
       guards: [
         {name: "contract", status: $contract_status},
-        {name: "criterion_context", status: $criterion_context_gate, message: $criterion_context_message},
+        {name: "verification_evaluation", status: $verification_evaluation_gate, message: $verification_evaluation_message},
         {name: "review", status: $review_status},
         {name: "change_assessment", status: $change_assessment_status},
         {name: "acceptance_receipt", status: $acceptance_status},
@@ -1450,8 +1368,8 @@ if command -v jq >/dev/null 2>&1 && jq -e . "$contract_report" >/dev/null 2>&1; 
         command: $contract_command,
         exit_code: $contract_exit,
         report: ($contract_report[0] // {}),
-        retry_context: ($criterion_context[0] // {}),
-        retry_context_guard: ({status: $criterion_context_gate, message: $criterion_context_message} + $criterion_context_drift),
+        execution_evaluation: ($verification_evaluation[0] // {}),
+        execution_evaluation_guard: {status: $verification_evaluation_gate, message: $verification_evaluation_message},
         task_profile: $task_profile,
         allowed_paths: $allowed_paths
       },
@@ -1514,7 +1432,7 @@ else
   ],
   "guards": [
     {"name": "contract", "status": "$([[ "$contract_exit" -eq 0 ]] && printf pass || printf fail)"},
-    {"name": "criterion_context", "status": "$(json_escape "$criterion_context_gate")", "message": "$(json_escape "$criterion_context_message")"},
+    {"name": "verification_evaluation", "status": "$(json_escape "$verification_evaluation_gate")", "message": "$(json_escape "$verification_evaluation_message")"},
     {"name": "review", "status": "$(json_escape "$review_status")"},
     {"name": "change_assessment", "status": "$(json_escape "$change_assessment_status")"},
     {"name": "acceptance_receipt", "status": "$(json_escape "$acceptance_status")"},
@@ -1541,7 +1459,7 @@ else
     "status": "$([[ "$contract_exit" -eq 0 ]] && printf pass || printf fail)",
     "command": "$(json_escape "$contract_command")",
     "exit_code": $contract_exit,
-    "retry_context_guard": {"status": "$(json_escape "$criterion_context_gate")", "message": "$(json_escape "$criterion_context_message")"},
+    "execution_evaluation_guard": {"status": "$(json_escape "$verification_evaluation_gate")", "message": "$(json_escape "$verification_evaluation_message")"},
     "task_profile": "$(json_escape "$task_profile")",
     "allowed_paths": []
   },

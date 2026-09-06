@@ -13,7 +13,7 @@ type VerificationResult = {
   stdout: string;
   stderr: string;
   report: {
-    results: Array<{ kind: string; target: string; passed: boolean; message: string }>;
+    results: Array<{ id?: string; kind: string; target: string; passed: boolean; message: string; command?: string }>;
   };
 };
 
@@ -72,8 +72,25 @@ function writeContract(root: string, paths: string[]): string {
       '',
       '```yaml',
       'exit_criteria:',
-      '  tests_pass:',
-      ...paths.map((path) => `    - path: ${path}`),
+      '```',
+      '',
+      '## Verification Plan',
+      '',
+      '```json',
+      JSON.stringify({
+        protocol: 1,
+        checks: paths.map((path, index) => ({
+          id: packageTestId(path),
+          kind: 'package_test',
+          path,
+          cwd: '.',
+          phase: 'verification',
+          cost: 'normal',
+          evidence_policy: 'current_exact',
+          necessity: `The package-owned fixture must execute ${path} through its owning package script.`,
+          inputs: { env: [] },
+        })),
+      }, null, 2),
       '```',
       '',
       '## Evidence Requirements',
@@ -89,10 +106,18 @@ function writeContract(root: string, paths: string[]): string {
 }
 
 function runVerifier(root: string, contract: string): VerificationResult {
+  if (spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: root, encoding: 'utf-8' }).status !== 0) {
+    expect(spawnSync('git', ['init', '-b', 'main'], { cwd: root, encoding: 'utf-8' }).status).toBe(0);
+    expect(spawnSync('git', ['config', 'user.name', 'Package Test Fixture'], { cwd: root, encoding: 'utf-8' }).status).toBe(0);
+    expect(spawnSync('git', ['config', 'user.email', 'package-test@example.com'], { cwd: root, encoding: 'utf-8' }).status).toBe(0);
+    writeFileSync(join(root, '.gitignore'), '.ai/harness/checks/\n.ai/harness/runs/\n.ai/harness/evidence/\n');
+    expect(spawnSync('git', ['add', '.'], { cwd: root, encoding: 'utf-8' }).status).toBe(0);
+    expect(spawnSync('git', ['commit', '-m', 'fixture'], { cwd: root, encoding: 'utf-8' }).status).toBe(0);
+  }
   const reportPath = join(root, 'report.json');
   const result = spawnSync(
     'bash',
-    [VERIFY_CONTRACT, '--contract', contract, '--strict', '--read-only', '--report-file', reportPath],
+    [VERIFY_CONTRACT, '--contract', 'task.contract.md', '--strict', '--read-only', '--report-file', reportPath],
     {
       cwd: root,
       encoding: 'utf-8',
@@ -112,7 +137,11 @@ function runVerifier(root: string, contract: string): VerificationResult {
 }
 
 function criterion(result: VerificationResult, path: string) {
-  return result.report.results.find((entry) => entry.kind === 'tests_pass' && entry.target === path);
+  return result.report.results.find((entry) => entry.kind === 'package_test' && entry.id === packageTestId(path));
+}
+
+function packageTestId(path: string): string {
+  return `package-test-${path.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 }
 
 describe('package-owned contract test runner', () => {
@@ -130,7 +159,7 @@ describe('package-owned contract test runner', () => {
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(criterion(result, path)).toMatchObject({ passed: true });
-    expect(result.stdout).toContain(`bun run --cwd packages/client test -- tests/requires-package-config.test.ts`);
+    expect(criterion(result, path)?.command).toContain(`run --cwd packages/client test -- tests/requires-package-config.test.ts`);
   }, 30_000);
 
   test('runs a root single-package Bun test through the root package script', () => {
@@ -146,7 +175,7 @@ describe('package-owned contract test runner', () => {
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(criterion(result, path)).toMatchObject({ passed: true });
-    expect(result.stdout).toContain('bun run --cwd . test -- tests/requires-root-config.test.ts');
+    expect(criterion(result, path)?.command).toContain('run --cwd . test -- tests/requires-root-config.test.ts');
   }, 30_000);
 
   test('fails closed when no owning package declares a test script', () => {
@@ -162,8 +191,7 @@ describe('package-owned contract test runner', () => {
     const result = runVerifier(cwd, writeContract(cwd, [path]));
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
-    expect(criterion(result, path)).toMatchObject({ passed: false });
-    expect(result.stdout).toContain('package scripts.test is missing');
+    expect(result.stdout).toContain('package_test package scripts.test is missing');
   }, 30_000);
 
   test('fails closed when the nearest package manifest is malformed', () => {
@@ -179,11 +207,10 @@ describe('package-owned contract test runner', () => {
     const result = runVerifier(cwd, writeContract(cwd, [path]));
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
-    expect(criterion(result, path)).toMatchObject({ passed: false });
-    expect(result.stdout).toContain('package manifest is malformed');
+    expect(result.stdout).toContain('package_test package manifest is malformed');
   }, 30_000);
 
-  test('fails closed when a tests_pass symlink resolves outside the repository', () => {
+  test('fails closed when a package_test symlink resolves outside the repository', () => {
     const cwd = workspace('package-owned-symlink-root');
     const outside = workspace('package-owned-symlink-outside');
     const path = 'linked-tests/plain.test.ts';
@@ -197,11 +224,10 @@ describe('package-owned contract test runner', () => {
     const result = runVerifier(cwd, writeContract(cwd, [path]));
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
-    expect(criterion(result, path)).toMatchObject({ passed: false });
-    expect(result.stdout).toContain('tests_pass path resolves outside repository');
+    expect(result.stdout).toContain('package_test path resolves outside repository');
   }, 30_000);
 
-  test('contains no bare Bun test fallback for tests_pass criteria', () => {
+  test('contains no bare Bun test fallback for package_test criteria', () => {
     const source = readFileSync(VERIFY_CONTRACT, 'utf-8');
     expect(source).not.toContain('run_bounded "$log_path" "$result_path" "$bun_bin" test "$path"');
   });

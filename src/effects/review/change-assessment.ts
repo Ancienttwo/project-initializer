@@ -100,6 +100,8 @@ function profileFor(paths: readonly string[]): { readonly workflowProfile: Workf
 export function prepareChangeAssessment(args: {
   readonly repoRoot: string;
   readonly contractPath: string;
+  /** An acceptance reader pins historical assessment to the receipt target. */
+  readonly targetRevision?: string;
   /** A prior packet may contribute only the closed reviewer-disagreement overlay. */
   readonly reviewerDisagreementPacket?: unknown;
 }): PreparedChangeAssessment {
@@ -114,7 +116,10 @@ export function prepareChangeAssessment(args: {
     throw new Error(`contract is unreadable: ${args.contractPath}`);
   }
   const declaration = parseChangeAssessmentContract(contract);
-  const subject = buildReviewSubject(args.repoRoot, { targetRef: reviewBase.targetRef });
+  const subject = buildReviewSubject(args.repoRoot, {
+    targetRef: reviewBase.targetRef,
+    targetRevision: args.targetRevision,
+  });
   const profile = profileFor(subject.paths);
   const assessment = assessChange({
     subject,

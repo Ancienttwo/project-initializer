@@ -58,8 +58,14 @@ const required = [
   "assets/templates/helpers/capability-config.ts",
   "assets/templates/helpers/change-assessment.ts",
   "assets/templates/helpers/runtime-evidence-receipt.ts",
+  "assets/templates/helpers/verification-plan.ts",
+  "assets/templates/helpers/migrate-verification-plan.ts",
   "interfaces/effective-state-v1.ts",
   "interfaces/types.ts",
+  "scripts/verification-plan.ts",
+  "scripts/migrate-verification-plan.ts",
+  "src/core/evidence/verification-plan.ts",
+  "src/effects/evidence/verification-execution.ts",
   "src/effects/operator/fleet-collector-process.ts",
   "assets/operator/fleet-windows-job-controller.ps1",
   "dist/operator-ui/index.html",
@@ -103,6 +109,9 @@ bun add "$TARBALL_PATH" >/dev/null
 
 CLI="$APP_DIR/node_modules/.bin/repo-harness"
 HOOK="$APP_DIR/node_modules/.bin/repo-harness-hook"
+# This smoke verifies the installed package runtime even when the operator shell
+# is configured to route development CLIs to another source checkout.
+unset REPO_HARNESS_SOURCE_ROOT
 OPERATOR_HOME="$TMP_DIR/operator-home"
 OPERATOR_REGISTRY="$OPERATOR_HOME/.repo-harness"
 OPERATOR_STDOUT="$TMP_DIR/operator-stdout.log"
@@ -317,6 +326,98 @@ if (plan.protocol !== 1 || plan.command !== "init" || plan.apply !== false) {
 JS_EOF
 
 "$CLI" init --repo "$TARGET_REPO" --no-verify --no-codegraph --json >"$TMP_DIR/init-apply.json"
+
+git -C "$TARGET_REPO" config user.email "tarball-smoke@example.invalid"
+git -C "$TARGET_REPO" config user.name "repo-harness tarball smoke"
+cat >>"$TARGET_REPO/.git/info/exclude" <<'EXCLUDE_EOF'
+.ai/harness/
+.smoke/
+EXCLUDE_EOF
+git -C "$TARGET_REPO" add .
+git -C "$TARGET_REPO" commit -qm "initialize smoke repository"
+
+mkdir -p "$TARGET_REPO/tasks/contracts" "$TARGET_REPO/.smoke"
+cat >"$TARGET_REPO/tasks/contracts/tarball-verification.contract.md" <<'CONTRACT_EOF'
+# Tarball Verification Contract
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "single-count",
+      "kind": "command",
+      "command": "mkdir -p .smoke && printf 'executed\\n' >> .smoke/execution-count",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "prove packaged verification execution and exact-context reuse",
+      "inputs": { "env": [] }
+    }
+  ]
+}
+```
+CONTRACT_EOF
+git -C "$TARGET_REPO" add tasks/contracts/tarball-verification.contract.md
+git -C "$TARGET_REPO" commit -qm "add verification smoke contract"
+
+VERIFICATION_CONTRACT="tasks/contracts/tarball-verification.contract.md"
+"$CLI" run verification-plan validate --repo "$TARGET_REPO" --contract "$VERIFICATION_CONTRACT" \
+  >"$TARGET_REPO/.smoke/validate.json"
+if "$CLI" run verification-plan evaluate --repo "$TARGET_REPO" --contract "$VERIFICATION_CONTRACT" \
+  --report-file .smoke/evaluate-missing-report.json >"$TARGET_REPO/.smoke/evaluate-missing.json"; then
+  echo "[tarball-smoke] ERROR: packaged verification evaluate passed without execution evidence" >&2
+  exit 1
+fi
+if [[ -e "$TARGET_REPO/.smoke/execution-count" ]]; then
+  echo "[tarball-smoke] ERROR: packaged verification evaluate spawned the declared command" >&2
+  exit 1
+fi
+"$CLI" run verification-plan execute --repo "$TARGET_REPO" --contract "$VERIFICATION_CONTRACT" \
+  --report-file .smoke/execute-first-report.json >"$TARGET_REPO/.smoke/execute-first.json"
+"$CLI" run verification-plan execute --repo "$TARGET_REPO" --contract "$VERIFICATION_CONTRACT" \
+  --report-file .smoke/execute-reuse-report.json >"$TARGET_REPO/.smoke/execute-reuse.json"
+"$CLI" run verification-plan evaluate --repo "$TARGET_REPO" --contract "$VERIFICATION_CONTRACT" \
+  --report-file .smoke/evaluate-final-report.json >"$TARGET_REPO/.smoke/evaluate-final.json"
+bun - "$TARGET_REPO" <<'JS_EOF'
+const [, , repo] = process.argv;
+const readJson = async (name) => await Bun.file(`${repo}/.smoke/${name}`).json();
+const fail = (message) => {
+  console.error(`[tarball-smoke] ERROR: ${message}`);
+  process.exit(1);
+};
+const validation = await readJson("validate.json");
+const missing = await readJson("evaluate-missing.json");
+const first = await readJson("execute-first.json");
+const reuse = await readJson("execute-reuse.json");
+const finalEvaluation = await readJson("evaluate-final.json");
+const counter = (await Bun.file(`${repo}/.smoke/execution-count`).text()).trim().split("\n");
+if (validation?.kind !== "verification_plan_validation" || validation?.valid !== true
+  || validation?.plan?.checks?.[0]?.id !== "single-count") fail("packaged verification validate returned the wrong plan");
+if (missing?.passed !== false || missing?.status !== "missing" || missing?.results?.[0]?.execution !== "missing") {
+  fail("packaged verification evaluate did not report missing evidence");
+}
+if (first?.passed !== true || first?.results?.[0]?.execution !== "executed") {
+  fail("packaged verification execute did not record the first execution");
+}
+if (reuse?.passed !== true || reuse?.results?.[0]?.execution !== "reused"
+  || reuse?.results?.[0]?.execution_id !== first?.results?.[0]?.execution_id) {
+  fail("packaged verification execute did not reuse the exact successful execution");
+}
+if (finalEvaluation?.passed !== true || finalEvaluation?.results?.[0]?.execution !== "reused"
+  || finalEvaluation?.results?.[0]?.execution_id !== first?.results?.[0]?.execution_id) {
+  fail("packaged verification evaluate did not read the existing execution without spawning");
+}
+if (counter.length !== 1 || counter[0] !== "executed") fail("verification command did not execute exactly once");
+JS_EOF
+if [[ -n "$(git -C "$TARGET_REPO" status --porcelain)" ]]; then
+  echo "[tarball-smoke] ERROR: packaged verification runtime counter, evidence, or reports are not ignored" >&2
+  git -C "$TARGET_REPO" status --short >&2
+  exit 1
+fi
 
 if ! "$CLI" run check-task-workflow --help >/dev/null; then
   echo "[tarball-smoke] ERROR: packaged 'repo-harness run check-task-workflow --help' failed (run dispatcher / helper lookup / bin startup broken)" >&2

@@ -8,7 +8,7 @@
 
 Shared root-cause gate fixture (see tests/fixtures/root-cause/expected-results.ts): proves
 a bugfix contract with all four Root Cause Evidence fields filled in correctly, a
-regression_guard listed under exit_criteria.tests_pass, and a genuine pre-fix failure
+regression_guard listed under the canonical Verification Plan, and a genuine pre-fix failure
 artifact passes both the TypeScript (contract-run.ts) and bash (verify-contract.sh) gates.
 
 ## Goal
@@ -47,6 +47,25 @@ evidence_requirements:
 
 ```yaml
 exit_criteria:
-  tests_pass:
-    - path: tests/fixtures/root-cause/regression-guard.test.ts
+```
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "fixture-regression-guard",
+      "kind": "package_test",
+      "path": "tests/fixtures/root-cause/regression-guard.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "This fixture declares its root-cause regression guard explicitly.",
+      "inputs": { "env": [] }
+    }
+  ]
+}
 ```

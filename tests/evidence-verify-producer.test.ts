@@ -346,3 +346,25 @@ describe("scripts/emit-verify-evidence.ts: exit code contract", () => {
     });
   }, 30_000);
 });
+
+
+test("frozen verification target remains bound when the policy ref moves", () => {
+  withTempRepo("verify-frozen-target", (repoRoot) => {
+    const { contractRelative } = setupFixtureRepo(repoRoot);
+    const frozen = git(repoRoot, ["rev-parse", "base-tag"]).trim();
+    const subject = buildReviewSubject(repoRoot, { targetRef: "base-tag", targetRevision: frozen });
+    git(repoRoot, ["tag", "-f", "base-tag", "HEAD"]);
+    const emitted = emitAuthoritativeVerifyEvidence({ repoRoot, contractPath: contractRelative,
+      commandLine: "verify-sprint --prepare-acceptance", status: "pass", runSnapshotPath: RUN_SNAPSHOT_ARG,
+      expectedSubjectSha256: subject.review_subject_sha256, targetRevision: frozen });
+    expect(emitted.ok).toBe(true);
+    if (emitted.ok) expect(emitted.event.subject_identity.base_commit).toBe(frozen);
+    const mixed = emitAuthoritativeVerifyEvidence({ repoRoot, contractPath: contractRelative,
+      commandLine: "verify-sprint --prepare-acceptance", status: "pass", runSnapshotPath: RUN_SNAPSHOT_ARG,
+      targetRevision: frozen, runTrace: { change_assessment: { selection_packet: {
+        target_ref: "base-tag", target_revision: git(repoRoot, ["rev-parse", "HEAD"]).trim(),
+      } } } });
+    expect(mixed.ok).toBe(false);
+    if (!mixed.ok) expect(mixed.message).toContain("run trace target differs");
+  });
+});

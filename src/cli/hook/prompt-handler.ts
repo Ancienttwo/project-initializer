@@ -721,26 +721,10 @@ export function runPromptHandler(opts: PromptHandlerInput): PromptHandlerResult 
       const rendered = renderPromptGuardAction(action, state, fsApi, opts.repoRoot);
       return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${rendered.stderr}`, reason: rendered.reason };
     }
-    const contractVerification = command(['run', 'verify-contract', '--contract', state.contractFile ?? '', '--strict', '--read-only']);
-    if (contractVerification.exitCode !== 0) {
-      const detail = contractVerification.stderr.trim() || contractVerification.stdout.trim();
-      const rendered = structuredError(
-        'ContractGuard',
-        `Contract verification failed for ${state.contractFile ?? '(none)'}.${detail ? ` ${detail}` : ''}`,
-        'Resolve the failing exit criteria in the contract before marking work done.',
-        'contract_failure',
-      );
-      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${contractVerification.stderr}${rendered.stderr}`, reason: rendered.reason };
-    }
-    const contractOutput: string[] = [];
-    const contractErrors: string[] = [];
-    appendCommandOutput(contractVerification, contractOutput, contractErrors);
-    out.push(...contractOutput);
-
     const evidenceError = checkStructuredEvidence(opts.repoRoot, state, fsApi);
     if (evidenceError) {
       const rendered = structuredError('EvidenceGuard', evidenceError, 'Run repo-harness run verify-sprint so .ai/harness/checks/latest.json records a passing current sprint verification.', 'quality_gate');
-      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${contractErrors.join('')}${rendered.stderr}`, reason: rendered.reason };
+      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${rendered.stderr}`, reason: rendered.reason };
     }
 
     const acceptance = command([
@@ -758,7 +742,7 @@ export function runPromptHandler(opts: PromptHandlerInput): PromptHandlerResult 
         'Run verify-sprint --prepare-acceptance, then record external acceptance or materialize user_waiver from one valid contract-bound UserWaiverGrant; do not ask the owner to repeat a subject hash.',
         'quality_gate',
       );
-      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${contractErrors.join('')}${acceptance.stderr}${rendered.stderr}`, reason: rendered.reason };
+      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${acceptance.stderr}${rendered.stderr}`, reason: rendered.reason };
     }
 
     const activePlanText = state.activePlan ? text(fsApi, opts.repoRoot, state.activePlan) ?? '' : '';
@@ -770,23 +754,23 @@ export function runPromptHandler(opts: PromptHandlerInput): PromptHandlerResult 
         `Finish the remaining Task Breakdown item: ${planTasks.next || `see ${state.activePlan ?? 'the active plan'}`}.`,
         'state_violation',
       );
-      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${contractErrors.join('')}${rendered.stderr}`, reason: rendered.reason };
+      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${rendered.stdout}`, stderr: `${stderrPrefix}${rendered.stderr}`, reason: rendered.reason };
     }
 
     if (isLinkedWorktree(opts.repoRoot)) {
       out.push(`[WorkflowNextAction] Done quality gates passed for ${state.activePlan ?? '(none)'}.\n`);
       out.push('[WorkflowNextAction] Review/checks pass; finish and fast-forward merge this contract worktree.\n');
       out.push('[WorkflowNextAction] repo-harness run contract-worktree finish\n');
-      return { exitCode: 0, stdout: out.join(''), stderr: `${stderrPrefix}${contractErrors.join('')}` };
+      return { exitCode: 0, stdout: out.join(''), stderr: `${stderrPrefix}` };
     }
 
     const run = command(['run', 'archive-workflow', '--plan', state.activePlan ?? '', '--outcome', deriveDoneOutcome(context)]);
     if (run.exitCode !== 0) {
       const detail = run.stderr.trim() || run.stdout.trim() || 'archive-workflow failed';
       const rendered = structuredError('AutoArchive', detail, 'Fix the archive-workflow error before marking the workflow complete.', 'missing_artifact');
-      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${run.stdout}${rendered.stdout}`, stderr: `${stderrPrefix}${contractErrors.join('')}${run.stderr}${rendered.stderr}`, reason: rendered.reason };
+      return { exitCode: rendered.exitCode, stdout: `${out.join('')}${run.stdout}${rendered.stdout}`, stderr: `${stderrPrefix}${run.stderr}${rendered.stderr}`, reason: rendered.reason };
     }
-    return { exitCode: 0, stdout: `${out.join('')}${run.stdout}`, stderr: `${stderrPrefix}${contractErrors.join('')}${run.stderr}` };
+    return { exitCode: 0, stdout: `${out.join('')}${run.stdout}`, stderr: `${stderrPrefix}${run.stderr}` };
   }
 
   appendTddBddAdvice(context, out);
