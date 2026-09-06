@@ -1,3 +1,5 @@
+import { observeShadowAdoption } from './issue-batch-shadow-adoption';
+import type { GithubCommandRunner } from '../external-sources/github';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
 import { capabilityRegistryFromArchcontextNodes } from '../../core/capabilities/registry';
@@ -38,6 +40,7 @@ export interface IssueBatchAdoptionDependencies {
     readonly model: { readonly verified: boolean }; readonly browser: { readonly profileDirectory?: string };
   } };
   readonly observe?: typeof observeIssueBatch;
+  readonly runner?: GithubCommandRunner;
   readonly now?: () => Date;
 }
 function fail(message: string): never { throw new IssueBatchAdoptionError('issue_adoption_reconciliation_required', message); }
@@ -120,13 +123,18 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   if (mode === 'off' || (mode === 'shadow' && !input.dry_run)) fail('campaign mode forbids materialization');
   const existing = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption');
   if (existing) {
-    const stored = existing as unknown as { input: IssueBatchAdoptionInput; sprint_path: string; publication_policy: CampaignPublicationPolicy };
+    const stored = existing as unknown as { input: IssueBatchAdoptionInput; sprint_path: string; publication_policy: CampaignPublicationPolicy; shadow_budget_artifact?: `shadow-${string}` };
     if (stored.sprint_path !== input.sprint_path || canonicalMessageBytes({ ...stored.publication_policy }) !== canonicalMessageBytes({ ...publicationPolicy })) fail('replay target differs from stored adoption');
     const authorization = readStoredProgramAuthorization(input.repo_root, status.campaign.authorization_sha256, input.env);
     if (stored.input.authorization_sha256 !== authorization.authorization_sha256 || canonicalMessageBytes({ ...stored.input.intent }) !== canonicalMessageBytes({ ...intent })) fail('replay authority differs');
     verifyCampaignAuthoringBudgetTerminal({ repo_root: input.repo_root, automation_run_id: stored.input.terminal.automation_run_id,
       expected_budget_sha256: stored.input.terminal.budget_sha256, campaign_id: intent.campaign_id, group_number: intent.group_number as 1 | 2 | 3,
       intent_sha256: intent.intent_sha256, env: input.env, terminal: stored.input.terminal });
+    if (mode === 'shadow') {
+      if (!stored.shadow_budget_artifact) fail('shadow adoption has no budgeted observation evidence');
+      const outcome = readIssueBatchAdoptionArtifact(input.repo_root, intent, stored.shadow_budget_artifact);
+      if (!outcome || outcome.outcome !== 'progress' || canonicalMessageBytes(outcome.final_snapshot as Record<string, unknown>) !== canonicalMessageBytes({ receipt: stored.input.snapshot.snapshot_receipt, observations: stored.input.snapshot.observations })) fail('shadow adoption observation evidence differs');
+    }
     const adopted = buildIssueBatchAdoption(stored.input);
     const publication = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'publication');
     let visible = false;
@@ -189,6 +197,27 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   verifyConnectorChallenge({ challenge, response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified });
   requireIssueBatchAuthority({ repo_root: input.repo_root, intent, env: input.env, now: now() });
   const prior = priorReconciliation(input.repo_root, intent);
+  if (mode === 'shadow') {
+    const capabilities = capabilityIds(input.repo_root, intent);
+    const observed = observeShadowAdoption({ binding, intent, prior, observe: deps.observe, runner: deps.runner, now, validate: snapshot => {
+      const reconciliation = reconcileIssueBatchSlots({ intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, ...prior, current_main_sha: intent.base_main_sha });
+      if (reconciliation.invalid_slots.length || reconciliation.unexpected_issue_ids.length) fail('invalid or unexpected slots require BRC5 reconciliation before adoption');
+      for (const slot of reconciliation.slots.filter(s => s.state === 'complete')) {
+        const observation = snapshot.observations.find(o => o.observation_sha256 === slot.observation_sha256)!;
+        const metadata = parseIssueBatchMetadata(observation.body);
+        if (!metadata || !capabilities.includes(metadata.primary_capability)) fail('adoption metadata references an unavailable capability');
+      }
+      return reconciliation.outcome === 'complete' ? 'complete' : 'partial';
+    } });
+    verifyCampaignAuthoringBudgetTerminal({ ...binding, terminal: observed.terminal });
+    const adoptionInput: IssueBatchAdoptionInput = { intent, session, snapshot: { snapshot_receipt: observed.finalSnapshot.receipt,
+      observations: observed.finalSnapshot.observations, prior_observations: observed.snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots },
+      capability_ids: capabilities, authorization_sha256: authorization.authorization_sha256, terminal: observed.terminal, challenge,
+      challenge_response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified };
+    const adopted = buildIssueBatchAdoption(adoptionInput);
+    persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy, shadow_budget_artifact: observed.artifact });
+    return { ...adopted, publication: null };
+  }
   const snapshot: IssueBatchObservationSnapshotV1 = (deps.observe ?? observeIssueBatch)({ repo_root: input.repo_root, intent, env: input.env, now });
   const reconciliation = reconcileIssueBatchSlots({ intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, ...prior, current_main_sha: intent.base_main_sha });
   if (reconciliation.invalid_slots.length || reconciliation.unexpected_issue_ids.length) fail('invalid or unexpected slots require BRC5 reconciliation before adoption');

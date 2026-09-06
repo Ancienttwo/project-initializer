@@ -1845,36 +1845,39 @@ export interface CompleteCampaignBudgetStepInput {
   readonly env?: NodeJS.ProcessEnv;
 }
 
-export function completeCampaignBudgetStep(input: CompleteCampaignBudgetStepInput): CampaignBudgetStepCompletionV1 {
+function completeCampaignBudgetStepLocked(input: CompleteCampaignBudgetStepInput, repoRoot: string, paths: RunPaths): CampaignBudgetStepCompletionV1 {
   const validated = validateCampaignBudgetStepEvent(input.admission);
   if (validated.kind !== CAMPAIGN_STEP_ADMISSION_KIND) fail('automation_budget_store_invalid', 'campaign completion requires an admission');
+  const now = automationStoreNow();
+  const status = lockedStatus(repoRoot, paths, validated.automation_run_id, now, input.env);
+  assertStepBudgetBinding({ ...validated, repo_root: repoRoot, expected_budget_sha256: validated.budget_sha256 }, status);
+  const records = readLedgerEvents(paths);
+  const stored = records.find(event => event.event_sha256 === validated.event_sha256);
+  if (stored === undefined || canonicalAutomationJson(stored) !== canonicalAutomationJson(validated)) fail('automation_budget_store_conflict', 'campaign completion admission is not durable');
+  const prior = records.find((event): event is CampaignBudgetStepCompletionV1 => event.kind === CAMPAIGN_STEP_COMPLETION_KIND && event.admission_sha256 === validated.event_sha256);
+  if (prior !== undefined) {
+    if (prior.outcome !== input.outcome || canonicalAutomationJson(prior.evidence_refs) !== canonicalAutomationJson(input.evidence_refs)) fail('automation_budget_store_conflict', 'campaign completion replay changes its outcome or evidence');
+    return prior;
+  }
+  if (status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_refused', 'campaign completion requires external reservation reconciliation');
+  const ledger = campaignLedger(paths, status.budget);
+  if (ledger.active_step?.event_sha256 !== validated.event_sha256) fail('automation_budget_store_conflict', 'campaign admission is not the active step');
+  const event = sealCampaignBudgetStepEvent({
+    ...validateCampaignBudgetStepIdentity(validated), kind: CAMPAIGN_STEP_COMPLETION_KIND,
+    admission_sha256: validated.event_sha256, outcome: input.outcome, evidence_refs: input.evidence_refs,
+    authorization_id: validated.authorization_id, budget_sha256: validated.budget_sha256,
+    step_index: status.current.next_step_index, previous_ledger_sha256: status.current.ledger_sha256, observed_at: now,
+  }) as CampaignBudgetStepCompletionV1;
+  foldStoredCampaignLedger(paths, status.budget, [...records, event], readLedgerReservations(paths));
+  persistCampaignStepEvent(repoRoot, paths, status, event);
+  return event;
+}
+
+export function completeCampaignBudgetStep(input: CompleteCampaignBudgetStepInput): CampaignBudgetStepCompletionV1 {
   const repoRoot = resolve(input.repo_root);
-  const paths = runPaths(repoRoot, validated.automation_run_id);
-  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
-    const now = automationStoreNow();
-    const status = lockedStatus(repoRoot, paths, validated.automation_run_id, now, input.env);
-    assertStepBudgetBinding({ ...validated, repo_root: repoRoot, expected_budget_sha256: validated.budget_sha256 }, status);
-    const records = readLedgerEvents(paths);
-    const stored = records.find(event => event.event_sha256 === validated.event_sha256);
-    if (stored === undefined || canonicalAutomationJson(stored) !== canonicalAutomationJson(validated)) fail('automation_budget_store_conflict', 'campaign completion admission is not durable');
-    const prior = records.find((event): event is CampaignBudgetStepCompletionV1 => event.kind === CAMPAIGN_STEP_COMPLETION_KIND && event.admission_sha256 === validated.event_sha256);
-    if (prior !== undefined) {
-      if (prior.outcome !== input.outcome || canonicalAutomationJson(prior.evidence_refs) !== canonicalAutomationJson(input.evidence_refs)) fail('automation_budget_store_conflict', 'campaign completion replay changes its outcome or evidence');
-      return prior;
-    }
-    if (status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_refused', 'campaign completion requires external reservation reconciliation');
-    const ledger = campaignLedger(paths, status.budget);
-    if (ledger.active_step?.event_sha256 !== validated.event_sha256) fail('automation_budget_store_conflict', 'campaign admission is not the active step');
-    const event = sealCampaignBudgetStepEvent({
-      ...validateCampaignBudgetStepIdentity(validated), kind: CAMPAIGN_STEP_COMPLETION_KIND,
-      admission_sha256: validated.event_sha256, outcome: input.outcome, evidence_refs: input.evidence_refs,
-      authorization_id: validated.authorization_id, budget_sha256: validated.budget_sha256,
-      step_index: status.current.next_step_index, previous_ledger_sha256: status.current.ledger_sha256, observed_at: now,
-    }) as CampaignBudgetStepCompletionV1;
-    foldStoredCampaignLedger(paths, status.budget, [...records, event], readLedgerReservations(paths));
-    persistCampaignStepEvent(repoRoot, paths, status, event);
-    return event;
-  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+  const paths = runPaths(repoRoot, input.admission.automation_run_id);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => completeCampaignBudgetStepLocked(input, repoRoot, paths),
+    { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
 export function readCampaignBudgetLedger(repoRoot: string, runId: string, env: NodeJS.ProcessEnv = process.env): CampaignBudgetLedgerV1 {
@@ -2046,6 +2049,25 @@ export interface CampaignAuthoringTerminalBindingInput {
 
 export interface SealCampaignAuthoringBudgetInput extends CampaignAuthoringTerminalBindingInput {
   readonly reason: CampaignAuthoringTerminalReason;
+  /** Final shadow step is completed under the seal lock; replay must remain the latest ledger event. */
+  readonly step_completion?: Pick<CompleteCampaignBudgetStepInput, 'admission' | 'outcome' | 'evidence_refs'>;
+}
+
+/** Authoring epoch is a projection of the existing run evidence, never a second counter. */
+export function readCampaignAuthoringProgress(input: CampaignAuthoringTerminalBindingInput) {
+  const repoRoot = resolve(input.repo_root);
+  const paths = runPaths(repoRoot, input.automation_run_id);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    const status = lockedStatus(repoRoot, paths, input.automation_run_id, automationStoreNow(), input.env);
+    const campaign = assertCampaignAuthorizationForRun(status.budget.authorization, input.automation_run_id);
+    if (status.budget.budget_sha256 !== input.expected_budget_sha256 || campaign.campaign_id !== input.campaign_id
+      || input.group_number > campaign.group_count) fail('automation_budget_store_conflict', 'authoring progress authority differs');
+    const ledger = campaignGroupLedger(paths, validateCampaignAutomationReservationContext({ campaign_id: input.campaign_id,
+      group_number: input.group_number, intent_sha256: input.intent_sha256, operation: 'initial', step_admission_sha256: null }));
+    return Object.freeze({ epoch_sha256: automationDigest({ reservations: ledger.reservations.map(r => r.reservation_sha256).sort(),
+      events: ledger.events.map(e => e.event_sha256).sort() }), completed_rounds: ledger.completed_rounds,
+      held_rounds: ledger.held_rounds, max_rounds: campaign.max_authoring_rounds_per_group });
+  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
 function evidenceRef(prefix: string, sha256: string): AutomationEvidenceRefV1 {
@@ -2103,8 +2125,8 @@ export function sealCampaignAuthoringBudget(
   const paths = runPaths(repoRoot, input.automation_run_id);
   prepareRun(paths);
   return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
-    const sealedAt = automationStoreNow();
-    const status = lockedStatus(repoRoot, paths, input.automation_run_id, sealedAt, input.env);
+    let sealedAt = automationStoreNow();
+    let status = lockedStatus(repoRoot, paths, input.automation_run_id, sealedAt, input.env);
     if (status.current.budget_sha256 !== input.expected_budget_sha256) {
       fail('automation_budget_store_conflict', 'campaign terminal expected budget revision is stale');
     }
@@ -2123,6 +2145,21 @@ export function sealCampaignAuthoringBudget(
     if (ledger.open_provider_invocations !== 0 || ledger.held_rounds !== 0 || ledger.reservations.length !== ledger.events.length) {
       fail('automation_budget_store_conflict', 'campaign authoring cannot seal while the group has an unresolved provider invocation');
     }
+    if (input.reason === 'authoring_exhausted' && ledger.completed_rounds !== campaign.max_authoring_rounds_per_group) {
+      fail('automation_budget_store_invalid', 'authoring_exhausted requires the exact configured number of completed rounds');
+    }
+    if (input.step_completion) {
+      const admission = input.step_completion.admission;
+      if (admission.automation_run_id !== input.automation_run_id || admission.campaign_id !== input.campaign_id
+        || admission.group_number !== input.group_number || admission.intent_sha256 !== input.intent_sha256
+        || input.step_completion.outcome !== 'progress') fail('automation_budget_store_conflict', 'terminal completion binding differs');
+      const completion = completeCampaignBudgetStepLocked({ ...input.step_completion, repo_root: repoRoot, env: input.env }, repoRoot, paths);
+      sealedAt = automationStoreNow();
+      status = lockedStatus(repoRoot, paths, input.automation_run_id, sealedAt, input.env);
+      if (status.current.ledger_sha256 !== chainAutomationLedgerDigest(completion.previous_ledger_sha256, completion.event_sha256)
+        || status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_store_conflict', 'terminal completion is no longer the latest ledger transition');
+    }
+    if (campaignLedger(paths, status.budget).active_step !== null) fail('automation_budget_store_conflict', 'campaign terminal requires a completed controller step');
     const path = campaignTerminalPath(paths, input.campaign_id, input.group_number);
     const existing = readCampaignTerminalOptional(paths, input.campaign_id, input.group_number);
     if (existing !== null) {

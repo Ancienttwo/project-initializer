@@ -12,6 +12,7 @@ import {
 } from '../../src/core/automation/budget';
 import {
   AutomationBudgetStoreError,
+  beginCampaignBudgetStep, completeCampaignBudgetStep, readCampaignAuthoringProgress,
   appendAutomationUsage,
   ensureCampaignAuthoringBudget,
   publishAutomationBudget,
@@ -372,4 +373,24 @@ describe('campaign authoring budget prerequisite', () => {
     appendAutomationUsage({ repo_root: input.repo, reservation: admission.reservation, outcome: 'completed', evidence_refs: [], env: input.env });
     expect(() => reserve(input, 'race-third', 'edit_issue')).toThrow('round limit is exhausted');
   });
+});
+
+
+test('shadow completion-and-seal rejects an intervening ledger transition and active-step bypass', () => {
+  const f = setup();
+  const binding = { repo_root: f.repo, automation_run_id: f.status.budget.automation_run_id,
+    expected_budget_sha256: f.status.budget.budget_sha256, campaign_id: 'campaign-budget-test',
+    group_number: 1 as const, intent_sha256: intent('group-1'), env: f.env };
+  const initial = reserve(f, 'initial', 'initial');
+  appendAutomationUsage({ repo_root: f.repo, reservation: initial.reservation, outcome: 'progress', evidence_refs: [], env: f.env });
+  const epoch = readCampaignAuthoringProgress(binding).epoch_sha256;
+  const admission = beginCampaignBudgetStep({ ...binding, idempotency_key: 'shadow' }).admission;
+  expect(readCampaignAuthoringProgress(binding).epoch_sha256).toBe(epoch);
+  expect(() => sealCampaignAuthoringBudget({ ...binding, reason: 'authoring_completed' })).toThrow('completed controller step');
+  const completion = { admission, outcome: 'progress' as const, evidence_refs: [{ ref: 'shadow:result', sha256: hex('result') }] };
+  completeCampaignBudgetStep({ ...binding, ...completion });
+  const other = beginCampaignBudgetStep({ ...binding, idempotency_key: 'intervening' }).admission;
+  completeCampaignBudgetStep({ ...binding, admission: other, outcome: 'no_progress', evidence_refs: [{ ref: 'other:result', sha256: hex('other') }] });
+  expect(() => sealCampaignAuthoringBudget({ ...binding, reason: 'authoring_completed', step_completion: completion })).toThrow('latest ledger transition');
+  expect(readCampaignAuthoringBudgetTerminal(binding)).toBeNull();
 });
