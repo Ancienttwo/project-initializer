@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from 'crypto';
-import { appendFileSync, mkdirSync } from 'fs';
 import { performance } from 'perf_hooks';
 import { join } from 'path';
 import type {
@@ -10,6 +9,7 @@ import type {
 } from '../../core/loop/loop-event-protocol';
 import type { HookEvent, RouteHost, RouteId } from './route-registry';
 import { resolveRunIdentity } from './run-identity';
+import { appendHookEventLog } from '../../effects/hook-event-log';
 
 export const HOOK_EVENT_TELEMETRY_PROTOCOL = 'loop-engine-hook-event/v1' as const;
 export const HOOK_EVENT_TELEMETRY_PATH = '.ai/harness/runs/hook-events.jsonl';
@@ -130,9 +130,7 @@ function roundMs(value: number): number {
 
 function writeRecord(repoRoot: string, record: HookEventTelemetryRecord): void {
   try {
-    const runsDir = join(repoRoot, '.ai/harness/runs');
-    mkdirSync(runsDir, { recursive: true });
-    appendFileSync(join(repoRoot, HOOK_EVENT_TELEMETRY_PATH), `${JSON.stringify(record)}\n`, { mode: 0o600 });
+    appendHookEventLog(join(repoRoot, HOOK_EVENT_TELEMETRY_PATH), `${JSON.stringify(record)}\n`, repoRoot);
   } catch {
     // Runtime telemetry is non-authoritative and must never alter hook safety.
   }

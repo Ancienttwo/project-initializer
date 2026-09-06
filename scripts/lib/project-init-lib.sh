@@ -3,94 +3,8 @@
 
 PI_RUNTIME_BLOCK_BEGIN="# BEGIN: claude-runtime-temp (managed by repo-harness)"
 PI_RUNTIME_BLOCK_END="# END: claude-runtime-temp"
-PI_DEFAULT_GITIGNORE_CONTENT=$(cat <<'EOF_GITIGNORE'
-# Dependencies
-node_modules/
-
-# Build artifacts
-artifacts/
-coverage/
-*.tar.gz
-*.tgz
-
-# External references
-_ref/
-.archcontext/*
-!.archcontext/manifest.yaml
-!.archcontext/product.yaml
-!.archcontext/model/
-.archcontext/model/*
-!.archcontext/model/nodes/
-!.archcontext/model/relations/
-!.archcontext/model/flows/
-!.archcontext/decisions/
-!.archcontext/policies/
-!.archcontext/practices/
-!.archcontext/projections/
-.codegraph/
-
-# Local operations state
-_ops/
-
-# Environment
-.env
-.env.*
-!.env.example
-
-# OS metadata
-.DS_Store
-EOF_GITIGNORE
-)
-PI_DEFAULT_RUNTIME_ENTRIES=$(cat <<'EOF_RUNTIME'
-.claude/settings.local.json
-.claude/.atomic_pending
-.claude/.session-id
-.claude/.trace.jsonl
-.claude/.session-handoff.md
-.claude/.task-state.json
-.claude/.task-handoff.md
-.claude/.codegraph-state/
-.claude/*.tmp
-.claude/*.bak
-.claude/*.bak.*
-.claude/*.backup-*
-tasks/.current.md.tmp.*
-tasks/current.md
-.ai/harness/checks/latest.json
-.ai/harness/checks/*.latest.json
-.ai/harness/checks/*.latest.md
-.ai/harness/checks/post-bash-latest.json
-.ai/harness/events.jsonl
-.ai/harness/archive/
-.ai/harness/failures/latest.jsonl
-.ai/harness/handoff/current.md
-.ai/harness/handoff/resume.md
-.ai/harness/capability-context/
-.ai/harness/journal/
-.ai/harness/architecture-projection/
-.ai/harness/security/*
-!.ai/harness/security/.gitkeep
-.ai/harness/planning/*
-!.ai/harness/planning/.gitkeep
-.ai/harness/delegation/*
-.ai/harness/architecture/events.jsonl
-.ai/harness/active-plan
-.ai/harness/active-worktree
-.ai/harness/sprint/
-.ai/harness/worktrees/
-.ai/harness/evidence/
-.ai/harness/runs/
-.ai/harness/state/
-.ai/harness/chatgpt/browser-lock.json
-.ai/harness/chatgpt/tmp/
-.ai/harness/chatgpt/sessions/
-.ai/harness/triage/*
-!.ai/harness/triage/.gitkeep
-.repo-harness/
-.codex/*
-.claude/.plan-state/
-EOF_RUNTIME
-)
+# The packaged asset is shared with the TS adoption planner; neither reader owns a list.
+PI_DEFAULT_GITIGNORE_CONTENT=""
 PI_EXTERNAL_TOOLING_HOSTS_DEFAULT=$(cat <<'EOF_EXTERNAL_TOOLING_HOSTS'
 [
   "claude-code",
@@ -517,7 +431,8 @@ pi_ensure_executable_if_apply() {
 
 pi_default_runtime_block() {
   local extra_entries="${1:-}"
-  local runtime_entries="$PI_DEFAULT_RUNTIME_ENTRIES"
+  local runtime_entries
+  runtime_entries="$(cat "${BASH_SOURCE[0]%/*}/../../assets/templates/runtime.gitignore")" || return 1
 
   if [[ -n "$extra_entries" ]]; then
     runtime_entries="${runtime_entries}"$'\n'"${extra_entries}"
@@ -554,7 +469,7 @@ pi_ensure_gitignore_block() {
   local mode="${4:-apply}"
   local block
 
-  block="$(pi_default_runtime_block "$extra_entries")"
+  block="$(pi_default_runtime_block "$extra_entries")" || return 1
 
   if [[ "$mode" != "apply" ]]; then
     echo "[dry-run] ensure managed runtime block in $file_path"

@@ -1,3 +1,4 @@
+import { artifactHash, validArtifactRepair } from './artifact-repair';
 import { createHash } from 'crypto';
 import type {
   WorkflowProfile,
@@ -56,6 +57,7 @@ export interface EffectiveStateInputs {
   readonly reviewSubject: EffectiveStateReviewSubject;
   readonly checksPath: string;
   readonly checksText: string | null;
+  readonly artifactRepairText?: string | null;
   readonly sprintPath: string | null;
   readonly sprintExists: boolean;
   readonly activeWorktreePath: string;
@@ -139,6 +141,7 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
   }
   if (reviewFreshness === 'stale') staleSources.push('review');
 
+  let failureClass: string | null = null;
   let checksStatus: string | null = null;
   let checksPlan: string | null = null;
   let checksFingerprint: string | null = null;
@@ -148,10 +151,12 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
     try {
       const checks = JSON.parse(input.checksText) as {
         status?: unknown;
+        failure_class?: unknown;
         active_plan?: unknown;
         review_subject_sha256?: unknown;
         acceptance_receipt?: { status?: unknown; disposition?: unknown };
       };
+      failureClass = typeof checks.failure_class === 'string' ? checks.failure_class : null;
       checksStatus = typeof checks.status === 'string' ? checks.status : null;
       checksPlan = typeof checks.active_plan === 'string' ? checks.active_plan : null;
       checksFingerprint = typeof checks.review_subject_sha256 === 'string'
@@ -269,12 +274,25 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
     }
   }
   if (checksFreshness === 'fresh' && checksStatus && checksStatus !== 'pass') {
-    blockers.push('checks_failed');
+    blockers.push(failureClass === 'missing_artifact' ? 'checks_artifact_invalid' : 'checks_failed');
   }
   if (!input.riskResolution.ok) {
     blockers.push(`workflow_profile:${input.riskResolution.code.toLowerCase()}`);
   }
   if (input.capabilityRegistryInvalid) blockers.push('capability_registry:invalid');
+
+  const artifactRepairValid = checksFreshness === 'fresh' && failureClass === 'missing_artifact'
+    && checksStatus !== null && checksStatus !== 'pass' && input.contractPath !== null
+    && input.contractText !== null && input.checksText !== null
+    && validArtifactRepair(input.artifactRepairText, {
+      contract_path: input.contractPath,
+      contract_sha256: artifactHash(input.contractText),
+      checks_sha256: artifactHash(input.checksText),
+      subject_revision: input.subjectRevision,
+    });
+  const artifactRepairAuthorized = artifactRepairValid && input.unsafeEditTargetPathCount === 0
+    && input.editTargetPaths.length > 0
+    && input.editTargetPaths.every(path => path === input.contractPath);
 
   // Progress token: one deterministic content hash over exactly the audit's
   // recipe. It composes revisions and values the resolver/projector already
@@ -348,6 +366,7 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
             satisfiedRequirements,
             hardBlockers: blockers,
             checksFailedRepairAuthorized,
+            artifactRepairAuthorized,
           },
         });
       })()
@@ -402,7 +421,10 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
       freshness: externalFreshness,
       status: acceptanceDisposition,
     },
-    checks: { path: input.checksPath, freshness: checksFreshness, status: checksStatus },
+    checks: { path: input.checksPath, freshness: checksFreshness, status: checksStatus,
+      ...(failureClass !== null ? { failure_class: failureClass } : {}),
+      ...(failureClass === 'missing_artifact' ? { artifact_repair: artifactRepairValid ? 'authorized' as const : 'required' as const } : {}),
+    },
     active_sprint: { path: input.sprintPath, freshness: sprintFreshness },
     worktree: {
       path: input.activeWorktreePath,

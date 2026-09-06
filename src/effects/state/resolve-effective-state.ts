@@ -1,3 +1,4 @@
+import { artifactRepairPath } from '../../core/state/artifact-repair';
 import { readFileSync, readdirSync, realpathSync, statSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { isAbsolute, posix, win32 } from 'path';
@@ -651,6 +652,8 @@ function resolveEffectiveStateUnlocked(
   const reviewText = readText(cwd, reviewPath);
   const reviewSubjectSha256 = reviewSubject.status === 'ok' ? reviewSubject.review_subject_sha256 : null;
   const checksText = readText(cwd, CHECKS_PATH);
+  const repairPath = artifactRepairPath(checksText);
+  const artifactRepairText = readText(cwd, repairPath);
   const sprintPath = readTrimmed(cwd, ACTIVE_SPRINT_MARKER);
   const taskId = planPath ? artifactStemFromPlan(planPath, planText) : null;
 
@@ -678,6 +681,7 @@ function resolveEffectiveStateUnlocked(
     target_rev: reviewSubject.status === 'ok' ? sha256(reviewSubject.target_rev) : sha256('unavailable:target-rev'),
   });
   const evidenceRevision = contentRevision({
+    ...(repairPath ? { artifact_repair: artifactRepairText !== null ? sha256(artifactRepairText) : sha256('missing:artifact-repair') } : {}),
     checks: checksText !== null ? sha256(checksText) : sha256('missing:checks'),
     review: reviewText !== null ? sha256(reviewText) : sha256('missing:review'),
     // Bound to the subject: evidence recomputed against a new subject is
@@ -703,6 +707,7 @@ function resolveEffectiveStateUnlocked(
     ...(contractPath ? [contractPath] : []),
     ...(reviewPath ? [reviewPath] : []),
     CHECKS_PATH,
+    ...(repairPath ? [repairPath] : []),
     ACTIVE_SPRINT_MARKER,
     ...(sprintPath ? [sprintPath] : []),
     HANDOFF_PATH,
@@ -743,6 +748,7 @@ function resolveEffectiveStateUnlocked(
     },
     checksPath: CHECKS_PATH,
     checksText,
+    artifactRepairText,
     sprintPath,
     sprintExists: Boolean(sprintPath && fileExists(cwd, sprintPath)),
     activeWorktreePath: ACTIVE_WORKTREE_MARKER,

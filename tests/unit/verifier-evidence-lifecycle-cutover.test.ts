@@ -175,6 +175,7 @@ describe('verifier evidence lifecycle cutover', () => {
       expect(command.duration_ms).toBeNull();
       expect(command.signal).toBeNull();
       expect(command.message).toContain('evidence producer');
+      expect(evidence.failure_class).toBe('missing_artifact');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

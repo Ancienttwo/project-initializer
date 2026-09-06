@@ -422,3 +422,15 @@ describe('state-snapshot compatibility projection', () => {
     expect(stale.marker.problem).toBe('deleted');
   });
 });
+
+
+test('verifier missing_artifact is blocked separately from contract test failures', () => {
+  const state = projectEffectiveState(input({
+    checksText: JSON.stringify({status:'fail',active_plan:PLAN,review_subject_sha256:SUBJECT,failure_class:'missing_artifact'}),
+    reviewSubject:{available:true,reviewSubjectSha256:SUBJECT,targetRevision:TARGET,targetOverlapCount:0},
+    editTargetPaths:[CONTRACT],
+  }));
+  expect(state.blockers).toContain('checks_artifact_invalid');
+  expect(state.blockers).not.toContain('checks_failed');
+  expect(state.readiness?.ok && state.readiness.allowedToEdit.decision).toBe('block');
+});

@@ -92,7 +92,26 @@ runtime event record.
 ## Telemetry contract
 
 `src/cli/hook/event-telemetry.ts` is the sole writer for
-`.ai/harness/runs/hook-events.jsonl`. A valid handled event record has:
+`.ai/harness/runs/hook-events.jsonl`. Storage maintenance lives in
+`src/effects/hook-event-log.ts`: before the next append, an active file at or
+above 8 MiB is atomically renamed into `hook-events.jsonl.archive/`. The archive
+retains at most 32 owned segments and 256 MiB, deleting oldest segments first.
+The active threshold may be exceeded by the last record or concurrent appends;
+individual records larger than 8 MiB are rejected by the non-authoritative sink.
+No elapsed-time retention setting or operator configuration is required.
+
+The diet report and benchmark read the retained archive plus active file,
+streaming UTF-8 lines. Report samples describe retained history, not lifetime
+history. An explicitly selected custom diet-report log remains a single file.
+Rotation/retention and snapshot file opening share the existing owner-fenced
+lock; appends remain O_APPEND, and a renamed inode is never truncated. Readers
+open their descriptors under that lock and consume them unlocked, so subsequent
+retention cannot invalidate the selected snapshot. Foreign archive filenames and
+symlink targets are never pruned. Telemetry write failure cannot change hook
+safety. Existing large logs within the archive budget are preserved as one
+segment on their first rotation; no migration command or second writer exists.
+
+A valid handled event record has:
 
 - protocol `loop-engine-hook-event/v1`;
 - `runtime_entries: 1`;

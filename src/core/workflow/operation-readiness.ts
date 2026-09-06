@@ -156,6 +156,7 @@ export interface OperationReadinessEvidence {
    * allowed by the active contract. Stop and ship remain hard-blocked.
    */
   readonly checksFailedRepairAuthorized?: boolean;
+  readonly artifactRepairAuthorized?: boolean;
 }
 
 /** The three already-resolved per-operation requirement decisions this evaluator consumes. */
@@ -291,7 +292,9 @@ export function evaluateReadiness(input: EvaluateReadinessInput): EvaluateReadin
   const hardBlockers = input.evidence.hardBlockers ?? [];
   const hardBlocked = hardBlockers.length > 0;
   const editHardBlocked = hardBlockers.some((blocker) => (
-    blocker !== 'checks_failed' || input.evidence.checksFailedRepairAuthorized !== true
+    blocker === 'checks_artifact_invalid'
+      ? input.evidence.artifactRepairAuthorized !== true
+      : blocker !== 'checks_failed' || input.evidence.checksFailedRepairAuthorized !== true
   ));
 
   const editStatuses = statusesFor(edit.requirements, satisfied);

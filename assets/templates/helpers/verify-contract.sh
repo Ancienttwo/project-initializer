@@ -635,6 +635,7 @@ quiet=0
 read_only=0
 report_file=""
 verification_plan_report=""
+verification_artifact_invalid=0
 verification_preflight_file="${REPO_HARNESS_VERIFICATION_PREFLIGHT_FILE:-}"
 force_expensive_rerun=0
 force_reason=""
@@ -1026,7 +1027,10 @@ contract_plan_path="$contract_file"
 if [[ "$contract_file" == /* && -n "$bun_bin" ]]; then
   contract_plan_path="$("$bun_bin" -e 'const fs=require("fs"),p=require("path"); const file=process.argv[2]; if(fs.lstatSync(file).isSymbolicLink()) throw Error("contract must not be a symlink"); const rel=p.relative(fs.realpathSync(process.argv[1]),fs.realpathSync(file)); if(!rel || rel===".." || rel.startsWith("../") || p.isAbsolute(rel)) throw Error("contract escapes repository"); process.stdout.write(rel);' "$repository_root" "$contract_file" 2> "$tmp_dir/plan-error")" || contract_plan_path=""
 fi
-if [[ -z "$bun_bin" ]] || ! "$bun_bin" "$SCRIPT_DIR/verification-plan.ts" validate --repo "$repository_root" --contract "$contract_plan_path" > "$plan_validation" 2> "$tmp_dir/plan-error"; then
+if [[ -z "$bun_bin" ]]; then
+  fail "verification_plan" "$contract_file" "Bun runtime is unavailable"
+elif ! "$bun_bin" "$SCRIPT_DIR/verification-plan.ts" validate --repo "$repository_root" --contract "$contract_plan_path" > "$plan_validation" 2> "$tmp_dir/plan-error"; then
+  verification_artifact_invalid=1
   fail "verification_plan" "$contract_file" "$(cat "$tmp_dir/plan-error" 2>/dev/null || true)"
 else
   while IFS= read -r path; do
@@ -1232,6 +1236,8 @@ elif [[ "$failed" -gt 0 ]]; then
     failure_class="verification_budget"
   elif [[ "$verification_preflight_ready" -eq 0 ]]; then
     failure_class="allowed_paths"
+  elif [[ "$verification_artifact_invalid" -eq 1 ]]; then
+    failure_class="missing_artifact"
   else
     failure_class="contract_failure"
   fi

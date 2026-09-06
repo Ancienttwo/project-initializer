@@ -14,6 +14,7 @@ import {
   isHookEventTelemetryRecord,
 } from '../src/cli/hook/event-telemetry';
 import type { HookEventTelemetryRecord } from '../src/core/loop/loop-event-protocol';
+import { readHookEventLog } from '../src/effects/hook-event-log';
 
 const ROOT = resolve(import.meta.dir, '..');
 const DEFAULT_MANIFEST = join(ROOT, 'evals/harness/scenarios.json');
@@ -1013,8 +1014,8 @@ export function benchmarkChangedFiles(workspace: string, baselineRevision?: stri
 
 export function readHookMetrics(workspace: string): HookEventTelemetryRecord[] {
   const path = join(workspace, HOOK_EVENT_TELEMETRY_PATH);
-  if (!existsSync(path)) return [];
-  const lines = readFileSync(path, 'utf-8').split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const lines = readHookEventLog(path, workspace);
+  if (lines === null) return [];
   const records: HookEventTelemetryRecord[] = [];
   for (const line of lines) {
     let parsed: unknown;
