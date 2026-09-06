@@ -228,3 +228,21 @@ across session-context, workflow-contract, create-project-dirs.runtime, helper-s
 ## Task Breakdown (Follow-up)
 - [x] 8c: reword both capability-context generators, resync helper projections, refresh the six generated blocks plus the two `.ai/hooks` parity copies.
 - [x] 8d: add `tasks/current.md` to `scripts/lib/project-init-lib.sh`, restore the create-project-dirs ignore assertion, and record the dual-authority deferred goal.
+
+## Follow-up: CI Red on This Branch
+
+Two suites failed on the branch but not on `main`; both traced to fixtures that still modelled
+`tasks/current.md` as a tracked, exemption-covered path.
+
+| Command | Outcome |
+|---------|---------|
+| `bun test tests/merge-gate.test.ts --timeout 60000` | 8 pass, 0 fail |
+| `bun test tests/state/cli-state-golden.test.ts --timeout 60000` | 13 pass, 0 fail |
+| `bun test tests/effective-state.test.ts tests/state/{adapter-parity,effective-state-stability,loop-semantics-characterization}.test.ts` | 55 pass, 0 fail |
+| `bun run check:type` | exit 0 |
+| `bash scripts/check-task-workflow.sh --strict` | `[workflow] OK` |
+| `REPO_HARNESS_DIFF_BASE=origin/main REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh` | exit 0 after rebinding the substantive digest |
+
+## Task Breakdown (CI Red)
+- [x] Move the merge-seal post-freeze lifecycle case off `tasks/current.md` onto `tasks/todos.md`, the remaining tracked derived ledger with the same post-freeze classification.
+- [x] Rebind the `stale-projections` effective-state golden through `UPDATE_EFFECTIVE_STATE_GOLDENS=1`; the drift is hash-only (`subject_revision`, `evidence_revision`, `progress_token`, `review_subject`) because the scenario's `tasks/current.md` write is now semantic in the review subject.

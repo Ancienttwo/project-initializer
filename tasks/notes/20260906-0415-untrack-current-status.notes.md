@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260906-0415-untrack-current-status.review.md
 > **Last Updated**: 2026-09-06 04:16
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:136e6e4129c26be0344d5dd96e6bec75ca5fcd03487e312434a0a1ed5c48e381`
+> **Substantive Change SHA256**: `sha256:864e011d183091306855ee8ff825b224052ee5606150f96163b0603e9d949e51`
 
 ## Falsifier Result: FAILED on the first pass, resolved by the parent (decisions 8a/8b)
 
@@ -162,3 +162,21 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 - Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
 - Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
 - Promote to harness asset files only after verification across more than one task or fixture.
+
+## CI red: two fixtures still modelled the tracked file
+
+Removing the `tasks/current.md` exemption from `isOperationalReviewPath` makes the path
+semantic. Two test fixtures depended on the exemption:
+
+- `tests/merge-gate.test.ts` sealed a post-freeze allowlist on `tasks/current.md` and then
+  committed it, expecting a non-semantic head move. An ignored file cannot appear in a
+  lifecycle commit at all, so the case moved to `tasks/todos.md` — the remaining tracked
+  derived ledger that `classifyPostFreezePath` still classifies as `derived`.
+- `tests/state/fixtures/stale-projections.json` froze hashes taken while the scenario's
+  rewrite of `tasks/current.md` was exempt. The regenerated golden differs only in
+  `subject_revision`, `evidence_revision`, `progress_token`, and `review_subject`; every
+  semantic field (`stale_sources`, `readiness`, `current_snapshot`) is unchanged.
+
+Deliberately not changed: `scripts/merge-gate.ts:80` still accepts `tasks/current.md` as a
+`derived` post-freeze shape. Allowlisting an ignored path is inert, and the file is outside
+this slice's Allowed Paths.
