@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-07 02:05
+> **Related Plan**: plans/archive/plan-20260907-0149-brc15a-shadow-provider-budget.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260907-0205
+> **Archive Projection V1**: `plans/plan-20260907-0149-brc15a-shadow-provider-budget.md` => `plans/archive/plan-20260907-0149-brc15a-shadow-provider-budget.md`
+> **Archive Projection V1**: `tasks/notes/20260907-0149-brc15a-shadow-provider-budget.notes.md` => `tasks/archive/notes-20260907-0205-brc15a-shadow-provider-budget.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-0149-brc15a-shadow-provider-budget.contract.md` => `tasks/archive/contract-20260907-0205-brc15a-shadow-provider-budget.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-0149-brc15a-shadow-provider-budget.review.md` => `tasks/archive/review-20260907-0205-brc15a-shadow-provider-budget.md`
+
 # Task Review: brc15a-shadow-provider-budget
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260907-0149-brc15a-shadow-provider-budget.md
-> **Contract**: tasks/contracts/20260907-0149-brc15a-shadow-provider-budget.contract.md
-> **Notes File**: tasks/notes/20260907-0149-brc15a-shadow-provider-budget.notes.md
+> **Plan**: plans/archive/plan-20260907-0149-brc15a-shadow-provider-budget.md
+> **Contract**: tasks/archive/contract-20260907-0205-brc15a-shadow-provider-budget.md
+> **Notes File**: tasks/archive/notes-20260907-0205-brc15a-shadow-provider-budget.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-07 01:49
 > **Recommendation**: pass
