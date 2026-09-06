@@ -36,6 +36,8 @@ bash scripts/check-deploy-sql-order.sh
 echo "[ci] context files"
 bash scripts/check-context-files.sh
 bash scripts/check-architecture-sync.sh
+echo "[ci] context map"
+bun run check:context-map
 if [[ "${GITHUB_ACTIONS:-}" == "true" && -z "${REPO_HARNESS_DIFF_BASE:-}" ]]; then
   echo "[ci] GitHub Actions must provide REPO_HARNESS_DIFF_BASE for diff-bound workflow evidence." >&2
   exit 1
