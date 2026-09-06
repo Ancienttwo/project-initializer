@@ -12,8 +12,12 @@ import {
 } from '../../src/core/automation/budget';
 import {
   AutomationBudgetStoreError,
-  beginCampaignBudgetStep, completeCampaignBudgetStep, readCampaignAuthoringProgress,
+  readCampaignAuthoringProgress,
   appendAutomationUsage,
+  beginCampaignBudgetStep,
+  completeCampaignBudgetStep,
+  reserveCampaignProviderBudget,
+  recordCampaignProviderOutcome,
   ensureCampaignAuthoringBudget,
   publishAutomationBudget,
   readAutomationBudgetStatus,
@@ -23,6 +27,7 @@ import {
   reserveCampaignAuthoringBudget,
   sealCampaignAuthoringBudget,
   verifyCampaignAuthoringBudgetTerminal,
+  verifyCampaignAuthoringReadonlyContinuation,
 } from '../../src/effects/automation/budget-store';
 import { mintProgramAuthorization } from '../../src/effects/automation/grant-store';
 
@@ -112,6 +117,44 @@ function reserve(input: ReturnType<typeof setup>, key: string, operation: 'initi
 }
 
 describe('campaign authoring budget prerequisite', () => {
+  test('exact readonly post-seal step preserves terminal authority only after completion', () => {
+    const input = setup(1);
+    const first = reserve(input, 'initial-before-probe', 'initial');
+    appendAutomationUsage({ repo_root: input.repo, reservation: first.reservation, outcome: 'completed', evidence_refs: [], env: input.env });
+    const binding = { repo_root: input.repo, automation_run_id: input.status.budget.automation_run_id,
+      expected_budget_sha256: input.status.budget.budget_sha256, campaign_id: 'campaign-budget-test',
+      group_number: 1 as const, intent_sha256: intent('group-1'), env: input.env };
+    const terminal = sealCampaignAuthoringBudget({ ...binding, reason: 'authoring_completed' });
+    const step = beginCampaignBudgetStep({ ...binding, idempotency_key: 'post-seal-read' }).admission;
+    const leaf = reserveCampaignProviderBudget({ ...binding, idempotency_key: 'post-seal-read-call',
+      step_admission_sha256: step.event_sha256, operation: 'github_read', request_sha256: hex('read-request') }).reservation;
+    expect(() => verifyCampaignAuthoringBudgetTerminal({ ...binding, terminal })).toThrow();
+    recordCampaignProviderOutcome({ repo_root: input.repo, reservation: leaf, outcome: 'returned', result_sha256: hex('read-response'), env: input.env });
+    expect(() => verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal })).toThrow('quiescent');
+    completeCampaignBudgetStep({ repo_root: input.repo, admission: step, outcome: 'progress', evidence_refs: [{ ref: 'snapshot:read', sha256: hex('snapshot') }], env: input.env });
+    expect(() => verifyCampaignAuthoringBudgetTerminal({ ...binding, terminal })).toThrow('stale automation ledger');
+    expect(() => readCampaignAuthoringBudgetTerminal(binding)).toThrow('stale automation ledger');
+    const continuation = verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal });
+    expect(continuation.terminal).toEqual(terminal);
+    expect(continuation.current_ledger_sha256).not.toBe(terminal.ledger_sha256);
+    expect(continuation.completion_event_sha256s).toHaveLength(1);
+  });
+  test.each(['github_comment', 'github_close', 'foreign_read'] as const)('active continuation rejects %s successors', operation => {
+    const input = setup(1);
+    const first = reserve(input, 'initial-before-forbidden', 'initial');
+    appendAutomationUsage({ repo_root: input.repo, reservation: first.reservation, outcome: 'completed', evidence_refs: [], env: input.env });
+    const binding = { repo_root: input.repo, automation_run_id: input.status.budget.automation_run_id,
+      expected_budget_sha256: input.status.budget.budget_sha256, campaign_id: 'campaign-budget-test',
+      group_number: 1 as const, intent_sha256: intent('group-1'), env: input.env };
+    const terminal = sealCampaignAuthoringBudget({ ...binding, reason: 'authoring_completed' });
+    const successor = operation === 'foreign_read' ? { ...binding, group_number: 2 as const, intent_sha256: intent('group-2') } : binding;
+    const admission = beginCampaignBudgetStep({ ...successor, idempotency_key: 'forbidden-successor' }).admission;
+    const leaf = reserveCampaignProviderBudget({ ...successor, idempotency_key: 'forbidden-call', step_admission_sha256: admission.event_sha256,
+      operation: operation === 'foreign_read' ? 'github_read' : operation, request_sha256: hex('forbidden-request') }).reservation;
+    recordCampaignProviderOutcome({ repo_root: input.repo, reservation: leaf, outcome: 'returned', result_sha256: hex('forbidden-result'), env: input.env });
+    completeCampaignBudgetStep({ repo_root: input.repo, admission, outcome: 'progress', evidence_refs: [{ ref: 'fixture:successor', sha256: hex('forbidden-result') }], env: input.env });
+    expect(() => verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal })).toThrow();
+  });
   test('reads and reconciles the unchanged generic reservation wire kind', () => {
     const input = setup();
     const generic = reserveAutomationBudget({

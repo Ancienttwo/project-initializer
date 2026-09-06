@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:66ad6663cca3979e934f41c42543fca8f757db8271c19e65d94319184594cf97",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "cea2225e0ada0c9fdc383ab19974253724e3a41d",
-    "worktreeDigest": "sha256:0606f99a158e50bf403cfc309dfbe726901481e96da34394f6b5a366418d8fbd",
-    "sourceTreeDigest": "sha256:51757b0b8dec637c02000880f6122c3e06b7a9fc3505d0ad165a1a42608e34d3",
+    "baseHeadSha": "3f9464db88fce488852cc45c24f352d93eb63dc4",
+    "worktreeDigest": "sha256:546e70ed7e6a452588724c13de6e854b07367f3831c7867b781abb8a4ef220d9",
+    "sourceTreeDigest": "sha256:57061404e514810a2128335c7748e3e9a39372e55722fc33646442d9363b4b57",
     "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-    "codeGraphDigest": "sha256:97cd640122a451f7fbfb8124287483738cfb91997a98d3ddae230e537883564c",
-    "indexedWorktreeDigest": "sha256:1676120c16c2e6f764230ccf43f8048bd214bd0432d965bbedda5207ebf603ef",
+    "codeGraphDigest": "sha256:38134d082cf6851a29416a973955623402e4d70ae56372222cf99cf5925963b4",
+    "indexedWorktreeDigest": "sha256:808d1887a66f732cf30d0e167403fb03fd81d581bee59ea947453f1dcdd569be",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:7023766afb958e46723279cc03103c075a8ca06082d528a5daeb961b53bccc81"
+    "projectionInputDigest": "sha256:b7b929f3f955740bc9de7864de15b418acb708aff3781b7d871420bee9a74875"
   },
-  "projectionDigest": "sha256:24a4f22ca332600aca40e9758d8eb8c074a48436cf40383a290e1310ed0d6f91",
+  "projectionDigest": "sha256:f293089f42ad6980f012da508ff556ab7436ec34351f5cc0e7dbdb2bef3ea409",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-      "sourceTreeDigest": "sha256:51757b0b8dec637c02000880f6122c3e06b7a9fc3505d0ad165a1a42608e34d3",
+      "sourceTreeDigest": "sha256:57061404e514810a2128335c7748e3e9a39372e55722fc33646442d9363b4b57",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:24a4f22ca332600aca40e9758d8eb8c074a48436cf40383a290e1310ed0d6f91"
+      "projectionDigest": "sha256:f293089f42ad6980f012da508ff556ab7436ec34351f5cc0e7dbdb2bef3ea409"
     }
   },
-  "receiptDigest": "sha256:ea1528306f3bfd97535100e998a4a6ea3fd13d16ff0d2cab3ac9842082b62af8",
+  "receiptDigest": "sha256:823439086b96124068fd4fb9468b76c868c9120c9e97426abf148325ea106ef7",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -824,12 +824,12 @@
       "ownership": "mixed",
       "rendererVersion": "archcontext.docs-renderer/v4",
       "format": "markdown",
-      "sourceDigest": "sha256:088fe69fea2cbedab6b94393077a36962836f953a6584f1d02a7e6c84eef4bf5",
-      "outputDigest": "sha256:c1e5b229aebf173d9e8bbc5f0a987437bff389b987a40047ad056122c24f8de7",
+      "sourceDigest": "sha256:1494a3f41b8a3ac362f3a647e38262857c3c70ec83058bf70c1df68a6f246103",
+      "outputDigest": "sha256:93a824fb8d2d33de1b45acfc16783a53193c6ef1bb4843b5c3dcf3c6ae5524f2",
       "verifiedAgainst": {
-        "branch": "codex/brc15a-shadow-provider-budget",
-        "commit": "54c6e8164e6a86badaf37475123854d2172b106f",
-        "committedAt": "2026-09-07T02:01:16+08:00"
+        "branch": "codex/brc9-adoption-provider-accounting",
+        "commit": "3f9464db88fce488852cc45c24f352d93eb63dc4",
+        "committedAt": "2026-09-07T02:42:07+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:d2978b298f0d4b17384710fa7adaae35d607c110a397819f082535610196f48e",
       "outputDigest": "sha256:ac50386fcb0ff83c9679ec2c36e5da425efb999b5d791bb052eb90b5ec924a6b",
       "verifiedAgainst": {
-        "branch": "codex/brc15a-shadow-provider-budget",
-        "commit": "54c6e8164e6a86badaf37475123854d2172b106f",
-        "committedAt": "2026-09-07T02:01:16+08:00"
+        "branch": "codex/brc9-adoption-provider-accounting",
+        "commit": "3f9464db88fce488852cc45c24f352d93eb63dc4",
+        "committedAt": "2026-09-07T02:42:07+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc15a-shadow-provider-budget",
-        "commit": "54c6e8164e6a86badaf37475123854d2172b106f",
-        "committedAt": "2026-09-07T02:01:16+08:00"
+        "branch": "codex/brc9-adoption-provider-accounting",
+        "commit": "3f9464db88fce488852cc45c24f352d93eb63dc4",
+        "committedAt": "2026-09-07T02:42:07+08:00"
       }
     },
     {

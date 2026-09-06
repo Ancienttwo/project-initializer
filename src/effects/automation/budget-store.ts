@@ -2075,10 +2075,12 @@ function evidenceRef(prefix: string, sha256: string): AutomationEvidenceRefV1 {
 }
 
 function assertTerminalMatchesLedger(
+  paths: RunPaths,
   terminal: CampaignAuthoringBudgetTerminalV1,
   status: AutomationBudgetStatusV1,
   ledger: CampaignGroupLedgerV1,
   binding: Pick<CampaignAuthoringTerminalBindingInput, 'automation_run_id' | 'campaign_id' | 'group_number' | 'intent_sha256'>,
+  readonlyContinuation = false,
 ): void {
   const campaign = status.budget.authorization.campaign;
   if (campaign === null) fail('automation_budget_store_invalid', 'campaign terminal belongs to a non-campaign budget');
@@ -2095,8 +2097,46 @@ function assertTerminalMatchesLedger(
   if (terminal.budget_sha256 !== status.budget.budget_sha256 || terminal.budget_revision !== status.budget.revision) {
     fail('automation_budget_store_conflict', 'campaign terminal is bound to a stale budget revision');
   }
-  if (terminal.ledger_sha256 !== status.current.ledger_sha256) {
+  if (!readonlyContinuation && terminal.ledger_sha256 !== status.current.ledger_sha256) {
     fail('automation_budget_store_conflict', 'campaign terminal is bound to a stale automation ledger');
+  }
+  const events = readLedgerEvents(paths);
+  const reservations = readLedgerReservations(paths);
+  const folded = foldStoredCampaignLedger(paths, status.budget, events, reservations);
+  if (status.current.open_reservation_sha256s.length !== 0 || folded.active_step !== null) {
+    fail('automation_budget_store_conflict', 'campaign terminal requires a quiescent automation ledger');
+  }
+  // Preserve the exact sealed prefix. Only fully bound readonly probe steps may extend it.
+  let chain = AUTOMATION_LEDGER_GENESIS;
+  const matches: number[] = chain === terminal.ledger_sha256 ? [0] : [];
+  for (let index = 0; index < events.length; index++) {
+    chain = chainAutomationLedgerDigest(chain, events[index]!.event_sha256);
+    if (chain === terminal.ledger_sha256) matches.push(index + 1);
+  }
+  if (chain !== status.current.ledger_sha256 || matches.length !== 1) {
+    fail('automation_budget_store_conflict', 'campaign terminal is bound to a stale automation ledger: exact prefix missing');
+  }
+  const prefixLength = matches[0]!;
+  if (foldStoredCampaignLedger(paths, status.budget, events.slice(0, prefixLength), reservations.filter(reservation => reservation.step_index <= prefixLength)).active_step !== null) {
+    fail('automation_budget_store_conflict', 'campaign terminal prefix contains an unfinished step');
+  }
+  const byDigest = new Map(reservations.map(reservation => [reservation.reservation_sha256, reservation]));
+  for (const event of events.slice(matches[0]!)) {
+    if (event.budget_sha256 !== terminal.budget_sha256 || event.authorization_id !== status.budget.authorization.authorization_id) {
+      fail('automation_budget_store_conflict', 'campaign terminal continuation authority differs');
+    }
+    const context = event.kind === AUTOMATION_USAGE_EVENT_KIND
+      ? (() => {
+        const reservation = byDigest.get(event.reservation_sha256);
+        if (reservation?.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND || reservation.campaign_context.operation !== 'github_read') {
+          return fail('automation_budget_store_conflict', 'campaign terminal is bound to a stale automation ledger: successor is not a readonly probe');
+        }
+        return reservation.campaign_context;
+      })()
+      : event;
+    if (context.campaign_id !== terminal.campaign_id || context.group_number !== terminal.group_number || context.intent_sha256 !== terminal.intent_sha256) {
+      fail('automation_budget_store_conflict', 'campaign terminal readonly continuation belongs to another group or intent');
+    }
   }
   if (terminal.max_authoring_rounds !== campaign.max_authoring_rounds_per_group) {
     fail('automation_budget_store_conflict', 'campaign terminal round bound does not match current authority');
@@ -2160,13 +2200,14 @@ export function sealCampaignAuthoringBudget(
         || status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_store_conflict', 'terminal completion is no longer the latest ledger transition');
     }
     if (campaignLedger(paths, status.budget).active_step !== null) fail('automation_budget_store_conflict', 'campaign terminal requires a completed controller step');
+    if (status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_store_conflict', 'campaign authoring cannot seal while the automation ledger is not quiescent');
     const path = campaignTerminalPath(paths, input.campaign_id, input.group_number);
     const existing = readCampaignTerminalOptional(paths, input.campaign_id, input.group_number);
     if (existing !== null) {
       if (existing.intent_sha256 !== input.intent_sha256 || existing.reason !== input.reason) {
         fail('automation_budget_store_conflict', 'campaign group was already sealed with a different binding or reason');
       }
-      assertTerminalMatchesLedger(existing, status, ledger, input);
+      assertTerminalMatchesLedger(paths, existing, status, ledger, input);
       return existing;
     }
     if (input.reason === 'authoring_exhausted' && ledger.completed_rounds !== campaign.max_authoring_rounds_per_group) {
@@ -2196,9 +2237,10 @@ export function sealCampaignAuthoringBudget(
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
-export function readCampaignAuthoringBudgetTerminal(
+function readCampaignAuthoringProof(
   input: CampaignAuthoringTerminalBindingInput,
-): CampaignAuthoringBudgetTerminalV1 | null {
+  readonlyContinuation: boolean,
+) {
   const repoRoot = resolve(input.repo_root);
   const paths = runPaths(repoRoot, input.automation_run_id);
   if (!existsSync(paths.current)) return null;
@@ -2222,13 +2264,41 @@ export function readCampaignAuthoringBudgetTerminal(
     if (terminal === null) return null;
     if (terminal.intent_sha256 !== input.intent_sha256) fail('automation_budget_store_conflict', 'campaign terminal intent binding differs');
     const ledger = campaignGroupLedger(paths, context);
-    assertTerminalMatchesLedger(terminal, status, ledger, input);
-    return terminal;
+    assertTerminalMatchesLedger(paths, terminal, status, ledger, input, readonlyContinuation);
+    const events = readLedgerEvents(paths);
+    let digest = AUTOMATION_LEDGER_GENESIS;
+    let afterSeal = digest === terminal.ledger_sha256;
+    const completion_event_sha256s: string[] = [];
+    for (const event of events) {
+      if (afterSeal && event.kind === CAMPAIGN_STEP_COMPLETION_KIND) completion_event_sha256s.push(event.event_sha256);
+      digest = chainAutomationLedgerDigest(digest, event.event_sha256);
+      if (digest === terminal.ledger_sha256) afterSeal = true;
+    }
+    return Object.freeze({ terminal, current_ledger_sha256: status.current.ledger_sha256,
+      completion_event_sha256s: Object.freeze(completion_event_sha256s) });
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
+
+export function readCampaignAuthoringBudgetTerminal(input: CampaignAuthoringTerminalBindingInput): CampaignAuthoringBudgetTerminalV1 | null {
+  return readCampaignAuthoringProof(input, false)?.terminal ?? null;
+}
+
+/** Active adoption only: the seal remains historical; this proof binds its readonly continuation to the current ledger. */
+export function readCampaignAuthoringReadonlyContinuation(input: CampaignAuthoringTerminalBindingInput) {
+  return readCampaignAuthoringProof(input, true);
 }
 
 export interface VerifyCampaignAuthoringBudgetTerminalInput extends CampaignAuthoringTerminalBindingInput {
   readonly terminal: CampaignAuthoringBudgetTerminalV1;
+}
+
+export function verifyCampaignAuthoringReadonlyContinuation(input: VerifyCampaignAuthoringBudgetTerminalInput) {
+  const expected = validateCampaignAuthoringTerminal(input.terminal);
+  const proof = readCampaignAuthoringReadonlyContinuation(input);
+  if (proof === null || canonicalAutomationJson(proof.terminal) !== canonicalAutomationJson(expected)) {
+    fail('automation_budget_store_conflict', 'campaign authoring continuation seal is missing or differs from stored authority');
+  }
+  return proof;
 }
 
 export function verifyCampaignAuthoringBudgetTerminal(

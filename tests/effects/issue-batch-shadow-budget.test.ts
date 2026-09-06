@@ -8,6 +8,7 @@ import { observeIssueBatch } from '../../src/effects/automation/issue-batch-obse
 import {
   appendAutomationUsage, ensureCampaignAuthoringBudget, readAutomationBudgetStatus, readCampaignAuthoringBudgetTerminal,
   readCampaignBudgetLedger, reserveCampaignAuthoringBudget,
+  beginCampaignBudgetStep, completeCampaignBudgetStep, reserveCampaignProviderBudget, recordCampaignProviderOutcome,
 } from '../../src/effects/automation/budget-store';
 import { GithubAdapterError, type GithubCommandRunner } from '../../src/effects/external-sources/github';
 const roots: string[] = [];
@@ -41,6 +42,21 @@ test('shadow real observer reserves every identity/page call and seals the final
   expect(f.terminal()?.ledger_sha256).toBe(f.status().current.ledger_sha256);
   const before = f.status().current.ledger_sha256;
   expect(await f.run()).toEqual(result); expect(f.githubCalls()).toBe(4); expect(f.status().current.ledger_sha256).toBe(before);
+}, 20000);
+test('shadow rejects its old terminal after a completed same-group GitHub read', async () => {
+  const f = await fixture();
+  await f.run();
+  const terminal = f.terminal()!;
+  const binding = { repo_root: f.root, automation_run_id: terminal.automation_run_id, expected_budget_sha256: terminal.budget_sha256,
+    campaign_id: f.intent.campaign_id, group_number: 1 as const, intent_sha256: f.intent.intent_sha256, env: f.env };
+  const admission = beginCampaignBudgetStep({ ...binding, idempotency_key: 'later-read' }).admission;
+  const leaf = reserveCampaignProviderBudget({ ...binding, idempotency_key: 'later-read-leaf', operation: 'github_read',
+    step_admission_sha256: admission.event_sha256, request_sha256: 'a'.repeat(64) }).reservation;
+  recordCampaignProviderOutcome({ repo_root: f.root, reservation: leaf, outcome: 'returned', result_sha256: 'b'.repeat(64), env: f.env });
+  completeCampaignBudgetStep({ repo_root: f.root, admission, outcome: 'progress', evidence_refs: [{ ref: 'fixture:later-read', sha256: 'b'.repeat(64) }], env: f.env });
+  expect(() => f.terminal()).toThrow('stale automation ledger');
+  await expect(f.run()).rejects.toThrow('stale automation ledger');
+  expect(f.githubCalls()).toBe(4);
 }, 20000);
 test('provider cap refuses a page before I/O and retry does not spend again', async () => {
   const f = await fixture(1, 3);
