@@ -8,7 +8,7 @@
 ## 結論
 
 1. **`verified`（觀察到 Connector 調用）在 oracle_browser 下拿不到。** oracle 受管讀回只有答案檔、stdout/stderr 日誌與 session meta；`--browser-archive never` 時連 conversation URL 都不輸出。Connector 調用痕跡只存在 ChatGPT 頁面上，CLI 讀回裡沒有。
-2. **可以用確定性挑戰驗證取代。** 本地在 exact SHA 上挑選檔案清單與檔案內容片段，要求模型逐字回報；本地比對。這次探針三段全部逐字元命中，證明模型讀到的是 exact commit，且不依賴模型自述。campaign 的 adoption 與 audit 門檻應改為 `challenge_verified`，`verified` 這個 UI 觀察等級從 v1 移除。
+2. **確定性挑戰只證明抽樣內容一致。** 本地在 exact SHA 上挑選檔案清單與內容片段並比對回答；此次觀察到的命中保留，但「因此讀到了 exact commit」的推論已由 2026-09-07 反例否定。現有 `challenge_verified` 不能單獨滿足 adoption 與 audit 的版本讀取要求；該要求仍未完成，見下方修正。
 3. **Cookie DB 複製這條傳輸不可靠，`--copy-profile` 可靠。** `--browser-cookie-path`（wrapper 現行做法）三跑一中；`--copy-profile` 加 `--browser-chrome-profile` 兩跑兩中。
 4. **attach-running 在 Chrome 136+ 上是死路。** Chrome 152 對預設 user-data 目錄忽略 `--remote-debugging-port`，`DevToolsActivePort` 不生成。
 5. **oracle session 是 detached worker。** 殺前台不會殺 worker 與拋棄式 Chrome；同 prompt 重派會被 `A session with the same prompt is already running` 擋下（exit 1），需要 `--force` 或先收乾淨。campaign 的取消與重試路徑必須處理。
@@ -47,7 +47,29 @@ import { createHash, randomUUID } from 'crypto';         ← 與 git show 第一
 
 ## 對設計的影響
 
-- **PRD Module 10 / sprint 第 13 行**：audit 門檻從 `connector_evidence == verified` 改為 `challenge_verified`：本地在 `final_main_sha` 上生成 N 個挑戰（隨機檔案的目錄清單、指定行原文、指定檔案 sha256 前綴），模型全部答對才算讀到 exact main。adoption 階段同樣用挑戰而不是 `bundle_only`。
+- **PRD Module 5/10、BRC6a/BRC14**：現有 challenge 的樣本匹配結果保留；原 exact-SHA 要求不降標。BRC6a 須補足可驗證版本讀取證據和消費邊界，未補足時不能宣稱 active adoption/fresh audit 通過。Shadow 可以記錄明確未驗證的觀測。
 - **sprint 新增一行（transport）**：`browser-consult` 透傳 `--copy-profile` 與 `--browser-chrome-profile`，取代 `--browser-cookie-path` 作為有 profile 綁定時的唯一傳輸；`browser-doctor` 探測 `copyProfile`、`browserChromeProfile` 能力；`BrowserSessionMeta.browser` 記 `transport`。不保留 cookie-path 作為靜默回退。
 - **campaign 取消路徑**：取消一次 GPT Pro 派單必須連 detached worker 與拋棄式 Chrome 一起收，並清 ORACLE_HOME_DIR 內的 running session，否則重派同 prompt 會被擋。
 - **帳號綁定**：Connector 授權綁在 ChatGPT 帳號上，不是機器上。campaign 授權要記 `chrome_profile_directory`（本機為 `Profile 13`），doctor 的 ready 判定要包含該 profile 的 chatgpt.com session cookie 未過期。
+
+## 2026-09-07 證據邊界修正
+
+只讀反例的 subject 是 `80d7659207d2d7dbb3083fa0a30969651aacb9f3`，對照舊 revision
+`0155acb01a6a79c0bf34376c974d6214e27fae38`。按
+`src/effects/automation/issue-batch-adoption.ts#challengeAt` 的選取算法，兩者都選到
+`agents/engineers/profiles/verification-evals-checks.json`；目錄清單、首行和完整文件 SHA-256
+三個答案完全相同。以舊 revision 的三個答案、prompt 提供的新 `base_main_sha` 和
+`model_verified: true` 呼叫 `src/core/automation/connector-challenge.ts#verifyConnectorChallenge`，
+結果仍是 `connector_evidence: challenge_verified`。此反例未發起真實 provider 呼叫。
+
+重現方法：對兩個固定 SHA 各用 `git ls-tree -rz --full-tree`，按上述函數的 mode/path/extension
+條件及 `localeCompare` 排序選檔；用 `git show`、目錄 `git ls-tree` 和文件 SHA-256 生成答案。
+以新 SHA 生成 challenge，再把舊 SHA 答案送入 verifier。不要用會移動的 HEAD 作反例身份。
+
+這不需要惡意模型：stale Connector/index 讀舊版本即可產生相同答案；adoption challenge 還
+复用 authoring session。Fresh session 不排除 stale index，改抽 diff 檔案也只能提高檢出率：
+metadata-only commit、revert 或其他相同內容的 revision 仍不能僅從文件 bytes 區分。
+
+原實驗記錄保留為當時的 transport/內容觀測，不再當作 exact revision 讀取證明。BRC6a
+負責凍結威脅模型、可驗證證據來源與 fail-closed 消費邊界；無法提供證據就保留原驗收未滿足。
+本次文檔修正沒有修復 runtime，沒有引入新 receipt 名稱，也不以弱化驗收將缺口關閉。

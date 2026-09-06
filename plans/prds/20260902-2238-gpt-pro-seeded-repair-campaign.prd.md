@@ -3,7 +3,7 @@
 > **Status**: Approved
 > **Slug**: `gpt-pro-seeded-repair-campaign`
 > **Created**: 2026-09-02 22:38
-> **Updated**: 2026-09-02 22:49
+> **Updated**: 2026-09-07 01:31
 > **Source Spec**: `docs/spec.md`
 > **Tier**: standard
 > **Baseline**: `main@a2830db43f7fffbe0535f5b98674f6c4e5aa4f84`
@@ -21,9 +21,9 @@
 - Core metric: 一个 group 从授权到 `accepted`，全程零人工 Issue 撰写、零 authority drift、且每个 slot 的处置都有可重建 receipt。
 - Hard constraint: GPT Pro 对代码只读、只能创建 Issue；本地不改写 Issue 正文、不提供 local issue-create fallback；Phase A merge 全部人工；campaign 自身、acceptance、merge、lease authority 永远 protected。
 - Key risk: 外部 provider（浏览器/Connector）产出的是部分成功与不确定结果，任何把「模型自报完成」当权威的地方都会静默造出假 Task。
-- Unknowns: GPT Pro 单会话补写缺口 slot 的可靠度。（`connector_evidence: 'verified'` 已由探针证明在 oracle_browser 下不可达，改用 `challenge_verified`，见 `docs/researches/20260902-gpt-pro-connector-readback-probe.md`。）
+- Unknowns: GPT Pro 有效 Issue 产出、单会话补缺可靠度，以及 exact revision 读回证明。现有 `challenge_verified` 仅证明抽样内容匹配；Canary 2 观测前两项，BRC6a 处理读回证明缺口。见 `docs/researches/20260902-gpt-pro-connector-readback-probe.md`。
 - Acceptance scenarios: 7/10 中断后只补 3 项；重复 slot 稳定 fail closed；feature kind 无法进入 campaign。
-- Suggested next step: 执行 sprint 第 1 行（authority freeze 与 baseline characterization），并在第 5 行之前跑完第 4 行的 Connector 读回能力探针。
+- Suggested next step: 先核对 BRC15a 的 shadow provider-budget 前置，再做真实观测；BRC6a 保留 exact-SHA 证明缺口，active 路径先补 BRC9 acquisition admission。
 
 ## Problem
 
@@ -45,7 +45,7 @@
 - Recommended Defaults:
   - `group_count = 1`、`issues_per_group ≤ 10`（上限，不是目标）、`max_parallel_tasks = 2`。
   - `development_campaign.mode` 默认 `off`。
-  - adoption 与 fresh main audit 的读回证据统一为 `challenge_verified`：本地在 exact SHA 上生成确定性挑战，模型逐字命中才算读到该 commit；模型自述不构成证据。
+  - adoption 与 fresh main audit 保留 exact-SHA 要求。现有 `challenge_verified` 只证明抽样内容一致，不能单独满足该要求；BRC6a 尚待补足证据与消费端边界。模型自述和回显 SHA 不构成版本读取证据。
   - oracle_browser 传输固定为 `--copy-profile` 加 `--browser-chrome-profile`；campaign 授权记录 `chrome_profile_directory`，doctor ready 判定含该 profile 的 chatgpt.com session cookie 未过期。
 - Freedoms:
   - slot 数量可以少于上限；一个 group 收 6 个有效 slot 是合法结果。
@@ -62,7 +62,7 @@
   - runtime store 的 git-common-dir 惯例已存在：`src/effects/engineers/binding-store.ts` 的 `ENGINEER_STORE_RELATIVE_ROOT = 'repo-harness/engineers/v1'`。
   - `.ai/harness/policy.json` 的 `external_sources.mode` 当前为 `"off"`。
 - [UNVERIFIED]:
-  - 已解决：sprint 第 4 行探针证明 `verified` 不可达，`challenge_verified` 可达且逐字命中；传输改 `--copy-profile`。见 `docs/researches/20260902-gpt-pro-connector-readback-probe.md`。
+  - 探针已解决 transport 与样本匹配可达性；没有解决 exact revision 证明。后续反例表明旧版本答案可通过新 SHA 的挑战校验，见 `docs/researches/20260902-gpt-pro-connector-readback-probe.md` 的证据边界修正。
   - GPT Pro 在同一 authoring session 内「只补缺失 slot、不动已写的」的服从率。
 - 不成立的前提（源设计文档中的三处，本 PRD 已改写）:
   - 源 §5.4 称 root `repo-harness execute` 是当前唯一 lifecycle route。`src/cli/index.ts` 与 `src/cli/commands/` 中不存在该命令。执行改走既有 fleet acquire 链。
@@ -87,7 +87,7 @@
 
 - User: Fresh GPT Pro Main Auditor
   - Need: 只拿到 exact final main SHA、本组 Issue/PR 清单和验收 rubric，不继承出题会话的上下文。
-  - Success signal: 出具的 disposition 能被本地用 `observed_main_sha == expected_main_sha` 独立校验。
+  - Success signal: disposition 绑定可验证的版本读取证据；`observed_main_sha == expected_main_sha` 只是身份一致性校验，不能单独证明读取行为。
 - User: Worker（Claude/Codex）
   - Need: 只消费真实 WorkEnvelope，不从 prompt 里推断任务归属。
   - Success signal: 两个并行 Worker 不会拿到同一个 Task。
@@ -99,13 +99,30 @@
 
 | Metric | Target | Measurement Method | Degradation Threshold |
 |---|---:|---|---:|
-| Group 闭合率（授权 → `accepted`） | 100% | campaign journal 终态统计 | 单组内 ≥1 个 slot 停在 `human_attention_required` |
+| 正常路径 Group 闭合率（授权 → `accepted`） | 100% | 统计满足授权、来源、预算与验收前置的 group；另列全部尝试及停止原因 | 正常路径未收口；安全停止单列且不得计为 accepted |
 | 本地 issue-create 调用次数 | 0 | 负向测试：fake provider 断言无 issue create 调用 | >0 |
 | 7/10 中断后的补写精度 | 只补 3 项、无重复 | canary 1 的断线 fixture | 补写触碰已完成 slot |
 | 重复 slot 的处置 | 100% fail closed | 观察器返回 `issue_batch_ambiguous` | 任何自动关闭「较差那个」 |
 | 崩溃后重复外部 mutation | 0 | 在每个 persist 边界注入崩溃后重放 | ≥1 |
 | Task 身份漂移 | 0 | canonical Sprint 与 Work Graph join 校验 | Issue number 成为 Task 身份 |
 | 现有 authority bytes 变化（第 1 行之后） | 0 | characterization 测试对比 | 任何 Task/Lease/Acceptance/Publication 字节变化 |
+
+安全停止是否正确与实际修复收益分别报告。`human_attention_required` 不算完成，也不因安全
+停止而放宽 guard；全部 slot 被证伪的一组即使安全闭合，也不能报告为产生了有效修复。
+
+### Canary 2 观测与后续投入
+
+BRC15a 从末尾 canary 中独立前移。以下是观测输出和 Campaign Owner 的投入决策依据，
+不是模型质量的 CI 硬阈值，也不是自动追加修复需求的依据：
+
+- 记录生成数、重复数、可本地复现/证伪数、protected/out-of-scope 数与未判定数；每项比例
+  同时给出分子、分母和判定证据。仅根据标题、模型自报或 slot 合法性不能判为有效问题。
+- Shadow 不进入 Task/代码执行；若现有只读调查不足以判断有效性，记为未判定，不把模型
+  评价当作 falsifier，也不为获取指标越过 shadow 边界。
+- 记录补缺目标与实际变更、是否触碰既有 slot、实际 authoring rounds/provider calls、耗时、
+  人工介入次数及时间。没有发生补缺机会时记未观测，不声称服从率已验证。
+- 完成观测后记录 Owner 对继续 active 工作的决定。质量不佳可以触发范围重评，不能因已
+  投入工程成本自动继续；未作决定时保留 pending，而不是编造新的 CI gate。
 
 ## Acceptance Scenarios
 
@@ -232,7 +249,7 @@
 - Purpose: 把已验证的 slot 一次性物化成 canonical Sprint 与 Work Graph。
 - Hard Constraints:
   - `issues_per_group` 是**上限不是目标**。authoring rounds 预算耗尽后，以现有有效 slot adopt（N ≤ 10），缺的 slot 记为 `unfilled` 并写进 receipt。不为了凑数放宽校验。
-  - adoption 的读回证据为 `challenge_verified`（本地确定性挑战全部命中），不接受模型自述。
+  - adoption 保留 exact-SHA 读取要求；现有 `challenge_verified`（确定性样本全部命中）不是充分证据。BRC6a 完成前 active adoption 的该项验收仍未满足；shadow dry-run 可记录样本结果和明确的版本未验证状态，不得升级为执行准入。
   - Sprint、Work Graph、issue manifest 必须在**同一个 Git transaction** 内落地；崩溃不得留下半更新。
   - materialization 本身不 Claim、不建 WorkEnvelope。Offers 只在 materialization commit 进入 canonical main 之后出现。
   - Work Graph join key 使用持久化 `task_id`（依赖 #283 落地并跑一次 migration；见 Known Unknowns）。
@@ -242,7 +259,7 @@
 - Failure path 1: 不支持的 kind → `issue_kind_unsupported`，该 slot 不物化。
 - Failure path 2: replay → 幂等，不重复新增 rows。
 - Dependencies: Module 4；#283、#284。
-- Open decisions: None
+- Open decisions: BRC6a 尚须冻结可验证版本读取证据的来源与消费边界；传输无法提供时保持 exact-SHA 要求未满足，不以抽样一致代替。
 
 ### Module 6 — Local auto-plan 交接
 
@@ -309,7 +326,7 @@
 - Hard Constraints:
   - audit session 必须是新会话，不能是 authoring session。
   - 必须读 exact `final_main_sha`；本地校验 `observed_main_sha == expected_main_sha`。
-  - audit 阶段读回证据必须为 `challenge_verified`：本地在 `final_main_sha` 上生成 ≥3 个确定性挑战，全部逐字命中；任一失败即 `unverified`。
+  - audit 必须消费 BRC6a 的可验证版本读取证据。现有 `challenge_verified` 即使全部命中也只证明抽样内容匹配；缺少 revision 证明时按 `unverified` 停止，不能进入下一组。保持 exact-SHA 要求，不通过改名或降低验收口径关闭缺口。
   - audit 不得创建或修改任何 Issue，不得 reopen，不得把 follow-up 自动扩成 Group 4。
   - Group 2 必须基于 Group 1 的 final main 出题；Group 3 基于 Group 2 的 final main。
   - 达到授权 group count 后 controller 进入 terminal。
@@ -317,7 +334,7 @@
 - Failure path 1: `rejected` → campaign blocked，不自动 rollback main，保留 findings，交用户决定。
 - Failure path 2: `unverified` → 不进入下一组，可在预算内有界重试 fresh audit。
 - Dependencies: Module 9。
-- Open decisions: None
+- Open decisions: BRC6a 尚须冻结可验证版本读取证据的来源与消费边界；传输无法提供时保持 exact-SHA 要求未满足，不以抽样一致代替。
 
 ## Data Model
 
@@ -374,7 +391,7 @@
         "issue_batch_intent_sha256": "string",
         "authorization_sha256": "string",
         "authoring_session_ref": "string",
-        "connector_evidence": "'challenge_verified' | 'unverified'", // 本地确定性挑战，不接受模型自述
+        "connector_evidence": "'challenge_verified' | 'unverified'", // 现有样本匹配等级；不等于 exact revision 读取证明
         "issues": "readonly CampaignIssueAdoptionV1[]", // N ≤ issues_per_group
         "unfilled_slots": "readonly string[]", // 预算耗尽后未填充的 slot
         "dependency_graph_sha256": "string",
@@ -483,17 +500,20 @@ observed → adopted → materialized → planning_required → plan_approved
 
 | Item | Impact | Resolution Path | Owner |
 |---|---|---|---|
-| [RESOLVED 2026-09-02] `oracle_browser` 不能产出 `connector_evidence: 'verified'`（受管读回无 Connector 痕迹），但 `challenge_verified` 可达 | audit 与 adoption 改为本地确定性挑战；transport 改 `--copy-profile` | 见 `docs/researches/20260902-gpt-pro-connector-readback-probe.md`；sprint 第 5 行落 transport | Campaign Controller owner |
-| #283（持久化 task_id）合入 main 后需要跑一次 migration | 未跑 migration 时本 sprint 的 Work Graph join 无法被 live code path 消费；且 Sprint 行格式将变为 `\| ID \| Task \| Mode \| Acceptance \| Status \|` | 等 #283 合入 → 跑 migration 命令 → 回填本 sprint 的 backlog 行格式 | 并行 session |
-| #284 的 `acceptance_authority` 必填键在本地 main（`a2830db4`）尚不可见 | 本 PRD 已按 #284 落地后的形状写；若合入前实现，`depends_on` 会缺键 | 确认 #284 合入 main 后再实现 Module 5 的物化逻辑 | 并行 session |
-| GPT Pro「只补缺失 slot」的服从率 | 决定 authoring rounds 预算需要多大 | canary 2 的真实 shadow 运行统计 | Campaign Controller owner |
-| GitHub Issue 分页与搜索索引延迟 | 分页不完整被当作 complete 会静默丢 slot | v1 用 provider issue list/read + 本地 observation store，不用全文搜索当 complete 权威 | Campaign Controller owner |
+| Connector transport 与样本读回 | 2026-09-02 探针观察到内容命中，未观察到 Connector invocation；不能升级为 exact revision 证明 | 历史实验和 2026-09-07 修正在 `docs/researches/20260902-gpt-pro-connector-readback-probe.md`；BRC6a 负责未满足的证明要求 | Campaign Controller owner |
+| Shadow provider-budget 消费 | authoring、补写、challenge、GitHub identity/list/page 与 adoption dry-run 仍有真实 effect；没有统一计费/对账证据不得启动 canary | BRC15a 前置只消费必要的 BRC9 预算接线；不依赖 acquisition charging | Campaign Controller owner |
+| GPT Pro 产出质量与只补缺失 slot 的服从率 | 决定后续自动化投入；现有 fixture 不能证明真实行为 | BRC15a 记录观测和未判定项，不设置模型质量 CI 阈值 | Campaign Owner |
+| GitHub Issue 分页与索引延迟 | 分页不完整被当作 complete 会静默丢 slot | provider issue list/read + 本地 observation store，不用全文搜索作 complete 权威 | Campaign Controller owner |
+
+#283 的 persisted task ID 迁移已记录在本 Sprint 的 schema-migration receipt；#284 的
+`acceptance_authority` 已由现有消费者使用。它们不再作为等待上游实现的未知项，历史 receipt
+不随 backlog 增行重写。
 
 ## Developer Handoff
 
 You are implementing this PRD.
 
-- Build first: sprint 第 1 行（authority freeze 与 baseline characterization）。在写任何状态机之前先冻结既有 authority 与负向 fixture，否则 campaign 会长成第二个 Task Board。
+- Next observation: BRC15a 的 shadow 预算前置与真实观测；active 路径先补 BRC9 acquisition admission。BRC6a 的读回证明缺口阻止 active adoption/fresh audit 验收。BRC0 的历史 authority-freeze 证据保留，不重做已交付底座。
 - Do not reinterpret:
   - 不要新建 `MergeEligibilityV1`；已有 `MergeReadinessV1` / `projectMergeReadiness`（`src/core/publication/merge-readiness.ts`）。
   - 不要新建 `DevelopmentCampaignAuthorizationV1`；复用 `ProgramAuthorizationV1` 并把 campaign 字段作为其 payload。
@@ -514,9 +534,15 @@ You are implementing this PRD.
 
 ### Acceptance Scripts
 
-1. Canary 1（model-free）：fake GitHub + fake GPT，覆盖 10 slot、第 7 项断线、duplicate slot、malformed metadata、issue edit drift、controller crash、cleanup crash、audit wrong SHA。全部收敛到闭集错误词汇，无一降级为 warning。
-2. Canary 2（real GPT shadow）：在 disposable repository，`mode = shadow`，GPT Pro 真实创建 Issue，本地观察 + slot 对账 + adoption dry-run；断言零 task/code/PR mutation。
-3. Canary 3（active/manual merge）：一个 group，`max_parallel_tasks = 2`，PR 自动生成、merge 人工执行、Issue closure 与 cleanup 自动、fresh GPT audit 收口。
+执行顺序与前置以 Sprint 的 BRC task 名称为准，数字保留原 canary 身份，不代表顺序：
+
+1. Canary 1（model-free，BRC15）：fake GitHub + fake GPT，覆盖 10 slot、第 7 项断线、duplicate slot、malformed metadata、issue edit drift、controller crash、cleanup crash、audit wrong SHA。全部收敛到闭集错误词汇，无一降级为 warning。完整矩阵仍依赖 BRC9/BRC10/BRC13/BRC14，不能整体前移。
+2. Canary 2（real GPT shadow，BRC15a，前移）：依赖 BRC3/BRC4/BRC5/BRC6 已落地路径和 shadow 实际 provider calls 的统一预算 admission、结算与未知结果对账证据；不依赖 acquisition charging。使用具体授权覆盖的 disposable repository 与 Connector profile，`external_sources.mode` 开启、`development_campaign.mode=shadow`。GPT Pro 真实创建 Issue，本地观察、对账及 adoption dry-run；允许必要的本地 journal，不 materialize Task、不 Claim、不执行代码、不创建 PR、不关闭 Issue。逐项输出上述观测数据与 exact-SHA 未验证边界；结果不能算 active adoption 或 final audit 通过。所需接线缺失时先完成独立有界 package，不在 canary 中临时改 runtime 或跳过预算。
+3. Canary 3（active/manual merge，BRC15）：消费 BRC15a 观测、Owner 后续投入决定及完整安全前置。一个 group，`max_parallel_tasks=2`，PR 自动生成、merge 人工执行、Issue closure 与 cleanup 自动、fresh GPT audit 收口。2 是容量上限，记录实际串行/重叠，不新增并行吞吐 gate。保持 `off → shadow → active/manual`，不得凭 shadow 成功跳过原有 active 验收。
+
+Automatic cleanup、bounded retry、liveness recovery 和授权 group 2/3 sequencing 仍属 Phase A
+要求。将它们后置需要明确修改范围并保留未满足记录；安全停止不等于完成。既有授权覆盖
+目标和操作时可持续使用；文档批准本身不代替具体 provider/campaign 授权。
 
 ## Adjacent Patterns
 

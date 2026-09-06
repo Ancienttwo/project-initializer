@@ -12,6 +12,12 @@
 
 ## Active Lessons
 
+- Date: 2026-09-07
+- Triggered by correction: BRC audit reproduced old-revision challenge answers passing with a new SHA, and cross-session discussion separated shadow observation from active execution requirements.
+- Mistake pattern: promoting sampled content equality and an echoed revision into proof of exact revision access; treating a parallel capacity limit as a throughput promise; placing a provider feasibility probe behind unrelated active-path work.
+- Prevention rule: name only what the evidence proves and retain unmet stronger acceptance requirements. Give shadow probes their actual effect/budget prerequisites, record unknown observations honestly, and keep active safety gates separate. A capacity upper bound does not require overlap; deferring an approved requirement requires an explicit scope amendment, not a successful safe stop.
+- Where to apply next time: BRC15a/BRC6a, Connector readback, real-provider canaries, and campaign acceptance. Evidence: `docs/researches/20260902-gpt-pro-connector-readback-probe.md`; execution boundaries: `docs/researches/20260905-repair-campaign-sprint-execution-boundaries.md`.
+
 - Date: 2026-09-05
 - Triggered by correction: a historical lite SessionStart message prohibited plan authoring after the current edit scope had already become standard and PlanStatusGuard required a plan.
 - Mistake pattern: interpreting snapshot ceremony guidance as a permanent session restriction, then reporting a conflict without resolving the current edit scope.
