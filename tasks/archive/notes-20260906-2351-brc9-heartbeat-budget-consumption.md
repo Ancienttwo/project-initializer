@@ -76,3 +76,10 @@
 - The one official codex-plugin review found this P1 on subject sha256:eb7a0695c2c13662c2ca1329cf4ce460cdc2689d2251d7fabba23e6b7dae52b9; it remains a failed review of that subject. Final corrected acceptance requires Owner disposition and is not an external pass. No second semantic review or local full suite is scheduled.
 
 > **Substantive Change SHA256**: `sha256:a791e47fb6a3a2cc47fe73414b49a18896f3e011985399b81ce1eef57a767b96`
+
+## Publication evidence
+
+- Publication 4ca8abd9019fc1492dadf07af7d483b88e9afbb3 was compared directly with 61db011d9733b09b18b5ee249ac0e2b481cadf28 in CI 34043649958. The archive retained development delta digests but lacked the complete publication digest; task-sync stopped before the test suite.
+- The identical direct-base check reproduced the failure locally. This documentation correction records the publication digest without changing product code or relabeling prepared/Owner evidence for another subject.
+
+> **Substantive Change SHA256**: `sha256:fc573460beec9667cd003f73f3a83ec45a5e6fa7da9877794cd2f98c3a6cce95`
