@@ -71,6 +71,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - tests/contract-run.test.ts
   - src/core/state/lease-liveness.ts
   - src/core/automation/budget.ts
   - src/effects/automation/campaign-acquisition.ts

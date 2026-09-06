@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
 import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -638,6 +638,8 @@ async function runChild(
     // stdout+stderr to one log (its own process-group-aware kill logic needs a single
     // stream), so stderr_path stays present but empty in this branch.
     const boundedResultPath = join(runDir, `${role}.bounded-result.json`);
+    // A reused output directory cannot supply this invocation's supervisor proof.
+    rmSync(boundedResultPath, { force: true });
     const boundedRunner = join(SCRIPT_DIR, "run-bounded-verifier-command.ts");
     const wrapper = spawn(
       process.execPath,
