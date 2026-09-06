@@ -262,13 +262,13 @@ describe('provider-free merge seal', () => {
       fixture.harness,
       'run',
       '--base', 'main',
-      '--allow-post-freeze', 'tasks/current.md',
+      '--allow-post-freeze', 'tasks/todos.md',
       '--format', 'sha',
     ], fixture.cwd);
     expect(sealed.status, sealed.stderr).toBe(0);
 
     mkdirSync(join(fixture.cwd, 'tasks'), { recursive: true });
-    writeFileSync(join(fixture.cwd, 'tasks', 'current.md'), '# Current\n\nlifecycle projection\n');
+    writeFileSync(join(fixture.cwd, 'tasks', 'todos.md'), '# Todos\n\nlifecycle projection\n');
     commit(fixture.cwd, 'archive lifecycle projection');
 
     const verified = run('bun', [fixture.harness, 'verify', '--base', 'main', '--format', 'sha'], fixture.cwd);
