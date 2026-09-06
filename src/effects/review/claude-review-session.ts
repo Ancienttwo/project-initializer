@@ -85,7 +85,7 @@ export function reviewSessionLocation(repoRoot: string, contract: string): { roo
 }
 
 export function tmux(session: ReviewSession, args: string[]): string {
-  return execFileSync(session.tmux_bin, ['-L', 'repo-harness-review', ...args], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  return execFileSync(session.tmux_bin, ['-L', 'repo-harness-claude-review', ...args], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
 export function assertReviewProcesses(session: ReviewSession, processes: ReviewProcesses): void {
@@ -226,7 +226,7 @@ export async function runClaudeReviewRound(options: ClaudeReviewOptions) {
     const review = markdownHeader(context.contract.content, 'Review File');
     if (review) projectAcceptance(resolve(root, review), receipt);
     return { status: output.verdict === 'PASS' ? 'accepted' : 'rejected', round, session_id: session.session_id,
-      child_pid: processes.child_pid, pane: processes.pane, attach: `tmux -L repo-harness-review attach -t ${session.tmux_session}`, output, receipt };
+      child_pid: processes.child_pid, pane: processes.pane, attach: `tmux -L repo-harness-claude-review attach -t ${session.tmux_session}`, output, receipt };
   } finally { lock.release(); }
 }
 
@@ -244,7 +244,7 @@ export function claudeReviewStatus(repoRoot: string, contractPath: string) {
   const rounds = Array.from({ length: CLAUDE_REVIEW_MAX_ROUNDS }, (_, i) => i + 1).filter(i => existsSync(join(dir, `request-${i}.json`)))
     .map(round => ({ round, submitted: true, result_saved: existsSync(join(dir, `result-${round}.json`)), receipt_saved: existsSync(join(dir, `accepted-${round}.json`)) }));
   return { status: closed ? 'closed' : error ? 'interrupted' : rounds.some(r => !r.receipt_saved) ? 'pending' : 'idle',
-    session_id: session.session_id, processes, rounds, error, attach: `tmux -L repo-harness-review attach -t ${session.tmux_session}` };
+    session_id: session.session_id, processes, rounds, error, attach: `tmux -L repo-harness-claude-review attach -t ${session.tmux_session}` };
 }
 
 export async function closeClaudeReview(options: Pick<ClaudeReviewOptions, 'repoRoot' | 'contract' | 'authorityHome'>, cancel = false) {

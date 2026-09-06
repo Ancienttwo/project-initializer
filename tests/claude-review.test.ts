@@ -21,7 +21,7 @@ afterEach(async () => {
     rmSync(fixture.root, { recursive: true, force: true });
     rmSync(fixture.home, { recursive: true, force: true });
   }
-  for (const name of sentinels.splice(0)) execFileSync('tmux', ['-L', 'repo-harness-review', 'kill-session', '-t', name]);
+  for (const name of sentinels.splice(0)) execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'kill-session', '-t', name]);
 });
 
 function git(root: string, ...args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
@@ -76,8 +76,8 @@ function fixture(mode = 'normal') {
 test('same child/session performs two rounds, records real receipt, rejects stale/duplicate subjects and closes precisely', async () => {
   const f = fixture();
   const sentinel = `sentinel-${Date.now()}`;
-  execFileSync('tmux', ['-L', 'repo-harness-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
-  const before = execFileSync('tmux', ['-L', 'repo-harness-review', 'list-panes', '-a', '-F', '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
+  execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
+  const before = execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'list-panes', '-a', '-F', '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
   const first = await runClaudeReviewRound(f.options);
   expect(first.status).toBe('rejected');
   await expect(closeClaudeReview(f.options)).rejects.toThrow();
@@ -95,7 +95,7 @@ test('same child/session performs two rounds, records real receipt, rejects stal
   for (let i = 0; i < 30; i++) { try { process.kill(second.child_pid, 0); await Bun.sleep(100); } catch { break; } }
   expect(() => process.kill(second.child_pid, 0)).toThrow();
   expect(claudeReviewStatus(f.root, contract).status).toBe('closed');
-  const after = execFileSync('tmux', ['-L', 'repo-harness-review', 'list-panes', '-a', '-F', '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
+  const after = execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'list-panes', '-a', '-F', '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
   for (const line of before.trim().split('\n')) expect(after).toContain(line);
 }, 30_000);
 
