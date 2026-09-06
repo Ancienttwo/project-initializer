@@ -131,7 +131,9 @@ function acquireEngineerTaskLocked(options: EngineerAcquireOptions, deps: Engine
     if (!repo) return Object.freeze({ ok: false, error: 'rollback_failed', message: `${message(error)}; acquired repository is unavailable for own-claim release`, residual_worktree: envelope.worktree_path });
     let live: LeaseRead['record'];
     try {
-      live = deps.readLease(repo.path, envelope.task_id).record;
+      const readback = deps.readLease(repo.path, envelope.task_id);
+      if (readback.classification === 'unknown') throw new Error('own Lease state is unknown');
+      live = readback.record;
     } catch (readError) {
       return Object.freeze({ ok: false, error: 'rollback_failed', message: `${message(error)}; own-claim readback failed: ${message(readError)}`, residual_worktree: envelope.worktree_path });
     }

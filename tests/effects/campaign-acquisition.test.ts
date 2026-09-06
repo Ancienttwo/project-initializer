@@ -1,4 +1,6 @@
 import { readyFixture } from '../helpers/campaign-acquisition-fixture';
+import { AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, ensureCampaignAuthoringBudget, readAutomationBudgetStatus, reserveAutomationBudget, appendAutomationUsage } from '../../src/effects/automation/budget-store';
+import { resolveGitCommonDirectory } from '../../src/effects/git/common-directory';
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
 import { runCampaignPlanningStep } from '../../src/effects/automation/campaign-planning';
 import { runCampaignPlanningPreflight } from '../../src/cli/commands/campaign';
@@ -10,6 +12,8 @@ import { loadEngineerProfile } from '../../src/effects/engineers/profile-store';
 import { enrollEngineerPrincipal } from '../../src/effects/engineers/principal-store';
 import { readClaimActorReceipt } from '../../src/effects/engineers/claim-actor-store';
 import { acquireNextScheduledEngineerTask } from '../../src/effects/engineers/scheduling-acquire-next';
+import { acquireScheduledEngineerTask } from '../../src/effects/engineers/scheduling-acquire';
+import { acquireEngineerTask } from '../../src/effects/engineers/acquire';
 import { resolveEngineerPrincipal } from '../../src/effects/engineers/principal';
 import { collectEngineerOffers } from '../../src/effects/engineers/scheduling';
 import { afterEach, expect, test } from 'bun:test';
@@ -20,6 +24,7 @@ import { createAdoptionRepository } from '../helpers/campaign-adoption-repositor
 import { adoptIssueBatch } from '../../src/effects/automation/issue-batch-adoption';
 import { withCampaignCapacity } from '../../src/effects/automation/campaign-capacity';
 import { runCampaignAcquisition } from '../../src/effects/automation/campaign-acquisition';
+import { withDevelopmentCampaignLock } from '../../src/effects/automation/development-campaign-store';
 import { projectCanonicalTasks } from '../../src/core/state/coordination-identity';
 import { resolveRepoIdentity } from '../../src/effects/state/coordination-canonical-source';
 import { claimSprintCommand, processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
@@ -29,6 +34,84 @@ const roots: string[] = [];
 afterEach(() => { roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); });
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+test('campaign acquisition charges once and refuses the next Claim after the acquisition limit', async () => {
+  const f = await readyFixture(true); roots.push(f.root, f.home);
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  const status = () => readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env);
+  const initial = status().current.consumed.successful_acquisitions;
+  const acquired = runCampaignAcquisition(f.executeInput);
+  expect(acquired).toMatchObject({ action: 'dispatch' });
+  if (!('envelope' in acquired) || !acquired.envelope) throw new Error('expected acquisition');
+  roots.push(acquired.envelope.worktree_path);
+  expect(status().current.consumed.successful_acquisitions).toBe(initial + 1);
+  expect(runCampaignAcquisition(f.executeInput)).toEqual(acquired);
+  expect(status().current.consumed.successful_acquisitions).toBe(initial + 1);
+  const reservation = reserveAutomationBudget({ repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256, idempotency_key: 'other-real-acquisition-fixture', operation: 'acquisition', unit_kind: 'execute', unit_id: 'other-task', attempt: 1, provider: null, env: f.env });
+  appendAutomationUsage({ repo_root: f.root, reservation, outcome: 'progress', evidence_refs: [{ ref: 'fixture:other-acquisition', sha256: 'a'.repeat(64) }], env: f.env });
+  expect(runCampaignAcquisition(f.executeInput)).toEqual(acquired);
+  let invoked = 0;
+  expect(() => runCampaignAcquisition({ ...f.executeInput, authorization_id: f.secondAuthorization, idempotency_key: 'over-limit' }, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toThrow();
+  expect(invoked).toBe(0);
+}, 60_000);
+
+test('unknown acquisition outcome preserves the reservation and never repeats an effect', async () => {
+  const f = await readyFixture(); roots.push(f.root, f.home);
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  expect(() => runCampaignAcquisition(f.executeInput, options => {
+    const acquired = acquireNextScheduledEngineerTask(options);
+    if (acquired.ok) roots.push(acquired.envelope.worktree_path);
+    throw new Error('crash after actual acquisition');
+  })).toThrow('crash after actual acquisition');
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
+  let invoked = 0;
+  expect(() => runCampaignAcquisition(f.executeInput, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toThrow('reconciliation');
+  expect(invoked).toBe(0);
+}, 60_000);
+
+test('receipt failure after real Fleet acquisition with unknown Lease retains budget authority', async () => {
+  const f = await readyFixture(); roots.push(f.root, f.home);
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  const result = runCampaignAcquisition(f.executeInput, options => acquireNextScheduledEngineerTask({ ...options,
+    dependencies: { acquire: selected => acquireScheduledEngineerTask({ ...selected,
+      dependencies: { acquire: engineer => acquireEngineerTask({ ...engineer, dependencies: {
+        publish(root, receipt) {
+          const lease = readLease(root, receipt.task_id).record;
+          if (!lease?.execution_worktree) throw new Error('expected actual Fleet acquisition');
+          roots.push(lease.execution_worktree);
+          writeFileSync(leaseOwnerPath(root, receipt.task_id), '{}');
+          throw new Error('receipt publication failed after owner record corruption');
+        },
+      } }) },
+    }) },
+  }));
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
+  expect(result).toMatchObject({ ok: false, error: 'rollback_failed' });
+  let invoked = 0;
+  expect(() => runCampaignAcquisition({ ...f.executeInput, idempotency_key: 'after-unknown-lease' }, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toThrow();
+  expect(invoked).toBe(0);
+}, 60_000);
+
+test('persisted acquisition result recovers an interrupted usage write without another acquire', async () => {
+  const f = await readyFixture(); roots.push(f.root, f.home);
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  const store = join(resolveGitCommonDirectory(f.root), AUTOMATION_BUDGET_STORE_RELATIVE_ROOT);
+  const beforeUsage = join(f.home, 'reserved-budget');
+  const acquired = runCampaignAcquisition(f.executeInput, options => {
+    cpSync(store, beforeUsage, { recursive: true });
+    return acquireNextScheduledEngineerTask(options);
+  });
+  if (!('envelope' in acquired) || !acquired.envelope) throw new Error('expected acquisition');
+  roots.push(acquired.envelope.worktree_path);
+  // Keep actual acquisition and its immutable result; restore only the budget before usage commit.
+  rmSync(store, { recursive: true }); cpSync(beforeUsage, store, { recursive: true });
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
+  let invoked = 0;
+  expect(runCampaignAcquisition(f.executeInput, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toEqual(acquired);
+  const current = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current;
+  expect(invoked).toBe(0);
+  expect(current.open_reservation_sha256s).toHaveLength(0);
+  expect(current.consumed.successful_acquisitions).toBe(1);
+}, 60_000);
 async function fixture(limit: 1 | 2 | 3 = 1) {
   const f = await createAdoptionRepository('active', 1, undefined, {}, {}, { max_parallel_tasks: limit });
   roots.push(f.root, f.home);
@@ -171,6 +254,20 @@ test.each(['shadow', 'foreign'] as const)('fresh handoff refuses %s drift and ne
   else expect(live?.claim_id).toBe(foreignClaim);
 });
 
+
+test('occupied admission lock returns idle before budget reservation or acquisition', async () => {
+  const f = await readyFixture(); roots.push(f.root, f.home);
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  const before = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current;
+  const entry = join(import.meta.dir, '../../src/effects/automation/campaign-acquisition.ts');
+  const output = withDevelopmentCampaignLock(f.root, f.intent.campaign_id, () => execFileSync(process.execPath, ['-e', `
+    import { runCampaignAcquisition } from ${JSON.stringify(entry)};
+    console.log(JSON.stringify(runCampaignAcquisition(${JSON.stringify(f.executeInput)}, () => { throw new Error('must not acquire'); })));
+  `], { cwd: f.root, env: f.env, encoding: 'utf8' }));
+  expect(JSON.parse(output)).toEqual({ action: 'idle', reason: 'campaign acquisition admission lock is occupied' });
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.ledger_sha256).toBe(before.ledger_sha256);
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toEqual(before.open_reservation_sha256s);
+}, 60000);
 
 test('different authenticated Engineers share the campaign cap across real acquisition processes', async () => {
   const f = await readyFixture(true); roots.push(f.root, f.home);

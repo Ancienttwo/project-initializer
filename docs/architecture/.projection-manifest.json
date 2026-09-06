@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:66ad6663cca3979e934f41c42543fca8f757db8271c19e65d94319184594cf97",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "3f9464db88fce488852cc45c24f352d93eb63dc4",
-    "worktreeDigest": "sha256:546e70ed7e6a452588724c13de6e854b07367f3831c7867b781abb8a4ef220d9",
-    "sourceTreeDigest": "sha256:57061404e514810a2128335c7748e3e9a39372e55722fc33646442d9363b4b57",
+    "baseHeadSha": "4f9a9486098b8a6b3cde78b4ecfa4ae356c8044d",
+    "worktreeDigest": "sha256:924ccc07d4bdb11978db96d5cd06d57a925cca9d464a3a553d8187b311761a58",
+    "sourceTreeDigest": "sha256:da5fb71d9148aa00b056d95736fcccbf0c5846fc5000c9a1ce9f5d76db46d967",
     "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-    "codeGraphDigest": "sha256:38134d082cf6851a29416a973955623402e4d70ae56372222cf99cf5925963b4",
-    "indexedWorktreeDigest": "sha256:808d1887a66f732cf30d0e167403fb03fd81d581bee59ea947453f1dcdd569be",
+    "codeGraphDigest": "sha256:2f82c821ea8d8b4628af09146ff6afa614970320d36ff7e2617c001e7f9d08af",
+    "indexedWorktreeDigest": "sha256:7dd869061a69bdf1061ce6f717e684f2a2f9ca28c4423c57af495eaf9855acc7",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:b7b929f3f955740bc9de7864de15b418acb708aff3781b7d871420bee9a74875"
+    "projectionInputDigest": "sha256:d030feb30144add02a032288ef5ef1d66c90b4d1de4d130c409767212483891f"
   },
-  "projectionDigest": "sha256:f293089f42ad6980f012da508ff556ab7436ec34351f5cc0e7dbdb2bef3ea409",
+  "projectionDigest": "sha256:4abb7733b59fefdff7578077ea6b57a3192db59dd8c673557712164fd88c0133",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:2ef2b28793c1e340f9151ae7a98456957452874eb1734aca377adfc2559fd9b6",
-      "sourceTreeDigest": "sha256:57061404e514810a2128335c7748e3e9a39372e55722fc33646442d9363b4b57",
+      "sourceTreeDigest": "sha256:da5fb71d9148aa00b056d95736fcccbf0c5846fc5000c9a1ce9f5d76db46d967",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:f293089f42ad6980f012da508ff556ab7436ec34351f5cc0e7dbdb2bef3ea409"
+      "projectionDigest": "sha256:4abb7733b59fefdff7578077ea6b57a3192db59dd8c673557712164fd88c0133"
     }
   },
-  "receiptDigest": "sha256:823439086b96124068fd4fb9468b76c868c9120c9e97426abf148325ea106ef7",
+  "receiptDigest": "sha256:87b0f108c6a1aeda9c6351643d01e7b64f162946a851ac17795fd5f99693825d",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -827,9 +827,9 @@
       "sourceDigest": "sha256:1494a3f41b8a3ac362f3a647e38262857c3c70ec83058bf70c1df68a6f246103",
       "outputDigest": "sha256:93a824fb8d2d33de1b45acfc16783a53193c6ef1bb4843b5c3dcf3c6ae5524f2",
       "verifiedAgainst": {
-        "branch": "codex/brc9-adoption-provider-accounting",
-        "commit": "3f9464db88fce488852cc45c24f352d93eb63dc4",
-        "committedAt": "2026-09-07T02:42:07+08:00"
+        "branch": "codex/brc9-acquisition-accounting",
+        "commit": "4f9a9486098b8a6b3cde78b4ecfa4ae356c8044d",
+        "committedAt": "2026-09-07T03:34:09+08:00"
       }
     },
     {
@@ -927,9 +927,9 @@
       "sourceDigest": "sha256:cdf567032caddaaed39c7205a7243dbf1f35ced90d92af584cfececc9ffd3a4d",
       "outputDigest": "sha256:5b8d7ca0d2bfe132fa3c68512637adcf53e5864f762cb12553fbecccf7d49b5b",
       "verifiedAgainst": {
-        "branch": "codex/brc9-attempt-prerequisite",
-        "commit": "1e2072bc65514c5cc68b0eb76da6de7ed2ee49ab",
-        "committedAt": "2026-09-06T18:26:34+08:00"
+        "branch": "codex/brc9-acquisition-accounting",
+        "commit": "d764cb521e0d52fc49eae9af7c1a258258167e9d",
+        "committedAt": "2026-09-07T03:24:28+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc9-adoption-provider-accounting",
-        "commit": "3f9464db88fce488852cc45c24f352d93eb63dc4",
-        "committedAt": "2026-09-07T02:42:07+08:00"
+        "branch": "codex/brc9-acquisition-accounting",
+        "commit": "4f9a9486098b8a6b3cde78b4ecfa4ae356c8044d",
+        "committedAt": "2026-09-07T03:34:09+08:00"
       }
     },
     {
