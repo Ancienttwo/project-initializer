@@ -98,7 +98,7 @@ export type AutomationContractScope = typeof AUTOMATION_CONTRACT_SCOPES[number];
 
 export type AutomationOperationKind = 'acquisition' | 'dispatch' | 'retry' | 'provider_invocation' | 'dispatch_attempt' | 'retry_attempt';
 
-export type AutomationOutcome = 'progress' | 'no_progress' | 'provider_failure' | 'completed';
+export type AutomationOutcome = 'progress' | 'no_progress' | 'provider_failure' | 'transient_failure' | 'completed';
 
 export type AutomationBudgetState = 'active' | 'reconciliation_required' | 'budget_exhausted';
 
@@ -276,6 +276,22 @@ export function validateProgramBudgetLimit(value: ProgramBudgetLimitV1): Program
   });
 }
 
+export interface CampaignTransientRetryPolicyV1 {
+  readonly max_consecutive_failures: number;
+  readonly initial_backoff_ms: number;
+  readonly maximum_backoff_ms: number;
+}
+
+export function validateCampaignTransientRetryPolicy(value: unknown): CampaignTransientRetryPolicyV1 {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('campaign transient_retry must be an object');
+  const policy = value as Record<string, unknown>;
+  if (JSON.stringify(Object.keys(policy).sort()) !== JSON.stringify(['initial_backoff_ms', 'max_consecutive_failures', 'maximum_backoff_ms'])) invalid('campaign transient_retry fields are invalid');
+  const initial = assertCount(policy.initial_backoff_ms, 'transient_retry.initial_backoff_ms', 1);
+  const maximum = assertCount(policy.maximum_backoff_ms, 'transient_retry.maximum_backoff_ms', 1);
+  if (maximum < initial) invalid('transient_retry maximum backoff is below initial backoff');
+  return Object.freeze({ max_consecutive_failures: assertCount(policy.max_consecutive_failures, 'transient_retry.max_consecutive_failures', 1), initial_backoff_ms: initial, maximum_backoff_ms: maximum });
+}
+
 export interface ProgramAuthorizationCampaignV1 {
   readonly campaign_id: string;
   readonly group_count: 1 | 2 | 3;
@@ -285,6 +301,7 @@ export interface ProgramAuthorizationCampaignV1 {
   readonly max_authoring_rounds_per_group: number;
   readonly max_controller_steps: number;
   readonly max_provider_calls: number;
+  readonly transient_retry?: CampaignTransientRetryPolicyV1;
   readonly issue_author: 'gpt_pro';
   readonly local_parent_host: 'claude' | 'codex';
   readonly chrome_profile_directory: string;
@@ -296,6 +313,8 @@ function validateProgramAuthorizationCampaign(value: unknown): ProgramAuthorizat
   if (typeof value !== 'object' || Array.isArray(value)) invalid('program authorization campaign must be an object or null');
   const campaign = value as Record<string, unknown>;
   const expected = ['allowed_issue_kinds', 'campaign_id', 'chrome_profile_directory', 'group_count', 'issue_author', 'issues_per_group', 'local_parent_host', 'max_authoring_rounds_per_group', 'max_controller_steps', 'max_parallel_tasks', 'max_provider_calls', 'require_fresh_main_audit'];
+  if (Object.hasOwn(campaign, 'transient_retry')) expected.push('transient_retry');
+  expected.sort();
   if (JSON.stringify(Object.keys(campaign).sort()) !== JSON.stringify(expected)) invalid('program authorization campaign fields are invalid');
   if (![1, 2, 3].includes(campaign.group_count as number)) invalid('program authorization campaign group_count must be 1, 2, or 3');
   if (!Number.isSafeInteger(campaign.issues_per_group) || (campaign.issues_per_group as number) < 1 || (campaign.issues_per_group as number) > 10) {
@@ -312,6 +331,7 @@ function validateProgramAuthorizationCampaign(value: unknown): ProgramAuthorizat
   if (campaign.local_parent_host !== 'claude' && campaign.local_parent_host !== 'codex') invalid('program authorization campaign local_parent_host is invalid');
   if (campaign.require_fresh_main_audit !== true) invalid('program authorization campaign require_fresh_main_audit must be true');
   return Object.freeze({
+    ...(Object.hasOwn(campaign, 'transient_retry') ? { transient_retry: validateCampaignTransientRetryPolicy(campaign.transient_retry) } : {}),
     campaign_id: assertIdentifier(campaign.campaign_id, 'campaign_id'),
     group_count: campaign.group_count as 1 | 2 | 3,
     issues_per_group: campaign.issues_per_group as number,
@@ -993,7 +1013,7 @@ export function deriveAutomationConsumption(
     agent_turns: reserved.agent_turns,
     successful_acquisitions: operation === 'acquisition' && progressed ? reserved.successful_acquisitions : 0,
     runner_invocations: reserved.runner_invocations,
-    provider_failures: outcome === 'provider_failure' ? reserved.provider_failures : 0,
+    provider_failures: outcome === 'provider_failure' || outcome === 'transient_failure' ? reserved.provider_failures : 0,
     repair_cycles: reserved.repair_cycles,
     input_tokens: reserved.input_tokens === null ? null : 0,
     output_tokens: reserved.output_tokens === null ? null : 0,
@@ -1046,7 +1066,7 @@ export type AutomationBudgetReservationV1 =
 
 const UNIT_KINDS: readonly ProgramUnitKind[] = Object.freeze(['execute', 'review', 'verify', 'integrate', 'merge']);
 const OPERATION_KINDS: readonly AutomationOperationKind[] = Object.freeze(['acquisition', 'dispatch', 'retry', 'provider_invocation', 'dispatch_attempt', 'retry_attempt']);
-const OUTCOMES: readonly AutomationOutcome[] = Object.freeze(['progress', 'no_progress', 'provider_failure', 'completed']);
+const OUTCOMES: readonly AutomationOutcome[] = Object.freeze(['progress', 'no_progress', 'provider_failure', 'transient_failure', 'completed']);
 
 export type CampaignAuthoringOperation = 'initial' | 'fill_missing' | 'edit_issue';
 export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'github_read' | 'github_comment' | 'github_close';
@@ -1945,4 +1965,25 @@ export function sealAutomationStopReceipt(input: SealAutomationStopReceiptInput)
     issued_at: input.issued_at,
   };
   return validateAutomationStopReceipt({ ...draft, stop_receipt_sha256: automationDigest(draft) } as AutomationStopReceiptV1);
+}
+
+/** Derived from the existing ordered usage ledger; bookkeeping cannot erase failures. */
+export function observeCampaignTransientRetry(events: readonly AutomationLedgerEventV1[], inputPolicy: CampaignTransientRetryPolicyV1, now: string): {
+  readonly consecutive_failures: number; readonly last_failure_at: string | null;
+  readonly next_eligible_at: string | null; readonly state: 'eligible' | 'backoff' | 'exhausted';
+} {
+  const policy = validateCampaignTransientRetryPolicy(inputPolicy);
+  const nowMs = Date.parse(assertTimestamp(now, 'retry observed_at'));
+  let count = 0; let last: string | null = null;
+  for (const event of [...events].sort((a, b) => a.step_index - b.step_index)) {
+    if (event.kind !== AUTOMATION_USAGE_EVENT_KIND || event.resolution === 'reconciled_not_started') continue;
+    if (event.outcome === 'transient_failure') { count++; last = event.observed_at; }
+    else if (event.outcome === 'completed' || (event.provider === 'gpt-pro' && event.outcome === 'progress')) { count = 0; last = null; }
+  }
+  if (last === null) return Object.freeze({ consecutive_failures: count, last_failure_at: null, next_eligible_at: null, state: 'eligible' });
+  const delay = Math.min(policy.maximum_backoff_ms, policy.initial_backoff_ms * 2 ** Math.min(1023, count - 1));
+  const deadline = Date.parse(last) + delay;
+  if (!Number.isSafeInteger(deadline) || !Number.isFinite(new Date(deadline).getTime())) invalid('campaign retry backoff exceeds timestamp range');
+  return Object.freeze({ consecutive_failures: count, last_failure_at: last, next_eligible_at: new Date(deadline).toISOString(),
+    state: count >= policy.max_consecutive_failures ? 'exhausted' : nowMs < deadline ? 'backoff' : 'eligible' });
 }

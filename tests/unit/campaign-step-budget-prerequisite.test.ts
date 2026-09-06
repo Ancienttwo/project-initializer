@@ -81,7 +81,7 @@ function authorization(rounds = 2, runnerInvocations = 8, steps = 4, calls = 8):
       allowed_issue_kinds: ['bugfix', 'test_gap'],
       max_parallel_tasks: 3,
       max_authoring_rounds_per_group: rounds, max_controller_steps: steps, max_provider_calls: calls,
-      issue_author: 'gpt_pro',
+      transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro',
       local_parent_host: 'codex',
       chrome_profile_directory: 'Profile-1',
       require_fresh_main_audit: true,

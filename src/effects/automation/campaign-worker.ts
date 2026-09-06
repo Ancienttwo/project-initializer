@@ -11,7 +11,7 @@ import { validateFleetWorkEnvelope } from '../fleet/acquire';
 import { readIssueBatchIntent } from './issue-batch-store';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
-import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, readAutomationBudgetStatus } from './budget-store';
+import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, readAutomationUsageForResult, readAutomationBudgetStatus } from './budget-store';
 import { automationStoreNow } from './clock';
 import type { CampaignAcquisitionInput } from './campaign-acquisition';
 
@@ -107,8 +107,12 @@ export function bindCampaignWorker(input: {
     identity_sha256: identity, outcome: final.outcome, ended_at: final.ended_at, runtime_effect_id: final.runtime_effect_id, evidence_refs: final.evidence_refs });
   const settleFinal = (final: NonNullable<typeof priorFinal>) => {
     if (!final.reservation) throw new Error('campaign worker final lacks its complete attempt reservation; reconciliation required');
-    appendAutomationUsage({ repo_root: root, reservation: final.reservation, outcome: 'no_progress',
-      evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env: input.env });
+    const settlement = { repo_root: root, reservation: final.reservation,
+      evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env: input.env };
+    if (!readAutomationUsageForResult(settlement)) appendAutomationUsage({ ...settlement,
+      outcome: final.outcome === 'transient_failure' ? 'transient_failure'
+        : final.contract_run.status === 'pass' && (final.outcome === 'completed' || final.outcome === 'not_reproducible') ? 'completed' : 'no_progress',
+    });
     finishAttempt(final);
   };
   if (priorFinal) {
@@ -116,11 +120,6 @@ export function bindCampaignWorker(input: {
     return { replay: priorFinal, selector, deadline_at: budget.deadline_at, beforeChild: () => { throw new Error('completed campaign worker cannot spawn'); }, afterChild: (_observation: CampaignWorkerChildObservation) => {}, finish: (_resultPath: string, _contractRun: CampaignContractRunResult) => priorFinal };
   }
   const launch = { request, started_at: new Date().toISOString() };
-  // This exclusive immutable claim is created before any child or attempt side effect.
-  withCampaignPlanningLock(root, intent, () => {
-    if (read('launch')) throw new Error('campaign worker launch already claimed');
-    persistPlanningRecord(root, intent, key(selector.dispatch_id, 'launch'), launch);
-  });
   let attemptStarted = false;
   let reservation: ReturnType<typeof reserveAutomationBudget> | null = null;
   const admittedRoles = new Set<'worker' | 'verifier'>();
@@ -131,9 +130,14 @@ export function bindCampaignWorker(input: {
       validate();
       if (admittedRoles.has(role) || command !== (role === 'worker' ? request.worker_command : request.verifier_command)) throw new Error('campaign worker child identity differs');
       if (role === 'worker') {
-        reservation = reserveAutomationBudget({ repo_root: root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
+        withCampaignPlanningLock(root, intent, () => {
+          if (read('launch')) throw new Error('campaign worker launch already claimed');
+          reservation = reserveAutomationBudget({ repo_root: root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
           idempotency_key: key(selector.dispatch_id, 'attempt'), operation: offer.attempt_count > 0 ? 'retry_attempt' : 'dispatch_attempt',
           unit_kind: 'execute', unit_id: offer.work_package_id, attempt: offer.attempt_count + 1, provider: null, env: input.env });
+          // Refused admission publishes no launch; an admitted launch fences every child.
+          persistPlanningRecord(root, intent, key(selector.dispatch_id, 'launch'), launch);
+        });
       } else if (!reservation || observations.length !== 1 || observations[0]?.role !== 'worker' || observations[0].exit_code !== 0) {
         throw new Error('campaign verifier requires its admitted and observed worker');
       }

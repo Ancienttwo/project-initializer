@@ -78,8 +78,11 @@ PRD Module 5 保留 exact-SHA 读取要求。BRC4 的 `session.verification` 来
 早期 #282 底座只有混合 agent-turn/runner-invocation、global repair/provider-failure 限额；
 后续 authoring-budget 与 campaign-step/provider prerequisites 已补入独立限额。#287 也已
 加入 `not_reproducible` 与 mutation-side retry admission。下述 package 段保留各自交付边界，
-不能把某一阶段的剩余项当作上游仍不存在。当前未验收的是消费接线、repair/transient policy
-与 terminal/provider 顺序，见本文开头和 Sprint；不得为补缺伪造 Task/Lease 或另建计数权威。
+不能把某一阶段的剩余项当作上游仍不存在。acquisition、完整 repair attempt 与 active terminal
+续验已分别发布；transient retry 包承担最终消费整合与 BRC9 全行验收，需求映射及验收边界见
+`docs/researches/20260907-brc9-transient-retry-consumption.md`。Sprint 状态和对应 AcceptanceReceipt
+决定是否完成；不得为补缺伪造 Task/Lease 或另建计数权威。acquisition 达限封存全局 run 的
+产品契约仍须单独明确，repair fixture 增额不是该问题已解决的证据。
 
 BRC6 的 partial-batch adoption 消费下述预算 store 的 authoring terminal；不能仅凭 BRC5 journal 的记录数宣称预算耗尽。现有 `materializeWorkDemand` 是单 Task、Sprint 与 WorkGraph 两文件事务；BRC6 需要一次多 slot、Sprint/WorkGraph/manifest 三文件事务，不能循环调用该单条入口。
 

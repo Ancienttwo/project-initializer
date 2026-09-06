@@ -31,7 +31,7 @@ export function createCampaignProviderExecutor(binding: ProviderBinding, runner:
       // A typed read failure proves the adapter returned. Mutation errors do
       // not prove whether the remote write occurred and retain their leaf.
       if (error instanceof GithubAdapterError) {
-        recordCampaignProviderOutcome({ ...binding, reservation, outcome: 'read_failed',
+        recordCampaignProviderOutcome({ ...binding, reservation, outcome: ['network', 'deadline', 'rate_limit'].includes(error.failure_class) ? 'read_transient_failure' : 'read_failed',
           result_sha256: automationDigest({ failure_class: error.failure_class, outcome: error.outcome }) });
       }
       throw error;

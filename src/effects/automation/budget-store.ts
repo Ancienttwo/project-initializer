@@ -29,6 +29,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'path';
 
 import {
   AUTOMATION_USAGE_EVENT_KIND,
+  observeCampaignTransientRetry,
   CAMPAIGN_STEP_ADMISSION_KIND,
   CAMPAIGN_STEP_COMPLETION_KIND,
   campaignBudgetStepKey,
@@ -297,6 +298,9 @@ export const AUTOMATION_RUN_DIRECTORY_ENTRIES: readonly string[] = Object.freeze
 );
 
 export type AutomationBudgetStoreErrorCode =
+  | 'campaign_retry_policy_required'
+  | 'campaign_retry_exhausted'
+  | 'campaign_retry_backoff'
   | 'automation_budget_clock_regression'
   | 'automation_budget_store_unavailable'
   | 'automation_budget_store_unsafe'
@@ -1567,6 +1571,15 @@ interface AutomationReservationAdmissionV1 {
   readonly disposition: 'reserved' | 'replayed';
 }
 
+function assertCampaignRetryAdmission(paths: RunPaths, budget: AutomationBudgetV1, now: string): void {
+  const campaign = budget.authorization.campaign;
+  if (campaign === null) return;
+  if (campaign.transient_retry === undefined) fail('campaign_retry_policy_required', 'campaign_retry_policy_required: mint an explicit campaign transient retry authorization before new effects');
+  const retry = observeCampaignTransientRetry(readLedgerEvents(paths), campaign.transient_retry, now);
+  if (retry.state === 'exhausted') fail('campaign_retry_exhausted', `campaign_retry_exhausted: ${retry.consecutive_failures} consecutive transient failures`);
+  if (retry.state === 'backoff') fail('campaign_retry_backoff', `campaign_retry_backoff: next eligible at ${retry.next_eligible_at}`);
+}
+
 function reserveAutomationBudgetAdmission(input: ReservationAdmissionInput): AutomationReservationAdmissionV1 {
   const repoRoot = resolve(input.repo_root);
   const paths = runPaths(repoRoot, input.automation_run_id);
@@ -1689,6 +1702,7 @@ function reserveAutomationBudgetAdmission(input: ReservationAdmissionInput): Aut
     }
     const replayed = replay();
     if (replayed !== null) return Object.freeze({ reservation: replayed, disposition: 'replayed' as const });
+    assertCampaignRetryAdmission(paths, status.budget, reservedAt);
     const campaignContext = validateCampaignReservationAdmission(paths, status.budget, input);
     if (status.budget.authorization.campaign !== null) {
       const ledger = campaignLedger(paths, status.budget);
@@ -1820,6 +1834,7 @@ export function beginCampaignBudgetStep(input: BeginCampaignBudgetStepInput): {
       return Object.freeze({ admission: prior, disposition: 'replayed' as const });
     }
     if (input.replay_only) fail('automation_budget_store_conflict', 'campaign receipt has no prior step admission');
+    assertCampaignRetryAdmission(paths, status.budget, now);
     const ledger = campaignLedger(paths, status.budget);
     if (ledger.active_step !== null || status.current.open_reservation_sha256s.length !== 0) fail('automation_budget_refused', 'campaign step reconciliation_required before another admission');
     if (status.stop_receipt !== null || status.current.state === 'budget_exhausted') fail('automation_budget_refused', 'campaign budget_exhausted before step admission');
@@ -2329,6 +2344,31 @@ export interface AppendAutomationUsageInput extends AutomationUsageResultV1 {
   readonly env?: NodeJS.ProcessEnv;
 }
 
+/** Existing settlement is immutable authority, including across producer upgrades. */
+export function readAutomationUsageForResult(
+  input: Pick<AppendAutomationUsageInput, 'repo_root' | 'reservation' | 'evidence_refs' | 'env'>,
+): AutomationUsageEventV1 | null {
+  const root = resolve(input.repo_root);
+  const reservation = validateAutomationReservation(input.reservation);
+  const paths = runPaths(root, reservation.automation_run_id);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    lockedStatus(root, paths, reservation.automation_run_id, automationStoreNow(), input.env);
+    const storedReservation = parse(readRaw(join(paths.reservationsByDigest, `${reservation.reservation_sha256}.json`), 'automation reservation'), validateAutomationReservation, 'automation reservation');
+    if (canonicalAutomationJson(storedReservation) !== canonicalAutomationJson(reservation)) {
+      fail('automation_budget_store_conflict', 'result reservation differs from stored authority');
+    }
+    const path = join(paths.events, `${reservation.reservation_sha256}.json`);
+    if (!existsSync(path)) return null;
+    const event = parse(readRaw(path, 'automation usage event'), validateAutomationUsageEvent, 'automation usage event');
+    if (event.reservation_sha256 !== reservation.reservation_sha256 || event.budget_sha256 !== reservation.budget_sha256
+      || event.automation_run_id !== reservation.automation_run_id || event.resolution !== 'observed'
+      || canonicalAutomationJson(event.evidence_refs) !== canonicalAutomationJson(input.evidence_refs)) {
+      fail('automation_budget_store_conflict', 'stored usage does not bind this exact observed result');
+    }
+    return event;
+  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
+
 export interface AutomationUsageCommitV1 {
   readonly event: AutomationUsageEventV1;
   readonly current: AutomationBudgetCurrentV1;
@@ -2462,15 +2502,15 @@ export function appendAutomationUsage(input: AppendAutomationUsageInput): Automa
 export function recordCampaignProviderOutcome(input: {
   readonly repo_root: string;
   readonly reservation: CampaignAutomationBudgetReservationV1;
-  readonly outcome: 'returned' | 'read_failed';
+  readonly outcome: 'returned' | 'read_failed' | 'read_transient_failure';
   readonly result_sha256: string;
   readonly env?: NodeJS.ProcessEnv;
 }): AutomationUsageCommitV1 {
   const reservation = validateAutomationReservation(input.reservation);
   if (reservation.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND
     || !('request_sha256' in reservation.campaign_context)
-    || (input.outcome !== 'returned' && input.outcome !== 'read_failed')
-    || (input.outcome === 'read_failed' && reservation.campaign_context.operation !== 'github_read')
+    || (input.outcome !== 'returned' && input.outcome !== 'read_failed' && input.outcome !== 'read_transient_failure')
+    || (input.outcome !== 'returned' && reservation.campaign_context.operation !== 'github_read')
     || typeof input.result_sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(input.result_sha256)) {
     fail('automation_budget_store_invalid', 'provider outcome requires an exact GitHub reservation and result digest');
   }
@@ -2492,7 +2532,7 @@ export function recordCampaignProviderOutcome(input: {
       outcome: input.outcome, result_sha256: input.result_sha256,
     };
     const receipt = { ...basis, receipt_sha256: automationDigest(basis) };
-    const usageOutcome = input.outcome === 'read_failed' ? 'provider_failure' : 'no_progress';
+    const usageOutcome = input.outcome === 'read_transient_failure' ? 'transient_failure' : input.outcome === 'read_failed' ? 'provider_failure' : 'no_progress';
     const evidenceRefs = [evidenceRef('campaign-provider-outcome', receipt.receipt_sha256)];
     const eventPath = join(paths.events, `${reservation.reservation_sha256}.json`);
     if (existsSync(eventPath)) {

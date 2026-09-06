@@ -17,7 +17,7 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 const digest = (label: string) => automationDigest({ label });
 const options = { timeout_ms: 1000, max_buffer: 65536 };
 
-function fixture(calls = 8) {
+function fixture(calls = 8, retryPolicy = { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'campaign-provider-')));
   roots.push(root);
   const repo = join(root, 'repo');
@@ -34,7 +34,7 @@ function fixture(calls = 8) {
     campaign: { campaign_id: 'provider-campaign', group_count: 1, issues_per_group: 2,
       allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2,
       max_authoring_rounds_per_group: 2, max_controller_steps: 4, max_provider_calls: calls,
-      issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', require_fresh_main_audit: true },
+      transient_retry: retryPolicy, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', require_fresh_main_audit: true },
     issued_by: 'owner', issued_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 3600000).toISOString(),
   });
   mintProgramAuthorization({ repo_root: repo, authorization, env });
@@ -138,4 +138,34 @@ test('recorded provider outcomes cannot be relabeled after usage is closed', () 
   expect(() => recordCampaignProviderOutcome({ ...f.binding, reservation, outcome: 'returned', result_sha256: digest('different') })).toThrow('different observation');
   expect(readFileSync(path, 'utf8')).toBe(before);
   expect(f.ledger().provider_calls).toBe(1);
+});
+
+test('typed transient read failures exhaust the campaign before another adapter call, despite successful intervening reads', async () => {
+  const f = fixture(8, { max_consecutive_failures: 2, initial_backoff_ms: 1, maximum_backoff_ms: 1 });
+  let calls = 0;
+  const provider = createCampaignProviderExecutor(f.binding, () => {
+    calls++;
+    if (calls !== 2) throw new GithubAdapterError('network', 'typed network failure');
+    return { stdout: 'observed' };
+  });
+  expect(() => provider.read(['first'], options)).toThrow('typed network failure');
+  await Bun.sleep(5);
+  expect(provider.read(['successful-read'], options).stdout).toBe('observed');
+  expect(() => provider.read(['second-failure'], options)).toThrow('typed network failure');
+  expect(() => provider.read(['forbidden'], options)).toThrow('campaign_retry_exhausted');
+  expect(calls).toBe(3);
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(0);
+  expect(f.status().current.consumed.provider_failures).toBe(2);
+});
+
+test('a non-transient typed read error is not reclassified as a transient result', () => {
+  const f = fixture(8, { max_consecutive_failures: 1, initial_backoff_ms: 1000, maximum_backoff_ms: 1000 });
+  let calls = 0;
+  const provider = createCampaignProviderExecutor(f.binding, () => {
+    if (++calls === 1) throw new GithubAdapterError('invalid_response', 'invalid provider response');
+    return { stdout: 'observed' };
+  });
+  expect(() => provider.read(['invalid'], options)).toThrow('invalid provider response');
+  expect(provider.read(['next-explicit-read'], options).stdout).toBe('observed');
+  expect(f.status().current.consumed.provider_failures).toBe(1);
 });
