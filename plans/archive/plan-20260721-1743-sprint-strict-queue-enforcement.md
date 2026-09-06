@@ -1,6 +1,13 @@
+> **Archived**: 2026-09-07 00:55
+> **Related Plan**: plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md
+> **Outcome**: Abandoned
+> **Lifecycle**: plan
+> **Parent Run ID**: run-20260907-0055
+> **Archive Projection V1**: `plans/plan-20260721-1743-sprint-strict-queue-enforcement.md` => `plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md`
+
 # Plan: Sprint strict-queue enforcement before EPC
 
-> **Status**: Draft
+> **Status**: Abandoned
 > **Created**: 20260721-1743
 > **Slug**: sprint-strict-queue-enforcement
 > **Planning Source**: repo-harness-plan
@@ -12,7 +19,6 @@
 > **Rollback Surface**: Revert the single strict-queue PR; no persisted schema or data migration, and in-flight marker format remains unchanged.
 > **Spec**: `docs/spec.md`
 > **Research**: See `docs/researches/`
-> **Task Contract**: `tasks/contracts/20260721-1743-sprint-strict-queue-enforcement.contract.md`
 > **Task Review**: `tasks/reviews/20260721-1743-sprint-strict-queue-enforcement.review.md`
 > **Implementation Notes**: `tasks/notes/20260721-1743-sprint-strict-queue-enforcement.notes.md`
 
@@ -28,7 +34,7 @@
 ## Workflow Inventory
 Complete this inventory before implementation. If any line is unknown, keep the plan in Draft and fill it before projection.
 
-- Scheduled plan (not active): `plans/plan-20260721-1743-sprint-strict-queue-enforcement.md`; it was captured with `--no-active` because HRD-08/09 own the current execution sequence.
+- Scheduled plan (not active): `plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md`; it was captured with `--no-active` because HRD-08/09 own the current execution sequence.
 - Sprint contract: `tasks/contracts/20260721-1743-sprint-strict-queue-enforcement.contract.md`
 - Sprint review: `tasks/reviews/20260721-1743-sprint-strict-queue-enforcement.review.md`
 - Implementation notes: `tasks/notes/20260721-1743-sprint-strict-queue-enforcement.notes.md`
@@ -37,7 +43,7 @@ Complete this inventory before implementation. If any line is unknown, keep the 
 - Run snapshots: `.ai/harness/runs/`
 - Scope authority: `tasks/contracts/20260721-1743-sprint-strict-queue-enforcement.contract.md` `allowed_paths`
 - Concurrency rule: `.ai/harness/active-plan` selects the active plan for this worktree when present; `.ai/harness/active-worktree` records the owning worktree. If another worktree already owns active work, open or switch to the matching worktree instead of serializing unrelated plans.
-- Execution isolation: approved contract-level work projects through `repo-harness run plan-to-todo --plan plans/plan-20260721-1743-sprint-strict-queue-enforcement.md` and may start `repo-harness run contract-worktree start --plan plans/plan-20260721-1743-sprint-strict-queue-enforcement.md`.
+- Execution isolation: approved contract-level work projects through `repo-harness run plan-to-todo --plan plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md` and may start `repo-harness run contract-worktree start --plan plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md`.
 
 ## Approach
 ### Strategy
@@ -71,7 +77,7 @@ See captured planning output.
 - Implementation notes file: `tasks/notes/20260721-1743-sprint-strict-queue-enforcement.notes.md`
 - Template: `.claude/templates/contract.template.md`
 - Verification command: `repo-harness run verify-contract --contract tasks/contracts/20260721-1743-sprint-strict-queue-enforcement.contract.md --strict`
-- Active plan rule: this Draft intentionally writes neither `.ai/harness/active-plan` nor `.ai/harness/active-worktree`. After HRD-09 merges, implementation still requires explicit owner approval and `repo-harness run plan-to-todo --plan plans/plan-20260721-1743-sprint-strict-queue-enforcement.md` in its isolated worktree.
+- Active plan rule: this Draft intentionally writes neither `.ai/harness/active-plan` nor `.ai/harness/active-worktree`. After HRD-09 merges, implementation still requires explicit owner approval and `repo-harness run plan-to-todo --plan plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md` in its isolated worktree.
 
 ## Handoff
 
@@ -80,7 +86,7 @@ See captured planning output.
 
 ## Promotion Gate
 
-- **Merge/PR unit**: Captured plan `plans/plan-20260721-1743-sprint-strict-queue-enforcement.md` is the proposed mergeable execution unit; revise before execute if this is only a checklist step.
+- **Merge/PR unit**: Captured plan `plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md` is the proposed mergeable execution unit; revise before execute if this is only a checklist step.
 - **Rollback surface**: Revert the single strict-queue PR; no persisted schema or data migration, and in-flight marker format remains unchanged.
 - **Verification boundary**: Targeted sprint-backlog behavior and projection-parity tests, generated-repo checks, root required checks, and strict contract verification.
 - **Review/acceptance boundary**: `tasks/reviews/20260721-1743-sprint-strict-queue-enforcement.review.md` must record pass against the captured acceptance criteria.
@@ -89,7 +95,7 @@ See captured planning output.
 
 ## Evidence Contract
 
-- **State/progress path**: `plans/plan-20260721-1743-sprint-strict-queue-enforcement.md` task breakdown, `tasks/todos.md` deferred-goal ledger, `tasks/contracts/20260721-1743-sprint-strict-queue-enforcement.contract.md`, `tasks/reviews/20260721-1743-sprint-strict-queue-enforcement.review.md`, and `tasks/notes/20260721-1743-sprint-strict-queue-enforcement.notes.md`
+- **State/progress path**: `plans/archive/plan-20260721-1743-sprint-strict-queue-enforcement.md` task breakdown, `tasks/todos.md` deferred-goal ledger, `tasks/contracts/20260721-1743-sprint-strict-queue-enforcement.contract.md`, `tasks/reviews/20260721-1743-sprint-strict-queue-enforcement.review.md`, and `tasks/notes/20260721-1743-sprint-strict-queue-enforcement.notes.md`
 - **Verification evidence**: `.ai/harness/checks/latest.json`, `.ai/harness/runs/`, and the commands named in the captured planning output
 - **Evaluator rubric**: `tasks/reviews/20260721-1743-sprint-strict-queue-enforcement.review.md` must record a passing Waza /check style recommendation
 - **Stop condition**: all task breakdown items are complete, sprint verification passes, and the review recommends pass
