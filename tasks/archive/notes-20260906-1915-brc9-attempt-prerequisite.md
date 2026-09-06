@@ -59,3 +59,9 @@ New-target prepare run-20260906T182709-55475 passed 24/24. The owner's explicit 
 The repaired main target is 4c6e59784cb5ae0b2c46e387586cc1630e37a030. GitHub CI run 34028703586 completed success for Test, all three MCP matrix jobs and Required / CI. The actual 322d7cde..4c6e5978 delta is confined to two Human Review Card fixtures in tests/helper-scripts.test.ts and the verification research note. Production package bytes did not change.
 
 After integrating this target, git diff against f8812317 confirms no change to the three attempt production files, their regression test or the BRC9 research note. Ordinary architecture projection applied with no human actions or refresh signals. Old external review and prepare runs retain their original subjects; fresh exact-target preparation and the existing owner grant provide the final integration binding. No duplicate full suite is required or run.
+
+## Publication diff binding
+
+Canonical finish published dbce6cc2f7c559ea6f5446bc35dea3cb39bed98d onto 4c6e59784cb5ae0b2c46e387586cc1630e37a030. CI run 34029781788 passed all three MCP matrix jobs but stopped at task-sync before the test suite: the archived workflow artifacts lacked the publication diff identity. The same direct-base check reproduced the refusal locally. This annotation binds that exact substantive diff; it does not change production bytes or reassign any review, prepare run, or AcceptanceReceipt to a different subject.
+
+> **Substantive Change SHA256**: `sha256:29a0c5c4757046fdbc7917a284f4a0a3119563a777b58ce0e6ae53c32d5b7274`
