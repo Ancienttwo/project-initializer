@@ -1,6 +1,13 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260905-1631-verify-context-diagnostics.md
+> **Outcome**: Superseded
+> **Lifecycle**: plan
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260905-1631-verify-context-diagnostics.md` => `plans/archive/plan-20260905-1631-verify-context-diagnostics.md`
+
 # Plan: Retain failed criterion context comparisons
 
-> **Status**: Executing
+> **Status**: Archived
 > **Created**: 20260905-1631
 > **Planning Source**: codex-plan
 > **Artifact Level**: work-package

@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-06 22:49
+> **Related Plan**: plans/archive/plan-20260906-0415-untrack-current-status.md
+> **Outcome**: Superseded
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260906-2249
+> **Archive Projection V1**: `plans/plan-20260906-0415-untrack-current-status.md` => `plans/archive/plan-20260906-0415-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0415-untrack-current-status.notes.md` => `tasks/archive/notes-20260906-2249-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0415-untrack-current-status.contract.md` => `tasks/archive/contract-20260906-2249-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0415-untrack-current-status.review.md` => `tasks/archive/review-20260906-2249-untrack-current-status.md`
+
 # Implementation Notes: untrack-current-status
 
 > **Status**: Active
-> **Plan**: plans/plan-20260906-0415-untrack-current-status.md
-> **Contract**: tasks/contracts/20260906-0415-untrack-current-status.contract.md
-> **Review**: tasks/reviews/20260906-0415-untrack-current-status.review.md
+> **Plan**: plans/archive/plan-20260906-0415-untrack-current-status.md
+> **Contract**: tasks/archive/contract-20260906-2249-untrack-current-status.md
+> **Review**: tasks/archive/review-20260906-2249-untrack-current-status.md
 > **Last Updated**: 2026-09-06 04:16
 > **Lifecycle**: notes
 > **Substantive Change SHA256**: `sha256:28f36a9888368e4d1c094d98c753057fbdfa4a7eeb4e5bc32e3d6d2fd95d6263`

@@ -1,6 +1,13 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260905-1455-isolated-worktree-readiness.md
+> **Outcome**: Superseded
+> **Lifecycle**: plan
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260905-1455-isolated-worktree-readiness.md` => `plans/archive/plan-20260905-1455-isolated-worktree-readiness.md`
+
 # Plan: Strict isolation agreement and Fleet verification lifecycle
 
-> **Status**: Approved
+> **Status**: Archived
 > **Created**: 20260905-1455
 > **Slug**: isolated-worktree-readiness
 > **Planning Source**: codex-plan

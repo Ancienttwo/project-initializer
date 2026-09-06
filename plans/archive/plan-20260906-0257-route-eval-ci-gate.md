@@ -1,6 +1,16 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+> **Outcome**: Superseded
+> **Lifecycle**: plan
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0257-route-eval-ci-gate.md` => `plans/archive/plan-20260906-0257-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md` => `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md` => `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md` => `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+
 # Plan: Route eval TS arm as named CI gate
 
-> **Status**: Executing
+> **Status**: Archived
 > **Created**: 20260906-0257
 > **Slug**: route-eval-ci-gate
 > **Planning Source**: repo-harness-plan
@@ -12,9 +22,9 @@
 > **Rollback Surface**: Revert only codex/route-eval-ci-gate
 > **Spec**: `docs/spec.md`
 > **Research**: See `docs/researches/`
-> **Task Contract**: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md`
-> **Task Review**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md`
-> **Implementation Notes**: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md`
+> **Task Contract**: `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+> **Task Review**: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+> **Implementation Notes**: `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
 > **Substantive Change SHA256**: `sha256:6538279cf2de85203faebb2919aca6593e828a96f1bbbd6e162c4759541e9270`
 
 ## Agentic Routing
@@ -29,16 +39,16 @@
 ## Workflow Inventory
 Complete this inventory before implementation. If any line is unknown, keep the plan in Draft and fill it before projection.
 
-- Active plan: `plans/plan-20260906-0257-route-eval-ci-gate.md`
-- Sprint contract: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md`
-- Sprint review: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md`
-- Implementation notes: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md`
+- Active plan: `plans/archive/plan-20260906-0257-route-eval-ci-gate.md`
+- Sprint contract: `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+- Sprint review: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+- Implementation notes: `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
 - Deferred-goal ledger: `tasks/todos.md`
 - Current checks: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
-- Scope authority: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md` `allowed_paths`
+- Scope authority: `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md` `allowed_paths`
 - Concurrency rule: `.ai/harness/active-plan` selects the active plan for this worktree when present; `.ai/harness/active-worktree` records the owning worktree. If another worktree already owns active work, open or switch to the matching worktree instead of serializing unrelated plans.
-- Execution isolation: approved contract-level work projects through `repo-harness run plan-to-todo --plan plans/plan-20260906-0257-route-eval-ci-gate.md` and may start `repo-harness run contract-worktree start --plan plans/plan-20260906-0257-route-eval-ci-gate.md`.
+- Execution isolation: approved contract-level work projects through `repo-harness run plan-to-todo --plan plans/archive/plan-20260906-0257-route-eval-ci-gate.md` and may start `repo-harness run contract-worktree start --plan plans/archive/plan-20260906-0257-route-eval-ci-gate.md`.
 
 ## Approach
 ### Strategy
@@ -67,11 +77,11 @@ See captured planning output.
 | Captured plan lacks enough detail | Medium | Execution may need clarification | Stop before implementation if the captured output contradicts repo rules or lacks concrete file targets |
 
 ## Task Contracts
-- Contract file: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md`
-- Review file: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md`
-- Implementation notes file: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md`
+- Contract file: `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+- Review file: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+- Implementation notes file: `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
 - Template: `.claude/templates/contract.template.md`
-- Verification command: `repo-harness run verify-contract --contract tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md --strict`
+- Verification command: `repo-harness run verify-contract --contract tasks/archive/contract-20260906-2248-route-eval-ci-gate.md --strict`
 - Active plan rule: this captured plan is written to `.ai/harness/active-plan` and the owning worktree is written to `.ai/harness/active-worktree` unless --no-active is used. Do not infer active execution from the latest non-archived plan.
 
 ## Handoff
@@ -81,18 +91,18 @@ See captured planning output.
 
 ## Promotion Gate
 
-- **Merge/PR unit**: Captured plan `plans/plan-20260906-0257-route-eval-ci-gate.md` is the proposed mergeable execution unit; revise before execute if this is only a checklist step.
+- **Merge/PR unit**: Captured plan `plans/archive/plan-20260906-0257-route-eval-ci-gate.md` is the proposed mergeable execution unit; revise before execute if this is only a checklist step.
 - **Rollback surface**: Revert only codex/route-eval-ci-gate
 - **Verification boundary**: Focused eval tests, check:route-eval, check-ci.sh syntax, integrity checks; no full suite
-- **Review/acceptance boundary**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md` must record pass against the captured acceptance criteria.
+- **Review/acceptance boundary**: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md` must record pass against the captured acceptance criteria.
 - **High-risk surface**: Risks named in captured planning output; keep the plan Draft if risk ownership is not concrete.
 - **Why not checklist row**: verification_boundary
 
 ## Evidence Contract
 
-- **State/progress path**: `plans/plan-20260906-0257-route-eval-ci-gate.md` task breakdown, `tasks/todos.md` deferred-goal ledger, `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md`, `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md`, and `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md`
+- **State/progress path**: `plans/archive/plan-20260906-0257-route-eval-ci-gate.md` task breakdown, `tasks/todos.md` deferred-goal ledger, `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`, `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`, and `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
 - **Verification evidence**: `.ai/harness/checks/latest.json`, `.ai/harness/runs/`, and the commands named in the captured planning output
-- **Evaluator rubric**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md` must record a passing Waza /check style recommendation
+- **Evaluator rubric**: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md` must record a passing Waza /check style recommendation
 - **Stop condition**: all task breakdown items are complete, sprint verification passes, and the review recommends pass
 - **Rollback surface**: Revert only codex/route-eval-ci-gate
 
@@ -243,7 +253,7 @@ $ bash scripts/check-architecture-sync.sh
 [ArchitectureProjection] provider=archctx apply=automatic state=ready pending=0 running=0 dead_letters=0 human_actions=0 adoption_required=0 blocking=0 uncommitted=0
 
 $ REPO_HARNESS_DIFF_BASE=origin/main REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh
-[task-sync] Bound canonical workflow evidence: plans/plan-20260906-0257-route-eval-ci-gate.md (sha256:6538279cf2de85203faebb2919aca6593e828a96f1bbbd6e162c4759541e9270).
+[task-sync] Bound canonical workflow evidence: plans/archive/plan-20260906-0257-route-eval-ci-gate.md (sha256:6538279cf2de85203faebb2919aca6593e828a96f1bbbd6e162c4759541e9270).
 (exit 0)
 
 $ bash scripts/check-task-workflow.sh --strict

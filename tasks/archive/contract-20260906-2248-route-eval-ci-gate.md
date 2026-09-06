@@ -1,28 +1,38 @@
-# Task Contract: context-map-drift-check
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+> **Outcome**: Superseded
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0257-route-eval-ci-gate.md` => `plans/archive/plan-20260906-0257-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md` => `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md` => `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md` => `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+
+# Task Contract: route-eval-ci-gate
 
 > **Status**: Active
-> **Plan**: plans/plan-20260906-0323-context-map-drift-check.md
+> **Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
-> **Last Updated**: 2026-09-06 03:23
-> **Review File**: `tasks/reviews/20260906-0323-context-map-drift-check.review.md`
-> **Notes File**: `tasks/notes/20260906-0323-context-map-drift-check.notes.md`
+> **Last Updated**: 2026-09-06 02:57
+> **Review File**: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+> **Notes File**: `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
 
-`.ai/context/context-map.json#discoverable_contexts` is the agent-facing map of capability contracts. It is append-only with no check and no runtime reader, so it has drifted: root CLAUDE.md/AGENTS.md are registered 5 times under 5 capability ids. A stale map makes agents load the wrong local contract with confidence. Without a gate the drift only grows.
+`src/cli/hook/prompt-intents.ts` is a 580-line regex intent classifier that re-derives LLM-owned semantics; retiring it needs a numeric oracle. The existing route-nl-vs-ts eval has only 9 scenarios and no named CI step, so a classifier regression on an uncovered intent or action is invisible until a user hits it. Skipping this leaves "delete the regex" as a feeling instead of a number.
 
 ## Goal
 
-`bun run check:context-map` validates the map against archcontext nodes, disk, and the generated-projection manifest under the four invariants in the plan's P3, is red on the current map and green after a one-shot `--write` repair committed in the same change, runs as a named step in `scripts/check-ci.sh`, and both writers (`scripts/context-contract-sync.sh`, `scripts/architecture-event.ts`) skip root-context-file paths at the push site.
+`bun run check:route-eval` runs the TS arm of `scripts/route-nl-vs-ts-eval.ts` over an expanded `ROUTE_SCENARIOS` corpus that covers every `PROMPT_GUARD_INTENTS` entry and every prompt-layer-reachable `PROMPT_GUARD_ACTIONS` entry, prints one line per scenario plus a coverage summary, exits non-zero on any mismatch or coverage shortfall against pinned constants, and runs as the named `[ci] route eval (TS arm)` step in `scripts/check-ci.sh` before `[ci] tests`. NL arm, report protocol, `evals/evals.json`, and runtime prompt-guard behavior are unchanged.
 
 ## Scope
 
-- In scope: new `scripts/check-context-map.ts` and `tests/check-context-map.test.ts`; root-path guard in both writers plus their `assets/templates/helpers/` projections and a regression test; one-shot repair of `.ai/context/context-map.json`; `package.json` script; `scripts/check-ci.sh` step; `tests/bootstrap-files.test.ts` only if it asserts the step list.
-- Out of scope: unifying the two writers; editing archcontext nodes, `src/core/capabilities/registry.ts`, root `CLAUDE.md`/`AGENTS.md`, or any nested contract file content; changing the map schema or the non-contract glob entries.
+- In scope: `scripts/route-nl-vs-ts-eval.ts` (corpus + `--check-ts-arm` mode), `tests/route-nl-vs-ts-eval.test.ts`, `package.json` script, `scripts/check-ci.sh` step, one paragraph in `docs/reference-configs/loop-engine-nl-decision-table.md`, and `tests/bootstrap-files.test.ts` only if its check-ci step assertions need the new line.
+- Out of scope: any edit to `src/cli/hook/prompt-intents.ts`, `src/cli/hook/prompt-guard-decision.ts`, `evals/evals.json`, hook runtime, or the NL arm. Do not move scenarios into a separate data file. Do not invent prompts from taste: every scenario cites a `lessonSource` from an existing test, `tasks/lessons.md`, or a decision-table rule. Actions unreachable from the prompt layer go into the plan's `## Unreachable Actions` section with a reason, never faked.
 - Taste constraints: <!-- advisory only, no run gate; default style/taste lives in AGENTS.md and the minimal-change policy, use this to record a per-task override -->
 
 ## Stop Conditions
@@ -33,7 +43,7 @@
 
 ## Falsifier
 
-If some `src/` runtime or hook actually reads `discoverable_contexts` entries by capability_id (not just the file path), removing the root duplicates could change behavior. Cheapest check: `rg -n 'discoverable_contexts' src scripts --glob '*.ts'` and read every hit before writing `--write`.
+If the TS arm cannot reach most actions from a prompt plus `PromptGuardState` alone (they depend on filesystem or git state the eval cannot fake), the corpus cannot be the oracle and the slice is wrong. Cheapest check: enumerate the branches of `runPromptGuardVerdictFromPrompt` first and count reachable actions before writing scenarios.
 
 ## Root Cause Evidence
 
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260906-0323-context-map-drift-check.md`
+- Source plan: `plans/archive/plan-20260906-0257-route-eval-ci-gate.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260906-0323-context-map-drift-check.review.md`
-- Notes file: `tasks/notes/20260906-0323-context-map-drift-check.notes.md`
+- Review file: `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+- Notes file: `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -58,7 +68,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[{"id":"context-map-check","kind":"deterministic_test","paths":["scripts/check-context-map.ts","tests/check-context-map.test.ts"]},{"id":"writer-root-guard","kind":"deterministic_test","paths":["scripts/context-contract-sync.sh","scripts/architecture-event.ts","tests/architecture-event.test.ts","tests/hook-contracts.test.ts"]},{"id":"map-repair","kind":"runtime_readback","paths":[".ai/context/context-map.json"]}]}
+{"protocol":1,"oracles":[{"id":"route-eval-ts-arm","kind":"deterministic_test","paths":["scripts/route-nl-vs-ts-eval.ts","tests/route-nl-vs-ts-eval.test.ts"]},{"id":"ci-chain-wiring","kind":"deterministic_test","paths":["scripts/check-ci.sh","package.json","tests/bootstrap-files.test.ts"]}]}
 ```
 
 ## Acceptance Policy
@@ -71,23 +81,17 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
-  - plans/plan-20260906-0323-context-map-drift-check.md
-  - tasks/contracts/20260906-0323-context-map-drift-check.contract.md
-  - tasks/reviews/20260906-0323-context-map-drift-check.review.md
-  - tasks/notes/20260906-0323-context-map-drift-check.notes.md
+  - plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+  - tasks/archive/contract-20260906-2248-route-eval-ci-gate.md
+  - tasks/archive/review-20260906-2248-route-eval-ci-gate.md
+  - tasks/archive/notes-20260906-2248-route-eval-ci-gate.md
   - tasks/todos.md
-  - scripts/check-context-map.ts
-  - scripts/context-contract-sync.sh
-  - scripts/architecture-event.ts
-  - assets/templates/helpers/context-contract-sync.sh
-  - assets/templates/helpers/architecture-event.ts
-  - tests/check-context-map.test.ts
-  - tests/architecture-event.test.ts
-  - tests/hook-contracts.test.ts
-  - tests/bootstrap-files.test.ts
-  - .ai/context/context-map.json
-  - package.json
+  - scripts/route-nl-vs-ts-eval.ts
   - scripts/check-ci.sh
+  - package.json
+  - tests/route-nl-vs-ts-eval.test.ts
+  - tests/bootstrap-files.test.ts
+  - docs/reference-configs/loop-engine-nl-decision-table.md
 ```
 
 ## Evidence Requirements
@@ -136,11 +140,11 @@ Executable checks are authored only in the canonical `## Verification Plan` JSON
 ```yaml
 exit_criteria:
   files_exist:
-    - scripts/check-context-map.ts
-    - .ai/context/context-map.json
+    - scripts/route-nl-vs-ts-eval.ts
+    - scripts/check-ci.sh
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260906-0323-context-map-drift-check.notes.md
+    - tasks/archive/notes-20260906-2248-route-eval-ci-gate.md
 ```
 
 
@@ -151,69 +155,43 @@ exit_criteria:
   "protocol": 1,
   "checks": [
     {
-      "id": "context-map",
+      "id": "route-eval-ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Verifies context-map validation and repair behavior.",
+      "necessity": "Verifies the route-eval TypeScript arm.",
       "inputs": {
         "env": []
       },
       "kind": "package_test",
-      "path": "tests/check-context-map.test.ts"
+      "path": "tests/route-nl-vs-ts-eval.test.ts"
     },
     {
-      "id": "architecture-event",
+      "id": "bootstrap-files",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Verifies architecture-event writer root-path guard behavior.",
+      "necessity": "Verifies CI wiring in bootstrap files.",
       "inputs": {
         "env": []
       },
       "kind": "package_test",
-      "path": "tests/architecture-event.test.ts"
+      "path": "tests/bootstrap-files.test.ts"
     },
     {
-      "id": "hook-contracts",
+      "id": "route-eval",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Verifies hook contract writer behavior.",
-      "inputs": {
-        "env": []
-      },
-      "kind": "package_test",
-      "path": "tests/hook-contracts.test.ts"
-    },
-    {
-      "id": "check-context-map",
-      "cwd": ".",
-      "phase": "verification",
-      "cost": "normal",
-      "evidence_policy": "current_exact",
-      "necessity": "Runs the context-map invariant check.",
+      "necessity": "Runs the named route-eval CI gate.",
       "inputs": {
         "env": []
       },
       "kind": "command",
-      "command": "bun run check:context-map"
-    },
-    {
-      "id": "helper-check",
-      "cwd": ".",
-      "phase": "preflight",
-      "cost": "normal",
-      "evidence_policy": "current_exact",
-      "necessity": "Checks distributed helper projections.",
-      "inputs": {
-        "env": []
-      },
-      "kind": "command",
-      "command": "bun run check:helpers"
+      "command": "bun run check:route-eval"
     },
     {
       "id": "check-ci-syntax",

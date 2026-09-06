@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-06 22:49
+> **Related Plan**: plans/archive/plan-20260906-0338-context-files-ci-step.md
+> **Outcome**: Superseded
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260906-2249
+> **Archive Projection V1**: `plans/plan-20260906-0338-context-files-ci-step.md` => `plans/archive/plan-20260906-0338-context-files-ci-step.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0338-context-files-ci-step.notes.md` => `tasks/archive/notes-20260906-2249-context-files-ci-step.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0338-context-files-ci-step.contract.md` => `tasks/archive/contract-20260906-2249-context-files-ci-step.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0338-context-files-ci-step.review.md` => `tasks/archive/review-20260906-2249-context-files-ci-step.md`
+
 # Task Review: context-files-ci-step
 
 > **Status**: Pending
-> **Plan**: plans/plan-20260906-0338-context-files-ci-step.md
-> **Contract**: tasks/contracts/20260906-0338-context-files-ci-step.contract.md
-> **Notes File**: tasks/notes/20260906-0338-context-files-ci-step.notes.md
+> **Plan**: plans/archive/plan-20260906-0338-context-files-ci-step.md
+> **Contract**: tasks/archive/contract-20260906-2249-context-files-ci-step.md
+> **Notes File**: tasks/archive/notes-20260906-2249-context-files-ci-step.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-06 03:38
 > **Recommendation**: fail

@@ -1,6 +1,13 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260905-1446-verification-scope-profile-consistency.md
+> **Outcome**: Superseded
+> **Lifecycle**: plan
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260905-1446-verification-scope-profile-consistency.md` => `plans/archive/plan-20260905-1446-verification-scope-profile-consistency.md`
+
 # Plan: Verification scope and profile snapshot consistency
 
-> **Status**: Approved
+> **Status**: Archived
 > **Created**: 20260905-1446
 > **Planning Source**: waza-think
 > **Artifact Level**: work-package

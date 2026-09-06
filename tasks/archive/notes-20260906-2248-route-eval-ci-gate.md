@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+> **Outcome**: Superseded
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0257-route-eval-ci-gate.md` => `plans/archive/plan-20260906-0257-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0257-route-eval-ci-gate.notes.md` => `tasks/archive/notes-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md` => `tasks/archive/contract-20260906-2248-route-eval-ci-gate.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0257-route-eval-ci-gate.review.md` => `tasks/archive/review-20260906-2248-route-eval-ci-gate.md`
+
 # Implementation Notes: route-eval-ci-gate
 
 > **Status**: Active
-> **Plan**: plans/plan-20260906-0257-route-eval-ci-gate.md
-> **Contract**: tasks/contracts/20260906-0257-route-eval-ci-gate.contract.md
-> **Review**: tasks/reviews/20260906-0257-route-eval-ci-gate.review.md
+> **Plan**: plans/archive/plan-20260906-0257-route-eval-ci-gate.md
+> **Contract**: tasks/archive/contract-20260906-2248-route-eval-ci-gate.md
+> **Review**: tasks/archive/review-20260906-2248-route-eval-ci-gate.md
 > **Last Updated**: 2026-09-06 02:57
 > **Lifecycle**: notes
 

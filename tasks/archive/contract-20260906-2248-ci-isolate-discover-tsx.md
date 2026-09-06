@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-06 22:48
+> **Related Plan**: plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
+> **Outcome**: Superseded
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260906-2248
+> **Archive Projection V1**: `plans/plan-20260906-0233-ci-isolate-discover-tsx.md` => `plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md` => `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md` => `tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md` => `tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md`
+
 # Task Contract: ci-isolate-discover-tsx
 
 > **Status**: Fulfilled
-> **Plan**: plans/plan-20260906-0233-ci-isolate-discover-tsx.md
+> **Plan**: plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-06 02:33
-> **Review File**: `tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md`
-> **Notes File**: `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md`
+> **Review File**: `tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md`
+> **Notes File**: `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 > **Substantive Change SHA256**: `sha256:ce7464205e19886cbe0afa7357a5f949d1c4df0ea43a9acdff9a73fb376a9ac5`
 
@@ -58,10 +68,10 @@ against the full-suite summary line.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260906-0233-ci-isolate-discover-tsx.md`
+- Source plan: `plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md`
-- Notes file: `tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md`
+- Review file: `tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md`
+- Notes file: `tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -85,11 +95,11 @@ against the full-suite summary line.
 allowed_paths:
   - scripts/lib/ci-run-tests.sh
   - tests/check-ci-isolate-aggregation.test.ts
-  - plans/plan-20260906-0233-ci-isolate-discover-tsx.md
+  - plans/archive/plan-20260906-0233-ci-isolate-discover-tsx.md
   - tasks/todos.md
-  - tasks/contracts/20260906-0233-ci-isolate-discover-tsx.contract.md
-  - tasks/reviews/20260906-0233-ci-isolate-discover-tsx.review.md
-  - tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md
+  - tasks/archive/contract-20260906-2248-ci-isolate-discover-tsx.md
+  - tasks/archive/review-20260906-2248-ci-isolate-discover-tsx.md
+  - tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md
 ```
 
 ## Evidence Requirements
@@ -156,7 +166,7 @@ exit_criteria:
     - scripts/lib/ci-run-tests.sh
     - tests/check-ci-isolate-aggregation.test.ts
   artifacts_exist:
-    - tasks/notes/20260906-0233-ci-isolate-discover-tsx.notes.md
+    - tasks/archive/notes-20260906-2248-ci-isolate-discover-tsx.md
   tests_pass:
     - path: tests/check-ci-isolate-aggregation.test.ts
     - path: tests/bootstrap-files.test.ts

@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-06 22:49
+> **Related Plan**: plans/archive/plan-20260906-0415-untrack-current-status.md
+> **Outcome**: Superseded
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260906-2249
+> **Archive Projection V1**: `plans/plan-20260906-0415-untrack-current-status.md` => `plans/archive/plan-20260906-0415-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0415-untrack-current-status.notes.md` => `tasks/archive/notes-20260906-2249-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0415-untrack-current-status.contract.md` => `tasks/archive/contract-20260906-2249-untrack-current-status.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0415-untrack-current-status.review.md` => `tasks/archive/review-20260906-2249-untrack-current-status.md`
+
 # Task Contract: untrack-current-status
 
 > **Status**: Active
-> **Plan**: plans/plan-20260906-0415-untrack-current-status.md
+> **Plan**: plans/archive/plan-20260906-0415-untrack-current-status.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-06 04:16
-> **Review File**: `tasks/reviews/20260906-0415-untrack-current-status.review.md`
-> **Notes File**: `tasks/notes/20260906-0415-untrack-current-status.notes.md`
+> **Review File**: `tasks/archive/review-20260906-2249-untrack-current-status.md`
+> **Notes File**: `tasks/archive/notes-20260906-2249-untrack-current-status.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260906-0415-untrack-current-status.md`
+- Source plan: `plans/archive/plan-20260906-0415-untrack-current-status.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260906-0415-untrack-current-status.review.md`
-- Notes file: `tasks/notes/20260906-0415-untrack-current-status.notes.md`
+- Review file: `tasks/archive/review-20260906-2249-untrack-current-status.md`
+- Notes file: `tasks/archive/notes-20260906-2249-untrack-current-status.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -71,10 +81,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
-  - plans/plan-20260906-0415-untrack-current-status.md
-  - tasks/contracts/20260906-0415-untrack-current-status.contract.md
-  - tasks/reviews/20260906-0415-untrack-current-status.review.md
-  - tasks/notes/20260906-0415-untrack-current-status.notes.md
+  - plans/archive/plan-20260906-0415-untrack-current-status.md
+  - tasks/archive/contract-20260906-2249-untrack-current-status.md
+  - tasks/archive/review-20260906-2249-untrack-current-status.md
+  - tasks/archive/notes-20260906-2249-untrack-current-status.md
   - tasks/todos.md
   - tasks/current.md
   - .gitignore
@@ -161,7 +171,7 @@ exit_criteria:
     - scripts/refresh-current-status.sh
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260906-0415-untrack-current-status.notes.md
+    - tasks/archive/notes-20260906-2249-untrack-current-status.md
 ```
 
 

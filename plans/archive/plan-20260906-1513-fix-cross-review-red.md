@@ -1,6 +1,13 @@
+> **Archived**: 2026-09-06 22:52
+> **Related Plan**: plans/archive/plan-20260906-1513-fix-cross-review-red.md
+> **Outcome**: Superseded
+> **Lifecycle**: plan
+> **Parent Run ID**: run-20260906-2252
+> **Archive Projection V1**: `plans/plan-20260906-1513-fix-cross-review-red.md` => `plans/archive/plan-20260906-1513-fix-cross-review-red.md`
+
 # Plan: Fix cross-review skill regressions from ad4afe77
 
-> **Status**: Approved
+> **Status**: Archived
 > **Created**: 20260906-1513
 > **Slug**: fix-cross-review-red
 > **Planning Source**: repo-harness-plan
@@ -13,7 +20,6 @@
 > **Rollback Surface**: Revert codex/fix-cross-review-red
 > **Spec**: `docs/spec.md`
 > **Research**: See `docs/researches/`
-> **Task Contract**: `tasks/contracts/20260906-1513-fix-cross-review-red.contract.md`
 > **Task Review**: `tasks/reviews/20260906-1513-fix-cross-review-red.review.md`
 > **Implementation Notes**: `tasks/notes/20260906-1513-fix-cross-review-red.notes.md`
 
@@ -29,7 +35,7 @@
 ## Workflow Inventory
 Complete this inventory before implementation. If any line is unknown, keep the plan in Draft and fill it before projection.
 
-- Active plan: `plans/plan-20260906-1513-fix-cross-review-red.md`
+- Active plan: `plans/archive/plan-20260906-1513-fix-cross-review-red.md`
 - Sprint contract: `tasks/contracts/20260906-1513-fix-cross-review-red.contract.md`
 - Sprint review: `tasks/reviews/20260906-1513-fix-cross-review-red.review.md`
 - Implementation notes: `tasks/notes/20260906-1513-fix-cross-review-red.notes.md`
@@ -38,7 +44,7 @@ Complete this inventory before implementation. If any line is unknown, keep the 
 - Run snapshots: `.ai/harness/runs/`
 - Scope authority: `tasks/contracts/20260906-1513-fix-cross-review-red.contract.md` `allowed_paths`
 - Concurrency rule: `.ai/harness/active-plan` selects the active plan for this worktree when present; `.ai/harness/active-worktree` records the owning worktree. If another worktree already owns active work, open or switch to the matching worktree instead of serializing unrelated plans.
-- Execution isolation: approved contract-level work projects through `repo-harness run plan-to-todo --plan plans/plan-20260906-1513-fix-cross-review-red.md` and may start `repo-harness run contract-worktree start --plan plans/plan-20260906-1513-fix-cross-review-red.md`.
+- Execution isolation: approved contract-level work projects through `repo-harness run plan-to-todo --plan plans/archive/plan-20260906-1513-fix-cross-review-red.md` and may start `repo-harness run contract-worktree start --plan plans/archive/plan-20260906-1513-fix-cross-review-red.md`.
 
 ## Approach
 ### Strategy
@@ -81,7 +87,7 @@ See captured planning output.
 
 ## Promotion Gate
 
-- **Merge/PR unit**: Captured plan `plans/plan-20260906-1513-fix-cross-review-red.md` is the proposed mergeable execution unit; revise before execute if this is only a checklist step.
+- **Merge/PR unit**: Captured plan `plans/archive/plan-20260906-1513-fix-cross-review-red.md` is the proposed mergeable execution unit; revise before execute if this is only a checklist step.
 - **Rollback surface**: Revert codex/fix-cross-review-red
 - **Verification boundary**: skill-surface tests, typecheck, PR CI for tmux-bound claude-review tests
 - **Review/acceptance boundary**: `tasks/reviews/20260906-1513-fix-cross-review-red.review.md` must record pass against the captured acceptance criteria.
@@ -90,7 +96,7 @@ See captured planning output.
 
 ## Evidence Contract
 
-- **State/progress path**: `plans/plan-20260906-1513-fix-cross-review-red.md` task breakdown, `tasks/todos.md` deferred-goal ledger, `tasks/contracts/20260906-1513-fix-cross-review-red.contract.md`, `tasks/reviews/20260906-1513-fix-cross-review-red.review.md`, and `tasks/notes/20260906-1513-fix-cross-review-red.notes.md`
+- **State/progress path**: `plans/archive/plan-20260906-1513-fix-cross-review-red.md` task breakdown, `tasks/todos.md` deferred-goal ledger, `tasks/contracts/20260906-1513-fix-cross-review-red.contract.md`, `tasks/reviews/20260906-1513-fix-cross-review-red.review.md`, and `tasks/notes/20260906-1513-fix-cross-review-red.notes.md`
 - **Verification evidence**: `.ai/harness/checks/latest.json`, `.ai/harness/runs/`, and the commands named in the captured planning output
 - **Evaluator rubric**: `tasks/reviews/20260906-1513-fix-cross-review-red.review.md` must record a passing Waza /check style recommendation
 - **Stop condition**: all task breakdown items are complete, sprint verification passes, and the review recommends pass

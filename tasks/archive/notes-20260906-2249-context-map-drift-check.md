@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-06 22:49
+> **Related Plan**: plans/archive/plan-20260906-0323-context-map-drift-check.md
+> **Outcome**: Superseded
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260906-2249
+> **Archive Projection V1**: `plans/plan-20260906-0323-context-map-drift-check.md` => `plans/archive/plan-20260906-0323-context-map-drift-check.md`
+> **Archive Projection V1**: `tasks/notes/20260906-0323-context-map-drift-check.notes.md` => `tasks/archive/notes-20260906-2249-context-map-drift-check.md`
+> **Archive Projection V1**: `tasks/contracts/20260906-0323-context-map-drift-check.contract.md` => `tasks/archive/contract-20260906-2249-context-map-drift-check.md`
+> **Archive Projection V1**: `tasks/reviews/20260906-0323-context-map-drift-check.review.md` => `tasks/archive/review-20260906-2249-context-map-drift-check.md`
+
 # Implementation Notes: context-map-drift-check
 
 > **Status**: Active
-> **Plan**: plans/plan-20260906-0323-context-map-drift-check.md
-> **Contract**: tasks/contracts/20260906-0323-context-map-drift-check.contract.md
-> **Review**: tasks/reviews/20260906-0323-context-map-drift-check.review.md
+> **Plan**: plans/archive/plan-20260906-0323-context-map-drift-check.md
+> **Contract**: tasks/archive/contract-20260906-2249-context-map-drift-check.md
+> **Review**: tasks/archive/review-20260906-2249-context-map-drift-check.md
 > **Last Updated**: 2026-09-06 03:23
 > **Lifecycle**: notes
 
@@ -49,4 +59,4 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 ## Operator-approved verification schema migration
 
 - The verification-execution-lifecycle cutover migrated this Active contract using an explicit mapping, preserving its seven original executable inputs. Type/syntax/helper projections are preflight; behavior checks remain verification. No criterion was executed and no acceptance result is asserted by this migration.
-- Workflow acceptance must use the installed strict runtime: `env -u REPO_HARNESS_SOURCE_ROOT repo-harness run verification-plan validate --repo . --contract tasks/contracts/20260906-0323-context-map-drift-check.contract.md`, then the installed prepare/finish flow. Source-local CLI and direct old helper scripts belong to the older code under development and cannot supply strict acceptance evidence.
+- Workflow acceptance must use the installed strict runtime: `env -u REPO_HARNESS_SOURCE_ROOT repo-harness run verification-plan validate --repo . --contract tasks/archive/contract-20260906-2249-context-map-drift-check.md`, then the installed prepare/finish flow. Source-local CLI and direct old helper scripts belong to the older code under development and cannot supply strict acceptance evidence.
