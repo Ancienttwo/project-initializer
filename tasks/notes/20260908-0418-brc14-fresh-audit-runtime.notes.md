@@ -29,3 +29,5 @@ Implementation acceptance is separate from real BRC14 completion. The trusted re
 > **Substantive Change SHA256**: `sha256:da4ca1bdf613ac900be1d34faece296975a8f25b3aef83a24f93ab21ef3d9c2d`
 
 The independent review found a stale CLI inventory and missing semantic architecture ownership. The CLI inventory now includes audit and its suite is in the contract. The development-campaign node explicitly owns both audit modules and the CLI call sink. The focused CLI run passed 4/4. The amended contract adds previously uncovered CLI coverage; the prior 13/13 run remains evidence for its original subject only.
+
+The exact architecture signal `sha256:522895ccef52a6ebe63e68cf15718a97c468c40466bb90ce2522fba0ce5d7594` was accepted with reference `approved-plan:da8ccce0:brc14-fresh-audit-runtime`, whose approved scope owns the lifecycle/audit boundary. Canonical projection also refreshes the controlled AGENTS/CLAUDE blocks and the existing automation-budget source-change queue card; these generated mirrors are included in allowed paths. No human-authored root instructions were changed.

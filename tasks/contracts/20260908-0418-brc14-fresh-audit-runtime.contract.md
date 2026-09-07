@@ -70,6 +70,8 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - AGENTS.md
+  - CLAUDE.md
   - src/core/automation/
   - src/effects/automation/
   - src/cli/commands/campaign.ts
