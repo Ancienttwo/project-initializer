@@ -1,59 +1,13 @@
-# Implementation Notes: brc-default-session-admission
+# Default-model campaign session admission decisions
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-0556-brc-default-session-admission.md
-> **Contract**: tasks/contracts/20260908-0556-brc-default-session-admission.contract.md
-> **Review**: tasks/reviews/20260908-0556-brc-default-session-admission.review.md
-> **Last Updated**: 2026-09-08 05:56
-> **Lifecycle**: notes
+The user-selected UI model is configuration authority; backend model identity remains unverified. Session/app evidence is a separate authority and must not be represented by renaming the old model boolean.
 
-## Design Decisions
+Protocol 2 binds the initial local/provider session and each continuation's exact source provider parent, repository, Chrome profile root/directory and GitHub composer observation. Authoring verification is a checked projection of embedded evidence. Old protocol inputs fail closed with no dual read or migration; stopped historical canary records remain research evidence only.
 
-- ...
+The Owner-requested metadata replay and original budget mapping completed in f3fbdd3e before resuming this prerequisite. That negative observation does not authorize active execution. No new provider budget or live call is part of this package.
 
-## Deviations From Plan Or Spec
+The post-repair drift fixture now supplies valid session lineage while retaining invalid Issue metadata. Its former unverified parent correctly prevents the next fill from acquiring evidence and exhausts no-progress budget before the intended drift assertion. Missing-evidence and failed-edit refusals remain independently covered; production budget and drift gates are unchanged.
 
-- None recorded.
-
-## Tradeoffs Considered
-
-| Option | Decision | Reason |
-|--------|----------|--------|
-| ... | ... | ... |
-
-## Open Questions
-
-- None.
-
-## Evidence Links
-
-- Checks: `.ai/harness/checks/latest.json`
-- Run snapshots: `.ai/harness/runs/`
-
-## Promotion Filter
-
-Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset files only when all three hold: hard to reverse, surprising without local context, and a real trade-off existed. If any one is missing, keep it in this notes file instead.
-
-## Promotion Candidates
-
-- Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
-- Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
-- Promote to harness asset files only after verification across more than one task or fixture.
-
-## Owner priority change — 2026-09-08
-
-The Owner required the original BRC15a Acceptance mapping and per-Issue offline metadata diagnosis before continuing activation prerequisites. Implementation is paused here, with WIP preserved and no main merge. The initial default-model regression was captured red then passed the first predicate change; this is development evidence only.
-
-Research identified that a renamed boolean is insufficient: persist structured provider/local/parent session evidence, bump the authoring session protocol and reject old model-only inputs. The partial WIP starts that cutover but has not completed challenge/adoption consumers or fixture updates. It is not typechecked or accepted after the protocol edits and must not be shipped. Include exact profileDir binding and source provider-parent identity when resumed.
-
-The independent metadata/evidence work continues in `codex/brc15a-offline-evidence`, rooted at `700fe3b0`, and must be integrated without absorbing this partial implementation. BRC6a remains Owner-closed; no additional GPT call, budget mint or active campaign has occurred.
-
-## Resume after the required metadata diagnosis
-
-The Owner-requested offline replay and original budget mapping completed in f3fbdd3e and was integrated before resuming this safety prerequisite. No active launch is authorized by the observation closeout.
-
-Session admission uses structured evidence, not a renamed boolean. Protocol 2 rejects old model-only authoring sessions and old challenge inputs; the verification field is only a checked projection of evidence. Exact profile root and source provider-parent binding are required.
-
-The post-repair source-drift fixture now supplies a verified edit session while retaining an invalid Issue body. Otherwise its deliberately unverified parent prevents the next fill from acquiring session evidence and the no-progress budget stops before the intended drift assertion. Separate missing-evidence and unverified-edit tests retain those refusal paths; production budget and drift gates were not changed.
+The isolated worktree initially lacked the repository's already-adopted CodeGraph cache. Restoring the accepted canary cache through a read-only SQLite backup and syncing the local copy kept unrelated proven architecture flows intact. Only development-campaign ownership/responsibility changed. First projection materialization added the ignored generated architecture file and required a post-apply reconciliation; no gate or provider implementation was altered.
 
 > **Substantive Change SHA256**: `sha256:93f472abee467294531c976378e5dc3f6d1a9074c1e91f19d2bf26a71153d769`

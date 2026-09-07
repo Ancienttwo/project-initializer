@@ -118,14 +118,14 @@ src/core/automation, src/effects/automation, related browser types only if neede
 Continue on the isolated integration ancestry preserving 700fe3b0 and e71fb76c Owner closeout. Revert the bounded implementation commit to roll back; historical stopped grants are never migrated or resumed. This package is not BRC14 positive audit or BRC15 active canary acceptance.
 
 ## Task Breakdown
-- [ ] Add failing default-session admission and evidence rejection regressions.
-- [ ] Replace model authority in all authoring/adoption/recovery consumers with strict session/app evidence.
+- [x] Add failing default-session admission and evidence rejection regressions.
+- [x] Replace model authority in all authoring/adoption/recovery consumers with strict session/app evidence.
 - [ ] Verify, record review and receipt, and archive this package while retaining remaining real-canary obligations.
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Add failing default-session admission and evidence rejection regressions.
-- [ ] Replace model authority in all authoring/adoption/recovery consumers with strict session/app evidence.
+- [x] Add failing default-session admission and evidence rejection regressions.
+- [x] Replace model authority in all authoring/adoption/recovery consumers with strict session/app evidence.
 - [ ] Verify, record review and receipt, and archive this package while retaining remaining real-canary obligations.
