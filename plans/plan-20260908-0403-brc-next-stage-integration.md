@@ -112,7 +112,7 @@ Merge codex/brc15a-adoption-alignment and codex/brc15a-provider-verification-evi
 Focused tests: tests/effects/gpt-pro-issue-authoring.test.ts, tests/unit/issue-batch-reconcile.test.ts, tests/unit/development-campaign-policy.test.ts, tests/effects/development-campaign-store.test.ts, tests/cli/development-campaign.test.ts, tests/cli/chatgpt-browser.test.ts, tests/unit/oracle-session-evidence.test.ts. Named suites cover both overlapping authoring/adoption paths and descriptor/default/browser transport behavior. Run typecheck and six required integrity checks. No full suite or real provider. Freeze and perform one integration-only /check acceptance; archive with --no-merge.
 
 ## Task Breakdown
-- [ ] Merge the two accepted packages and resolve only combined-scope conflicts.
+- [x] Merge the two accepted packages and resolve only combined-scope conflicts.
 - [ ] Verify the combined authoring/default/app/provider contract without GPT.
 - [ ] Record next-stage boundary, acceptance and archive while preserving main WIP.
 
@@ -120,6 +120,6 @@ Focused tests: tests/effects/gpt-pro-issue-authoring.test.ts, tests/unit/issue-b
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Merge the two accepted packages and resolve only combined-scope conflicts.
+- [x] Merge the two accepted packages and resolve only combined-scope conflicts.
 - [ ] Verify the combined authoring/default/app/provider contract without GPT.
 - [ ] Record next-stage boundary, acceptance and archive while preserving main WIP.
