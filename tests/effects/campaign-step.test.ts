@@ -70,7 +70,7 @@ function browserResult(input: BrowserConsultInput, sessionId: string, status: Br
   };
 }
 
-async function fixture(status: BrowserConsultResult['status'] = 'completed', maxIssues = 20) {
+async function fixture(status: BrowserConsultResult['status'] = 'completed', maxIssues = 20, slotCount = 2) {
   const root = mkdtempSync(join(tmpdir(), 'campaign-step-'));
   const home = mkdtempSync(join(tmpdir(), 'campaign-step-home-'));
   const profile = mkdtempSync(join(tmpdir(), 'campaign-step-profile-'));
@@ -80,7 +80,7 @@ async function fixture(status: BrowserConsultResult['status'] = 'completed', max
   execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
   writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
-    development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: 2, maximum_parallel_tasks: 2 } },
+    development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: slotCount, maximum_parallel_tasks: 2 } },
     external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: maxIssues, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } },
   })}\n`);
   mkdirSync(join(root, '.repo-harness'), { recursive: true });
@@ -92,7 +92,7 @@ async function fixture(status: BrowserConsultResult['status'] = 'completed', max
   execFileSync('git', ['add', '.archcontext', 'src'], { cwd: root });
   execFileSync('git', ['add', '.ai'], { cwd: root }); execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: root });
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-  const authorization = sealProgramAuthorization({ authorization_id: 'auth-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: limits, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: 1, issues_per_group: 2, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', max_authoring_rounds_per_group: 5, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: at, expires_at: '2027-09-05T00:00:00.000Z' });
+  const authorization = sealProgramAuthorization({ authorization_id: 'auth-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: limits, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: 1, issues_per_group: slotCount, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', max_authoring_rounds_per_group: 5, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: at, expires_at: '2027-09-05T00:00:00.000Z' });
   const env = { ...process.env, REPO_HARNESS_HOME: home };
   mintProgramAuthorization({ repo_root: root, authorization, env });
   const campaign = buildDevelopmentCampaignDefinition({ campaign_id: 'campaign-1', authorization_id: authorization.authorization_id, authorization_sha256: authorization.authorization_sha256, repository_id: authorization.repository_id, target_ref: authorization.target_ref, target_revision: authorization.target_revision, created_at: at });
@@ -408,6 +408,46 @@ describe('durable campaign heartbeat step', () => {
     expect(readCampaignBudgetLedger(f.root, runId, f.env)).toEqual(before);
     expect(readdirSync(receipts)).toHaveLength(0);
     expect(mutations).toBe(1);
+  });
+
+  test('Canary 1: seven of ten Issues survive a disconnected tail request without blind retry', async () => {
+    const f = await fixture('completed', 20, 10);
+    const issues = Array.from({ length: 7 }, (_, i) => ({
+      id: 201 + i, number: i + 1, html_url: `https://github.com/acme/widgets/issues/${i + 1}`,
+      state: 'open', title: 'repair', body: body(f.intent, String(i + 1).padStart(2, '0')),
+      labels: [{ name: 'campaign' }], assignees: [], created_at: null, updated_at: null,
+    }));
+    const original = JSON.stringify(issues);
+    let reads = 0; let followups = 0; let mutations = 0;
+    const deps: Partial<CampaignStepDependencies> = {
+      now: () => new Date(later),
+      provider_command: () => ({ stdout: JSON.stringify(++reads === 1
+        ? { id: 100, full_name: 'acme/widgets', html_url: 'https://github.com/acme/widgets' } : issues) }),
+      mutate_issue: () => { mutations++; throw new Error('existing Issues must not be mutated'); },
+      followup: async request => {
+        followups++;
+        expect(request.prompt).toContain('missing slots: 08, 09, 10.');
+        expect(request.prompt).toContain('Do not edit or duplicate any other slot.');
+        expect(request.model).toBeUndefined();
+        expect(request.chatgptApp).toBe('GitHub');
+        throw new Error('browser disconnected after seven observed Issues');
+      },
+    };
+    const args = input(f, 'canary-seven');
+    await expect(runCampaignStep(args, deps)).rejects.toMatchObject({ code: 'campaign_step_mutation_failed' });
+    expect({ reads, followups, mutations }).toEqual({ reads: 2, followups: 1, mutations: 0 });
+    const reservations = listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'reservations');
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0]).toMatchObject({ requested_slots: ['08', '09', '10'] });
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    const before = readCampaignBudgetLedger(f.root, runId, f.env);
+    expect(before.reserved_provider_calls).toBe(1);
+    for (const key of ['canary-seven', 'canary-another-key']) {
+      await expect(runCampaignStep(input(f, key), deps)).rejects.toMatchObject({ code: 'campaign_reconciliation_required' });
+      expect(readCampaignBudgetLedger(f.root, runId, f.env)).toEqual(before);
+    }
+    expect({ reads, followups, mutations }).toEqual({ reads: 2, followups: 1, mutations: 0 });
+    expect(JSON.stringify(issues)).toBe(original);
   });
 
   test('leaves an unknown mutation reserved and blocks any blind retry or new provider read', async () => {
