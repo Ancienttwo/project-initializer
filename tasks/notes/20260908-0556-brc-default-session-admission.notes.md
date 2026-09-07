@@ -12,6 +12,6 @@ The isolated worktree initially lacked the repository's already-adopted CodeGrap
 
 The policy verification boundary is origin/main, so the allowed-path inventory includes the unchanged, previously accepted BRC14 CLI entrypoint `src/cli/commands/campaign.ts`. This package makes no additional change to that file; its existing acceptance remains baseline evidence, while this contract verifies the session-admission delta.
 
-Review found pre-egress gaps for profile-root drift and an unverified continuation source. Three regression cases failed before the fix; authoring and adoption now reject these states before reservation or provider I/O. Restoring the original adoption binding remains resumable. No source-session fallback is introduced.
+Review found pre-egress gaps for profile-root drift and an unverified continuation source. Three regression cases failed before the fix; authoring and adoption now reject these states before reservation or provider I/O. Restoring the original adoption binding remains resumable. No source-session fallback is introduced. The stale-decision race regression now expects the earlier typed source-evidence rejection; its zero-repeat and journal-count assertions remain unchanged.
 
-> **Substantive Change SHA256**: `sha256:81a31cd38c6a1a7d332acdcdfce692a127306b854fa09a5115d3a6847c2aa57d`
+> **Substantive Change SHA256**: `sha256:7e62956f3ddeced2d39b55dcad4dc6efd67035ab64ae7610d19291cd22872c14`

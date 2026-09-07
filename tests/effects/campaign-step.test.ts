@@ -357,7 +357,7 @@ describe('durable campaign heartbeat step', () => {
     await runCampaignStep(input(f, 'first-failed-edit'), deps);
     hiddenJournalReads = { root: f.root, reservations: 1, results: 1 };
 
-    await expect(runCampaignStep(input(f, 'stale-edit-decision'), deps)).rejects.toMatchObject({ code: 'campaign_reconciliation_required' });
+    await expect(runCampaignStep(input(f, 'stale-edit-decision'), deps)).rejects.toMatchObject({ code: 'issue_authoring_state_invalid' });
     expect(followups).toBe(1);
     expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'reservations')).toHaveLength(1);
     expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'results')).toHaveLength(1);
