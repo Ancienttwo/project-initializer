@@ -145,4 +145,5 @@ Real provider latency may consume the entire 45-minute grant. There is no automa
 ## Task Breakdown
 - [x] Initialize private target, exact shadow policy and approved bounded grant.
 - [x] Attempt real authoring and adoption dry-run; preserve failed model verification and open reservation.
-- [ ] Resolve transport/terminal prerequisite and record user investment decision; BRC15a remains pending.
+- [x] Resolve observed Pro selector failure in isolated Oracle candidate and reconcile original reservation at full upper bound.
+- [ ] Obtain explicit replacement-grant authorization for remaining one authoring round / 63 provider calls / fresh 45 minutes; execute real authoring and record user investment decision. BRC15a remains pending.
