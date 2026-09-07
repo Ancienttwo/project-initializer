@@ -217,3 +217,7 @@ Keep this section last; `repo-harness run sprint-backlog complete-task` appends 
 | 2026-09-07 04:59 | BRC9 — Campaign budget 与 attempt receipts（消费 #282/#287 子集） | `plans/archive/plan-20260907-0348-brc9-transient-retry-consumption.md` | done |
 | 2026-09-07 12:14 | BRC10 — Lease liveness 与 controller recovery（消费 #286） | `plans/archive/plan-20260907-0554-brc10-lifecycle.md` | done |
 | 2026-09-07 14:59 | BRC13 — Issue closure 与 exact branch/worktree cleanup（人工 merge 之后） | `plans/archive/plan-20260907-1224-brc13-closeout.md` | done |
+
+## BRC14 readiness evidence
+
+2026-09-07 只读追踪记录：`docs/researches/20260907-brc14-fresh-audit-readiness.md`。BRC14 保持 pending：trusted exact-revision producer 尚未找到，现有 authoring base 固定为初始 target，通用 transition 也尚未被 audit receipt 约束。该记录不改变 BRC6a、BRC14 或 activation 的验收要求。
