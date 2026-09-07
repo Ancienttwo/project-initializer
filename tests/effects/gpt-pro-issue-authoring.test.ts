@@ -77,6 +77,27 @@ describe('GPT Pro issue batch authoring effect', () => {
     expect(calls).toBe(1);
   });
 
+  test('Canary 1: initial authoring disconnect after seven fake Issues cannot repeat creation', async () => {
+    const f = fixture();
+    const created: string[] = [];
+    let calls = 0;
+    const input = { repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env };
+    const deps = {
+      readBinding: readBrowserBinding, now: () => observedAt,
+      consult: async () => {
+        calls++;
+        expect(existsSync(join(issueBatchGroupStoreRoot(f.root, 'campaign-1', 1), 'intent.json'))).toBe(true);
+        for (let i = 1; i <= 7; i++) created.push(String(i).padStart(2, '0'));
+        throw new Error('simulated disconnect after seventh provider Issue');
+      },
+    };
+    await expect(startIssueBatchAuthoring(input, deps)).rejects.toThrow('simulated disconnect');
+    expect(created).toEqual(['01', '02', '03', '04', '05', '06', '07']);
+    await expect(startIssueBatchAuthoring(input, deps)).rejects.toMatchObject({ code: 'issue_authoring_reconciliation_required' });
+    expect(calls).toBe(1);
+    expect(created).toHaveLength(7);
+  });
+
   test('refuses another authoring call after the single authorized round is settled', async () => {
     const f = fixture(1, 1); let followups = 0;
     const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, {
