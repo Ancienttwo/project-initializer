@@ -60,7 +60,7 @@ export function verifyConnectorChallenge(input: { challenge: ConnectorChallengeV
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail('invalid challenge response');
   const r = raw as Record<string, unknown>;
   if (Object.keys(r).sort().join(',') !== 'answers,base_main_sha' || r.base_main_sha !== c.base_main_sha
-    || !Array.isArray(r.answers) || r.answers.length !== 3 || r.answers.some((answer, i) => answer !== c.targets[i]!.expected)) fail('exact-SHA challenge answers do not match');
+    || !Array.isArray(r.answers) || r.answers.length !== 3 || r.answers.some((answer, i) => answer !== c.targets[i]!.expected)) fail('challenge identity or content answers do not match');
   const basis = { protocol: CONNECTOR_CHALLENGE_PROTOCOL, kind: 'repo-harness-connector-challenge-receipt' as const, challenge_sha256: c.challenge_sha256,
     intent_sha256: c.intent_sha256, base_main_sha: c.base_main_sha, source_session_ref: c.source_session_ref,
     response_session_ref: input.response_session_ref, response_sha256: canonicalMessageDigest({ response: input.response }), connector_evidence: 'challenge_verified' as const };

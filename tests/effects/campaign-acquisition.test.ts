@@ -1,301 +1,70 @@
-import { readyFixture } from '../helpers/campaign-acquisition-fixture';
-import { AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, ensureCampaignAuthoringBudget, readAutomationBudgetStatus, reserveAutomationBudget, appendAutomationUsage } from '../../src/effects/automation/budget-store';
-import { resolveGitCommonDirectory } from '../../src/effects/git/common-directory';
-import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
-import { runCampaignPlanningStep } from '../../src/effects/automation/campaign-planning';
-import { runCampaignPlanningPreflight } from '../../src/cli/commands/campaign';
-import { makeSnapshot } from '../helpers/issue-batch-adoption-fixture';
-import { buildExternalSourceProjection } from '../../src/core/external-sources/projection';
-import { writeProviderIssueObservation, writeExternalSourceRefreshReceipt } from '../../src/effects/external-sources/store';
-import { bindEngineer, readEngineerBindingStatus } from '../../src/effects/engineers/binding-store';
-import { loadEngineerProfile } from '../../src/effects/engineers/profile-store';
-import { enrollEngineerPrincipal } from '../../src/effects/engineers/principal-store';
-import { readClaimActorReceipt } from '../../src/effects/engineers/claim-actor-store';
-import { acquireNextScheduledEngineerTask } from '../../src/effects/engineers/scheduling-acquire-next';
-import { acquireScheduledEngineerTask } from '../../src/effects/engineers/scheduling-acquire';
-import { acquireEngineerTask } from '../../src/effects/engineers/acquire';
-import { resolveEngineerPrincipal } from '../../src/effects/engineers/principal';
-import { collectEngineerOffers } from '../../src/effects/engineers/scheduling';
 import { afterEach, expect, test } from 'bun:test';
 import { execFileSync } from 'child_process';
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { createAdoptionRepository } from '../helpers/campaign-adoption-repository';
-import { adoptIssueBatch } from '../../src/effects/automation/issue-batch-adoption';
-import { withCampaignCapacity } from '../../src/effects/automation/campaign-capacity';
+import { historicalPlanningFixture, installHistoricalBoundDispatch } from '../helpers/historical-campaign-lifecycle';
 import { runCampaignAcquisition } from '../../src/effects/automation/campaign-acquisition';
-import { withDevelopmentCampaignLock } from '../../src/effects/automation/development-campaign-store';
-import { projectCanonicalTasks } from '../../src/core/state/coordination-identity';
-import { resolveRepoIdentity } from '../../src/effects/state/coordination-canonical-source';
-import { claimSprintCommand, processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
-import { readLease, leaseOwnerPath } from '../../src/effects/state/coordination-lease-store';
-
+import { withCampaignCapacity } from '../../src/effects/automation/campaign-capacity';
+import { ensureCampaignAuthoringBudget, readAutomationBudgetStatus } from '../../src/effects/automation/budget-store';
+import { requireCampaignPlanningAuthority } from '../../src/effects/automation/campaign-planning-proof';
+import { readLease } from '../../src/effects/state/coordination-lease-store';
+import { resolveEngineerPrincipal } from '../../src/effects/engineers/principal';
+import { collectEngineerOffers } from '../../src/effects/engineers/scheduling';
+import { acquireNextScheduledEngineerTask } from '../../src/effects/engineers/scheduling-acquire-next';
+import { validateFleetWorkEnvelope } from '../../src/effects/fleet/acquire';
+import { validateClaimActorReceiptLive } from '../../src/effects/engineers/claim-actor-store';
 const roots: string[] = [];
-afterEach(() => { roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); });
+afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })));
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-test('campaign acquisition charges once and refuses the next Claim after the acquisition limit', async () => {
-  const f = await readyFixture(true); roots.push(f.root, f.home);
+
+test('new acquisition and repeated request refuse before budget, callback or Lease mutation', async () => {
+  const f = await historicalPlanningFixture(); roots.push(f.root, f.home);
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
-  const status = () => readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env);
-  const initial = status().current.consumed.successful_acquisitions;
-  const acquired = runCampaignAcquisition(f.executeInput);
-  expect(acquired).toMatchObject({ action: 'dispatch' });
-  if (!('envelope' in acquired) || !acquired.envelope) throw new Error('expected acquisition');
-  roots.push(acquired.envelope.worktree_path);
-  expect(status().current.consumed.successful_acquisitions).toBe(initial + 1);
-  expect(runCampaignAcquisition(f.executeInput)).toEqual(acquired);
-  expect(status().current.consumed.successful_acquisitions).toBe(initial + 1);
-  const reservation = reserveAutomationBudget({ repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256, idempotency_key: 'other-real-acquisition-fixture', operation: 'acquisition', unit_kind: 'execute', unit_id: 'other-task', attempt: 1, provider: null, env: f.env });
-  appendAutomationUsage({ repo_root: f.root, reservation, outcome: 'progress', evidence_refs: [{ ref: 'fixture:other-acquisition', sha256: 'a'.repeat(64) }], env: f.env });
-  expect(runCampaignAcquisition(f.executeInput)).toEqual(acquired);
+  const before = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env);
   let invoked = 0;
-  expect(() => runCampaignAcquisition({ ...f.executeInput, authorization_id: f.secondAuthorization, idempotency_key: 'over-limit' }, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toThrow();
+  for (const idempotency_key of ['execute', 'execute', 'new-request']) {
+    expect(() => runCampaignAcquisition({ ...f.executeInput, idempotency_key }, () => { invoked++; throw new Error('unexpected acquire'); })).toThrow('trusted exact revision readback');
+  }
   expect(invoked).toBe(0);
-}, 60_000);
-
-test('unknown acquisition outcome preserves the reservation and never repeats an effect', async () => {
-  const f = await readyFixture(); roots.push(f.root, f.home);
-  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
-  expect(() => runCampaignAcquisition(f.executeInput, options => {
-    const acquired = acquireNextScheduledEngineerTask(options);
-    if (acquired.ok) roots.push(acquired.envelope.worktree_path);
-    throw new Error('crash after actual acquisition');
-  })).toThrow('crash after actual acquisition');
-  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
-  let invoked = 0;
-  expect(() => runCampaignAcquisition(f.executeInput, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toThrow('reconciliation');
-  expect(invoked).toBe(0);
-}, 60_000);
-
-test('receipt failure after real Fleet acquisition with unknown Lease retains budget authority', async () => {
-  const f = await readyFixture(); roots.push(f.root, f.home);
-  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
-  const result = runCampaignAcquisition(f.executeInput, options => acquireNextScheduledEngineerTask({ ...options,
-    dependencies: { acquire: selected => acquireScheduledEngineerTask({ ...selected,
-      dependencies: { acquire: engineer => acquireEngineerTask({ ...engineer, dependencies: {
-        publish(root, receipt) {
-          const lease = readLease(root, receipt.task_id).record;
-          if (!lease?.execution_worktree) throw new Error('expected actual Fleet acquisition');
-          roots.push(lease.execution_worktree);
-          writeFileSync(leaseOwnerPath(root, receipt.task_id), '{}');
-          throw new Error('receipt publication failed after owner record corruption');
-        },
-      } }) },
-    }) },
-  }));
-  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
-  expect(result).toMatchObject({ ok: false, error: 'rollback_failed' });
-  let invoked = 0;
-  expect(() => runCampaignAcquisition({ ...f.executeInput, idempotency_key: 'after-unknown-lease' }, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toThrow();
-  expect(invoked).toBe(0);
-}, 60_000);
-
-test('persisted acquisition result recovers an interrupted usage write without another acquire', async () => {
-  const f = await readyFixture(); roots.push(f.root, f.home);
-  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
-  const store = join(resolveGitCommonDirectory(f.root), AUTOMATION_BUDGET_STORE_RELATIVE_ROOT);
-  const beforeUsage = join(f.home, 'reserved-budget');
-  const acquired = runCampaignAcquisition(f.executeInput, options => {
-    cpSync(store, beforeUsage, { recursive: true });
-    return acquireNextScheduledEngineerTask(options);
-  });
-  if (!('envelope' in acquired) || !acquired.envelope) throw new Error('expected acquisition');
-  roots.push(acquired.envelope.worktree_path);
-  // Keep actual acquisition and its immutable result; restore only the budget before usage commit.
-  rmSync(store, { recursive: true }); cpSync(beforeUsage, store, { recursive: true });
-  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
-  let invoked = 0;
-  expect(runCampaignAcquisition(f.executeInput, options => { invoked++; return acquireNextScheduledEngineerTask(options); })).toEqual(acquired);
-  const current = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current;
-  expect(invoked).toBe(0);
-  expect(current.open_reservation_sha256s).toHaveLength(0);
-  expect(current.consumed.successful_acquisitions).toBe(1);
-}, 60_000);
-async function fixture(limit: 1 | 2 | 3 = 1) {
-  const f = await createAdoptionRepository('active', 1, undefined, {}, {}, { max_parallel_tasks: limit });
-  roots.push(f.root, f.home);
-  const publication = (await adoptIssueBatch(f.input, f.deps)).publication!;
-  git(f.root, ['merge', '--ff-only', publication.materialized_commit]);
-  const tasks = projectCanonicalTasks({ repoIdentity: resolveRepoIdentity(f.root), sprintPath: sprint, sprintText: readFileSync(join(f.root, sprint), 'utf8') });
-  const claim = (index: number) => claimSprintCommand({ taskId: tasks[index]!.task_id, expectedTaskRevision: tasks[index]!.task_revision, targetRef: 'main', sprintPath: sprint, sessionId: `engineer-${index}` }, processSprintDependencies(f.root));
-  return { ...f, tasks, claim };
-}
-
-test('real campaign leases consume capacity until released; unknown lease fails closed', async () => {
-  const f = await fixture();
-  const first = withCampaignCapacity(f.root, f.tasks[0]!.task_id, 'main', f.env, () => f.claim(0));
-  expect(first.exitCode).toBe(0);
-  expect(() => withCampaignCapacity(f.root, f.tasks[1]!.task_id, 'main', f.env, () => f.claim(1))).toThrow('max_parallel_tasks');
-  const lease = JSON.parse(first.stdout);
-  expect(releaseSprintCommand({ claimId: lease.claim_id }, processSprintDependencies(f.root)).exitCode).toBe(0);
-  const second = withCampaignCapacity(f.root, f.tasks[1]!.task_id, 'main', f.env, () => f.claim(1));
-  expect(second.exitCode).toBe(0);
-  writeFileSync(leaseOwnerPath(f.root, f.tasks[1]!.task_id), '{}');
-  expect(() => withCampaignCapacity(f.root, f.tasks[0]!.task_id, 'main', f.env, () => f.claim(0))).toThrow('Lease state is unknown');
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env)).toEqual(before);
+  const authority = requireCampaignPlanningAuthority(f.root, f.intent, f.env);
+  for (const task of authority.manifest.slots) expect(readLease(f.root, task.task_id).record).toBeNull();
 });
 
-test('two processes competing for different campaign tasks cannot exceed one live lease', async () => {
-  const f = await fixture();
-  const capacity = join(import.meta.dir, '../../src/effects/automation/campaign-capacity.ts');
-  const coordination = join(import.meta.dir, '../../src/effects/state/coordination-sprint.ts');
-  const children = f.tasks.map((task, index) => Bun.spawn([process.execPath, '-e', `
-    import { withCampaignCapacity } from ${JSON.stringify(capacity)};
-    import { claimSprintCommand, processSprintDependencies } from ${JSON.stringify(coordination)};
-    try {
-      const result = withCampaignCapacity(process.cwd(), ${JSON.stringify(task.task_id)}, 'main', process.env, () => claimSprintCommand({taskId:${JSON.stringify(task.task_id)}, expectedTaskRevision:${JSON.stringify(task.task_revision)}, targetRef:'main', sprintPath:${JSON.stringify(sprint)}, sessionId:'engineer-${index}'}, processSprintDependencies(process.cwd())));
-      console.log(JSON.stringify(result));
-    } catch (error) { console.log(JSON.stringify({error:error.code})); }
-  `], { cwd: f.root, env: f.env, stdout: 'pipe', stderr: 'pipe' }));
-  const results = await Promise.all(children.map(async child => {
-    const output = await new Response(child.stdout).text();
-    const stderr = await new Response(child.stderr).text();
-    expect(await child.exited, stderr).toBe(0);
-    return JSON.parse(output);
-  }));
-  expect(results.filter(r => r.exitCode === 0)).toHaveLength(1);
-  expect(results.filter(r => r.error === 'campaign_capacity_full')).toHaveLength(1);
-  expect(f.tasks.filter(task => readLease(f.root, task.task_id).record !== null)).toHaveLength(1);
+test('generic campaign claim actuator cannot bypass the readiness projection', async () => {
+  const f = await historicalPlanningFixture(); roots.push(f.root, f.home);
+  const task = requireCampaignPlanningAuthority(f.root, f.intent, f.env).manifest.slots[0]!.task_id;
+  let claims = 0;
+  expect(() => withCampaignCapacity(f.root, task, 'main', f.env, () => { claims++; })).toThrow('trusted exact revision readback');
+  expect(claims).toBe(0); expect(readLease(f.root, task).record).toBeNull();
+  expect(withCampaignCapacity(f.root, 'f'.repeat(64), 'main', f.env, () => 'unrelated')).toBe('unrelated');
 });
 
-test('campaign execution requires the exact local planning parent and shadow never acquires', async () => {
-  const f = await fixture();
-  const input = { repo_root: f.root, campaign_id: f.intent.campaign_id, group_number: 1, intent_sha256: f.intent.intent_sha256, host: 'codex' as const, session_id: 'parent', authorization_id: 'missing', idempotency_key: 'one', env: f.env };
-  expect(() => runCampaignAcquisition(input)).toThrow('does not own');
-  expect(() => runCampaignAcquisition({ ...input, host: 'claude' })).toThrow('authorized local parent');
-  const path = join(f.root, '.ai/harness/policy.json'); const policy = JSON.parse(readFileSync(path, 'utf8'));
-  policy.development_campaign.mode = 'shadow'; writeFileSync(path, JSON.stringify(policy)); git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'shadow']);
-  expect(runCampaignAcquisition(input)).toMatchObject({ action: 'idle' });
-  expect(f.tasks.every(task => readLease(f.root, task.task_id).record === null)).toBe(true);
-  policy.development_campaign.mode = 'off'; writeFileSync(path, JSON.stringify(policy)); git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'off']);
-  expect(() => runCampaignAcquisition(input)).toThrow();
+test('historical bound envelope and actor remain valid without admitting another dispatch', async () => {
+  const f = await historicalPlanningFixture(); roots.push(f.root, f.home);
+  const d = installHistoricalBoundDispatch(f);
+  expect(() => validateFleetWorkEnvelope(f.root, d.envelope, f.env)).not.toThrow();
+  expect(() => validateClaimActorReceiptLive(f.root, d.receipt, d.envelope)).not.toThrow();
+  const before = readLease(f.root, d.envelope.task_id);
+  expect(() => runCampaignAcquisition(f.executeInput)).toThrow('trusted exact revision readback');
+  expect(readLease(f.root, d.envelope.task_id)).toEqual(before);
 });
 
-
-test('real Engineer acquisition returns a bound envelope, replays it, and fences lost ownership', async () => {
-  const f = await readyFixture(); roots.push(f.root, f.home);
-  const acquired = runCampaignAcquisition(f.executeInput);
-  expect(acquired, JSON.stringify(acquired)).toMatchObject({ action: 'dispatch' });
-  if (!('envelope' in acquired) || !acquired.envelope || !acquired.receipt) throw new Error(JSON.stringify(acquired));
-  roots.push(acquired.envelope.worktree_path);
-  expect(readLease(f.root, acquired.envelope.task_id).record).toMatchObject({ state: 'bound', claim_id: acquired.envelope.claim_id, execution_worktree: acquired.envelope.worktree_path });
-  expect(readClaimActorReceipt(f.root, acquired.envelope.task_id, acquired.envelope.claim_id)).toEqual(acquired.receipt);
-  expect(runCampaignAcquisition(f.executeInput)).toEqual(acquired);
-  const contract = join(f.root, acquired.envelope.plan.contract_path);
-  const originalContract = readFileSync(contract, 'utf8');
-  writeFileSync(contract, originalContract + '\nChanged after acquisition.');
-  expect(() => runCampaignAcquisition(f.executeInput)).toThrow('plan or contract proof changed');
-  expect(readLease(f.root, acquired.envelope.task_id).record?.claim_id).toBe(acquired.envelope.claim_id);
-  writeFileSync(contract, originalContract);
-
-  expect(runCampaignAcquisition({ ...f.executeInput, idempotency_key: 'second' })).toMatchObject({ action: 'idle' });
-  expect(() => runCampaignAcquisition({ ...f.executeInput, authorization_id: 'unissued' })).toThrow('not mapped');
-  expect(releaseSprintCommand({ claimId: acquired.envelope.claim_id }, processSprintDependencies(f.root)).exitCode).toBe(0);
-  expect(() => runCampaignAcquisition(f.executeInput)).toThrow('live Lease');
-});
-
-test('fresh handoff authority drift releases its own lease and persists a refusal', async () => {
-  const f = await readyFixture(true); roots.push(f.root, f.home);
-  let taskId = '';
-  let originalContract = '';
-  let contract = '';
-  let result: ReturnType<typeof runCampaignAcquisition> | undefined;
-  try {
-    result = runCampaignAcquisition(f.executeInput, options => acquireNextScheduledEngineerTask({ ...options,
-      accept_acquired: acquired => {
-        taskId = acquired.envelope.task_id;
-        roots.push(acquired.envelope.worktree_path);
-        contract = join(f.root, acquired.envelope.plan.contract_path);
-        originalContract = readFileSync(contract, 'utf8');
-        writeFileSync(contract, originalContract + '\nAuthority drift before first handoff.');
-        return options.accept_acquired?.(acquired);
-      },
-    }));
-  } catch (error) { throw new Error('handoff failure must produce a durable typed refusal', { cause: error }); }
-  expect(taskId).not.toBe('');
-  expect(readLease(f.root, taskId).record).toBeNull();
-  expect(result).toMatchObject({ ok: false, error: 'claim_actor_receipt_failed' });
-  writeFileSync(contract, originalContract);
-  expect(runCampaignAcquisition(f.executeInput)).toEqual(result);
-  const next = runCampaignAcquisition({ ...f.executeInput, authorization_id: f.secondAuthorization, idempotency_key: 'after-refused-handoff' });
-  expect(next).toMatchObject({ action: 'dispatch' });
-  if ('envelope' in next && next.envelope) roots.push(next.envelope.worktree_path);
-});
-
-test.each(['shadow', 'foreign'] as const)('fresh handoff refuses %s drift and never releases another owner', async drift => {
-  const f = await readyFixture(); roots.push(f.root, f.home);
-  let taskId = '';
-  let foreignClaim = '';
-  const result = runCampaignAcquisition(f.executeInput, options => acquireNextScheduledEngineerTask({ ...options,
-    accept_acquired: acquired => {
-      const work = acquired.envelope;
-      taskId = work.task_id;
-      roots.push(work.worktree_path);
-      if (drift === 'shadow') {
-        const path = join(f.root, '.ai/harness/policy.json');
-        const policy = JSON.parse(readFileSync(path, 'utf8'));
-        policy.development_campaign.mode = 'shadow';
-        writeFileSync(path, JSON.stringify(policy));
-        git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'shadow before handoff']);
-      } else {
-        const deps = processSprintDependencies(f.root);
-        expect(releaseSprintCommand({ claimId: work.claim_id }, deps).exitCode).toBe(0);
-        const claim = claimSprintCommand({ taskId, expectedTaskRevision: work.task_revision, targetRef: 'main', sprintPath: sprint, sessionId: 'other-owner' }, deps);
-        expect(claim.exitCode).toBe(0);
-        foreignClaim = JSON.parse(claim.stdout).claim_id;
-      }
-      return options.accept_acquired?.(acquired);
-    },
-  }));
-  expect(result).toMatchObject({ ok: false, error: 'claim_actor_receipt_failed' });
-  expect(taskId).not.toBe('');
-  const live = readLease(f.root, taskId).record;
-  if (drift === 'shadow') expect(live).toBeNull();
-  else expect(live?.claim_id).toBe(foreignClaim);
-});
-
-
-test('occupied admission lock returns idle before budget reservation or acquisition', async () => {
-  const f = await readyFixture(); roots.push(f.root, f.home);
-  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
-  const before = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current;
+test('two OS callers cannot allocate campaign Claims under the frozen admission boundary', async () => {
+  const f = await historicalPlanningFixture(true); roots.push(f.root, f.home);
   const entry = join(import.meta.dir, '../../src/effects/automation/campaign-acquisition.ts');
-  const output = withDevelopmentCampaignLock(f.root, f.intent.campaign_id, () => execFileSync(process.execPath, ['-e', `
+  const children = [f.executeInput.authorization_id, f.secondAuthorization].map(authorization_id => Bun.spawn([process.execPath, '-e', `
     import { runCampaignAcquisition } from ${JSON.stringify(entry)};
-    console.log(JSON.stringify(runCampaignAcquisition(${JSON.stringify(f.executeInput)}, () => { throw new Error('must not acquire'); })));
-  `], { cwd: f.root, env: f.env, encoding: 'utf8' }));
-  expect(JSON.parse(output)).toEqual({ action: 'idle', reason: 'campaign acquisition admission lock is occupied' });
-  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.ledger_sha256).toBe(before.ledger_sha256);
-  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toEqual(before.open_reservation_sha256s);
-}, 60000);
-
-test('different authenticated Engineers share the campaign cap across real acquisition processes', async () => {
-  const f = await readyFixture(true); roots.push(f.root, f.home);
-  const entry = join(import.meta.dir, '../../src/effects/automation/campaign-acquisition.ts');
-  const children = [f.executeInput.authorization_id, f.secondAuthorization].map((authorization_id, index) => Bun.spawn([process.execPath, '-e', `
-    import { runCampaignAcquisition } from ${JSON.stringify(entry)};
-    console.log(JSON.stringify(runCampaignAcquisition(${JSON.stringify({ ...f.executeInput, authorization_id, idempotency_key: `engineer-${index}` })})));
+    try { runCampaignAcquisition(${JSON.stringify({ ...f.executeInput, authorization_id })}); process.exit(2); }
+    catch (error) { if (!String(error).includes('trusted exact revision readback')) throw error; }
   `], { cwd: f.root, env: f.env, stdout: 'pipe', stderr: 'pipe' }));
-  const results = await Promise.all(children.map(async child => {
-    const output = await new Response(child.stdout).text(); const stderr = await new Response(child.stderr).text();
-    expect(await child.exited, stderr).toBe(0);
-    return JSON.parse(output);
-  }));
-  const dispatched = results.filter(r => r.action === 'dispatch');
-  for (const result of dispatched) roots.push(result.envelope.worktree_path);
-  expect(dispatched, JSON.stringify(results)).toHaveLength(1);
-  expect(results.filter(r => r.action === 'idle'), JSON.stringify(results)).toHaveLength(1);
-  const winner = dispatched[0]!;
-  expect(readLease(f.root, winner.envelope.task_id).record?.claim_id).toBe(winner.envelope.claim_id);
-  expect(releaseSprintCommand({ claimId: winner.envelope.claim_id }, processSprintDependencies(f.root)).exitCode).toBe(0);
-  const loser = winner.receipt.engineer_id.endsWith('.second') ? f.executeInput.authorization_id : f.secondAuthorization;
-  const next = runCampaignAcquisition({ ...f.executeInput, authorization_id: loser, idempotency_key: loser === f.executeInput.authorization_id ? 'engineer-0' : 'engineer-1' });
-  expect(next, JSON.stringify(next)).toMatchObject({ action: 'dispatch' });
-  if ('envelope' in next && next.envelope) roots.push(next.envelope.worktree_path);
+  for (const child of children) expect(await child.exited, await new Response(child.stderr).text()).toBe(0);
+  for (const task of requireCampaignPlanningAuthority(f.root, f.intent, f.env).manifest.slots) expect(readLease(f.root, task.task_id).record).toBeNull();
 });
 
-test('real Engineer acquire-next skips a full campaign for later unrelated ready work', async () => {
-  const f = await readyFixture(true); roots.push(f.root, f.home);
+test('real Engineer acquire-next skips a campaign with unavailable revision admission for later unrelated ready work', async () => {
+  const f = await historicalPlanningFixture(true); roots.push(f.root, f.home);
   const taskId = 'e'.repeat(64);
   const task = 'Unrelated ready repair';
   const plan = 'plans/plan-unrelated.md';
@@ -313,11 +82,8 @@ test('real Engineer acquire-next skips a full campaign for later unrelated ready
   writeFileSync(join(f.root, contract), readFileSync(join(f.root, 'tasks/contracts/repair-0.contract.md'), 'utf8').replace('plans/plan-repair-0.md', plan));
   git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'unrelated canonical ready task']);
 
-  const winner = runCampaignAcquisition({ ...f.executeInput, authorization_id: f.secondAuthorization, idempotency_key: 'fill-capacity' });
-  expect(winner).toMatchObject({ action: 'dispatch' });
-  if ('envelope' in winner && winner.envelope) roots.push(winner.envelope.worktree_path);
   const principal = resolveEngineerPrincipal({ repo_root: f.root, authorization_id: f.executeInput.authorization_id, env: f.env });
-  expect(collectEngineerOffers({ repo_root: f.root, principal, env: f.env }).offers.map(offer => offer.task_id)).toEqual([campaignTask, taskId]);
+  expect(collectEngineerOffers({ repo_root: f.root, principal, env: f.env }).offers.map(offer => offer.task_id)).toEqual([taskId]);
   const input = { repo_root: f.root, principal, env: f.env, session_id: 'parent', idempotency_key: 'unrelated-next' };
   const acquired = acquireNextScheduledEngineerTask(input);
   expect(acquired, JSON.stringify(acquired)).toMatchObject({ ok: true, envelope: { task_id: taskId } });
@@ -327,15 +93,4 @@ test('real Engineer acquire-next skips a full campaign for later unrelated ready
     expect(acquireNextScheduledEngineerTask(input)).toEqual(acquired);
   }
   expect(readLease(f.root, campaignTask).record).toBeNull();
-});
-
-
-test('canonical group without local authority cannot disappear from campaign capacity accounting', async () => {
-  const f = await fixture();
-  const groupOne = join(f.root, `tasks/campaigns/${f.intent.campaign_id}/group-1.issues.json`);
-  const groupTwo = join(f.root, `tasks/campaigns/${f.intent.campaign_id}/group-2.issues.json`);
-  writeFileSync(groupTwo, readFileSync(groupOne));
-  git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'unavailable group authority']);
-  expect(() => withCampaignCapacity(f.root, f.tasks[0]!.task_id, 'main', f.env, () => f.claim(0))).toThrow('group authority is unavailable');
-  expect(readLease(f.root, f.tasks[0]!.task_id).record).toBeNull();
 });

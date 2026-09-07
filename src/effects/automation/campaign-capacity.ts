@@ -1,3 +1,4 @@
+import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { dirname, join } from 'path';
 import { canonicalMessageDigest } from '../../core/messages/mechanics';
 import type { CampaignPublicationV1 } from './issue-batch-publication';
@@ -24,6 +25,7 @@ export function withCampaignCapacity<T>(root: string, taskId: string, targetRef:
     const selected = campaignTaskIntent(root, taskId, targetRef);
     if (!selected || selected.intent_sha256 !== intent.intent_sha256) throw new CampaignCapacityError('campaign_capacity_unavailable', 'campaign membership changed before claim');
     const authority = requireCampaignPlanningAuthority(root, selected, env);
+    requireCampaignActiveAdmission();
     const limit = authority.grant.campaign!.max_parallel_tasks;
     if (authority.policy.mode !== 'active' || limit > authority.policy.limits.maximum_parallel_tasks) throw new CampaignCapacityError('campaign_capacity_unavailable', 'campaign execution is disabled or exceeds current policy');
     const taskIds = new Set<string>();

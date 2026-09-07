@@ -1,3 +1,4 @@
+import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { canonicalMessageBytes, canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
 import { buildPlanningJob, CampaignPlanningError, rejectPlannedFeatures, validatePlanningResult, type CampaignPlanningJob, type CampaignPlanningResultInput, type PlanningArtifact } from '../../core/automation/campaign-planning';
 import type { IssueBatchAdoptionInput } from '../../core/automation/issue-batch-adoption';
@@ -50,6 +51,7 @@ export function runCampaignPlanningStep(input: CampaignPlanningStepInput, deps: 
   const shadow = authority.policy.mode === 'shadow';
   if (shadow && input.result !== undefined) throw new CampaignPlanningError('human_attention_required', 'shadow cannot persist planning outcomes');
   const submitted = input.result === undefined ? null : validatePlanningResult(input.result);
+  if (!shadow && (!submitted || submitted.outcome === 'plan_ready')) requireCampaignActiveAdmission();
   const execute = () => {
     // Closing an issued job cannot authorize execution and must remain possible after source drift.
     if (submitted && submitted.outcome !== 'plan_ready') {
