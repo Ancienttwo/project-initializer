@@ -110,3 +110,17 @@ Oracle 检查对象为本机隔离候选 `26e12021f9593d7ac4ede7b252099653f1b4ac
 - Response SHA-256: `9fbae2749fa62c5ad2d18c5b41ed99f2cf027aa343e3b04dfdfe9516ad80ea58`。
 - 原始响应、intent、UI model observation 和本地 validation：本 worktree 的 `.ai/harness/evidence/brc6a-producer-probe-default/`；完整 browser session 位于 `.ai/harness/chatgpt/sessions/<session-id>/`。这两处是 ignored evidence，不是新权威 store。
 - 结论：**BRC6a pending，active admission 不变**。不再自动重跑同类模型探针。若继续，应先选择可独立观察 tool response 的传输或经 Owner 明确修改读取方式的合同；不先实现没有已证实 producer 的新 receipt/verifier。
+
+## 2026-09-08：显式 GitHub 激活后的纠正探针
+
+用户指出须从 composer「+」选择 GitHub，或用 `@github` 激活。此前默认模型探针没有记录 app 显式激活，且 prompt 要求原始 commit 对象不可得即提前停止，因此不能用它判断已激活 Connector 的文件读取能力。上节“先选择其他传输”的建议暂缓；先修正调用入口。
+
+在独立的 Profile 13 临时副本打开新会话，通过「+」搜索 GitHub 并选择。提交前 DOM 已确认 `data-inline-selection-pill`、`data-keyword="GitHub"`、`data-id="plugin:connector_76869538009648d5b282a4bb21c3d157"`，不是普通文本提及。界面保持默认 **6 Pro**，未选择模型或 thinking。当前 Oracle 候选没有 app 选择参数，所以本次用其既有 profile-copy/Chrome-launch helper 启动，再通过 CDP 操作 composer；不是 Oracle 已支持自动 app 激活的验收。
+
+Prompt 经 Gitleaks 扫描通过，只给同一 canary、固定 commit 和 README 路径，要求真实读取首 8 行、末 4 行及工具返回的标识；未给预期内容或 blob SHA。没有要求原始对象，不因该额外条件提前停止。一次发送、没有补问；这是用户纠正后新增的第三次实际模型请求，前两次成本仍保留。会话 `6a9f0045-c728-83ea-a489-27796265282a`，页面显示 Worked for 1m 59s 后完成。
+
+结果：README 首 8 行、末 4 行与本地固定 commit 的 `git show <sha>:README.md` 相符（逐行 LF 拼接比较，不把 DOM 末尾换行当原始文件字节证据）；回答中的 blob SHA `4779ce156e273311fa013c0bd7f71b9c9048129d` 与本地 Git 一致。页面显示 README 读取进度及 Talked to App。展开后实际可见 `api_tool` / `Find in resource` 请求，参数是 `uri: /response/turn0` 与 `query: ## License`。本次已验证激活后的实际内容读回，不能再笼统报告 Connector 不工作。
+
+回答称 `GitHub.fetch_file` 返回 content、encoding、sha、display_url、display_title，且没有单独 resolved-commit 字段。该字段清单和 fetch_file 细节目前仍来自回答；当前展开的 UI 未给出完整 GitHub 原始 response，不能升级为 provider-origin receipt。blob 一致及 URL 中带 requested SHA 也不独立解决 same-tree/different-commit 反例。因此 **Connector 内容读回通过；BRC6a exact-revision admission 仍 pending**。下一步在已工作的 app 激活入口上保留实际 request/result 证据，先确认是否足够满足现有合同，不先建设 raw-object verifier 或更换传输。
+
+本次 ignored evidence 位于 `.ai/harness/evidence/brc6a-github-activated/`，包含扫描过的 prompt、提交前 activation、最终结果、可见工具请求和本地 validation。没有改生产源码、放宽 admission 或提交 GitHub 写请求。
