@@ -27,6 +27,12 @@ test('a provider completion cannot conceal an outstanding operation', () => {
     message, terminal]))).toThrow('leaves an operation active');
 });
 
+test('unknown top-level provider operations cannot disappear from terminal evidence', () => {
+  expect(() => parseCodexExecStructuredOutput(stream([start,
+    { type: 'remote.operation.started', operation_id: 'unobserved' }, message, terminal])))
+    .toThrow('unknown Codex event');
+});
+
 test('provider terminal requires ordered start and final completion with no failed turn', () => {
   for (const events of [[terminal, message, start], [start, terminal, message],
     [start, { type: 'turn.failed', error: { message: 'connection lost' } }, message, terminal]]) {

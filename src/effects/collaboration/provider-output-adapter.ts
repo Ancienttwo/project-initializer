@@ -146,7 +146,10 @@ export function parseCodexExecStructuredOutput(stdout: string): CodexExecStructu
   const pending = new Set<string>();
   const operationTypes = new Set<string>();
   for (const event of events) {
-    if (!['item.started', 'item.updated', 'item.completed'].includes(event.type as string)) continue;
+    if (['thread.started', 'turn.started', 'turn.completed'].includes(event.type as string)) continue;
+    if (!['item.started', 'item.updated', 'item.completed'].includes(event.type as string)) {
+      reject('adapter_payload_not_json', 'provider output contains an unknown Codex event');
+    }
     const item = record(event.item);
     if (!item || typeof item.id !== 'string' || typeof item.type !== 'string') {
       reject('adapter_payload_not_json', 'provider output contains an unidentified Codex operation');
