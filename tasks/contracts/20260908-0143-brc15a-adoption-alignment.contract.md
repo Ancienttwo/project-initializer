@@ -84,6 +84,7 @@ allowed_paths:
   - tests/effects/gpt-pro-issue-authoring.test.ts
   - tests/unit/development-campaign-policy.test.ts
   - tests/unit/issue-batch-reconcile.test.ts
+  - tests/cli/development-campaign.test.ts
   - tests/cli/chatgpt-browser.test.ts
   - tests/fixtures/repair-campaign/protected-capabilities.json
   - docs/researches/20260908-brc15a-adoption-alignment.md
@@ -162,11 +163,18 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
-      "evidence_policy": "current_exact",
-      "necessity": "Replays metadata and exact registry authority regression before provider I/O.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Replays metadata and exact registry authority regression before provider I/O. Baseline covers unchanged production; only CLI fixture selection changes in final delta.",
       "inputs": {
         "env": []
-      }
+      },
+      "baseline": {
+        "run_file": ".ai/harness/runs/verification-vx-cf050bbf5fdd49e4a781.json",
+        "execution_id": "vx-cf050bbf5fdd49e4a781"
+      },
+      "delta_checks": [
+        "campaign-cli-delta"
+      ]
     },
     {
       "id": "boundary-check-0",
@@ -175,11 +183,18 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
-      "evidence_policy": "current_exact",
-      "necessity": "Named affected boundary coverage or required repository integrity; no full-suite trigger.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Named affected boundary coverage or required repository integrity; no full-suite trigger. Baseline covers unchanged production; only CLI fixture selection changes in final delta.",
       "inputs": {
         "env": []
-      }
+      },
+      "baseline": {
+        "run_file": ".ai/harness/runs/verification-vx-c81ba300efce4450a093.json",
+        "execution_id": "vx-c81ba300efce4450a093"
+      },
+      "delta_checks": [
+        "campaign-cli-delta"
+      ]
     },
     {
       "id": "boundary-check-1",
@@ -271,6 +286,19 @@ exit_criteria:
       "inputs": {
         "env": []
       }
+    },
+    {
+      "id": "campaign-cli-delta",
+      "kind": "command",
+      "command": "bun test tests/cli/development-campaign.test.ts --timeout 60000",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CLI startup fixture consumes complete-page policy; all production code unchanged from baseline.",
+      "inputs": {
+        "env": []
+      }
     }
   ]
 }
@@ -284,6 +312,7 @@ the intended coverage; do not infer that choice from paths or command text.
 
 - Functional behavior: metadata constraints and frozen capability IDs reach initial and continuation prompts; startup rejects incomplete issue-number snapshots.
 - Edge cases: dirty current registry is ignored; missing frozen registry refuses before intent and provider I/O.
+- Baseline: run-20260908T015705-80673 passed 22/22; only the CLI startup fixture changes afterward, verified by campaign-cli-delta. The original evidence is baseline, not an exact pass for the new subject.
 - Regression risks: Oracle effort authority remains absent, so model verification remains false and BRC15a is pending. No provider call or old receipt mutation.
 
 ## Rollback Point
