@@ -58,7 +58,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"inherited-browser-regressions","kind":"deterministic_test","paths":["*"]}]}
 ```
 
 ## Acceptance Policy
@@ -142,6 +142,26 @@ exit_criteria:
 {
   "protocol": 1,
   "checks": [
+    {
+      "id": "inherited-browser-regressions",
+      "kind": "command",
+      "command": "bun test tests/unit/oracle-session-evidence.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/issue-batch-adoption.test.ts tests/cli/chatgpt-browser.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Policy review_base includes the previously accepted provider package; its product/tests are unchanged. Reuse its immutable focused baseline and this successor documentation integrity delta.",
+      "inputs": {
+        "env": []
+      },
+      "baseline": {
+        "run_file": ".ai/harness/runs/verification-vx-2b525d873c704a5bb9f5.json",
+        "execution_id": "vx-2b525d873c704a5bb9f5"
+      },
+      "delta_checks": [
+        "integrity-2"
+      ]
+    },
     {
       "id": "integrity-0",
       "kind": "command",
