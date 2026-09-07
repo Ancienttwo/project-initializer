@@ -1,3 +1,4 @@
+import { requireCampaignActiveAdmission } from '../automation/campaign-revision-admission';
 import { canonicalMessageBytes } from '../../core/messages/mechanics';
 /**
  * Read-side fleet offers and the acquisition seam.
@@ -70,7 +71,7 @@ import { validateLeaseReclaimEligibility } from '../../core/state/lease-liveness
 import { readClaimTokenForTask } from '../state/coordination-claim-token';
 import { readLease, type LeaseRead } from '../state/coordination-lease-store';
 import { resolveBoard } from '../state/resolve-board';
-import { campaignTaskPlanProof } from '../automation/campaign-planning-proof';
+import { campaignTaskIntent, campaignTaskPlanProof } from '../automation/campaign-planning-proof';
 import { CampaignCapacityError, withCampaignCapacity } from '../automation/campaign-capacity';
 
 type TaskOfferPlanFailure = NonNullable<ClassifyTaskOfferInput['plan_failure']>;
@@ -232,6 +233,14 @@ export function collectRepoTaskOffers(
       });
     }
     if (proofResult?.ok) proofResult = campaignTaskPlanProof(repo.path, card.task_id, card.task_revision, proofResult, options.env, targetRef);
+    // Current execution projection is distinct from immutable envelope antecedent validation.
+    if (proofResult?.ok) {
+      try {
+        if (campaignTaskIntent(repo.path, card.task_id, targetRef)) requireCampaignActiveAdmission();
+      } catch (error) {
+        proofResult = { ok: false, code: 'plan_not_projectable', error: String(error), candidates: [proofResult.proof.plan_path] };
+      }
+    }
     return buildTaskOffer(repo, registry, board, card, index, proofResult);
   });
   return Object.freeze({

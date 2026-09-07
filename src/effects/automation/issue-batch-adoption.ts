@@ -1,3 +1,4 @@
+import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { observeShadowAdoption } from './issue-batch-shadow-adoption';
 import type { GithubCommandRunner } from '../external-sources/github';
 import { execFileSync } from 'child_process';
@@ -178,6 +179,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   const status = readDevelopmentCampaignStatus(input.repo_root, intent.campaign_id, input.env);
   const mode = readDevelopmentCampaignPolicyAtRevision(input.repo_root, intent.base_main_sha).mode;
   if (mode === 'off' || (mode === 'shadow' && !input.dry_run)) fail('campaign mode forbids materialization');
+  if (mode === 'active') requireCampaignActiveAdmission();
   const existing = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption');
   if (existing) {
     const stored = existing as unknown as { input: IssueBatchAdoptionInput; sprint_path: string; publication_policy: CampaignPublicationPolicy; shadow_budget_artifact?: `shadow-${string}` };

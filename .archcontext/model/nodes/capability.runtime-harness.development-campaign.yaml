@@ -28,6 +28,7 @@ source:
     - "src/core/automation/campaign-runtime.ts"
     - "src/effects/automation/campaign-runtime.ts"
     - "src/effects/automation/campaign-recovery.ts"
+    - "src/effects/automation/campaign-revision-admission.ts"
     - "src/effects/automation/campaign-worker.ts"
     - "src/core/automation/campaign-planning.ts"
     - "src/effects/automation/campaign-planning.ts"

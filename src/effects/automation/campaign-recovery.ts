@@ -1,3 +1,4 @@
+import { readAutomationUsageForResult } from './budget-store';
 import { canonicalMessageDigest, canonicalMessageBytes } from '../../core/messages/mechanics';
 import { campaignRuntimeRecordKey, type CampaignCodexInvocation } from '../../core/automation/campaign-runtime';
 import type { LeaseOwnerRecord } from '../../core/state/coordination-identity';
@@ -11,7 +12,7 @@ import { resumeReclaimedEngineerTask } from '../engineers/acquire';
 import { readLease, withTaskLock } from '../state/coordination-lease-store';
 import { readEngineerBindingStatus } from '../engineers/binding-store';
 import { readClaimActorReceipt, validateClaimActorReceiptLive } from '../engineers/claim-actor-store';
-import { readCampaignWorkerHandoff, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation } from './campaign-worker';
+import { readCampaignWorkerHandoff, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation, type CampaignWorkerFinal } from './campaign-worker';
 import { observeCampaignCodexTerminal } from './campaign-runtime';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
@@ -108,8 +109,14 @@ export function recoverCampaignDispatch(input: {
   now?: () => Date;
   crash_hook?: (boundary: 'after_intent' | 'after_lease_write' | 'after_bind' | 'after_token' | 'after_actor' | 'after_recovered') => void;
 }) {
-  retireCampaignDispatch(input);
   const context = readCampaignWorkerHandoff(input.selector);
+  const final = readPlanningRecord<CampaignWorkerFinal>(context.root, context.intent, key(context.selector.dispatch_id, 'final'));
+  if (!final) throw new Error('trusted exact revision readback is unavailable; recovery without a persisted final cannot rebind');
+  // Validate the original reservation and any existing result charge before changing ownership.
+  // A null usage is the supported crash boundary between durable final and settlement.
+  readAutomationUsageForResult({ repo_root: context.root, reservation: final.reservation,
+    evidence_refs: [{ ref: `campaign-worker:${context.selector.dispatch_id}:result`, sha256: final.result_sha256 }], env: input.env });
+  retireCampaignDispatch(input);
   const { root, intent, selector, handoff } = context;
   const previous = handoff.acquired.envelope;
   return withCampaignPlanningLock(root, intent, () => {

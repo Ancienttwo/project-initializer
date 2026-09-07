@@ -1,9 +1,8 @@
+import { prepareCampaignCodexInvocation } from '../../src/effects/automation/campaign-runtime';
 import { runCampaignNotPlanned } from '../../src/effects/automation/campaign-not-planned';
 import { automationDigest } from '../../src/core/automation/budget';
 import { listProviderIssueObservations } from '../../src/effects/external-sources/store';
 import { planningResultKey, requireCampaignPlanningAuthority, type PlanningAdmission } from '../../src/effects/automation/campaign-planning-proof';
-import { runCampaignAcquisition } from '../../src/effects/automation/campaign-acquisition';
-import { bindCampaignWorker } from '../../src/effects/automation/campaign-worker';
 import { runCampaignCloseout } from '../../src/effects/automation/campaign-closeout';
 import { readLease, createLeaseDirectory, writeLeaseOwnerDurably } from '../../src/effects/state/coordination-lease-store';
 import { buildLeaseOwnerRecord, beginLeaseCompletionRecord, enterReviewingLeaseRecord } from '../../src/core/state/coordination-identity';
@@ -19,7 +18,7 @@ import { join } from 'path';
 import { execFileSync, spawnSync } from 'child_process';
 import { cleanupExactWorktree, assertWorktreeBinding } from '../../src/effects/state/coordination-worktree-topology';
 import { canonicalMessageDigest, messageSha256 } from '../../src/core/messages/mechanics';
-import { readyFixture } from '../helpers/campaign-acquisition-fixture';
+import { historicalPlanningFixture, installHistoricalBoundDispatch, installHistoricalAttempt, installHistoricalChild, installHistoricalFinal } from '../helpers/historical-campaign-lifecycle';
 import { ensureCampaignAuthoringBudget, beginCampaignBudgetStep, readCampaignBudgetLedger } from '../../src/effects/automation/budget-store';
 import { readPlanningRecord, persistPlanningRecord, withCampaignPlanningLock } from '../../src/effects/automation/campaign-planning-store';
 import { runCampaignCloseoutProviderAttempt } from '../../src/effects/automation/campaign-closeout-provider';
@@ -27,7 +26,7 @@ import { runCampaignCloseoutProviderAttempt } from '../../src/effects/automation
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 async function fixture() {
-  const f = await readyFixture(); roots.push(f.root, f.home);
+  const f = await historicalPlanningFixture(); roots.push(f.root, f.home);
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
   const step = { repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
     campaign_id: f.intent.campaign_id, group_number: 1 as const, intent_sha256: f.intent.intent_sha256, idempotency_key: 'closeout-fixture', env: f.env };
@@ -110,12 +109,12 @@ test('shared lifecycle refuses audit while published Tasks lack cleanup receipts
 }, 60_000);
 
 async function acquired() {
-  const f = await readyFixture(false, false, undefined, true, { max_agent_turns: 40, max_runner_invocations: 40 }); roots.push(f.root, f.home);
-  const result = runCampaignAcquisition(f.executeInput);
+  const f = await historicalPlanningFixture(false, false, undefined, true, { max_agent_turns: 40, max_runner_invocations: 40 }); roots.push(f.root, f.home);
+  const result = installHistoricalBoundDispatch(f);
   if (!('worker_handoff' in result) || !result.worker_handoff || !result.envelope) throw new Error(JSON.stringify(result));
   roots.push(result.envelope.worktree_path);
   const input = { selector: result.worker_handoff, host: f.executeInput.host, session_id: f.executeInput.session_id, env: f.env };
-  return { ...f, envelope: result.envelope, input };
+  return { ...f, envelope: result.envelope, input, historical: result };
 }
 
 function installProviderFixture(f: Awaited<ReturnType<typeof acquired>>, finalVerdict: 'pass' | 'fail' = 'pass', detachedCommand = false) {
@@ -149,18 +148,18 @@ test.each(['normal', 'source-drift', 'release-crash'])('worker publication close
   const sourceDrift = mode === 'source-drift';
   const f = await acquired(); const env = installProviderFixture(f); const worktree = f.envelope.worktree_path;
   const git = (root: string, ...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  const controller = bindCampaignWorker({ selector: f.input.selector, worktree, contract: f.envelope.plan.contract_path,
-    worker_command: 'codex-exec:worker', verifier_command: 'codex-exec:verifier', provider: 'codex-exec', env });
+  const attempt = installHistoricalAttempt(f, f.historical);
   for (const role of ['worker', 'verifier'] as const) {
     writeFileSync(join(worktree, `${role}.prompt.md`), 'Fixture prompt');
-    const invocation = controller.prepareChild(role, `${role}.prompt.md`); controller.beforeChild(role, `codex-exec:${role}`);
+    const invocation = prepareCampaignCodexInvocation({repo_root:f.root,worktree,prompt_path:`${role}.prompt.md`,env,
+      identity:{dispatch_id:f.input.selector.dispatch_id,role,task_id:f.envelope.task_id,task_revision:f.envelope.task_revision,claim_id:f.envelope.claim_id,lease_generation:f.envelope.generation,binding_generation:f.historical.acquired.offer.binding_generation}});
     const child = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/run-bounded-verifier-command.ts'), '--deadline-ms', String(Date.now() + 10_000),
       '--log', join(worktree, `${role}.stdout`), '--stderr-log', join(worktree, `${role}.stderr`), '--result', join(worktree, `${role}.result`),
       '--', invocation.executable, ...invocation.argv], { cwd: worktree, env: { ...env, CONTRACT_RUN_ROLE: role, CONTRACT_RUN_ATTEMPT_RESULT: 'final.json' }, encoding: 'utf8' });
     expect(child.status, child.stderr).toBe(0);
-    controller.afterChild({ ...JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8')), role, command: `codex-exec:${role}`, stdout_path: `${role}.stdout`, stderr_path: `${role}.stderr` });
+    installHistoricalChild(f, f.historical, invocation, { ...JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8')), role, command: `codex-exec:${role}`, stdout_path: `${role}.stdout`, stderr_path: `${role}.stderr` });
   }
-  controller.finish('final.json', { status: 'pass', failure_class: null });
+  installHistoricalFinal(f, f.historical, attempt);
   git(f.root, 'commit', '-qm', 'fixture provider profiles');
   const sprint = join(worktree, f.envelope.sprint_path);
   writeFileSync(sprint, readFileSync(sprint, 'utf8').split('\n').map(line => line.includes(f.envelope.task_id) ? line.replace('[ ]', '[x]') : line).join('\n'));
@@ -292,7 +291,7 @@ test('a moved remote ref is preserved by compare-and-delete and leaves reconcili
 }, 60_000);
 
 test('not_planned requires reviewed typed falsifier and all non-executing planning outcomes', async () => {
-  const f = await readyFixture(false, false, undefined, true, { max_agent_turns: 40, max_runner_invocations: 40 }, true); roots.push(f.root, f.home);
+  const f = await historicalPlanningFixture(false, false, undefined, true, { max_agent_turns: 40, max_runner_invocations: 40 }, true); roots.push(f.root, f.home);
   const authority = requireCampaignPlanningAuthority(f.root, f.intent, f.env); const issue = authority.manifest.receipt.issues[0]!;
   const slot = authority.manifest.slots.find(value => value.slot === issue.slot)!;
   const planning = readPlanningRecord<PlanningAdmission>(f.root, f.intent, planningResultKey(slot.task_id))!;
