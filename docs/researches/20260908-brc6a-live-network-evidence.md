@@ -29,14 +29,14 @@ New-file justification: one collector serves two existing CDP owners; its unit t
 
 Fresh authorization must cover exactly **one GPT request**, at most **600 seconds** assistant wait, no follow-up/retry/restart and no GitHub writes. Preserve the current UI model/thinking state and select a real GitHub inline app pill before send. Stop on activation failure, incomplete stream, missing original arguments, timeout or an unapproved extra call. Do not reference old stopped budgets.
 
-The prepared command uses a fresh isolated Oracle home and new output directory, followed by CLI dry-run before dispatch. It is not executed by this implementation slice:
+The prepared command uses a fresh isolated Oracle home and new output directory, with CLI flags verified by a zero-call dry-run (exit 0, picker=current). The UI model is not inferred from the preview requested-model label. The live command is not executed by this implementation slice:
 
 ```bash
 ORACLE_HOME_DIR=/tmp/brc6a-approved-live-probe/oracle-home \
 node --import tsx bin/oracle-cli.ts \
   --engine browser --wait \
   --copy-profile "$HOME/Library/Application Support/Google/Chrome" \
-  --browser-profile "Profile 13" \
+  --browser-chrome-profile "Profile 13" \
   --browser-model-strategy current --browser-app GitHub \
   --browser-timeout 600s --browser-auto-reattach-interval 0 \
   --write-session /tmp/brc6a-approved-live-probe/session.json \
