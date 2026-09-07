@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 02:05
+> **Related Plan**: plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-0205
+> **Archive Projection V1**: `plans/plan-20260908-0143-brc15a-adoption-alignment.md` => `plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0143-brc15a-adoption-alignment.notes.md` => `tasks/archive/notes-20260908-0205-brc15a-adoption-alignment.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0143-brc15a-adoption-alignment.contract.md` => `tasks/archive/contract-20260908-0205-brc15a-adoption-alignment.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0143-brc15a-adoption-alignment.review.md` => `tasks/archive/review-20260908-0205-brc15a-adoption-alignment.md`
+
 # Task Contract: brc15a-adoption-alignment
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-0143-brc15a-adoption-alignment.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 01:44
-> **Review File**: `tasks/reviews/20260908-0143-brc15a-adoption-alignment.review.md`
-> **Notes File**: `tasks/notes/20260908-0143-brc15a-adoption-alignment.notes.md`
+> **Review File**: `tasks/archive/review-20260908-0205-brc15a-adoption-alignment.md`
+> **Notes File**: `tasks/archive/notes-20260908-0205-brc15a-adoption-alignment.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-0143-brc15a-adoption-alignment.md`
+- Source plan: `plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-0143-brc15a-adoption-alignment.review.md`
-- Notes file: `tasks/notes/20260908-0143-brc15a-adoption-alignment.notes.md`
+- Review file: `tasks/archive/review-20260908-0205-brc15a-adoption-alignment.md`
+- Notes file: `tasks/archive/notes-20260908-0205-brc15a-adoption-alignment.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -88,10 +98,10 @@ allowed_paths:
   - tests/cli/chatgpt-browser.test.ts
   - tests/fixtures/repair-campaign/protected-capabilities.json
   - docs/researches/20260908-brc15a-adoption-alignment.md
-  - plans/plan-20260908-0143-brc15a-adoption-alignment.md
-  - tasks/contracts/20260908-0143-brc15a-adoption-alignment.contract.md
-  - tasks/reviews/20260908-0143-brc15a-adoption-alignment.review.md
-  - tasks/notes/20260908-0143-brc15a-adoption-alignment.notes.md
+  - plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md
+  - tasks/archive/contract-20260908-0205-brc15a-adoption-alignment.md
+  - tasks/archive/review-20260908-0205-brc15a-adoption-alignment.md
+  - tasks/archive/notes-20260908-0205-brc15a-adoption-alignment.md
 ```
 
 ## Evidence Requirements
@@ -147,7 +157,7 @@ exit_criteria:
     - docs/researches/20260908-brc15a-adoption-alignment.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-0143-brc15a-adoption-alignment.notes.md
+    - tasks/archive/notes-20260908-0205-brc15a-adoption-alignment.md
 ```
 
 ## Verification Plan

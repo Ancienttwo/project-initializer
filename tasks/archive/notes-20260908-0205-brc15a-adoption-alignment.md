@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 02:05
+> **Related Plan**: plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-0205
+> **Archive Projection V1**: `plans/plan-20260908-0143-brc15a-adoption-alignment.md` => `plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0143-brc15a-adoption-alignment.notes.md` => `tasks/archive/notes-20260908-0205-brc15a-adoption-alignment.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0143-brc15a-adoption-alignment.contract.md` => `tasks/archive/contract-20260908-0205-brc15a-adoption-alignment.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0143-brc15a-adoption-alignment.review.md` => `tasks/archive/review-20260908-0205-brc15a-adoption-alignment.md`
+
 # Implementation Notes: brc15a-adoption-alignment
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-0143-brc15a-adoption-alignment.md
-> **Contract**: tasks/contracts/20260908-0143-brc15a-adoption-alignment.contract.md
-> **Review**: tasks/reviews/20260908-0143-brc15a-adoption-alignment.review.md
+> **Plan**: plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md
+> **Contract**: tasks/archive/contract-20260908-0205-brc15a-adoption-alignment.md
+> **Review**: tasks/archive/review-20260908-0205-brc15a-adoption-alignment.md
 > **Last Updated**: 2026-09-08 01:44
 > **Lifecycle**: notes
 

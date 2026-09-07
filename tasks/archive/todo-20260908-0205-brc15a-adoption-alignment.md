@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-08 02:05
+> **Related Plan**: plans/archive/plan-20260908-0143-brc15a-adoption-alignment.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260908-0205
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-08 01:44
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
