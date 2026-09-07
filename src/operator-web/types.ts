@@ -49,7 +49,7 @@ import type {
  * module's literal type, so a drift from the core constant fails typecheck
  * here rather than at runtime.
  */
-export const OPERATOR_FLEET_PAYLOAD_PROTOCOL: OperatorFleetSnapshotV1['protocol'] = 3;
+export const OPERATOR_FLEET_PAYLOAD_PROTOCOL: OperatorFleetSnapshotV1['protocol'] = 4;
 
 /**
  * The collaboration protocol the browser transport accepts, restated for the
@@ -484,6 +484,22 @@ function decodeCard(value: unknown, repositoryId: string): OperatorFleetCardV1 {
   ] as const);
   const snapshotConsistency = requireOneOf(card.snapshot_consistency, ['stable', 'changed_during_read'] as const);
   const error = decodeError(card.error);
+  const evidence = inbox.delivery_evidence === null ? null : requireRecord(inbox.delivery_evidence);
+  if ((error !== null) !== (evidence === null)) throw new OperatorPayloadError();
+  const candidateCount = evidence === null ? 0 : requireNonNegativeInteger(evidence.candidate_count);
+  const latest = evidence === null || evidence.latest === null ? null : requireRecord(evidence.latest);
+  if ((candidateCount === 1) !== (latest !== null)) throw new OperatorPayloadError();
+  const deliveryEvidence = evidence === null ? null : Object.freeze({
+    candidate_count: candidateCount,
+    latest: latest === null ? null : Object.freeze({
+      adapter_kind: requireOneOf(latest.adapter_kind, ['codex-app-thread', 'tmux-cli-agent'] as const),
+      effect_state: requireOneOf(latest.effect_state, ['intent_persisted', 'effect_started', 'observed_success', 'observed_failure', 'reconciliation_required', 'stopped', 'superseded'] as const),
+      receipt_kind: latest.receipt_kind === null ? null : requireOneOf(latest.receipt_kind, ['task_message_delivery_receipt', 'module_message_delivery_receipt', 'controller_step_receipt'] as const),
+      observed_at: requireNotificationInstant(latest.observed_at),
+      observation_sequence: requireNonNegativeInteger(latest.observation_sequence),
+      observation_sha256: requireSha256(latest.observation_sha256),
+    }),
+  });
   return Object.freeze({
     repository_id: repositoryId,
     task_id: taskId,
@@ -512,6 +528,7 @@ function decodeCard(value: unknown, repositoryId: string): OperatorFleetCardV1 {
       runtime_reachability: runtimeReachability,
       effect_sha256: effectSha256,
       failure_class: failureClass,
+      delivery_evidence: deliveryEvidence,
     }),
     snapshot_consistency: snapshotConsistency,
     error,
@@ -545,6 +562,13 @@ function requireCollaborationRecordId(value: unknown): string {
   const id = requireString(value);
   if (!COLLABORATION_RECORD_ID_PATTERN.test(id)) throw new OperatorPayloadError();
   return id;
+}
+
+/** Same UTC timestamp wire grammar as the notification authority; no Node imports in this bundle. */
+function requireNotificationInstant(value: unknown): string {
+  const instant = requireInstant(value);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/u.test(instant)) throw new OperatorPayloadError();
+  return instant;
 }
 
 function requireInstant(value: unknown): string {

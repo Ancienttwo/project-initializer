@@ -35,7 +35,7 @@ function sourceSnapshot(): FleetBoardSnapshotV1 {
             merge_readiness: null,
             execution_readiness: 'execution_ready',
             feedback: { pending_count: 1, no_progress: false, repair_actions: [] },
-            inbox: { unread_count: 2, addressed_to_current_claim: false, delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null },
+            inbox: { unread_count: 2, addressed_to_current_claim: false, delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, delivery_evidence: { candidate_count: 0, latest: null }, failure_class: null },
             snapshot_consistency: 'changed_during_read',
             error: null,
           },
@@ -151,7 +151,7 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
             merge_readiness: null,
             execution_readiness: 'execution_ready',
             feedback: { pending_count: 0, no_progress: false, repair_actions: [] },
-            inbox: { unread_count: 0, addressed_to_current_claim: false, delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null },
+            inbox: { unread_count: 0, addressed_to_current_claim: false, delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, delivery_evidence: { candidate_count: 0, latest: null }, failure_class: null },
             snapshot_consistency: 'stable',
             error: null,
           },
@@ -168,7 +168,7 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
             merge_readiness: null,
             execution_readiness: null,
             feedback: { pending_count: 0, no_progress: false, repair_actions: [] },
-            inbox: { unread_count: 0, addressed_to_current_claim: false, delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null },
+            inbox: { unread_count: 0, addressed_to_current_claim: false, delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, delivery_evidence: null, failure_class: null },
             snapshot_consistency: 'stable',
             error: { code: 'repo_inbox_unreadable', message: 'inbox stderr /private/agent-root' },
           },
@@ -225,4 +225,20 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
       'task_label', 'task_revision',
     ]);
   });
+});
+
+
+test('notification evidence is copied by allowlist without exposing raw runtime fields', () => {
+  const latest = { adapter_kind: 'tmux-cli-agent' as const, effect_state: 'stopped' as const, receipt_kind: null,
+    observed_at: '2026-09-07T00:00:00.000Z', observation_sequence: 2, observation_sha256: `sha256:${'f'.repeat(64)}`,
+    endpoint_id: 'private-endpoint', host_id: 'private-host' };
+  const baseline = sourceSnapshot();
+  const source = { ...baseline, repositories: baseline.repositories.map(repo => ({ ...repo,
+    cards: repo.cards.map(card => ({ ...card, inbox: { ...card.inbox, delivery_evidence: { candidate_count: 1, latest } } })),
+  })) };
+  const result = projectOperatorFleetSnapshot(source);
+  expect(JSON.stringify(result)).not.toContain('private-endpoint');
+  expect(JSON.stringify(result)).not.toContain('private-host');
+  expect(result.repositories[0]!.cards[0]!.inbox.delivery_evidence!.latest!.observation_sha256).toBe(latest.observation_sha256);
+  expect(Object.isFrozen(result.repositories[0]!.cards[0]!.inbox.delivery_evidence!.latest)).toBe(true);
 });

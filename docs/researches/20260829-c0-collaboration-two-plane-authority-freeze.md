@@ -654,3 +654,15 @@ BRC6 intake evidence additions use the same closed-scan criterion:
 |---|---|---|
 | `src/core/automation/connector-challenge.ts` | C-1 | Exact-content readback proof for campaign intake; no delivery-plane identity or semantic acceptance verdict. |
 | `src/core/automation/issue-batch-adoption.ts` | C-1 | Intake projection, like WorkDemand; canonical Sprint and WorkGraph remain Task authority, and delivery Publication receipts remain separate. |
+
+
+## Operator delivery evidence amendment (2026-09-07)
+
+The approved `operator-delivery-evidence` package moves FleetBoardSnapshot from
+protocol 3 to 4, adding required `inbox.delivery_evidence` as an allowlisted
+projection of the current Claim's notify effects. Other authority versions,
+store roots, delivery receipt semantics and collaboration inclusion rules stay
+unchanged. The resulting inventory digest is
+`sha256:e7b3dce11c70ddd47b7dbd6cbd96f54b92de24863d373426e01adf8be595e787`.
+The protocol change and this explicit amendment are verified by
+`tests/unit/collaboration-authority-baseline.test.ts`.

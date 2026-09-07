@@ -3,10 +3,10 @@ import { createHash } from 'crypto';
 import type { TaskOfferExecutionReadiness } from './task-offer';
 import type { MergeReadinessBlockerCode, MergeReadinessV1 } from '../publication/merge-readiness';
 import type { BoardLeaseState, TaskState } from '../state/types';
-import type { AgentRuntimeFailureClass } from '../engineers/agent-runtime-effect';
+import type { AgentRuntimeFailureClass, AgentRuntimeAdapterKind, AgentRuntimeEffectState, AgentRuntimeReceiptKind } from '../engineers/agent-runtime-effect';
 
 /** A fleet projection is its own read model; it never changes BoardColumn. */
-export const FLEET_BOARD_PROTOCOL = 3 as const;
+export const FLEET_BOARD_PROTOCOL = 4 as const;
 export const FLEET_BOARD_KIND = 'fleet_board_snapshot' as const;
 
 export type FleetBoardColumn = 'available' | 'working' | 'in_review' | 'ready_to_merge' | 'done';
@@ -33,7 +33,23 @@ export interface FleetBoardErrorV1 {
   readonly message: string;
 }
 
+export interface FleetBoardDeliveryObservationV1 {
+  readonly adapter_kind: AgentRuntimeAdapterKind;
+  readonly effect_state: AgentRuntimeEffectState;
+  readonly receipt_kind: AgentRuntimeReceiptKind | null;
+  /** Notification observation time, never worker activity or receipt ACK time. */
+  readonly observed_at: string;
+  readonly observation_sequence: number;
+  readonly observation_sha256: string;
+}
+
+export interface FleetBoardDeliveryEvidenceV1 {
+  readonly candidate_count: number;
+  readonly latest: FleetBoardDeliveryObservationV1 | null;
+}
+
 export interface FleetBoardInboxSummaryV1 {
+  readonly delivery_evidence: FleetBoardDeliveryEvidenceV1 | null;
   readonly unread_count: number;
   readonly addressed_to_current_claim: boolean;
   readonly delivery_state: RuntimeDeliveryState;
@@ -207,6 +223,7 @@ export function projectFleetBoardCard(repositoryId: string, input: FleetBoardCar
   const readinessAttention = input.merge_readiness?.attention_owner ?? 'none';
   const publication = input.current_publication;
   const error = input.error;
+  if (error === null && input.inbox.delivery_evidence === null) throw new Error('Readable Fleet card requires delivery evidence');
   return Object.freeze({
     repository_id: repositoryId,
     task_id: input.task_id,
@@ -235,6 +252,17 @@ export function projectFleetBoardCard(repositoryId: string, input: FleetBoardCar
       repair_actions: Object.freeze([...input.feedback.repair_actions]),
     }),
     inbox: Object.freeze({
+      delivery_evidence: error !== null || input.inbox.delivery_evidence === null ? null : Object.freeze({
+        candidate_count: input.inbox.delivery_evidence.candidate_count,
+        latest: input.inbox.delivery_evidence.latest === null ? null : Object.freeze({
+          adapter_kind: input.inbox.delivery_evidence.latest.adapter_kind,
+          effect_state: input.inbox.delivery_evidence.latest.effect_state,
+          receipt_kind: input.inbox.delivery_evidence.latest.receipt_kind,
+          observed_at: input.inbox.delivery_evidence.latest.observed_at,
+          observation_sequence: input.inbox.delivery_evidence.latest.observation_sequence,
+          observation_sha256: input.inbox.delivery_evidence.latest.observation_sha256,
+        }),
+      }),
       unread_count: input.inbox.unread_count,
       addressed_to_current_claim: input.inbox.addressed_to_current_claim,
       delivery_state: input.inbox.delivery_state,

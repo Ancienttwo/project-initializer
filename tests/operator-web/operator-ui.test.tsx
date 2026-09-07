@@ -47,7 +47,7 @@ describe('operator web control board', () => {
       'External',
       'Done',
     )).toBe(true);
-    expect(markup).toContain('protocol 3');
+    expect(markup).toContain('protocol 4');
     expect(markup).toContain('observe-only · one write: task message');
   });
 
@@ -160,7 +160,7 @@ describe('operator web control board', () => {
     );
 
     expect(markup).toContain('protocol — · sequence —');
-    expect(markup).not.toContain('protocol 3');
+    expect(markup).not.toContain('protocol 4');
   });
 
   test('keeps empty, changed-during-read, and repo-degraded semantics explicit', () => {

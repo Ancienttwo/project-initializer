@@ -40,6 +40,7 @@ import { resolveRepoIdentity } from '../../src/effects/state/coordination-canoni
 import { repoHarnessRepoIdFor } from '../../src/effects/repo-registry';
 import {
   AgentRuntimeEffectStoreError,
+  projectTaskAgentRuntimeState,
   migrateProviderThreadEffectsV1,
   observeAgentRuntimeEffect,
   prepareAgentRuntimeEffect,
@@ -161,6 +162,33 @@ describe('R1 provider-neutral Agent Runtime', () => {
     const started = startAgentRuntimeEffect({ repo_root: repoRoot, effect_id: prepared.intent.effect_id, started_at: '2026-08-30T11:03:00.000Z' }); expect(started.action).not.toBeNull(); expect(JSON.stringify(started.action)).not.toContain('task body');
     deliverTaskInbox({ repo_root: repoRoot, task_id: taskId, canonical_source: { targetRef: 'HEAD', sprintPath }, recipient: { kind: 'claim', claim_id: claimId, generation: 1 }, execution_worktree: repoRoot, delivery_channel: 'agent_runtime_effect', message_id: taskMessageId, delivery_ref: started.action!.control_ref, delivered_at: '2026-08-30T11:04:00.000Z' });
     const done = observeAgentRuntimeEffect({ repo_root: repoRoot, effect_id: prepared.intent.effect_id, adapter: { adapter_kind: 'codex-app-thread', outcome: 'accepted', process_exit_code: null, process_signal: null }, observed_at: '2026-08-30T11:05:00.000Z', receipt_wait_exhausted: false }); expect(done.current.state).toBe('observed_success'); expect(done.observation.receipt_kind).toBe('task_message_delivery_receipt');
+    const input = { repo_root: repoRoot, task_id: taskId, task_revision: taskRevision, current_claim: { claim_id: claimId, generation: 1 } };
+    const projection = projectTaskAgentRuntimeState(input);
+    expect(projection.delivery_state).toBe('delivered');
+    expect(projection.delivery_evidence).toEqual({ candidate_count: 1, latest: {
+      adapter_kind: 'codex-app-thread', effect_state: 'observed_success', receipt_kind: 'task_message_delivery_receipt',
+      observed_at: done.observation.observed_at, observation_sequence: done.current.sequence,
+      observation_sha256: done.current.latest_observation_sha256,
+    } });
+    expect(JSON.stringify(projection)).not.toContain(binding.provider_thread_id);
+    for (const changed of [{ current_claim: null }, { task_id: 'f'.repeat(64) }, { task_revision: 'f'.repeat(64) }, { current_claim: { claim_id: bindingTwo, generation: 1 } }, { current_claim: { claim_id: claimId, generation: 2 } }]) {
+      expect(projectTaskAgentRuntimeState({ ...input, ...changed, statuses: [done] }).delivery_evidence).toEqual({ candidate_count: 0, latest: null });
+    }
+    expect(projectTaskAgentRuntimeState({ ...input, statuses: [] }).delivery_evidence).toEqual({ candidate_count: 0, latest: null });
+    for (const state of ['stopped', 'superseded'] as const) {
+      const observation = buildAgentRuntimeEffectObservation({ ...done.observation, state, receipt_kind: null, receipt_sha256: null });
+      const terminal = projectTaskAgentRuntimeState({ ...input, statuses: [{ ...done, observation, current: buildAgentRuntimeEffectCurrent(observation) }] });
+      expect(terminal.delivery_state).toBe('pending');
+      expect(terminal.delivery_evidence.latest?.effect_state).toBe(state);
+    }
+    expect(() => projectTaskAgentRuntimeState({ ...input, statuses: [{ ...done, current: prepared.current }] })).toThrow(AgentRuntimeEffectStoreError);
+    const mismatched = buildAgentRuntimeEffectObservation({ ...done.observation, adapter: { ...done.observation.adapter, adapter_kind: 'tmux-cli-agent' } });
+    expect(() => projectTaskAgentRuntimeState({ ...input, statuses: [{ ...done, observation: mismatched, current: buildAgentRuntimeEffectCurrent(mismatched) }] })).toThrow(AgentRuntimeEffectStoreError);
+    // Two different messages are two candidates, not two runs or an invented latest effect.
+    const secondId = '77777777-7777-4777-8777-777777777777';
+    sendTaskMessage({ repo_root: repoRoot, canonical_source: { targetRef: 'HEAD', sprintPath }, event: buildTaskMessageEvent({ message_id: secondId, task_id: taskId, task_revision: taskRevision, scope: 'claim', target_claim_id: claimId, target_generation: 1, sender_kind: 'operator', sender_id: 'runtime-test', sender_trust: 'local_operator', audience: 'owner', body: 'another message', created_at: '2026-08-30T11:06:00.000Z', in_reply_to: null }) });
+    prepareAgentRuntimeEffect({ repo_root: repoRoot, message_kind: 'task_message', task_id: taskId, message_id: secondId, idempotency_key: 'second-task-runtime', expected_task_revision: taskRevision, expected_claim_id: claimId, expected_lease_generation: 1, expected_capability_sha256: observed.capability_sha256, created_at: '2026-08-30T11:07:00.000Z' });
+    expect(projectTaskAgentRuntimeState(input)).toMatchObject({ delivery_state: 'reconciliation_required', runtime_reachability: 'unknown', delivery_evidence: { candidate_count: 2, latest: null } });
   });
 
   test('a Task hook delivery or a foreign control reference never proves the effect', () => {

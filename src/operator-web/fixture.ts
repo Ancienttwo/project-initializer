@@ -19,7 +19,7 @@ const baseInbox = {
   delivery_state: 'pending',
   runtime_reachability: 'unknown',
   effect_sha256: null,
-  failure_class: null,
+  delivery_evidence: { candidate_count: 0, latest: null }, failure_class: null,
 } as const;
 
 function mergeReadiness(
@@ -156,6 +156,11 @@ const stableRepositories: readonly OperatorFleetRepositoryV1[] = [
         runtime_reachability: 'unavailable',
         effect_sha256: `sha256:${'9'.repeat(64)}`,
         failure_class: 'adapter_unavailable',
+        delivery_evidence: { candidate_count: 1, latest: {
+          adapter_kind: 'tmux-cli-agent', effect_state: 'reconciliation_required',
+          receipt_kind: null, observed_at: '2026-08-31T00:00:00.000Z',
+          observation_sequence: 2, observation_sha256: `sha256:${'8'.repeat(64)}`,
+        } },
       },
     }),
     card('repo-harness', fixtureTasks.review, 'in_review', {
@@ -189,7 +194,7 @@ const stableRepositories: readonly OperatorFleetRepositoryV1[] = [
 ];
 
 export const stableSnapshot: OperatorFleetSnapshotV1 = {
-  protocol: 3,
+  protocol: 4,
   kind: 'operator_fleet_snapshot',
   registry_revision: `sha256:${'e'.repeat(64)}`,
   sequence: 18,

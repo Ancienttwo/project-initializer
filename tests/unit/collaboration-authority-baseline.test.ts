@@ -511,12 +511,13 @@ const DELIBERATELY_EXCLUDED: readonly ExcludedModule[] = [
 /**
  * Frozen at `main@a490a5ef76b439228a4b3282934c29ba15090cdf`, then deliberately
  * advanced by the approved R1 provider-neutral Agent Runtime work package when
- * FleetBoardSnapshot moved to protocol 3. A change here is an authority change:
+ * FleetBoardSnapshot moved to protocol 3, then by the approved Operator delivery
+ * evidence package for protocol 4. A change here is an authority change:
  * it must be justified by the work package that caused it, not silently
  * re-baselined.
  */
 const FROZEN_INVENTORY_SHA256 =
-  'sha256:4e6d4f3388da0a21fd06895725f2540926944a38fbeaa68e02dde9c78a96f0c3';
+  'sha256:e7b3dce11c70ddd47b7dbd6cbd96f54b92de24863d373426e01adf8be595e787';
 
 function inventoryDigest(): string {
   return `sha256:${createHash('sha256').update(JSON.stringify(AUTHORITY_INVENTORY), 'utf8').digest('hex')}`;
@@ -752,7 +753,7 @@ describe('C0 delivery-plane authority baseline', () => {
       'project-board': 1,
       'task-offer': 1,
       'fleet-offers': 1,
-      'fleet-board': 3,
+      'fleet-board': 4,
       'task-freeze-receipt': 1,
       'publication-receipt': 1,
       'publication-lineage': 1,
