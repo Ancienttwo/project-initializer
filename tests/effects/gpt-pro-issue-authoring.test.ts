@@ -19,7 +19,7 @@ const hex = (seed: string): string => new Bun.CryptoHasher('sha256').update(seed
 const observedAt = '2026-09-05T00:00:00.000Z';
 const limits: ProgramBudgetLimitV1 = { max_agent_turns: 10, max_successful_acquisitions: 2, max_runner_invocations: 10, max_provider_failures: 2, max_consecutive_no_progress_steps: 2, max_repair_cycles: 2, max_wall_clock_seconds: 3600, max_input_tokens: null, max_output_tokens: null, max_cost_micros: null };
 
-function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5) {
+function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5, validRegistry = true) {
   const root = mkdtempSync(join(tmpdir(), 'gpt-pro-authoring-'));
   const home = mkdtempSync(join(tmpdir(), 'gpt-pro-authoring-home-'));
   const profile = mkdtempSync(join(tmpdir(), 'gpt-pro-profile-'));
@@ -28,9 +28,15 @@ function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5) {
   execFileSync('git', ['config', 'user.email', 'fixture@example.com'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
-  writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({ development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: groupCount, maximum_issues_per_group: 10, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'issue_numbers', issue_numbers: [1] }, limits: { max_pages: 1, max_issues: 10, max_body_bytes: 4096, max_total_bytes: 65536, deadline_ms: 1000 } } } })}\n`);
+  writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({ development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: groupCount, maximum_issues_per_group: 10, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 1, max_issues: 10, max_body_bytes: 4096, max_total_bytes: 65536, deadline_ms: 1000 } } } })}\n`);
   mkdirSync(join(root, '.repo-harness'), { recursive: true });
   writeFileSync(join(root, '.repo-harness', 'chatgpt-browser.local.json'), `${JSON.stringify({ version: 1, product: 'chatgpt', profileDir: profile, profileDirectory: 'Profile 13', selectedProfilePath: join(profile, 'Profile 13'), browserChannel: 'chrome', chatgptUrl: 'https://chatgpt.com/', updatedAt: observedAt })}\n`);
+  mkdirSync(join(root, '.archcontext/model/nodes'), { recursive: true });
+  mkdirSync(join(root, 'src'), { recursive: true });
+  writeFileSync(join(root, 'src/index.ts'), 'export {};\n');
+  writeFileSync(join(root, '.archcontext/model/nodes/capability.yaml'), JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: 'capability.runtime-harness.authoring', kind: 'capability', name: 'Authoring', status: 'active', summary: 'Own authoring', responsibilities: ['Own authoring'], source: { include: ['src/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } }));
+  if (!validRegistry) writeFileSync(join(root, '.archcontext/model/nodes/capability.yaml'), '{}');
+  execFileSync('git', ['add', '.archcontext', 'src'], { cwd: root });
   execFileSync('git', ['add', '.ai'], { cwd: root }); execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: root });
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
   const authorization = sealProgramAuthorization({ authorization_id: 'authorization-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: limits, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: groupCount, issues_per_group: 10, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 13', max_authoring_rounds_per_group: authoringRounds, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: observedAt, expires_at: '2027-09-05T00:00:00.000Z' });
@@ -205,7 +211,9 @@ describe('GPT Pro issue batch authoring effect', () => {
         return result(input, 'session-initial');
       },
     });
-    expect(captured).toMatchObject({ provider: 'oracle', model: 'gpt-5.5-pro', requireSecretScan: true, profileDirectory: 'Profile 13' });
+    expect(captured).toMatchObject({ provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, profileDirectory: 'Profile 13' });
+    expect(captured).not.toHaveProperty('model');
+    expect(captured).not.toHaveProperty('thinking');
     expect(started.intent).toMatchObject({ repository_id: 'repo-1', provider_repository: 'acme/widgets', target_ref: 'refs/heads/main', base_main_sha: f.revision });
     expect(started.intent.slots).toHaveLength(10);
     expect(captured!.prompt).toContain('slot=10');
@@ -218,6 +226,9 @@ describe('GPT Pro issue batch authoring effect', () => {
     const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, { readBinding: readBrowserBinding, now: () => observedAt, consult: async (input) => result(input, 'session-initial', 'completed', true) });
     const calls: Array<{ sessionId: string; prompt: string; secretScan?: boolean }> = [];
     const followup = async (input: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => {
+      expect(input).toMatchObject({ chatgptApp: 'GitHub' });
+      expect(input).not.toHaveProperty('model');
+      expect(input).not.toHaveProperty('thinking');
       calls.push({ sessionId: input.sessionId, prompt: input.prompt, secretScan: input.requireSecretScan });
       return result(input, `session-${calls.length + 1}`, 'completed', true);
     };
@@ -230,6 +241,11 @@ describe('GPT Pro issue batch authoring effect', () => {
     expect(calls[1]!.prompt).toContain('https://github.com/acme/widgets/issues/7');
     expect(calls[1]!.prompt).toContain('database ID is exactly 201');
     expect(calls[1]!.prompt).toContain('Do not create a new Issue');
+    for (const call of calls) {
+      expect(call.prompt).toContain('capability.runtime-harness.authoring');
+      expect(call.prompt).toContain('"type":"integer"');
+      expect(call.prompt).toContain('sorted');
+    }
   });
 
   test('rejects an edit locator that cannot name one exact repository Issue before browser follow-up', async () => {
@@ -259,3 +275,33 @@ describe('GPT Pro issue batch authoring effect', () => {
     expect(browserCalls).toBe(1);
   });
 });
+
+ test('authoring carries consumer metadata types and the exact revision capability catalog', async () => {
+  const f = fixture();
+  // Working bytes are not the authority for a frozen campaign.
+  writeFileSync(join(f.root, '.archcontext/model/nodes/capability.yaml'), '{}');
+  await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, {
+    readBinding: readBrowserBinding, now: () => observedAt,
+    consult: async input => {
+      expect(input.prompt).toContain('"minimum":0');
+      expect(input.prompt).toContain('"maximum":100');
+      expect(input.prompt).toContain('"type":"integer"');
+      expect(input.prompt).toContain('capability.runtime-harness.authoring');
+      expect(input.prompt).toContain('sorted');
+      return result(input, 'contract-proof');
+    },
+  });
+ });
+
+ test('missing frozen capability authority refuses before intent or provider reservation', async () => {
+   const f = fixture(1, 5, false);
+   const before = readdirSync(join(f.root, '.git', 'repo-harness')).sort();
+   let calls = 0;
+   await expect(startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, {
+     readBinding: readBrowserBinding, now: () => observedAt,
+     consult: async input => { calls += 1; return result(input, 'must-not-run'); },
+   })).rejects.toThrow('capability registry is unavailable');
+   expect(calls).toBe(0);
+   expect(existsSync(join(issueBatchGroupStoreRoot(f.root, 'campaign-1', 1), 'intent.json'))).toBe(false);
+   expect(readdirSync(join(f.root, '.git', 'repo-harness')).sort()).toEqual(before);
+ });

@@ -51,3 +51,17 @@ describe('development campaign target-base policy', () => {
     expect(() => requireDevelopmentCampaignStartPolicy(noIntake.root, noIntake.revision)).toThrow('external_sources.mode must be enabled');
   });
 });
+
+ test('rejects incomplete issue-number snapshot policy before campaign start', () => {
+  const f = repo(policy('shadow'));
+  expect(() => requireDevelopmentCampaignStartPolicy(f.root, f.revision)).toThrow('complete');
+ });
+
+ test('accepts complete-page selection from the frozen startup policy', () => {
+   const document = policy('shadow');
+   const complete = JSON.parse(JSON.stringify(document));
+   complete.external_sources.github.selection = { kind: 'labels', labels_all: ['campaign'], assignees_any: [] };
+   const f = repo(complete);
+   writeFileSync(join(f.root, '.ai/harness/policy.json'), JSON.stringify(document));
+   expect(requireDevelopmentCampaignStartPolicy(f.root, f.revision).mode).toBe('shadow');
+ });
