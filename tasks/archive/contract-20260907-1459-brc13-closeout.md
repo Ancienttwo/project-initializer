@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-07 14:59
+> **Related Plan**: plans/archive/plan-20260907-1224-brc13-closeout.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260907-1459
+> **Archive Projection V1**: `plans/plan-20260907-1224-brc13-closeout.md` => `plans/archive/plan-20260907-1224-brc13-closeout.md`
+> **Archive Projection V1**: `tasks/notes/20260907-1224-brc13-closeout.notes.md` => `tasks/archive/notes-20260907-1459-brc13-closeout.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-1224-brc13-closeout.contract.md` => `tasks/archive/contract-20260907-1459-brc13-closeout.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-1224-brc13-closeout.review.md` => `tasks/archive/review-20260907-1459-brc13-closeout.md`
+
 # Task Contract: brc13-closeout
 
-> **Status**: Active
-> **Plan**: plans/plan-20260907-1224-brc13-closeout.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260907-1224-brc13-closeout.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-07 12:26
-> **Review File**: `tasks/reviews/20260907-1224-brc13-closeout.review.md`
-> **Notes File**: `tasks/notes/20260907-1224-brc13-closeout.notes.md`
+> **Review File**: `tasks/archive/review-20260907-1459-brc13-closeout.md`
+> **Notes File**: `tasks/archive/notes-20260907-1459-brc13-closeout.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -37,10 +47,10 @@ A cleanup concurrent with a new bind, a close before all Issue Tasks have actual
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260907-1224-brc13-closeout.md`
+- Source plan: `plans/archive/plan-20260907-1224-brc13-closeout.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260907-1224-brc13-closeout.review.md`
-- Notes file: `tasks/notes/20260907-1224-brc13-closeout.notes.md`
+- Review file: `tasks/archive/review-20260907-1459-brc13-closeout.md`
+- Notes file: `tasks/archive/notes-20260907-1459-brc13-closeout.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -62,12 +72,12 @@ A cleanup concurrent with a new bind, a close before all Issue Tasks have actual
 
 ```yaml
 allowed_paths:
-  - plans/plan-20260907-1224-brc13-closeout.md
+  - plans/archive/plan-20260907-1224-brc13-closeout.md
   - plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md
   - tasks/todos.md
-  - tasks/contracts/20260907-1224-brc13-closeout.contract.md
-  - tasks/reviews/20260907-1224-brc13-closeout.review.md
-  - tasks/notes/20260907-1224-brc13-closeout.notes.md
+  - tasks/archive/contract-20260907-1459-brc13-closeout.md
+  - tasks/archive/review-20260907-1459-brc13-closeout.md
+  - tasks/archive/notes-20260907-1459-brc13-closeout.md
   - docs/researches/20260907-brc13-closeout.md
   - .archcontext/model/nodes/capability.runtime-harness.development-campaign.yaml
   - src/core/automation/budget.ts
@@ -168,7 +178,7 @@ exit_criteria:
     - src/effects/automation/campaign-not-planned.ts
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260907-1224-brc13-closeout.notes.md
+    - tasks/archive/notes-20260907-1459-brc13-closeout.md
 ```
 
 ## Verification Plan

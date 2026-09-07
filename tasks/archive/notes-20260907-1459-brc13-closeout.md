@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-07 14:59
+> **Related Plan**: plans/archive/plan-20260907-1224-brc13-closeout.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260907-1459
+> **Archive Projection V1**: `plans/plan-20260907-1224-brc13-closeout.md` => `plans/archive/plan-20260907-1224-brc13-closeout.md`
+> **Archive Projection V1**: `tasks/notes/20260907-1224-brc13-closeout.notes.md` => `tasks/archive/notes-20260907-1459-brc13-closeout.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-1224-brc13-closeout.contract.md` => `tasks/archive/contract-20260907-1459-brc13-closeout.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-1224-brc13-closeout.review.md` => `tasks/archive/review-20260907-1459-brc13-closeout.md`
+
 # Implementation Notes: brc13-closeout
 
 > **Status**: Active
-> **Plan**: plans/plan-20260907-1224-brc13-closeout.md
-> **Contract**: tasks/contracts/20260907-1224-brc13-closeout.contract.md
-> **Review**: tasks/reviews/20260907-1224-brc13-closeout.review.md
+> **Plan**: plans/archive/plan-20260907-1224-brc13-closeout.md
+> **Contract**: tasks/archive/contract-20260907-1459-brc13-closeout.md
+> **Review**: tasks/archive/review-20260907-1459-brc13-closeout.md
 > **Lifecycle**: notes
 
 ## Design decisions
