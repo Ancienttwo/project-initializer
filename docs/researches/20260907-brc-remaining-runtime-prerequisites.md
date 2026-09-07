@@ -21,3 +21,11 @@ The Sprint requires GPT Pro to create the Issues; local Issue creation is forbid
 BRC6a's admission correction is merged, but its trusted exact-revision producer remains absent. The current content challenge and browser result contain no independently observed revision proof. BRC14 cannot acquire an accepted audit by adding a SHA field, a caller-supplied receipt or a fake success fixture. The approved PRD also keeps BRC15's full model-free matrix dependent on BRC14; a subset of existing unit tests does not complete that matrix.
 
 BRC15a is the independently executable observation once its runtime inputs are supplied and its actual Issue-writing capability is established. Its result must report exact-SHA as unverified, preserve unknown reservations and record the owner's investment decision. No browser session, provider call, Issue mutation or Sprint completion was performed in this investigation.
+
+## Remaining controller implementation
+
+The read-only call-path audit found no fresh-audit producer/consumer. `development-campaign-store.ts` accepts opaque `evidence_refs`; cleanup protects entry to audit/next group/completion but does not establish audit acceptance. The CLI still exposes generic transition, and the core's `accept_group` checks the preceding state rather than a fresh-audit authority. `gpt-pro-issue-authoring.ts` uses the immutable initial target for new intents and continuation, so Group 2/3 cannot yet consume the previous accepted final main.
+
+Once a real revision producer is available, one coherent BRC14 package must connect fresh-session identity, complete slots, budgeted audit invocation, the result authority, controlled transitions and the next-group baseline. Keeping the generic transition as an alternate acceptance path would leave the invariant unenforced. Creating only an always-rejecting audit endpoint would not deliver this package.
+
+The independent source audit also ran 48 focused tests (191 assertions) across admission, Connector challenge, adoption, campaign store and closeout; all passed on the current checkout. Those tests confirm existing boundaries only. Static ten-slot fixtures and two-slot effect fixtures do not prove the full BRC15 canary; no complete BRC15 runner was found. This observation does not replace a frozen final acceptance or mark any remaining row done.
