@@ -44,3 +44,9 @@ Historical test corrections included canonical Lease target spelling (main) and 
 - Trusted revision producer and same-content old-revision readback falsifier.
 - Existing independent classified_at reclaim issue; this package's crash-replay tests reuse the same observed classification timestamp.
 - No real shadow canary, provider calls or release in this package.
+
+## Publication evidence binding
+
+> **Substantive Change SHA256**: `sha256:5ff571336c4331cc5d1e134932acffefeb3b52ac8042885eff892fd0bbcf8d3d`
+
+PR #341 run 34109776761 stopped at task-sync before tests because the archived package lacked the publication diff binding. The same failure reproduced locally against base `8cf2af5b87e712a946449e6604feea3c67dbfe75`. This binding covers that base-to-publication substantive delta; adding it changes only this archived notes artifact. The 25/25 acceptance evidence and product subject remain unchanged. Both PR merge-base and main direct-parent task-sync modes validate the binding.
