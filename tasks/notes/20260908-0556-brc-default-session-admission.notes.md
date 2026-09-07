@@ -10,4 +10,6 @@ The post-repair drift fixture now supplies valid session lineage while retaining
 
 The isolated worktree initially lacked the repository's already-adopted CodeGraph cache. Restoring the accepted canary cache through a read-only SQLite backup and syncing the local copy kept unrelated proven architecture flows intact. Only development-campaign ownership/responsibility changed. First projection materialization added the ignored generated architecture file and required a post-apply reconciliation; no gate or provider implementation was altered.
 
+The policy verification boundary is origin/main, so the allowed-path inventory includes the unchanged, previously accepted BRC14 CLI entrypoint `src/cli/commands/campaign.ts`. This package makes no additional change to that file; its existing acceptance remains baseline evidence, while this contract verifies the session-admission delta.
+
 > **Substantive Change SHA256**: `sha256:93f472abee467294531c976378e5dc3f6d1a9074c1e91f19d2bf26a71153d769`

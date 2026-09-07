@@ -74,6 +74,7 @@ allowed_paths:
   - src/core/automation/
   - src/effects/automation/
   - src/cli/chatgpt-browser/
+  - src/cli/commands/campaign.ts
   - tests/
   - docs/
   - .archcontext/
