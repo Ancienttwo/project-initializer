@@ -34,3 +34,11 @@
 - 复用 development-campaign、connector-challenge、issue-batch-adoption fixtures，增加实际 receipt → next-intent consumer 测试。
 
 本次只读追踪没有找到可消费的 trusted exact-revision producer。BRC14 的可执行边界须在该事实改变后重新核对；BRC15a 明确标为 exact-SHA 未验证的 shadow observation 不因此自动获得 active 权限。
+
+## BRC6a local counterexample and executable boundary
+
+On the integrated Operator/BRC13 source (`10bce5e5`), a disposable local Git repository reproduced the same-content, different-revision counterexample. Commit `ab651256f48d6f52be8a26dfe78074abc1e5f6f9` and an empty successor `408298d77a3e2b0345a002ece63b8e58bade12f5` have the same tree. The three answers were read from the old commit; the response echoed the successor SHA. `verifyConnectorChallenge` returned `challenge_verified` (receipt `sha256:1b3fbaf3f12a378071c9fcb449dfb4b68cc21097834dad79b97dce009854072e`). No browser/provider call or real campaign mutation occurred.
+
+Reproduction recipe: create a tracked directory containing one unchanged text file, commit it, make an empty successor commit, build the successor challenge for the directory entries / exact text line / file SHA-256, and pass the old commit answers with the successor SHA to `verifyConnectorChallenge`. The verifier compares the echoed SHA and three answer strings, but has no independently observed revision field. This is a verifier-level counterexample, not a new end-to-end active campaign run.
+
+The active consumer is `src/effects/automation/issue-batch-adoption.ts#adoptIssueBatch`: after challenge verification it can build and publish the adoption. `src/core/automation/issue-batch-adoption.ts` fixes receipt evidence to `challenge_verified`, and `tests/effects/issue-batch-adoption.test.ts` currently expects successful active publication with that input. The bounded correction is to freeze this counterexample and reject active adoption before materialization when trusted revision evidence is unavailable. Preserve explicitly unverified shadow observation. Do not add an unproducible receipt schema or treat an always-rejecting gate as delivery of the missing producer. BRC6a's exact-revision criterion and BRC14 remain pending until a real transport authority supplies verifiable revision readback.
