@@ -1,6 +1,6 @@
 # BRC15a real GPT shadow canary
 
-Status: approved replacement run completed real GPT authoring and independent readback; both campaigns are stopped with zero open reservations. Ten Issues exist, but zero pass metadata validation and adoption is refused. BRC15a is complete as a negative observation. The Owner subsequently approved continued investment; active acceptance remains gated independently.
+Status: approved replacement run completed real GPT authoring and independent readback; both campaigns are stopped with zero open reservations. Ten Issues cover the expected markers, but zero pass metadata validation and adoption is refused. No qualified adoptable batch was obtained; repair value is unassessed. BRC15a is complete as a negative observation. The Owner subsequently approved continued investment; active acceptance remains gated independently.
 
 The private target is Ancienttwo/repo-harness-brc15a-canary-20260907, seeded from tracked repo-harness 33c5012e1185a695fdaf54a7bb84fc613cfb653b with fresh history and no GitHub workflow automation. Production working-tree changes were excluded. Target initialization commit: 33d692aaa0ab593df0c160082b18fdac02c82e9c. Remote private/main readback passed, initial Issue inventory was empty, and target working tree was clean before mint.
 
@@ -98,7 +98,7 @@ The campaign was canonically stopped against its exact current digest after the 
 
 ### Original investment recommendation (before the Owner decision)
 
-Do not advance to active repair on these results. The smallest justified next slice is authoring/adoption contract alignment: give the author the real metadata schema and capability IDs, repair model-verification projection without weakening its authority, and use a complete-snapshot canary selection in the next explicitly frozen setup. First validate those boundaries locally against these real failures. The write channel is proven usable; adoption utility is currently 0/10 and conversation ownership needed one manual recovery. No automatic next grant is authorized by this report.
+Do not advance to active repair on these results. The smallest justified next slice is authoring/adoption contract alignment: give the author the real metadata schema and capability IDs, repair model-verification projection without weakening its authority, and use a complete-snapshot canary selection in the next explicitly frozen setup. First validate those boundaries locally against these real failures. The write channel is proven usable; metadata-qualified candidates are currently 0/10; semantic repair utility is unassessed and conversation ownership needed one manual recovery. No automatic next grant is authorized by this report.
 
 Local evidence digest: `brc15a-github-issues.json` SHA256 `d08da4b4960fef72dc738e7629de4719fb7a26a4fee554a319e4096952a10bb8`.
 
@@ -112,7 +112,7 @@ Local evidence digest: `brc15a-pro-slider-budget-final.json` SHA256 `f9cab8ba256
 
 The Owner repeatedly approved continued implementation and directed completion of the remaining BRC work. This resolves the investment decision in favor of continued investment. It does not mint another provider grant or change any runtime admission requirement. Earlier pending statements describe the historical checkpoints above, not the current BRC15a status.
 
-BRC15a closes with the negative result preserved: ten unique declared slots, zero missing or duplicate slots, and zero valid metadata records. Missing-slot follow-up is **0 / not applicable**: there were no missing slots, and the replacement grant authorized only the remaining one authoring round. Follow-up obedience and repair usefulness were not measured.
+BRC15a closes with the negative result preserved: 10/10 expected marker coverage, zero missing or duplicate markers, and 0/10 valid metadata records. These are not completed slots or a complete batch. Missing-slot follow-up is **0 / not applicable**: there were no missing slots, and the replacement grant authorized only the remaining one authoring round. Follow-up obedience and repair usefulness were not measured.
 
 The three observed boundaries remain distinct:
 
@@ -125,3 +125,7 @@ On closeout, all four evidence digests recorded above were rechecked against the
 BRC15 consumes this observation as Canary 2, including its failures. The accepted alignment and default-model packages address the observed setup/authoring boundaries, but their local checks are not a replacement real canary. BRC14 still owns fresh audit and trusted exact-version evidence consumption; BRC15 still requires active/manual Canary 3. BRC6a remains Owner-closed and receives no additional probe.
 
 Closeout verification: deploy SQL order, architecture sync, task sync, strict task workflow, project-state inspection, and init dry-run all passed. The first architecture check reported a missing provider in the fresh worktree; installing the frozen lockfile dependencies from the local cache resolved that environment prerequisite without changing tracked files. This documentation-only closeout does not rerun model or runtime acceptance.
+
+## Owner clarification and offline replay — 2026-09-08
+
+The Owner narrowed subsequent work to metadata diagnosis and existing safety prerequisites, explicitly separating negative observation completion from batch completion, campaign acceptance and active authorization. The per-Issue replay and Acceptance mapping are in `docs/researches/20260908-brc15a-offline-metadata-replay.md`; they supersede shorthand such as “slots complete” or an inference that zero valid metadata means zero repair value. The mapping must be evaluated on original admission/settlement evidence, never retroactively on the alignment implementation. BRC6a stays Owner-closed with no further probe.

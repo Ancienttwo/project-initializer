@@ -204,6 +204,10 @@ Owner 明确指示：“BRC6a可以关了，已证实可用”。据此以实际
 
 这是 Owner 对任务完成边界的明确决定，不把模型文字变成 provider-origin resolved-commit receipt。BRC14 继续负责 fresh audit、版本准入消费及组间推进；本次关闭不表示真实 active/manual canary 已通过，也不修改运行时检查。
 
+## BRC15a negative observation closeout — 2026-09-08
+
+逐项 Acceptance 映射与原始 prompt、十个 Issue body、parser blob、budget admission/settlement 见 `docs/researches/20260908-brc15a-offline-metadata-replay.md`。结果为 **10/10 marker 覆盖，0/10 metadata 合格，无合格可采纳批次，修复价值未评估**。canonical observer 是配置失败，adoption 是 session 上游拒绝；补缺与下游 active 链路未覆盖，不记为通过。Owner 后续投入已收窄到 metadata 定因及既有安全前置条件。任务收口不修改 stopped campaign、不授予 active、不复用旧预算；BRC6a 保持 Owner-closed。
+
 ## Execution Log
 
 Keep this section last; `repo-harness run sprint-backlog complete-task` appends rows here.
