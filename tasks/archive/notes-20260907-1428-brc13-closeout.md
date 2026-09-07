@@ -107,3 +107,9 @@ Root Cause Evidence: trigger = canonical finish with local main behind origin/ma
 The helper now fetches the exact source review OID into its private scratch clone and binds the resolved ref before the existing exact source/scratch check. It does not move source refs, change acceptance policy or relax the guard. This is the only directly blocking out-of-scope fix admitted; a second unrelated fault requires handoff. The corrected repo-local canonical CLI must execute finish so it consumes this helper; the installed helper still has the reproduced omission.
 
 > **Substantive Change SHA256**: `sha256:3d52c8d4783733c9f54aacb215284e188b41644c23f304ed5c621e9bcfa48b19`
+
+## Publication diff binding
+
+PR #339 compares the complete publication diff against 7430fb9315175bc20762df94da25baa9885bc779. CI 34091097161 passed all three MCP platforms and refused Test before execution because only incremental development digests were recorded. The exact publication binding below closes that evidence gap; product source is unchanged.
+
+> **Substantive Change SHA256**: `sha256:ab7d87ed045a3b91eeb60493a88deb7e89cbcceb6ff11d2c083d3e71055c9f73`
