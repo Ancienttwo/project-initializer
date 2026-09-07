@@ -124,3 +124,12 @@ Prompt 经 Gitleaks 扫描通过，只给同一 canary、固定 commit 和 READM
 回答称 `GitHub.fetch_file` 返回 content、encoding、sha、display_url、display_title，且没有单独 resolved-commit 字段。该字段清单和 fetch_file 细节目前仍来自回答；当前展开的 UI 未给出完整 GitHub 原始 response，不能升级为 provider-origin receipt。blob 一致及 URL 中带 requested SHA 也不独立解决 same-tree/different-commit 反例。因此 **Connector 内容读回通过；BRC6a exact-revision admission 仍 pending**。下一步在已工作的 app 激活入口上保留实际 request/result 证据，先确认是否足够满足现有合同，不先建设 raw-object verifier 或更换传输。
 
 本次 ignored evidence 位于 `.ai/harness/evidence/brc6a-github-activated/`，包含扫描过的 prompt、提交前 activation、最终结果、可见工具请求和本地 validation。没有改生产源码、放宽 admission 或提交 GitHub 写请求。
+
+
+## 2026-09-08：本会话原生 GitHub Connector 原始返回补证
+
+父会话的 callable GitHub Connector 已可用。一次直接、只读的 `github_fetch_file` 请求读取 `Ancienttwo/repo-harness` 的 `README.md`，显式 `ref=33c5012e1185a695fdaf54a7bb84fc613cfb653b`、`start_line=1`、`end_line=8`。这不是 canary 仓库，也不是上述 ChatGPT conversation 的工具调用，没有新增 GPT 请求或 GitHub 写入。
+
+这次直接观察的 structuredContent 字段为 `content`、`encoding`、`sha`、`display_url`、`display_title`；`encoding=utf-8`，`sha=4779ce156e273311fa013c0bd7f71b9c9048129d`，`display_url=https://github.com/Ancienttwo/repo-harness/blob/33c5012e1185a695fdaf54a7bb84fc613cfb653b/README.md`，`display_title=README.md`，`isError=false`。没有单独 `resolved_commit` 字段。这是该直接请求实际收到的字段，不再依赖模型对 schema 的自述；不能据此推断所有 GitHub 工具的字段全集。
+
+直接 Connector 调用的已知 request ref 与 provider 返回现在可以一起观察，但它属于本会话这一独立调用。它没有补出 `6a9f0045-c728-83ea-a489-27796265282a` 的原始 response，也没有证明 Oracle authoring/fresh-audit 实际消费了同一调用。保持 BRC6a pending；后续接线应取得目标 Oracle 会话自身的 request/result provenance，再判定其固定 ref 合同是否满足 exact-version 要求，不把缺少某个字段名本身当作永久不可能的证明。
