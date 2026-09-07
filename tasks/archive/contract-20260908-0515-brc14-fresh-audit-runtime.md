@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 05:15
+> **Related Plan**: plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-0515
+> **Archive Projection V1**: `plans/plan-20260908-0418-brc14-fresh-audit-runtime.md` => `plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md` => `tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0418-brc14-fresh-audit-runtime.contract.md` => `tasks/archive/contract-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0418-brc14-fresh-audit-runtime.review.md` => `tasks/archive/review-20260908-0515-brc14-fresh-audit-runtime.md`
+
 # Task Contract: brc14-fresh-audit-runtime
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-0418-brc14-fresh-audit-runtime.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 04:18
-> **Review File**: `tasks/reviews/20260908-0418-brc14-fresh-audit-runtime.review.md`
-> **Notes File**: `tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md`
+> **Review File**: `tasks/archive/review-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Notes File**: `tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -45,10 +55,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-0418-brc14-fresh-audit-runtime.md`
+- Source plan: `plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-0418-brc14-fresh-audit-runtime.review.md`
-- Notes file: `tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md`
+- Review file: `tasks/archive/review-20260908-0515-brc14-fresh-audit-runtime.md`
+- Notes file: `tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -133,7 +143,7 @@ exit_criteria:
     - docs/researches/20260908-brc14-fresh-audit-runtime.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md
+    - tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md
 ```
 
 ## Verification Plan

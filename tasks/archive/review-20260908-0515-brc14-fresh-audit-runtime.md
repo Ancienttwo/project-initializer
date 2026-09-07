@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 05:15
+> **Related Plan**: plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-0515
+> **Archive Projection V1**: `plans/plan-20260908-0418-brc14-fresh-audit-runtime.md` => `plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md` => `tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0418-brc14-fresh-audit-runtime.contract.md` => `tasks/archive/contract-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0418-brc14-fresh-audit-runtime.review.md` => `tasks/archive/review-20260908-0515-brc14-fresh-audit-runtime.md`
+
 # Task Review: brc14-fresh-audit-runtime
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-0418-brc14-fresh-audit-runtime.md
-> **Contract**: tasks/contracts/20260908-0418-brc14-fresh-audit-runtime.contract.md
-> **Notes File**: tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md
+> **Plan**: plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md
+> **Contract**: tasks/archive/contract-20260908-0515-brc14-fresh-audit-runtime.md
+> **Notes File**: tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 04:18
 > **Recommendation**: pass

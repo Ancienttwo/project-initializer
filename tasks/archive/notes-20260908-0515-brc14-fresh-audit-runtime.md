@@ -1,8 +1,18 @@
+> **Archived**: 2026-09-08 05:15
+> **Related Plan**: plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-0515
+> **Archive Projection V1**: `plans/plan-20260908-0418-brc14-fresh-audit-runtime.md` => `plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0418-brc14-fresh-audit-runtime.notes.md` => `tasks/archive/notes-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0418-brc14-fresh-audit-runtime.contract.md` => `tasks/archive/contract-20260908-0515-brc14-fresh-audit-runtime.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0418-brc14-fresh-audit-runtime.review.md` => `tasks/archive/review-20260908-0515-brc14-fresh-audit-runtime.md`
+
 # Implementation Notes: brc14-fresh-audit-runtime
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-0418-brc14-fresh-audit-runtime.md
-> **Contract**: tasks/contracts/20260908-0418-brc14-fresh-audit-runtime.contract.md
+> **Plan**: plans/archive/plan-20260908-0418-brc14-fresh-audit-runtime.md
+> **Contract**: tasks/archive/contract-20260908-0515-brc14-fresh-audit-runtime.md
 > **Lifecycle**: notes
 > **Substantive Change SHA256**: `sha256:d3f3ee5a167b4f638824f4cc2dafbde747517d653bd09bf32d160aa3eeb347e2`
 
