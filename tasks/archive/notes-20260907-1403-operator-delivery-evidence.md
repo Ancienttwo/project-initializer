@@ -61,3 +61,11 @@ criterion as the deterministic oracle for the new Fleet projection types. No new
 test command or code was added. Product/type checks from the all-pass second
 contract execution also retain their recorded baselines with the same exact
 content delta; workflow checks remain current.
+
+## Publication integration with BRC13
+
+> **Substantive Change SHA256**: `sha256:afb7d66731f94257b23ee69ebf947b4eb1694a3014b241d8cc9ca9ed4dc71cf5`
+
+The publication delta is bound to remote main `2cbd3b2ba9e12daea0c55ff01f6a6f9d8b0a7c22`. Integration preserves Operator commit `426f24c8` and ledger reconciliation `fa9e61cd` as ancestors, together with BRC13. The only merge conflict was the generated architecture manifest; the configured provider refreshed it against the combined source and a current deterministic reconciliation returned noop with no human actions. No production source was edited during integration.
+
+The original external-pass receipt remains bound to its original subject and target `7430fb93`; this appendix does not extend or replace it. On the combined tree, the ten Fleet/Operator test files (unit fleet-board, operator-fleet-snapshot, operator-web-types, r1-provider-neutral-agent-runtime; effects fleet-board; CLI fleet-board, fleet-feedback, operator-serve; Operator interactions and UI) passed 260 tests with 1326 assertions. Typecheck passed. BRC13 main CI `34095153642` is retained as its own baseline, not relabelled as a combined-tree pass. Required repository integrity checks are rerun for publication; required CI remains the publication gate. No second external review, local full suite, or package release is introduced by this integration.
