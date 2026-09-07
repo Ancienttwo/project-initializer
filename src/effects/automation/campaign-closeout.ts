@@ -6,14 +6,14 @@ import { allCampaignIssueTasksMerged, campaignIssueMembers, campaignCloseoutKey,
 import type { WorkEnvelopeV1 } from '../fleet/acquire';
 import { readLease } from '../state/coordination-lease-store';
 import { cleanupExactWorktree, type ExactWorktreeCleanup } from '../state/coordination-worktree-topology';
-import { reconcilePublication, type ReconcilePublicationResult } from '../publication/publication-lifecycle';
+import { resumePublicationIntegrationRelease, reconcilePublication, type ReconcilePublicationResult } from '../publication/publication-lifecycle';
 import type { GithubCommandRunner } from '../external-sources/github';
 import { readCompletedCampaignWorker } from './campaign-worker';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { readPlanningRecord, persistPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
 import { ensureCampaignAuthoringBudget, beginCampaignBudgetStep, completeCampaignBudgetStep, readAutomationBudgetStatus } from './budget-store';
 import { createCampaignProviderExecutor } from './campaign-provider-execution';
-import { campaignCloseoutReadOptions, createCampaignCloseoutFetch, createCampaignCloseoutIntegrationObserver, runCampaignCloseoutProviderAttempt, type StoredCloseoutProviderRequests } from './campaign-closeout-provider';
+import { campaignCloseoutRemoteDestination, campaignCloseoutReadOptions, createCampaignCloseoutFetch, createCampaignCloseoutIntegrationObserver, runCampaignCloseoutProviderAttempt, type StoredCloseoutProviderRequests } from './campaign-closeout-provider';
 
 interface CloseoutIntent extends StoredCloseoutProviderRequests {
   readonly task_id: string;
@@ -42,6 +42,7 @@ export interface CampaignCleanupReceiptV1 {
 export function runCampaignCloseout(input: {
   readonly selector: unknown; readonly host: 'codex' | 'claude'; readonly session_id: string;
   readonly remote: string; readonly env?: NodeJS.ProcessEnv; readonly github_runner?: GithubCommandRunner;
+  readonly crash_hook?: (phase: 'after_merge_persisted') => void;
   readonly cleanup: (root: string, expected: ExactWorktreeCleanup) => unknown;
 }) {
   const { root, intent, envelope: work, writable_inactive: writableInactive } = readCompletedCampaignWorker(input.selector, input.env);
@@ -67,7 +68,7 @@ export function runCampaignCloseout(input: {
     if (!lease || lease.state !== 'reviewing' || !lease.current_publication
       || lease.claim_id !== work.claim_id || lease.generation !== work.generation || lease.task_revision !== work.task_revision
       || lease.execution_worktree !== work.worktree_path || lease.branch !== work.branch || lease.unit_ref !== work.unit_ref) throw new Error('closeout requires the exact reviewing publication');
-    const remoteHash = automationDigest(git(['remote', 'get-url', input.remote]));
+    const remoteHash = automationDigest(campaignCloseoutRemoteDestination(root, input.remote));
     const request: CampaignCloseoutProviderRequest = { protocol: 1, operation: 'git_ref_delete_attempt', remote: input.remote,
       ref: `refs/heads/${work.branch}`, expected_oid: lease.current_publication.head_sha, remote_url_sha256: remoteHash };
     const created: CloseoutIntent = { kind: 'repo-harness-campaign-closeout-intent', task_id: work.task_id, task_revision: work.task_revision,
@@ -100,10 +101,15 @@ export function runCampaignCloseout(input: {
         requireCampaignPlanningAuthority(root, intent, input.env);
         if (proof.integration_state !== 'merged' || !proof.merge_commit_sha) throw new Error('campaign closure requires an actual merged PR');
         persistPlanningRecord(root, intent, key('merge'), proof);
+        input.crash_hook?.('after_merge_persisted');
       },
     }));
   }
-  if (readLease(root, work.task_id).classification !== 'available') throw new Error('closeout publication Lease release requires reconciliation');
+  withCampaignPlanningLock(root, intent, () => resumePublicationIntegrationRelease({ repo_root: root, task_id: work.task_id,
+    expected_claim_id: work.claim_id, expected_generation: work.generation, publication_id: stored.publication_id,
+    expected_head_sha: stored.head_sha, evidence: integration!.evidence,
+    authorization_fence: () => { requireCampaignPlanningAuthority(root, intent, input.env); },
+  }));
   completeStep(mergeStep, integration);
   const { slots: memberSlots, members } = campaignIssueMembers({ slots: authority.manifest.slots, issues: authority.manifest.receipt.issues }, issue.provider_issue_id);
   const proofs = members.map(member => read<ReconcilePublicationResult>(campaignCloseoutKey(member.task_id, 'merge')));

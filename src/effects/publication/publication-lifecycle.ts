@@ -884,6 +884,35 @@ export function readPublicationIntegrationObservations(
   return Object.freeze(observations.sort((left, right) => left.observation_id.localeCompare(right.observation_id)));
 }
 
+/** Resume only a release whose exact immutable observation was already persisted here. */
+export function resumePublicationIntegrationRelease(input: {
+  readonly repo_root: string; readonly task_id: string; readonly expected_claim_id: string;
+  readonly expected_generation: number; readonly publication_id: string; readonly expected_head_sha: string;
+  readonly evidence: PublicationIntegrationObservationV1; readonly authorization_fence: () => void;
+}): void {
+  withTaskLock(input.repo_root, input.task_id, () => {
+    const evidence = validatePublicationIntegrationObservation(input.evidence);
+    const bytes = `${canonicalPublicationIntegrationObservationBytes(evidence)}\n`;
+    if (readFileSync(integrationObservationPath(input.repo_root, evidence), 'utf8') !== bytes
+      || evidence.task_id !== input.task_id || evidence.claim_id !== input.expected_claim_id
+      || evidence.generation !== input.expected_generation || evidence.publication_id !== input.publication_id
+      || evidence.head_sha !== input.expected_head_sha) throw failure('publication_pointer_mismatch', 'release proof differs from persisted integration');
+    const lease = readLease(input.repo_root, input.task_id);
+    if (lease.classification === 'available') return;
+    const record = currentReviewingRecord(input.repo_root, input.task_id);
+    const pointer = record.current_publication;
+    assertLeaseMatchesReceipt(record, receiptForPointer(input.repo_root, pointer), pointer);
+    if (record.claim_id !== evidence.claim_id || record.generation !== evidence.generation
+      || record.task_revision !== evidence.task_revision || pointer.publication_id !== evidence.publication_id
+      || pointer.receipt_sha256 !== evidence.receipt_sha256 || pointer.head_sha !== evidence.head_sha) {
+      throw failure('publication_claim_mismatch', 'remaining reviewing Lease differs from persisted integration');
+    }
+    assertCanonicalCompletedAt(input.repo_root, record, evidence.fetched_target_oid);
+    input.authorization_fence();
+    removeLease(input.repo_root, input.task_id, input.expected_claim_id);
+  });
+}
+
 /** Provider-OID-fenced closeout for one exact reviewing publication. */
 export function reconcilePublication(input: ReconcilePublicationInput): ReconcilePublicationResult {
   try {

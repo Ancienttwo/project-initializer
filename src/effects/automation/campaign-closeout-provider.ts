@@ -10,6 +10,15 @@ import { readPlanningRecord, persistPlanningRecord, withCampaignPlanningLock } f
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { readAutomationBudgetStatus, reserveCampaignProviderBudget, recordCampaignProviderOutcome, reconcileAutomationReservation, type BeginCampaignBudgetStepInput } from './budget-store';
 
+/** One effective destination is required for both destructive push and readback. */
+export function campaignCloseoutRemoteDestination(root: string, remote: string): string {
+  const urls = (push: boolean) => execFileSync('git', ['remote', 'get-url', ...(push ? ['--push'] : []), '--all', remote],
+    { cwd: root, encoding: 'utf8' }).trim().split('\n');
+  const fetch = urls(false); const push = urls(true);
+  if (fetch.length !== 1 || push.length !== 1 || !fetch[0] || fetch[0] !== push[0]) throw new Error('closeout requires one identical fetch and push destination');
+  return fetch[0];
+}
+
 interface PhaseResult { readonly returned: boolean; readonly stdout: string; readonly detail: string | null }
 export interface StoredCloseoutProviderRequests {
   readonly kind: 'repo-harness-campaign-closeout-intent';
@@ -69,8 +78,10 @@ export function runCampaignCloseoutProviderAttempt(input: {
     const github = (args: string[], timeout: number): PhaseResult => ({ returned: true,
       stdout: (input.github_runner ?? runGithubCommand)(args, { timeout_ms: timeout, max_buffer: 2 * 1024 * 1024 }).stdout, detail: null });
     const git = (args: string[], timeout: number): PhaseResult => {
-      if (request.operation !== 'git_ref_delete_attempt' || automationDigest(execFileSync('git', ['remote', 'get-url', request.remote], { cwd: input.root, encoding: 'utf8' }).trim()) !== request.remote_url_sha256) throw new Error('closeout remote configuration changed');
-      const result = spawnSync('git', args, { cwd: input.root, encoding: 'utf8', timeout, maxBuffer: 2 * 1024 * 1024 });
+      if (request.operation !== 'git_ref_delete_attempt') throw new Error('closeout Git request is invalid');
+      const destination = campaignCloseoutRemoteDestination(input.root, request.remote);
+      if (automationDigest(destination) !== request.remote_url_sha256) throw new Error('closeout remote configuration changed');
+      const result = spawnSync('git', args.map(value => value === request.remote ? destination : value), { cwd: input.root, encoding: 'utf8', timeout, maxBuffer: 2 * 1024 * 1024 });
       return { returned: result.status === 0 && !result.error, stdout: result.stdout ?? '', detail: result.error?.message ?? (result.status === 0 ? null : result.stderr) };
     };
     const mutation = phase('mutation', timeout => request.operation === 'git_ref_delete_attempt'
@@ -78,16 +89,25 @@ export function runCampaignCloseoutProviderAttempt(input: {
       : request.operation === 'github_comment_attempt'
         ? github(['api', '--method', 'POST', `repos/${request.repository}/issues/${request.issue_number}/comments`, '-f', `body=${request.body}`], timeout)
         : github(['api', '--method', 'PATCH', `repos/${request.repository}/issues/${request.issue_number}`, '-f', 'state=closed', '-f', `state_reason=${request.disposition}`], timeout));
+    let commentId: number | null = null;
+    if (request.operation === 'github_comment_attempt' && mutation.returned) {
+      const created = JSON.parse(mutation.stdout);
+      if (!Number.isSafeInteger(created?.id) || created.id < 1) throw new Error('closeout comment response has no exact id');
+      commentId = created.id;
+    }
     const readback = phase('readback', timeout => request.operation === 'git_ref_delete_attempt'
       ? git(['ls-remote', '--refs', request.remote, request.ref], timeout)
-      : github(['api', '--method', 'GET', `repos/${request.repository}/issues/${request.issue_number}${request.operation === 'github_comment_attempt' ? '/comments?per_page=100' : ''}`], timeout));
+      : github(['api', '--method', 'GET', request.operation === 'github_comment_attempt' && commentId !== null
+        ? `repos/${request.repository}/issues/comments/${commentId}`
+        : `repos/${request.repository}/issues/${request.issue_number}${request.operation === 'github_comment_attempt' ? '/comments?per_page=100' : ''}`], timeout));
     if (!readback.returned) throw new Error('closeout readback is unknown; reservation remains unresolved');
     let confirmed: boolean;
     if (request.operation === 'git_ref_delete_attempt') confirmed = readback.stdout.trim() === '';
     else {
       const value = JSON.parse(readback.stdout);
       confirmed = request.operation === 'github_comment_attempt'
-        ? Array.isArray(value) && value.filter(item => item && typeof item.id === 'number' && item.body === request.body).length === 1
+        ? (commentId !== null ? value?.id === commentId && value.body === request.body
+          : Array.isArray(value) && value.filter(item => item && typeof item.id === 'number' && item.body === request.body).length === 1)
         : value && value.number === request.issue_number && value.state === 'closed' && value.state_reason === request.disposition;
     }
     if (!confirmed) throw new Error('closeout readback does not confirm its exact mutation; no resend');

@@ -1,6 +1,6 @@
 # BRC13 Issue closure and exact cleanup
 
-Status: implementation in progress; not accepted or merged.
+Implementation reference. Delivery and exact acceptance evidence are recorded in the associated contract review and notes.
 
 The implementation uses the existing campaign planning journal, one automation budget store, publication reconciliation and contract-worktree cleanup. The transaction starts from a durable completed worker antecedent and the current reviewing Lease. It joins canonical adoption slots to immutable Issue ids; every mapped Task must supply actual merged-PR evidence before the Issue closes.
 
@@ -17,6 +17,8 @@ The implementation uses the existing campaign planning journal, one automation b
 
 A receipt describing Provider completion does not establish that detached commands stopped writing. BRC10's unknown inactivity remains unknown during BRC13 cleanup; this transaction does not invent containment. Dirty work and moved refs also remain pending.
 
-The current readback window for an Issue comment is 100 comments. An unconfirmed bounded observation keeps the reservation unresolved and never licenses a duplicate comment. Real campaign activation and BRC6a trusted revision readback are separate gates.
+A known created comment is read back by its exact Provider id. When the POST response is unknown, the reserved readback window remains 100 comments. An unconfirmed bounded observation keeps the reservation unresolved and never licenses a duplicate comment. Real campaign activation and BRC6a trusted revision readback are separate gates.
 
 Verification and remaining implementation details are owned by `tasks/contracts/20260907-1224-brc13-closeout.contract.md` and its notes. No production campaign, Issue mutation or user worktree cleanup was executed while developing this package; external effects in the tests use disposable Git repositories and Provider fixtures.
+
+Deletion requires a single identical effective fetch and push URL, bound by digest and used directly for both destructive push and readback. Different or multiple destinations refuse. A crash after merge proof persistence resumes only the exact remaining reviewing Lease through publication authority; a changed claim, generation or publication refuses.

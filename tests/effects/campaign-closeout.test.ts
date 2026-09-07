@@ -61,7 +61,7 @@ test('receipt-before-settlement crash replays the original two-call charge', asy
   const f = await fixture(); const before = f.ledger().provider_calls; let calls = 0;
   const github_runner = (args: readonly string[]) => {
     calls++;
-    return { stdout: JSON.stringify(args[2] === 'POST' ? { id: 123 } : [{ id: 123, body: 'Exact fixture closure marker' }]) };
+    return { stdout: JSON.stringify(args[2] === 'POST' ? { id: 123 } : { id: 123, body: 'Exact fixture closure marker' }) };
   };
   expect(() => runCampaignCloseoutProviderAttempt({ ...f.provider, github_runner, crash_hook: phase => {
     if (phase === 'after_receipt') throw new Error('receipt crash');
@@ -145,7 +145,8 @@ for (const event of [{type:'thread.started',thread_id:'fixture-'+role}, ...(${de
 }
 
 
-test.each([false, true])('worker publication closeout preserves source drift=%s', async (sourceDrift) => {
+test.each(['normal', 'source-drift', 'release-crash'])('worker publication closeout mode=%s', async (mode) => {
+  const sourceDrift = mode === 'source-drift';
   const f = await acquired(); const env = installProviderFixture(f); const worktree = f.envelope.worktree_path;
   const git = (root: string, ...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const controller = bindCampaignWorker({ selector: f.input.selector, worktree, contract: f.envelope.plan.contract_path,
@@ -192,7 +193,7 @@ test.each([false, true])('worker publication closeout preserves source drift=%s'
     } } } }) };
     if (args[2] === 'POST') { comment = args.find(arg => arg.startsWith('body='))!.slice(5); return { stdout: '{"id":1}' }; }
     if (args[2] === 'PATCH') { closed = true; return { stdout: '{}' }; }
-    if (args[3]!.includes('/comments')) return { stdout: JSON.stringify([{ id: 1, body: comment }]) };
+    if (args[3]!.includes('/comments')) return { stdout: JSON.stringify(args[3]!.includes('/issues/comments/') ? { id: 1, body: comment } : [{ id: 1, body: comment }]) };
     return { stdout: JSON.stringify({ id: adopted.provider_issue_id, number: adopted.issue_number, title: sourceDrift ? 'Changed source title' : observation.title, body: observation.body, state: closed ? 'closed' : 'open', state_reason: closed ? 'completed' : null }) };
   };
   const input = { ...f.input, remote: 'origin', env, github_runner, cleanup: (root: string, expected: import('../../src/effects/state/coordination-worktree-topology').ExactWorktreeCleanup) => {
@@ -205,6 +206,15 @@ test.each([false, true])('worker publication closeout preserves source drift=%s'
     expect(closed).toBe(false); expect(existsSync(worktree)).toBe(true);
     expect(calls.some(call => call.includes('--method POST') || call.includes('--method PATCH'))).toBe(false);
     return;
+  }
+  if (mode === 'release-crash') {
+    expect(() => runCampaignCloseout({ ...input, crash_hook: () => { throw new Error('merge proof crash'); } } as Parameters<typeof runCampaignCloseout>[0])).toThrow();
+    const remaining = readLease(f.root, f.envelope.task_id).record!;
+    expect(remaining.state).toBe('reviewing');
+    writeLeaseOwnerDurably(f.root, f.envelope.task_id, { ...remaining, generation: remaining.generation + 1 });
+    expect(() => runCampaignCloseout(input)).toThrow('remaining reviewing Lease differs');
+    expect(readLease(f.root, f.envelope.task_id).record?.generation).toBe(remaining.generation + 1);
+    writeLeaseOwnerDurably(f.root, f.envelope.task_id, remaining);
   }
   expect(runCampaignCloseout(input).disposition).toBe('complete');
   expect(closed).toBe(true); expect(existsSync(worktree)).toBe(false);
@@ -301,7 +311,7 @@ test('not_planned requires reviewed typed falsifier and all non-executing planni
     calls++;
     if (args[2] === 'POST') { comment = args.find(value => value.startsWith('body='))!.slice(5); return { stdout: '{"id":1}' }; }
     if (args[2] === 'PATCH') { expect(args).toContain('state_reason=not_planned'); closed = true; return { stdout: '{}' }; }
-    if (args[3]!.includes('/comments')) return { stdout: JSON.stringify([{ id: 1, body: comment }]) };
+    if (args[3]!.includes('/comments')) return { stdout: JSON.stringify(args[3]!.includes('/issues/comments/') ? { id: 1, body: comment } : [{ id: 1, body: comment }]) };
     return { stdout: JSON.stringify({ id: issue.provider_issue_id, number: issue.issue_number, title: observed.title, body: observed.body,
       state: closed ? 'closed' : 'open', state_reason: closed ? 'not_planned' : null }) };
   };
@@ -315,4 +325,33 @@ test('not_planned requires reviewed typed falsifier and all non-executing planni
   const count = calls; expect(runCampaignNotPlanned(input).disposition).toBe('complete'); expect(calls).toBe(count);
   expect(comment).toContain('Disposition: not_planned'); expect(comment).toContain(issue.source_observation_sha256);
   expect(readLease(f.root, slot.task_id).classification).toBe('available');
+}, 60_000);
+
+
+test('a separate push destination cannot receive closeout deletion', async () => {
+  const f = await fixture();
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: f.root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const fetch = join(f.home, 'fetch.git'); const push = join(f.home, 'push.git');
+  git('init', '--bare', fetch); git('init', '--bare', push);
+  git('remote', 'add', 'origin', fetch); git('push', push, 'HEAD:refs/heads/delete-me');
+  git('remote', 'set-url', '--push', 'origin', push);
+  const oid = git('rev-parse', 'HEAD'); const closeout_key = canonicalMessageDigest({ fixture: 'push-destination' }).slice(7);
+  withCampaignPlanningLock(f.root, f.intent, () => persistPlanningRecord(f.root, f.intent, closeout_key, {
+    kind: 'repo-harness-campaign-closeout-intent', provider_requests: { delete: { protocol: 1, operation: 'git_ref_delete_attempt',
+      remote: 'origin', ref: 'refs/heads/delete-me', expected_oid: oid, remote_url_sha256: automationDigest(fetch) } },
+  }));
+  expect(() => runCampaignCloseoutProviderAttempt({ ...f.provider, closeout_key, request_key: 'delete' })).toThrow();
+  expect(git('ls-remote', '--refs', push, 'refs/heads/delete-me').split('\t')[0]).toBe(oid);
+}, 60_000);
+
+
+test('a known comment is read back by exact id beyond the first hundred', async () => {
+  const f = await fixture(); const paths: string[] = [];
+  runCampaignCloseoutProviderAttempt({ ...f.provider, github_runner: args => {
+    paths.push(args[3]!);
+    if (args[2] === 'POST') return { stdout: JSON.stringify({ id: 501 }) };
+    if (args[3]!.endsWith('/issues/comments/501')) return { stdout: JSON.stringify({ id: 501, body: 'Exact fixture closure marker' }) };
+    return { stdout: JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ id: i + 1, body: 'old comment' }))) };
+  } });
+  expect(paths[1]).toBe(`repos/${f.intent.provider_repository}/issues/comments/501`);
 }, 60_000);
