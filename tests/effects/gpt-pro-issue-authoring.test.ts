@@ -352,3 +352,17 @@ describe('GPT Pro issue batch authoring effect', () => {
    expect(existsSync(join(issueBatchGroupStoreRoot(f.root, 'campaign-1', 1), 'intent.json'))).toBe(false);
    expect(readdirSync(join(f.root, '.git', 'repo-harness')).sort()).toEqual(before);
  });
+
+ test.each(['missing evidence', 'profile root drift'])('continuation rejects %s before reservation or followup', async scenario => {
+  const f = fixture();
+  const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, { readBinding: readBrowserBinding, now: () => observedAt, consult: async input => result(input, 'source', 'completed', scenario !== 'missing evidence') });
+  const runs = join(f.root, '.git', 'repo-harness', 'automation-budget', 'v1', 'runs');
+  const reservations = () => readdirSync(runs).flatMap(run => readdirSync(join(runs, run, 'reservations')).map(name => run + '/' + name)).sort();
+  const before = reservations(); let calls = 0;
+  const binding = readBrowserBinding(f.root);
+  await expect(continueIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, intent_sha256: started.intent.intent_sha256, source_session_ref: started.session.session_ref, operation: 'fill_missing', requested_slots: ['01'], env: f.env }, {
+    readBinding: () => scenario === 'profile root drift' ? { ...binding, binding: { ...binding.binding!, profileDir: binding.binding!.profileDir + '-foreign' } } : binding,
+    now: () => observedAt, followup: async input => { calls++; return result(input, 'next', 'completed', true); },
+  })).rejects.toThrow();
+  expect(calls).toBe(0); expect(reservations()).toEqual(before);
+ });

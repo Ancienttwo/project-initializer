@@ -231,7 +231,10 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
   if (intent.repository_id !== value.status.campaign.repository_id || intent.provider_repository !== value.externalPolicy.github.repository
     || intent.target_ref !== value.status.campaign.target_ref || intent.base_main_sha !== value.baseMain
     || intent.chrome_profile_directory !== value.authorization.campaign!.chrome_profile_directory) fail('issue_authoring_invalid', 'issue batch intent binding is stale');
-  assertIssueAuthoringSourceSession(value.repoRoot, input.campaign_id, input.group_number, intent.intent_sha256, input.source_session_ref);
+  const source = assertIssueAuthoringSourceSession(value.repoRoot, input.campaign_id, input.group_number, intent.intent_sha256, input.source_session_ref);
+  if (!source.browser_evidence) fail('issue_authoring_state_invalid', 'source session evidence is required before continuing authoring');
+  if (source.browser_evidence.repo_root !== value.repoRoot || source.browser_evidence.profile_dir !== value.binding.profileDir
+    || source.browser_evidence.profile_directory !== value.binding.profileDirectory) fail('issue_authoring_profile_mismatch', 'source session profile binding differs from current authoring binding');
   const requested = exactSlots(input.requested_slots, intent);
   const providerIssueId = input.operation === 'edit_issue' ? input.provider_issue_id?.trim() || null : null;
   const locator = input.operation === 'edit_issue' ? providerIssueUrl(input.provider_issue_url, intent.provider_repository) : null;

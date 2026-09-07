@@ -226,7 +226,8 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   if (challenge.source_session_ref !== session.session_ref) fail('challenge session differs from source session');
   persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'challenge', { ...challenge });
   const browser = deps.readBinding(input.repo_root);
-  if (browser.error || !browser.binding?.profileDir || browser.binding.profileDirectory !== intent.chrome_profile_directory) fail('browser profile binding differs from authorization');
+  if (browser.error || !browser.binding?.profileDir || browser.binding.profileDirectory !== intent.chrome_profile_directory
+    || browser.binding.profileDir !== session.browser_evidence!.profile_dir || session.browser_evidence!.repo_root !== input.repo_root) fail('browser profile binding differs from source session or authorization');
   let response = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'response') as unknown as ResponseEvidence | null;
   if (!response) {
     const admission = reserveCampaignAuthoringBudget({ ...binding, operation: 'challenge', idempotency_key: challenge.challenge_sha256 });
