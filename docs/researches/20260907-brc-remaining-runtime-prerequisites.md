@@ -10,9 +10,9 @@ The current repository binding selects `Profile 11`. The historical Connector pr
 
 `src/effects/automation/gpt-pro-issue-authoring.ts` checks the saved browser binding against the campaign authorization's `chrome_profile_directory`. Its browser input uses the Oracle transport, GPT Pro model and required secret scan; it does not select a ChatGPT app. A doctor override therefore does not change the campaign's actual account or authorization.
 
-## Provider capability remains an external prerequisite
+## Live account capability supersedes the generic documentation assumption
 
-The [current OpenAI GitHub app documentation](https://help.openai.com/en/articles/11145903-connecting-github-to-chatgpt), read on 2026-09-07, describes on-demand repository retrieval rather than a ChatGPT-managed synchronized index. It also states that the built-in GitHub app is read-only. This does not establish the capabilities of a separate custom app on the user's account. Consequently neither Issue creation nor a trusted exact-revision receipt can be inferred from the built-in app's availability.
+The [OpenAI GitHub app documentation](https://help.openai.com/en/articles/11145903-connecting-github-to-chatgpt), read on 2026-09-07, describes on-demand repository retrieval and a read-only app. A subsequent live account inspection contradicted applying that limitation to this account: Profile 13's connected OpenAI GitHub plugin exposes Create issue, Update issue, Fetch commit, Fetch file, Resolve ref, Get commit tree SHA and immutable tree/blob readers. Its permission view says Allow all actions. The observed account's tool surface takes precedence over the generic article; a missing Issue-write tool is no longer the identified blocker. Actual repository permission and successful execution still require the bounded canary, and the UI action list does not itself prove exact-revision readback.
 
 The Sprint requires GPT Pro to create the Issues; local Issue creation is forbidden as a substitute. Before a real canary, identify the selected account's actual writable tool, the authorized disposable repository, and explicit call/time limits. Observe created Issues through the existing independent GitHub observer. Missing capabilities must remain an observed blocker, not be replaced with local writes or model self-report.
 
@@ -29,3 +29,9 @@ The read-only call-path audit found no fresh-audit producer/consumer. `developme
 Once a real revision producer is available, one coherent BRC14 package must connect fresh-session identity, complete slots, budgeted audit invocation, the result authority, controlled transitions and the next-group baseline. Keeping the generic transition as an alternate acceptance path would leave the invariant unenforced. Creating only an always-rejecting audit endpoint would not deliver this package.
 
 The independent source audit also ran 48 focused tests (191 assertions) across admission, Connector challenge, adoption, campaign store and closeout; all passed on the current checkout. Those tests confirm existing boundaries only. Static ten-slot fixtures and two-slot effect fixtures do not prove the full BRC15 canary; no complete BRC15 runner was found. This observation does not replace a frozen final acceptance or mark any remaining row done.
+
+## Live profile inspection
+
+Oracle's existing copyChromeProfile helper created disposable copies of Profile 13, and the existing native CDP diagnostic verified a live ChatGPT composer. The settings UI was inspected without submitting prompts or changing permissions. It showed the connected GitHub plugin's concrete read/write action list. Each owned browser was closed and its session-bearing copy removed. The shared browser MCP was already occupied and was left intact. No model invocation or Issue mutation occurred.
+
+The repository's shared Git state contains no campaign budget artifacts to reuse. The next concrete preparation is a disposable canary target with an explicit small grant and Profile 13 binding, followed by the existing budgeted authoring/observation path. In parallel, inspect actual tool-result transport before designing the BRC6a producer; action names or a model's echoed SHA remain insufficient.
