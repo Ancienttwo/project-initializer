@@ -1,3 +1,4 @@
+import { canonicalMessageBytes } from '../../core/messages/mechanics';
 import {
   buildClaimActorReceipt,
   type ClaimActorReceiptV1,
@@ -7,6 +8,7 @@ import { realpathSync } from 'fs';
 import type { CommandOutcome } from '../../core/state/command-outcome';
 import {
   acquireFleetTask,
+  resumeReclaimedFleetWork,
   type FleetAcquireAssertionV1,
   type FleetAcquireOptions,
   type FleetAcquireResult,
@@ -15,7 +17,7 @@ import {
 import { readRepoHarnessRegistrySnapshot, type RepoHarnessRegistrySnapshot } from '../repo-registry';
 import { readLease, type LeaseRead } from '../state/coordination-lease-store';
 import { processSprintDependencies, releaseSprintCommand } from '../state/coordination-sprint';
-import { publishClaimActorReceipt, validateClaimActorReceiptLive } from './claim-actor-store';
+import { readClaimActorReceipt, publishClaimActorReceipt, validateClaimActorReceiptLive } from './claim-actor-store';
 import { readEngineerBindingStatus, withEngineerBindingLock } from './binding-store';
 
 export type EngineerAcquireFailureCode = 'fleet_acquire_failed' | 'claim_actor_receipt_failed' | 'rollback_failed';
@@ -160,4 +162,31 @@ export function acquireEngineerTask(options: EngineerAcquireOptions): EngineerAc
     options.principal.engineer_id,
     () => acquireEngineerTaskLocked(options, deps),
   );
+}
+
+/** Retain the authenticated Binding while publishing the new generation's actor receipt. */
+export function resumeReclaimedEngineerTask(input: {
+  repo_root: string; principal: EngineerPrincipalV1; previous: WorkEnvelopeV1;
+  previous_receipt: ClaimActorReceiptV1; claim_id: string;
+  receipt: import('../../core/state/lease-liveness').LeaseReclaimEligibilityReceiptV1;
+  session_id: string; bound_at: string; env?: NodeJS.ProcessEnv;
+  crash_hook?: (boundary: 'after_bind' | 'after_token' | 'after_actor') => void;
+}) {
+  return withEngineerBindingLock(input.repo_root, input.principal.engineer_id, () => {
+    const binding = readEngineerBindingStatus(input.repo_root, input.principal.engineer_id, input.principal.engineer_contract_revision);
+    if (binding.current.state !== 'active' || binding.current.current_binding_id !== input.principal.binding_id
+      || binding.current.binding_generation !== input.principal.binding_generation
+      || input.previous_receipt.engineer_id !== input.principal.engineer_id || input.previous_receipt.binding_id !== input.principal.binding_id
+      || input.previous_receipt.binding_generation !== input.principal.binding_generation) throw new Error('reclaimed Engineer Binding differs');
+    const original = readClaimActorReceipt(input.repo_root, input.previous.task_id, input.previous.claim_id);
+    if (!original || canonicalMessageBytes({ receipt: original }) !== canonicalMessageBytes({ receipt: input.previous_receipt })) throw new Error('original ClaimActor receipt differs');
+    const envelope = resumeReclaimedFleetWork(input);
+    const receipt = buildClaimActorReceipt({ envelope, principal: input.principal, session_id: input.session_id, bound_at: input.bound_at });
+    const existing = readClaimActorReceipt(input.repo_root, envelope.task_id, envelope.claim_id);
+    if (existing && canonicalMessageBytes({ receipt: existing }) !== canonicalMessageBytes({ receipt })) throw new Error('reclaimed ClaimActor receipt differs');
+    const published = publishClaimActorReceipt(input.repo_root, receipt);
+    input.crash_hook?.('after_actor');
+    validateClaimActorReceiptLive(input.repo_root, published, envelope);
+    return Object.freeze({ envelope, receipt: published });
+  });
 }
