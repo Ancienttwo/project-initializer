@@ -84,3 +84,29 @@ Oracle 检查对象为本机隔离候选 `26e12021f9593d7ac4ede7b252099653f1b4ac
 - [OpenAI GitHub app](https://help.openai.com/en/articles/11145903-connecting-github-t-chatgpt-deep-research)：当前说明为按需读取，不建立 ChatGPT 同步索引；GitHub 自身搜索索引是另一回事。因此历史“stale Connector/index”只保留为旧探针及陈旧读取威胁，不宣称当前产品必有 Connector index。本文未发现该页承诺可导出的 exact-commit 工具回执；文档未承诺不等于技术上绝不可能。该页描述的 GitHub app 也不能用来否定本机 canary 已观察到的具体写入通道，两者产品表面未证明相同。
 - [GitHub Git commits](https://docs.github.com/en/rest/git/commits)：commit 绑定 tree，签名 verification 是 commit 签名校验。JSON 响应、字段 `sha` 或签名布尔值不能直接当 raw object 字节；不能假定 API 总提供可无损重建的 raw object。
 - [OpenAI MCP/Connectors API](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)：Responses 的 `mcp_call` 包含调用参数和工具结果，官方说明结果进入模型 context。这支持新传输的可观察性方向，不证明当前 Oracle browser 已有同等证据，也不证明本仓库的目标模型和 app 权限已兼容。
+
+
+## 2026-09-08：获批真实只读探针结果
+
+用户批准一次只读能力探针后，首次调用错误地沿用旧 `--model GPT-5.5 Pro --thinking pro` 参数。用户明确纠正为 Latest Pro/GPT6 Pro，随后确定偏好为“用户配置一次，之后使用默认”，不由 agent 自动选模型。旧调用的 Oracle 元数据报 GPT-5.5，界面却显示 6 Pro；不能据此确定其实际模型身份。已在自己绑定的 conversation 点击 Stop answering，并终止、确认退出该调用的自有 controller/Chrome。旧结果不纳入验收；其 Oracle 原生 metadata 残留 running，不能据此重派或当仍有活进程，原记录未伪改为成功。
+
+替换调用不传 `--model` 或 `--thinking`，Oracle strategy 为 `current`，没有进行模型切换。只读 DOM 观察到 composer 显示 **6 Pro**；Oracle 的 requestedModel/default log 仍带 GPT-5.5 字样且 canonical `model.verified=false`。这是显示观察与旧默认元数据不一致，不能补写成 provider-verified 模型。此偏好已通知 BRC10，后续 campaign 的默认配置与实际模型验证需由其 owning boundary 处理，不在本探针绕过原准入要求。
+
+### 输入和边界
+
+- 目标复用已授权的私有 canary repository，固定 `33d692aaa0ab593df0c160082b18fdac02c82e9c` 和 `README.md`，未新建/推送 fixture。
+- Prompt 仅给目标身份、返回格式与只读约束；没有提供 commit/tree/blob bytes 或预期答案。要求无法取得原始对象即停止，不从 JSON metadata 合成。
+- 独立诊断最多一次替换调用、600 秒、无补问；没有复用已停止 campaign 的预算或创建新的 campaign grant。累计实际 Oracle wrapper 调用 **2 次**，含作废的首次调用；不能把纠错成本隐去。模型内部工具调用次数没有独立可验证计量。
+- 替换会话 `chgpt_20260908_020457_brc6a-default-model-raw-object-probe`；conversation `6a9efc70-b370-83ea-84cc-d97b3c8c95f2`；约 1 分 38 秒后正常返回。启动时要求 exact prompt Gitleaks scan。
+
+### 观察和判定
+
+最终 JSON 为 `status=unavailable`；commit、root tree、README blob 三个 base64 字段全部为 null。本地严格 JSON 读取与三字段空值断言通过，故本次**没有可校验的 Git 对象产物**。
+
+回答称检查了 48 个 GitHub 工具 schema，未发现无损原始 commit 输出方法，并称未读取仓库内容。这些是模型自述；本轮没有 provider-origin tool trace 验证其调用数、工具全集或无内容读取，不能把它们升级为独立能力清单。结果证明本次路径未产出，不证明所有 Connector、API 或未来版本永久不支持。
+
+独立预期对象在本地由 Git 读出并验证：commit 217 bytes，root tree 1307 bytes，README blob 27700 bytes；这些 bytes 未进入 prompt。因远端三个对象均缺失，没有执行一个冒充成功的对象链校验。替换调用的自有 controller 与 Chrome PID 在返回后均已退出。
+
+- Response SHA-256: `9fbae2749fa62c5ad2d18c5b41ed99f2cf027aa343e3b04dfdfe9516ad80ea58`。
+- 原始响应、intent、UI model observation 和本地 validation：本 worktree 的 `.ai/harness/evidence/brc6a-producer-probe-default/`；完整 browser session 位于 `.ai/harness/chatgpt/sessions/<session-id>/`。这两处是 ignored evidence，不是新权威 store。
+- 结论：**BRC6a pending，active admission 不变**。不再自动重跑同类模型探针。若继续，应先选择可独立观察 tool response 的传输或经 Owner 明确修改读取方式的合同；不先实现没有已证实 producer 的新 receipt/verifier。
