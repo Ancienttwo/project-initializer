@@ -632,7 +632,7 @@ describe("archive evidence gates", () => {
     }
   }, 30_000);
 
-  test("predict-manifest merges live checks evidence into the scratch clone instead of nesting it", () => {
+  test.each(["main", "origin/main"])("predict-manifest preserves live evidence and exact review base %s", (reviewBase) => {
     withTempRepo("archive-workflow-predict-manifest", (cwd) => {
       installWorkflowArchiveFixture(cwd);
       // The real repo gitignores the structured checks payload and tracks only
@@ -655,6 +655,17 @@ describe("archive evidence gates", () => {
       // has sitting in .ai/harness/checks/latest.json when finish predicts.
       writeWorkflowChecks(cwd);
 
+      if (reviewBase === "origin/main") {
+        const policyFile = join(cwd, ".ai/harness/policy.json");
+        const policy = JSON.parse(readFileSync(policyFile, "utf8"));
+        policy.worktree_strategy.review_base = reviewBase;
+        expect(runProcess("git", ["checkout", "-b", "candidate"], cwd).status).toBe(0);
+        writeFileSync(policyFile, JSON.stringify(policy));
+        expect(runProcess("git", ["add", policyFile], cwd).status).toBe(0);
+        expect(runProcess("git", ["commit", "-m", "candidate with newer remote target"], cwd).status).toBe(0);
+        expect(runProcess("git", ["update-ref", "refs/remotes/origin/main", "HEAD"], cwd).status).toBe(0);
+      }
+      const originalMain = runProcess("git", ["rev-parse", "main"], cwd).stdout;
       const output = join(cwd, "predicted-manifest.txt");
       const result = run(
         "scripts/archive-workflow.sh",
@@ -669,7 +680,8 @@ describe("archive evidence gates", () => {
         cwd,
         { EXPECT_ACCEPTANCE_CWD: cwd },
       );
-      expect(result.status).toBe(0);
+      expect(result.status, result.stderr).toBe(0);
+      expect(runProcess("git", ["rev-parse", "main"], cwd).stdout).toBe(originalMain);
       expect(existsSync(output)).toBe(true);
       const manifest = readFileSync(output, "utf-8");
       expect(manifest).toContain("plans/archive/plan-20260711-1200-demo.md");
