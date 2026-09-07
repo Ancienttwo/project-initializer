@@ -93,6 +93,7 @@ if (args[0] === 'repo' && args[1] === 'view') {
     body,
     createdAt: '2026-08-23T00:00:00Z',
     mergedAt: null,
+    mergeCommit: null,
   };
 } else if (query.includes('checkSuites')) {
   value = { data: { node: { pullRequest: { commits: { nodes: [{ commit: {

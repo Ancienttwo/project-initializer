@@ -104,7 +104,7 @@ function installFixture(): Fixture {
     '#!/bin/bash', 'set -euo pipefail',
     'head="$(git rev-parse HEAD)"', 'base="$(git rev-parse main)"', 'body="$(jq -Rs . < "$GH_BODY_FILE")"',
     'merged_at="null"; [[ -z "${GH_PR_MERGED_AT:-}" ]] || merged_at="\\"$GH_PR_MERGED_AT\\""',
-    'pr="{\\"number\\":1,\\"url\\":\\"https://example.invalid/pr/1\\",\\"headRefOid\\":\\"$head\\",\\"headRefName\\":\\"codex/lifecycle\\",\\"baseRefName\\":\\"main\\",\\"baseRefOid\\":\\"$base\\",\\"body\\":$body,\\"createdAt\\":\\"2026-08-22T04:05:55Z\\",\\"state\\":\\"${GH_PR_STATE:-OPEN}\\",\\"mergedAt\\":$merged_at}"',
+    'pr="{\\"number\\":1,\\"url\\":\\"https://example.invalid/pr/1\\",\\"headRefOid\\":\\"$head\\",\\"headRefName\\":\\"codex/lifecycle\\",\\"baseRefName\\":\\"main\\",\\"baseRefOid\\":\\"$base\\",\\"body\\":$body,\\"createdAt\\":\\"2026-08-22T04:05:55Z\\",\\"state\\":\\"${GH_PR_STATE:-OPEN}\\",\\"mergedAt\\":$merged_at,\\"mergeCommit\\":{\\"oid\\":\\"$base\\"}}"',
     'if [[ "$1 $2" == "repo view" ]]; then printf \'{"id":"R_lifecycle"}\\n\'; exit 0; fi',
     'if [[ "$1 $2" == "pr list" ]]; then [[ "${GH_PR_EXISTS:-0}" == "1" ]] && printf \'[%s]\\n\' "$pr" || printf \'[]\\n\'; exit 0; fi',
     'if [[ "$1 $2" == "pr view" ]]; then printf \'%s\\n\' "$pr"; exit 0; fi',

@@ -1,3 +1,4 @@
+import { assertWorktreeBinding, withWorktreeTopologyLock } from './coordination-worktree-topology';
 /**
  * Effect-owned coordination verbs for the shared lease protocol.
  *
@@ -95,6 +96,9 @@ export interface CoordinationPort {
   readonly withTaskLock: <T>(taskId: string, run: () => T) => T;
   /** The shared backlog lock, taken before any task lock. */
   readonly withBacklogLock: <T>(run: () => T) => T;
+  /** Acquired before the Task lock for a worktree ownership mutation. */
+  readonly withWorktreeTopologyLock: <T>(run: () => T) => T;
+  readonly assertWorktreeBinding: (worktree: string, branch: string) => void;
   /** True when this clone has a lease plane at all; false is "nothing owns anything here". */
   readonly leasesRootExists: () => boolean;
   /** The token this tree holds for one task id, addressed by identity. */
@@ -465,7 +469,8 @@ export function bindSprintCommand(
   if (isOutcome(unitRef)) return unitRef;
 
   try {
-    return withOwnedLease(deps, claimId, (taskId) => {
+    return deps.coordination.withWorktreeTopologyLock(() => withOwnedLease(deps, claimId, (taskId) => {
+      deps.coordination.assertWorktreeBinding(worktree, branch);
       const current = lockedRecord(deps, taskId);
       if (isOutcome(current)) return current;
       const transition = bindLeaseRecord(current, {
@@ -478,7 +483,7 @@ export function bindSprintCommand(
       deps.coordination.appendResumedReceipt(worktree, unitRef);
       deps.coordination.writeLeaseOwner(taskId, transition.record);
       return ok(transition.record);
-    });
+    }));
   } catch (error) {
     return operationalFailure(error);
   }
@@ -1172,6 +1177,8 @@ export function processSprintDependencies(cwd: string): SprintCommandDependencie
       readCanonicalSprint: (source) => readCanonicalSprint(cwd, source),
       withTaskLock: (taskId, run) => withTaskLock(cwd, taskId, run),
       withBacklogLock: (run) => withBacklogLock(cwd, run),
+      withWorktreeTopologyLock: (run) => withWorktreeTopologyLock(cwd, run),
+      assertWorktreeBinding: (worktree, branch) => assertWorktreeBinding(cwd, worktree, branch),
       leasesRootExists: () => existsSync(join(coordinationRoot(cwd), 'leases')),
       readClaimToken: (taskId) => readClaimTokenForTask(cwd, taskId),
       removeClaimToken: (taskId) => removeClaimTokenForTask(cwd, taskId),

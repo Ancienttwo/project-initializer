@@ -23,7 +23,7 @@ import {
   enterReviewingLeaseRecord,
 } from '../../src/core/state/coordination-identity';
 import { reconcilePublication } from '../../src/effects/publication/publication-lifecycle';
-import { writePublicationReceiptCache } from '../../src/effects/publication/publication-receipt';
+import { observeProviderPullRequestIntegration, providerIntegrationFromJson, writePublicationReceiptCache } from '../../src/effects/publication/publication-receipt';
 import { resolveRepoIdentity } from '../../src/effects/state/coordination-canonical-source';
 import { createLeaseDirectory, leaseOwnerPath, readLease, writeLeaseOwnerDurably } from '../../src/effects/state/coordination-lease-store';
 import { resolveGitCommonDirectory } from '../../src/effects/git/common-directory';
@@ -145,7 +145,7 @@ function installFixture(options: FixtureOptions = {}): Fixture {
     'body="$(jq -Rs . < "$GH_BODY_FILE")"',
     'head="$(git rev-parse codex/reconcile)"', 'base="$(git --git-dir "$GH_REMOTE_REPO" rev-parse refs/heads/main)"',
     'merged_at="null"; [[ -z "${GH_PR_MERGED_AT:-}" ]] || merged_at="\\"$GH_PR_MERGED_AT\\""',
-    'pr="{\\"number\\":1,\\"url\\":\\"https://example.invalid/pr/1\\",\\"headRefOid\\":\\"$head\\",\\"headRefName\\":\\"codex/reconcile\\",\\"baseRefName\\":\\"main\\",\\"baseRefOid\\":\\"$base\\",\\"body\\":$body,\\"createdAt\\":\\"2026-08-22T04:05:55Z\\",\\"state\\":\\"${GH_PR_STATE:-MERGED}\\",\\"mergedAt\\":$merged_at}"',
+    'pr="{\\"number\\":1,\\"url\\":\\"https://example.invalid/pr/1\\",\\"headRefOid\\":\\"$head\\",\\"headRefName\\":\\"codex/reconcile\\",\\"baseRefName\\":\\"main\\",\\"baseRefOid\\":\\"$base\\",\\"body\\":$body,\\"createdAt\\":\\"2026-08-22T04:05:55Z\\",\\"state\\":\\"${GH_PR_STATE:-MERGED}\\",\\"mergedAt\\":$merged_at,\\"mergeCommit\\":{\\"oid\\":\\"$base\\"}}"',
     'if [[ "$1 $2" == "repo view" ]]; then printf \'{"id":"R_reconcile"}\\n\'; exit 0; fi',
     'if [[ "$1 $2" == "pr view" ]]; then printf \'%s\\n\' "$pr"; exit 0; fi',
     'echo "unexpected gh invocation: $*" >&2; exit 2', '',
@@ -199,6 +199,21 @@ describe('publication recovery and reconcile', () => {
     expect(() => validatePublicationIntegrationObservation({ ...first, unknown: true })).toThrow('fields are invalid');
     expect(() => validatePublicationIntegrationObservation({ ...first, observation_id: `sha256:${'f'.repeat(64)}` })).toThrow('id is stale');
   });
+
+  test('merged provider evidence rejects missing mergeCommit instead of substituting head or base', () => {
+    const value = { number: 1, url: 'https://example.invalid/pr/1', headRefOid: 'a'.repeat(40), headRefName: 'topic',
+      baseRefName: 'main', baseRefOid: 'b'.repeat(40), body: '', createdAt: '2026-08-22T04:05:55Z',
+      state: 'MERGED', mergedAt: '2026-08-22T05:05:55Z', mergeCommit: null };
+    expect(() => providerIntegrationFromJson('R_test', value, 1)).toThrow('actual merge evidence');
+    expect(() => providerIntegrationFromJson('R_test', { ...value, mergeCommit: { oid: 'invalid' } }, 1)).toThrow('oid is invalid');
+    expect(providerIntegrationFromJson('R_test', { ...value, mergeCommit: { oid: 'c'.repeat(40) } }, 1).merge_commit_sha).toBe('c'.repeat(40));
+  });
+
+  test('unreachable actual merge commit retains the exact reviewing Lease', () => withFixture({}, (fixture) => {
+    const observe = () => ({ ...observeProviderPullRequestIntegration(fixture.root, 1, fixture.gh), merge_commit_sha: 'f'.repeat(40) });
+    expectLifecycleError(() => reconcilePublication({ ...reconcileInput(fixture), observe_integration: observe }), 'integration_unproven');
+    expect(existsSync(leaseOwnerPath(fixture.root, fixture.taskId))).toBe(true);
+  }));
 
   test('a fetched provider OID plus canonical completion clears only the exact reviewing lease', () => withFixture({}, (fixture) => {
     const localMainBefore = git(fixture.root, 'rev-parse', 'main');

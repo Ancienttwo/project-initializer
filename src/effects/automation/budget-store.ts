@@ -33,6 +33,10 @@ import {
   CAMPAIGN_STEP_ADMISSION_KIND,
   CAMPAIGN_STEP_COMPLETION_KIND,
   campaignBudgetStepKey,
+  campaignProviderForOperation,
+  campaignProviderCallReservation,
+  campaignProviderOperationReservation,
+  type CampaignCloseoutOperation,
   validateCampaignBudgetStepIdentity,
   validateCampaignBudgetStepEvent,
   validateAutomationLedgerEvent,
@@ -1587,11 +1591,10 @@ function reserveAutomationBudgetAdmission(input: ReservationAdmissionInput): Aut
   // caller: an acquisition that reserves zero acquisitions is not a smaller
   // request, it is an unmetered one. Token and cost components stay null while
   // no provider-attested usage authority is wired.
-  const reserved = automationOperationReservation(input.operation, {
-    input_tokens: null,
-    output_tokens: null,
-    cost_micros: null,
-  });
+  const tokens = { input_tokens: null, output_tokens: null, cost_micros: null };
+  const reserved = input.reservation_kind === 'campaign'
+    ? campaignProviderOperationReservation(input.campaign_context.operation, tokens)
+    : automationOperationReservation(input.operation, tokens);
   return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
     // The deadline decision belongs to the serialized state transition. A
     // caller may wait behind another process long enough to cross the run's
@@ -1716,10 +1719,9 @@ function reserveAutomationBudgetAdmission(input: ReservationAdmissionInput): Aut
           || step.group_number !== campaignContext.group_number || step.intent_sha256 !== campaignContext.intent_sha256) {
           fail('automation_budget_refused', 'provider call does not belong to the active campaign step');
         }
-        const github = campaignContext.operation === 'github_read' || campaignContext.operation === 'github_comment' || campaignContext.operation === 'github_close';
-        if (input.provider !== (github ? 'github' : 'gpt-pro')) fail('automation_budget_store_invalid', 'campaign provider does not match its operation');
+        if (input.provider !== campaignProviderForOperation(campaignContext.operation)) fail('automation_budget_store_invalid', 'campaign provider does not match its operation');
         const limit = status.budget.authorization.campaign.max_provider_calls;
-        if (ledger.provider_calls + ledger.reserved_provider_calls >= limit) campaignLimitRefusal(paths, status, 'provider_calls', limit, ledger.provider_calls, ledger.reserved_provider_calls, effectiveIdempotencyKey, reservedAt);
+        if (ledger.provider_calls + ledger.reserved_provider_calls + campaignProviderCallReservation(campaignContext.operation) > limit) campaignLimitRefusal(paths, status, 'provider_calls', limit, ledger.provider_calls, ledger.reserved_provider_calls, effectiveIdempotencyKey, reservedAt, campaignProviderCallReservation(campaignContext.operation));
       }
     }
     const commonReservation = {
@@ -1793,13 +1795,13 @@ function assertStepBudgetBinding(input: BeginCampaignBudgetStepInput, status: Au
 
 function campaignLimitRefusal(
   paths: RunPaths, status: AutomationBudgetStatusV1, metric: 'controller_steps' | 'provider_calls',
-  limit: number, consumed: number, reserved: number, key: string, now: string,
+  limit: number, consumed: number, reserved: number, key: string, now: string, requested = 1,
 ): never {
   const refusal: AutomationBudgetRefusalV1 = Object.freeze({
     protocol: 1, kind: 'repo-harness-automation-budget-refusal',
     automation_run_id: status.budget.automation_run_id, budget_sha256: status.budget.budget_sha256,
     refusal_code: 'budget_limit_exceeded', operation: 'provider_invocation', idempotency_key: key,
-    metric, limit, consumed, reserved, would_consume: consumed + reserved + 1, refused_at: now,
+    metric, limit, consumed, reserved, would_consume: consumed + reserved + requested, refused_at: now,
   });
   persistStopReceipt(paths, status.budget, status.current, refusal,
     status.current.open_reservation_sha256s.map(digest => ({ authority_kind: 'reservation', authority_id: digest, recovery: 'normal_recovery_required' })), now);
@@ -1902,7 +1904,7 @@ export function readCampaignBudgetLedger(repoRoot: string, runId: string, env: N
 
 export interface ReserveCampaignProviderBudgetInput extends BeginCampaignBudgetStepInput {
   readonly step_admission_sha256: string;
-  readonly operation: 'github_read' | 'github_comment' | 'github_close';
+  readonly operation: 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation;
   readonly request_sha256: string;
 }
 
@@ -1912,7 +1914,7 @@ export function reserveCampaignProviderBudget(input: ReserveCampaignProviderBudg
     expected_budget_sha256: input.expected_budget_sha256, idempotency_key: input.idempotency_key,
     original_idempotency_key: input.idempotency_key, reservation_kind: 'campaign',
     operation: 'provider_invocation', unit_kind: 'execute', unit_id: `${input.campaign_id}:group:${input.group_number}`,
-    attempt: 1, provider: 'github',
+    attempt: 1, provider: campaignProviderForOperation(input.operation),
     campaign_context: { campaign_id: input.campaign_id, group_number: input.group_number,
       intent_sha256: input.intent_sha256, operation: input.operation,
       step_admission_sha256: input.step_admission_sha256, request_sha256: input.request_sha256 },
@@ -2143,7 +2145,7 @@ function assertTerminalMatchesLedger(
     const context = event.kind === AUTOMATION_USAGE_EVENT_KIND
       ? (() => {
         const reservation = byDigest.get(event.reservation_sha256);
-        if (reservation?.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND || reservation.campaign_context.operation !== 'github_read') {
+        if (reservation?.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND || !['github_read', 'git_read'].includes(reservation.campaign_context.operation)) {
           return fail('automation_budget_store_conflict', 'campaign terminal is bound to a stale automation ledger: successor is not a readonly probe');
         }
         return reservation.campaign_context;
@@ -2510,7 +2512,7 @@ export function recordCampaignProviderOutcome(input: {
   if (reservation.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND
     || !('request_sha256' in reservation.campaign_context)
     || (input.outcome !== 'returned' && input.outcome !== 'read_failed' && input.outcome !== 'read_transient_failure')
-    || (input.outcome !== 'returned' && reservation.campaign_context.operation !== 'github_read')
+    || (input.outcome !== 'returned' && !['github_read', 'git_read'].includes(reservation.campaign_context.operation))
     || typeof input.result_sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(input.result_sha256)) {
     fail('automation_budget_store_invalid', 'provider outcome requires an exact GitHub reservation and result digest');
   }

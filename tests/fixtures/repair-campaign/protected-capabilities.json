@@ -51,7 +51,8 @@
       "paths": [
         "src/core/state/coordination-identity.ts",
         "src/core/state/sprint-backlog-rows.ts",
-        "src/effects/state/coordination-lease-store.ts"
+        "src/effects/state/coordination-lease-store.ts",
+        "src/effects/state/coordination-worktree-topology.ts"
       ],
       "reason": "Task identity derivation, the canonical backlog row grammar and the lease owner store are protected, but no archcontext capability include glob currently owns them; capability.runtime-harness.integration-acceptance only references coordination-lease-store.ts as a sink. Recorded here so protection does not depend on a capability node that does not exist."
     },
