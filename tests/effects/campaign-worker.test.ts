@@ -82,7 +82,7 @@ test.each(['completed', 'not_reproducible', 'transient_failure'] as const)('pers
   expect(budgetStatus(f).open_reservation_sha256s).toHaveLength(0);
   const settled = budgetStatus(f);
   expect(() => recovered.beforeChild('worker', 'worker')).toThrow('cannot spawn');
-  expect(() => recovered.prepareChild('worker', 'prompt.md')).toThrow('cannot prepare');
+  await expect(recovered.prepareChild('worker', 'prompt.md', Date.now() + 1000)).rejects.toThrow('cannot prepare');
   expect(() => recovered.renew()).toThrow('cannot renew');
   expect(bindCampaignWorker(workerInput(f)).replay).toEqual(final);
   expect(budgetStatus(f)).toEqual(settled);

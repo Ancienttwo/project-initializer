@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { constants, lstatSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
 import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -78,6 +78,9 @@ interface ChildResult {
   stderr_path: string;
   skipped?: boolean;
   timed_out?: boolean;
+  termination_cause?: "completed" | "deadline" | "cancelled" | "output_error";
+  signal?: NodeJS.Signals | null;
+  started?: boolean;
   process_group_quiescence?: { scope: 'posix_process_group' | 'unsupported'; state: 'quiescent' | 'active' | 'unknown' };
   renewal_failure?: string;
   output_sha256?: { stdout: string; stderr: string };
@@ -706,32 +709,41 @@ async function runChild(
         wrapper.once("exit", resolve);
       });
     } finally { if (timer) clearInterval(timer); }
-    if (!existsSync(stdoutPath)) writeFileSync(stdoutPath, "");
-    if (!invocation || !existsSync(stderrPath)) writeFileSync(stderrPath, "");
+    if (!existsSync(stdoutPath)) writeFileSync(stdoutPath, "", { flag: "wx" });
+    if (!invocation || !existsSync(stderrPath)) writeFileSync(stderrPath, "", { flag: constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW });
     let exitCode: number | null = wrapperExit;
     let timedOut = false;
     let quiescence: ChildResult["process_group_quiescence"] = { scope: "unsupported", state: "unknown" };
     let outputProof: Pick<ChildResult, "output_sha256" | "output_complete"> = {};
+    let supervision: Pick<ChildResult, "termination_cause" | "signal" | "started"> = {};
     if (existsSync(boundedResultPath)) {
+      const stat = lstatSync(boundedResultPath);
+      if (!stat.isFile() || stat.isSymbolicLink()) throw new CliError("contract-run: supervisor result is not a regular file", 1);
       try {
         const bounded = JSON.parse(readFileSync(boundedResultPath, "utf-8")) as {
           exit_code: number;
           timed_out: boolean;
+          termination_cause?: ChildResult["termination_cause"];
+          signal?: NodeJS.Signals | null;
+          started?: boolean;
           output_sha256?: { stdout: string; stderr: string };
           output_complete?: boolean;
           process_group_quiescence?: ChildResult["process_group_quiescence"];
         };
         if (invocation) outputProof = { output_sha256: bounded.output_sha256, output_complete: bounded.output_complete };
+        supervision = { termination_cause: bounded.termination_cause, signal: bounded.signal, started: bounded.started };
+        if (!Number.isInteger(bounded.exit_code) || bounded.exit_code !== wrapperExit) throw new Error("supervisor exit and receipt differ");
         exitCode = bounded.exit_code;
         timedOut = bounded.timed_out === true;
         const observed = bounded.process_group_quiescence;
         if (observed && ["posix_process_group", "unsupported"].includes(observed.scope) && ["quiescent", "active", "unknown"].includes(observed.state)) quiescence = observed;
       } catch {
-        // Keep the wrapper's own exit status if the result artifact is unreadable.
+        throw new CliError("contract-run: supervisor result is invalid or differs from its exit", 1);
       }
     }
     return {
       ...outputProof,
+      ...supervision,
       role,
       command,
       exit_code: exitCode,
@@ -943,7 +955,7 @@ async function buildRun(opts: Options) {
 
   if (opts.mode === "run" && briefPreflight.ok) {
     if (consume("worker")) {
-      const invocation = opts.campaignProvider ? campaign!.prepareChild("worker", repoRelative(repo, workerPrompt)) : undefined;
+      const invocation = opts.campaignProvider ? await campaign!.prepareChild("worker", repoRelative(repo, workerPrompt), wallTimeDeadlineMs!) : undefined;
       campaign?.beforeChild("worker", opts.workerCommand!);
       const worker = await runChild(
         "worker",
@@ -959,11 +971,11 @@ async function buildRun(opts: Options) {
       campaign?.afterChild(worker);
       if (worker.exit_code !== 0) {
         status = "fail";
-        failureClass = worker.timed_out ? "wall_time_exceeded" : "worker_failed";
+        failureClass = worker.termination_cause === "cancelled" ? "cancelled" : worker.timed_out ? "wall_time_exceeded" : "worker_failed";
       }
     }
     if (status === "pass" && consume("verifier")) {
-      const invocation = opts.campaignProvider ? campaign!.prepareChild("verifier", repoRelative(repo, verifierPrompt)) : undefined;
+      const invocation = opts.campaignProvider ? await campaign!.prepareChild("verifier", repoRelative(repo, verifierPrompt), wallTimeDeadlineMs!) : undefined;
       campaign?.beforeChild("verifier", opts.verifierCommand!);
       const verifier = await runChild(
         "verifier",
@@ -983,7 +995,7 @@ async function buildRun(opts: Options) {
       }
       if (verifier.exit_code !== 0) {
         status = "fail";
-        failureClass = verifier.timed_out ? "wall_time_exceeded" : "verifier_failed";
+        failureClass = verifier.termination_cause === "cancelled" ? "cancelled" : verifier.timed_out ? "wall_time_exceeded" : "verifier_failed";
       } else if (!opts.campaignProvider && reviewFile && !existsSync(repoPath(repo, reviewFile))) {
         status = "fail";
         failureClass = "missing_review";
@@ -1058,7 +1070,7 @@ try {
     const recovered = recoverCampaignDispatch({ selector: JSON.parse(readFileSync(repoPath(resolve(opts.repo), opts.campaignHandoff!), "utf8")),
       host: opts.campaignParentHost!, session_id: opts.campaignParentSession!, env: process.env });
     console.log(JSON.stringify(recovered, null, 2));
-    process.exit(recovered.disposition === "reconciliation_required" ? 1 : 0);
+    process.exit(recovered.disposition === "settled_final" ? 0 : 1);
   }
   const { manifest, manifestPath } = await buildRun(opts);
   if (opts.json) {

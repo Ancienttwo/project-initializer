@@ -81,7 +81,7 @@ export function runCampaignNotPlanned(input: {
   const admission = beginCampaignBudgetStep(step).admission;
   const readbackKey = campaignCloseoutKey(issue.provider_issue_id, 'not-planned-source');
   if (!readPlanningRecord(root, intent, readbackKey)) {
-    const read = createCampaignProviderExecutor({ ...step, step_admission_sha256: admission.event_sha256 }, input.github_runner).read;
+    const read = createCampaignProviderExecutor({ ...step, step_admission_sha256: admission.event_sha256 }, input.github_runner, 'refresh').read;
     const value = JSON.parse(read(['api', '--method', 'GET', `repos/${intent.provider_repository}/issues/${issue.issue_number}`], campaignCloseoutReadOptions(budget.deadline_at)).stdout);
     if (String(value.id) !== issue.provider_issue_id || value.number !== issue.issue_number || value.state !== 'open' || typeof value.title !== 'string'
       || typeof value.body !== 'string' || messageSha256(value.title) !== issue.title_sha256 || messageSha256(value.body) !== issue.body_sha256) throw new Error('not_planned Issue source drifted');
