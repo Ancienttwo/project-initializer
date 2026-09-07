@@ -827,9 +827,9 @@
       "sourceDigest": "sha256:1494a3f41b8a3ac362f3a647e38262857c3c70ec83058bf70c1df68a6f246103",
       "outputDigest": "sha256:93a824fb8d2d33de1b45acfc16783a53193c6ef1bb4843b5c3dcf3c6ae5524f2",
       "verifiedAgainst": {
-        "branch": "codex/brc6a-admission",
-        "commit": "773755591e44930bfe3458a7938b207de53fc834",
-        "committedAt": "2026-09-07T17:47:24+08:00"
+        "branch": "codex/brc-issues-342-351",
+        "commit": "0058350c21fa147b58d80e255dd0e0878386b6da",
+        "committedAt": "2026-09-08T03:34:45+08:00"
       }
     },
     {
@@ -867,9 +867,9 @@
       "sourceDigest": "sha256:973d35624db31c3aa05e5e80286f0dca2353df48cd031d45264fbf478dbce240",
       "outputDigest": "sha256:a0c4f25001b2f5308a3ceb0fea7a4777ac5062c38a161aa07f61f34128ccae86",
       "verifiedAgainst": {
-        "branch": "codex/brc10-recovery",
-        "commit": "20f968e3cb6dda0004f88605897e68d50790a81e",
-        "committedAt": "2026-09-07T12:03:45+08:00"
+        "branch": "codex/brc-issues-342-351",
+        "commit": "0058350c21fa147b58d80e255dd0e0878386b6da",
+        "committedAt": "2026-09-08T03:34:45+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:c205808fc038325026903491fd2f58d167d06a50208bfd73e2538fa95bea7807",
       "outputDigest": "sha256:f806a466a49d3fae323b92eb363e07ae5e471b9352c40f7bcb2f27df7d8863ca",
       "verifiedAgainst": {
-        "branch": "codex/brc6a-admission",
-        "commit": "773755591e44930bfe3458a7938b207de53fc834",
-        "committedAt": "2026-09-07T17:47:24+08:00"
+        "branch": "codex/brc-issues-342-351",
+        "commit": "0058350c21fa147b58d80e255dd0e0878386b6da",
+        "committedAt": "2026-09-08T03:34:45+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc6a-admission",
-        "commit": "0e37ed1b0e2dd8e7192523b44c435d933a7e1ac1",
-        "committedAt": "2026-09-07T18:00:42+08:00"
+        "branch": "codex/brc-issues-342-351",
+        "commit": "0058350c21fa147b58d80e255dd0e0878386b6da",
+        "committedAt": "2026-09-08T03:34:45+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:dc2faa5abe1e85c162bcc9a126ee79a0178c75d03c20ff97519b8b463cc2ee44",
       "outputDigest": "sha256:aa5aac73ff819f8ad0c053a57d5b1627faf2fc5bdbc18e8ab4722de0ab085d59",
       "verifiedAgainst": {
-        "branch": "codex/brc6a-admission",
-        "commit": "773755591e44930bfe3458a7938b207de53fc834",
-        "committedAt": "2026-09-07T17:47:24+08:00"
+        "branch": "codex/brc-issues-342-351",
+        "commit": "0058350c21fa147b58d80e255dd0e0878386b6da",
+        "committedAt": "2026-09-08T03:34:45+08:00"
       }
     },
     {
