@@ -1,6 +1,6 @@
 # BRC15a real GPT shadow canary
 
-Status: original failed attempt is stopped and fully charged; Oracle selector fix is verified in an isolated candidate. BRC15a remains pending; no replacement grant has been minted.
+Status: approved replacement run completed real GPT authoring and independent readback; both campaigns are stopped with zero open reservations. Ten Issues exist, but zero pass metadata validation and adoption is refused. BRC15a and the user investment decision remain pending.
 
 The private target is Ancienttwo/repo-harness-brc15a-canary-20260907, seeded from tracked repo-harness 33c5012e1185a695fdaf54a7bb84fc613cfb653b with fresh history and no GitHub workflow automation. Production working-tree changes were excluded. Target initialization commit: 33d692aaa0ab593df0c160082b18fdac02c82e9c. Remote private/main readback passed, initial Issue inventory was empty, and target working tree was clean before mint.
 
@@ -55,6 +55,55 @@ P3: keep this adapter fix in the Oracle producer, without changing campaign prom
 
 The provider invocation did run. Its failed session was passed to the existing `reconcileAutomationReservation` API with `reconciled_reserved` and `provider_failure`, binding the exact session digest and charging the full reserved upper bound. No zero-usage or GPT-completion claim was made. Current ledger: provider_calls consumed 1 / reserved 0; provider_failures consumed 1 / reserved 0; open reservations 0; event count 1; ledger digest `af574fc60194143188f313f913a09ac133594df7c2cba2a58b66d5e5f174b1ad`. The campaign was then canonically stopped against its exact current digest. Original failed session and charge remain immutable.
 
-### Proposed next run; not authorized or minted
+### Replacement-run proposal (subsequently approved below)
 
 Reuse the same private target and exact head, Profile 13 and pinned candidate. New identities: campaign `brc15a-20260907-pro-slider`, authorization `brc15a-20260907-pro-slider-grant`. Request only the remaining one authoring round, at most 63 provider calls and one provider failure; keep one group / ten slots / 16 controller steps / shadow only, with a fresh 45-minute expiry from mint. All other grant bounds and prohibitions remain as originally approved. This preserves the original cumulative two-invocation authoring ceiling and 64-call ceiling. No follow-up authoring after this remaining round. The original plan explicitly disallows an automatic second grant, so this proposed mint needs a new user authorization. Successful selector probes cannot replace real GPT authoring or the eventual user investment decision.
+
+## Approved remaining-budget run, 2026-09-08
+
+User explicitly approved the proposed remaining-budget grant. Minted authorization `0d6772fe95ff0bbb87c011e0acdf25e548a1aea8b0c3a464be631401e0278a4b`, issued `2026-09-07T17:08:21.619Z`, expires `2026-09-07T17:53:21.619Z`. Campaign `brc15a-20260907-pro-slider`; same private repository and unchanged target commit. Limits: one authoring round, 63 provider calls, one provider failure, 16 controller steps, shadow only. Oracle candidate HEAD `26e12021f9593d7ac4ede7b252099653f1b4aca8` was clean. Real authoring invoked once through the supported binary environment override. Outcome recorded below.
+
+## Replacement-run result
+
+The real authoring invocation completed with session `chgpt_20260908_013100_brc15a-20260907-pro-slider-group-1-issue-authori`, intent `sha256:f4aa3b1df08285847fa6bc808a69a7dea669d3be6b1c1319c8eeeeccfa23c540`, and session digest `sha256:20621f970ccaeb647d56d6b3c156f733eda9f2647c1691e2f768ed6b6d62c1cd`. Oracle elapsed 21m58s. The ten GitHub records were created at 17:14:36–17:15:38Z, roughly 6–7 minutes after launch.
+
+### Conversation ownership and human intervention
+
+Oracle initially bound conversation `6a9eefe0-d188-83ea-afc4-27bb35defd72`. A later read-only inspection found the same browser target displaying a different conversation, `6a9ef008-1420-83ea-9575-a7f061c2d577`, whose reply claimed zero new Issues and merely existing slots. The extractor returning null on that page was correct: its expected conversation guard rejected the mismatch. The initial suspicion of a broken response extractor was withdrawn. Who changed the conversation is not established; do not attribute the navigation to Oracle, the user or another agent without evidence.
+
+One operator intervention navigated that owned browser target back to the exact originally bound URL. Its actual reply described creating slots 01–10; Oracle then captured it and exited successfully. No prompt was resubmitted or follow-up sent by this execution session. The other conversation's output is not accepted as this run's result. Both recorded Oracle controller/Chrome PIDs were absent after completion.
+
+### Independent GitHub readback
+
+One request through `createCampaignProviderExecutor.read` fetched the dedicated repository's all-state Issue page with page size 20, 30-second timeout and 163840-byte buffer. The response was HTTP 200 with ten records and no next-page Link. This is an independent budgeted audit; it is **not** a canonical adoption snapshot or acceptance receipt.
+
+- Issues #1–#10 are open and are not PR records; all have matching created_at/updated_at at observation time.
+- Existing `declaredIssueBatchSlot` resolves exactly slots 01–10, once each: ten present, zero missing, zero duplicates, zero unexpected marker slots in that page.
+- Existing `parseIssueBatchMetadata` returns null for **10/10**: every priority is a P1/P2/P3 string while the protocol requires an integer 0–100. The emitted capability names also match none of the exact target's node IDs. Named suspected paths do exist at the frozen commit, but many are broad directories; this does not establish a real defect.
+- Root-cause and repair usefulness were not experimentally validated. Counts prove real writing and marker fidelity, not ten useful or adoptable tasks.
+
+### Admission defects and own setup error
+
+1. The raw Oracle model-selection metadata reports GPT-5.5 verified and Pro selection succeeded, but the repo-harness browser result and authoring session project model verification as false/unverified. `campaign adopt --dry-run` returns `issue_authoring_session_unverified`. The stored session was not edited to bypass this.
+2. The target policy selected explicit Issue numbers. `observeIssueBatch` rejects that policy as `issue_provider_snapshot_incomplete` because it cannot prove a complete batch. This is the orchestrator's canary setup error, not a claim that the product should accept incomplete snapshots. No frozen target policy or grant was rewritten.
+3. The authoring prompt names metadata keys but omits the numeric priority contract and the authoritative capability vocabulary. The real output fails the actual parser. Preserve parser authority; do not coerce P1 or invent capability aliases to admit these Issues.
+
+The attempted early observation was refused before admission while authoring was pending. After authoring completed, the policy-invalid observation admitted one controller step but performed zero GitHub calls; its persisted policy refusal was used to complete that step as no_progress. A separate budgeted readback then completed as progress.
+
+### Budget and closure
+
+Replacement automation run `c42ce4db0b79ab0d1f3dfddda0a4d920a91cce25a4d919271dd646df726c658f`: harness provider_calls **2** (one Oracle invocation plus one GitHub read), provider_failures **0**, controller_steps **2**, open reservations **0**, ledger events **6**, ledger digest `4cc4de2bb5ad3fb63e1bab8a4f8ecc317d51faed65d5402df10c9c27ea8e8f92`. GPT's internal Connector tool-call count is not measured by that wrapper ledger. Including the prior failed attempt, total harness provider_calls are 3 and total authoring invocations are 2. No second-round authoring or Issue edits were performed in this approved replacement run.
+
+The campaign was canonically stopped against its exact current digest after the readback. No Task/Claim/worker, code repair, PR, merge, Issue close or release was initiated by this execution session. Existing Issues and immutable evidence remain available. Exact-SHA provider proof is still unverified; echoed baseline text and local Git do not replace it.
+
+### Investment recommendation; user decision pending
+
+Do not advance to active repair on these results. The smallest justified next slice is authoring/adoption contract alignment: give the author the real metadata schema and capability IDs, repair model-verification projection without weakening its authority, and use a complete-snapshot canary selection in the next explicitly frozen setup. First validate those boundaries locally against these real failures. The write channel is proven usable; adoption utility is currently 0/10 and conversation ownership needed one manual recovery. No automatic next grant is authorized by this report.
+
+Local evidence digest: `brc15a-github-issues.json` SHA256 `d08da4b4960fef72dc738e7629de4719fb7a26a4fee554a319e4096952a10bb8`.
+
+Local evidence digest: `brc15a-readback-validation.json` SHA256 `6d2641a3c3fcb83e67126ef85d6700682dbd65fdbdc891f899ec10e304921c05`.
+
+Local evidence digest: `brc15a-pro-slider-author-result.json` SHA256 `b5c23c3db1494a968f00be2ff870c1c10712f35e0ef3955f7373141146ed3c6d`.
+
+Local evidence digest: `brc15a-pro-slider-budget-final.json` SHA256 `f9cab8ba2568af52b44f5558be6b92d9ec01fd570f78accf8a15811ffb528738`.
