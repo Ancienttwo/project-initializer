@@ -144,6 +144,7 @@ export function parseCodexExecStructuredOutput(stdout: string): CodexExecStructu
     reject('adapter_payload_not_json', 'provider output does not end in one ordered successful Codex turn');
   }
   const pending = new Set<string>();
+  const operations = new Map<string, { type: string; completed: boolean }>();
   const operationTypes = new Set<string>();
   for (const event of events) {
     if (['thread.started', 'turn.started', 'turn.completed'].includes(event.type as string)) continue;
@@ -154,6 +155,14 @@ export function parseCodexExecStructuredOutput(stdout: string): CodexExecStructu
     if (!item || typeof item.id !== 'string' || typeof item.type !== 'string') {
       reject('adapter_payload_not_json', 'provider output contains an unidentified Codex operation');
     }
+    const previous = operations.get(item.id);
+    if (previous && (previous.type !== item.type || previous.completed)) {
+      reject('adapter_payload_not_json', 'provider output reuses a terminal operation or changes its type');
+    }
+    if (event.type === 'item.updated' && !previous) {
+      reject('adapter_payload_not_json', 'provider output updates an operation that was never started');
+    }
+    operations.set(item.id, { type: item.type, completed: event.type === 'item.completed' });
     operationTypes.add(item.type);
     if (event.type === 'item.started') {
       if (pending.has(item.id)) reject('adapter_payload_not_json', 'provider output starts an operation twice');

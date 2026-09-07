@@ -8,7 +8,7 @@ import { runGithubCommand, type GithubCommandRunner } from '../external-sources/
 import { automationStoreNow } from './clock';
 import { readPlanningRecord, persistPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
-import { readAutomationBudgetStatus, reserveCampaignProviderBudget, recordCampaignProviderOutcome, reconcileAutomationReservation, type BeginCampaignBudgetStepInput } from './budget-store';
+import { readAutomationBudgetStatus, runCampaignProviderRead, reserveCampaignProviderBudget, recordCampaignProviderOutcome, reconcileAutomationReservation, type BeginCampaignBudgetStepInput } from './budget-store';
 
 /** One effective destination is required for both destructive push and readback. */
 export function campaignCloseoutRemoteDestination(root: string, remote: string): string {
@@ -48,8 +48,13 @@ export function runCampaignCloseoutProviderAttempt(input: {
       ?? reserveCampaignProviderBudget({ ...input.step, step_admission_sha256: input.step_admission_sha256,
         operation: request.operation, request_sha256: digest, idempotency_key: key('admission') }).reservation;
     persistPlanningRecord(input.root, input.intent, key('reservation'), reservation);
+    const reconcileOriginal = (evidence: unknown) => reconcileAutomationReservation({ repo_root: input.root, reservation,
+      resolution: 'reconciled_reserved', outcome: 'no_progress', reason: 'mutation response/readback unresolved; original two-call upper bound charged before metered read recovery',
+      evidence_refs: [{ ref: `controller-run:${reservation.automation_run_id}`, sha256: automationDigest(evidence) }], env: input.step.env });
     const settle = (receipt: CampaignCloseoutProviderReceipt) => {
       if (receipt.request_sha256 !== digest || receipt.reservation_sha256 !== reservation.reservation_sha256) throw new Error('closeout receipt binding differs');
+      const accounted = readPlanningRecord(input.root, input.intent, key('recovery-accounting'));
+      if (accounted) { reconcileOriginal(accounted); return; }
       if (receipt.mutation_returned) recordCampaignProviderOutcome({ repo_root: input.root, reservation, outcome: 'returned', result_sha256: automationDigest(receipt), env: input.step.env });
       else reconcileAutomationReservation({ repo_root: input.root, reservation, resolution: 'reconciled_reserved', outcome: 'completed',
         reason: 'exact mandatory readback confirms mutation; unknown original response charged at reserved upper bound',
@@ -95,25 +100,75 @@ export function runCampaignCloseoutProviderAttempt(input: {
       if (!Number.isSafeInteger(created?.id) || created.id < 1) throw new Error('closeout comment response has no exact id');
       commentId = created.id;
     }
-    const readback = phase('readback', timeout => request.operation === 'git_ref_delete_attempt'
+    const hadReadback = readPlanningRecord(input.root, input.intent, key('readback-started')) !== null;
+    const invokeRead = (timeout: number) => request.operation === 'git_ref_delete_attempt'
       ? git(['ls-remote', '--refs', request.remote, request.ref], timeout)
       : github(['api', '--method', 'GET', request.operation === 'github_comment_attempt' && commentId !== null
         ? `repos/${request.repository}/issues/comments/${commentId}`
-        : `repos/${request.repository}/issues/${request.issue_number}${request.operation === 'github_comment_attempt' ? '/comments?per_page=100' : ''}`], timeout));
-    if (!readback.returned) throw new Error('closeout readback is unknown; reservation remains unresolved');
-    let confirmed: boolean;
-    if (request.operation === 'git_ref_delete_attempt') confirmed = readback.stdout.trim() === '';
-    else {
-      const value = JSON.parse(readback.stdout);
-      confirmed = request.operation === 'github_comment_attempt'
-        ? (commentId !== null ? value?.id === commentId && value.body === request.body
-          : Array.isArray(value) && value.filter(item => item && typeof item.id === 'number' && item.body === request.body).length === 1)
-        : value && value.number === request.issue_number && value.state === 'closed' && value.state_reason === request.disposition;
+        : `repos/${request.repository}/issues/${request.issue_number}${request.operation === 'github_comment_attempt' ? '/comments?per_page=100' : ''}`], timeout);
+    const confirms = (observed: PhaseResult): boolean => {
+      if (!observed.returned) return false;
+      if (request.operation === 'git_ref_delete_attempt') return observed.stdout.trim() === '';
+      try {
+        const value = JSON.parse(observed.stdout);
+        return request.operation === 'github_comment_attempt'
+          ? (commentId !== null ? value?.id === commentId && value.body === request.body
+            : Array.isArray(value) && value.filter(item => item && typeof item.id === 'number' && item.body === request.body).length === 1)
+          : value && value.number === request.issue_number && value.state === 'closed' && value.state_reason === request.disposition;
+      } catch { return false; }
+    };
+    let readback = phase('readback', invokeRead);
+    let readbackReservation = reservation.reservation_sha256;
+    let readbackGeneration = 0;
+    if (!confirms(readback) && hadReadback) {
+      // Accounting completion does not complete the mutation transaction. Only exact readback does.
+      const accounting = { reservation_sha256: reservation.reservation_sha256, request_sha256: digest, mutation, readback };
+      persistPlanningRecord(input.root, input.intent, key('recovery-accounting'), accounting);
+      reconcileOriginal(accounting);
+      for (let generation = 1; ; generation++) {
+        const recoveryKey = (part: string) => key(`recovery-read:${generation}:${part}`);
+        const saved = readPlanningRecord<PhaseResult>(input.root, input.intent, recoveryKey('result'));
+        const reserved = readPlanningRecord<CampaignAutomationBudgetReservationV1>(input.root, input.intent, recoveryKey('reservation'));
+        const started = readPlanningRecord(input.root, input.intent, recoveryKey('started'));
+        const settleRead = (r: CampaignAutomationBudgetReservationV1, value: PhaseResult) => recordCampaignProviderOutcome({ repo_root: input.root,
+          reservation: r, outcome: value.returned ? 'returned' : 'read_failed', result_sha256: automationDigest(value), env: input.step.env });
+        if (saved) {
+          if (!reserved) throw new Error('recovery read lost its reservation');
+          settleRead(reserved, saved);
+          if (confirms(saved)) { readback = saved; readbackReservation = reserved.reservation_sha256; readbackGeneration = generation; break; }
+          continue;
+        }
+        if (started) {
+          if (!reserved) throw new Error('recovery read lost its reservation');
+          reconcileAutomationReservation({ repo_root: input.root, reservation: reserved, resolution: 'reconciled_reserved', outcome: 'no_progress',
+            reason: 'interrupted read-only recovery charged at its reserved upper bound',
+            evidence_refs: [{ ref: `controller-run:${reservation.automation_run_id}`, sha256: automationDigest(started) }], env: input.step.env });
+          continue;
+        }
+        const readReservation = reserved ?? reserveCampaignProviderBudget({ ...input.step, step_admission_sha256: input.step_admission_sha256,
+          operation: request.operation === 'git_ref_delete_attempt' ? 'git_read' : 'github_read',
+          request_sha256: automationDigest({ mutation: digest, original_reservation: reservation.reservation_sha256, generation }),
+          idempotency_key: recoveryKey('admission') }).reservation;
+        persistPlanningRecord(input.root, input.intent, recoveryKey('reservation'), readReservation);
+        const status = readAutomationBudgetStatus(input.root, reservation.automation_run_id, input.step.env);
+        const remaining = Date.parse(readReservation.deadline_at) - Date.parse(automationStoreNow());
+        if (status.stop_receipt || remaining <= 0 || status.current.open_reservation_sha256s.length !== 1
+          || status.current.open_reservation_sha256s[0] !== readReservation.reservation_sha256) throw new Error('recovery read is stopped or no longer owned');
+        persistPlanningRecord(input.root, input.intent, recoveryKey('started'), { request_sha256: digest, reservation_sha256: readReservation.reservation_sha256, generation });
+        input.crash_hook?.('after_recovery_read_started');
+        try { readback = invokeRead(Math.min(remaining, 30000)); }
+        catch (error) { readback = { returned: false, stdout: '', detail: error instanceof Error ? error.message : String(error) }; }
+        persistPlanningRecord(input.root, input.intent, recoveryKey('result'), readback);
+        settleRead(readReservation, readback);
+        readbackReservation = readReservation.reservation_sha256; readbackGeneration = generation;
+        break; // One fresh observation per operator invocation, never an implicit retry loop.
+      }
     }
-    if (!confirmed) throw new Error('closeout readback does not confirm its exact mutation; no resend');
+    if (!readback.returned) throw new Error('closeout readback is unknown; mutation remains unresolved');
+    if (!confirms(readback)) throw new Error('closeout readback does not confirm its exact mutation; no resend');
     const receipt: CampaignCloseoutProviderReceipt = { operation: request.operation, request_sha256: digest,
       reservation_sha256: reservation.reservation_sha256, mutation_returned: mutation.returned,
-      readback_stdout: readback.stdout, observed_at: automationStoreNow() };
+      readback_stdout: readback.stdout, readback_reservation_sha256: readbackReservation, readback_generation: readbackGeneration, observed_at: automationStoreNow() };
     persistPlanningRecord(input.root, input.intent, key('receipt'), receipt);
     input.crash_hook?.('after_receipt');
     settle(receipt);
@@ -143,15 +198,14 @@ export function createCampaignCloseoutIntegrationObserver(input: {
 export function createCampaignCloseoutFetch(binding: Parameters<typeof reserveCampaignProviderBudget>[0]) {
   return (args: readonly string[]) => {
     if (args[0] !== 'fetch') throw new Error('closeout observation requires git fetch');
-    const reserved = reserveCampaignProviderBudget({ ...binding, operation: 'git_read', request_sha256: automationDigest(args) });
-    if (reserved.disposition !== 'reserved') throw new Error('closeout fetch was already admitted; reconcile before retry');
-    const remaining = Date.parse(reserved.reservation.deadline_at) - Date.parse(automationStoreNow());
-    if (remaining <= 0) throw new Error('closeout fetch deadline elapsed');
-    const result = spawnSync('git', [...args], { cwd: binding.repo_root, encoding: 'utf8', timeout: Math.min(remaining, 30_000), maxBuffer: 2 * 1024 * 1024 });
-    if (result.error || result.status === null) throw new Error('closeout fetch outcome is unknown');
-    recordCampaignProviderOutcome({ repo_root: binding.repo_root, reservation: reserved.reservation,
-      outcome: result.status === 0 ? 'returned' : 'read_failed', result_sha256: automationDigest({ status: result.status, stdout: result.stdout, stderr: result.stderr }), env: binding.env });
-    if (result.status !== 0) throw new Error('closeout fetch failed');
+    runCampaignProviderRead({ ...binding, operation: 'git_read', observation_mode: 'refresh', observation_request_sha256: automationDigest(args),
+      invoke: timeout => {
+        const result = spawnSync('git', [...args], { cwd: binding.repo_root, encoding: 'utf8', timeout, maxBuffer: 2 * 1024 * 1024 });
+        if (result.error || result.status !== 0) throw new Error(`closeout fetch failed: ${result.error?.message ?? result.stderr}`);
+        return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+      },
+      classify_failure: () => 'read_failed',
+    });
   };
 }
 

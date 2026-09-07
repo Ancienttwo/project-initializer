@@ -1,3 +1,4 @@
+import { campaignAttemptOutcome } from '../../src/core/automation/campaign-runtime';
 import { reserveAutomationBudget } from '../../src/effects/automation/budget-store';
 import { recordTaskAutomationAttemptStart } from '../../src/effects/engineers/automation-attempt-store';
 import { bindCampaignWorker, type CampaignWorkerFinal, type CampaignWorkerChildObservation } from '../../src/effects/automation/campaign-worker';
@@ -49,7 +50,7 @@ import { buildLeaseLivenessPolicy } from '../../src/core/state/lease-liveness';
 
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-export async function historicalPlanningFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number } = {}, nonReproducible = false, planningOnly = false) {
+export async function historicalPlanningFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number; max_provider_failures?: number } = {}, nonReproducible = false, planningOnly = false) {
   const capability = 'capability.runtime-harness.fixture';
   const inventory = readFileSync(join(import.meta.dir, '../fixtures/repair-campaign/protected-capabilities.json'), 'utf8');
   const otherCapability = 'capability.runtime-harness.second';
@@ -239,7 +240,7 @@ export function installHistoricalChild(f: Pick<Awaited<ReturnType<typeof histori
   persistPlanningRecord(f.root,f.intent,campaignRuntimeRecordKey(dispatch,role,'intent'),invocation);
   persistPlanningRecord(f.root,f.intent,campaignRuntimeRecordKey(dispatch,role,'started'),{invocation_sha256:invocation.invocation_sha256,identity:invocation.identity});
   persistPlanningRecord(f.root,f.intent,campaignRuntimeRecordKey(dispatch,role,'terminal'),terminal);
-  persistPlanningRecord(f.root,f.intent,canonicalMessageDigest({dispatch,part:`child-${role}`}).slice(7),{observation,terminal});
+  persistPlanningRecord(f.root,f.intent,canonicalMessageDigest({dispatch,part:`child-${role}`}).slice(7),{observation,stdout_sha256:createHash('sha256').update(readFileSync(join(d.envelope.worktree_path,observation.stdout_path))).digest('hex'),stderr_sha256:createHash('sha256').update(readFileSync(join(d.envelope.worktree_path,observation.stderr_path))).digest('hex')});
   return terminal;
 }
 
@@ -250,7 +251,7 @@ export function installHistoricalFinal(f: Pick<Awaited<ReturnType<typeof histori
   const result_sha256=createHash('sha256').update(bytes).digest('hex');
   const child=(role:string)=>readPlanningRecord<{observation:CampaignWorkerChildObservation}>(f.root,f.intent,canonicalMessageDigest({dispatch,part:`child-${role}`}).slice(7));
   const worker=child('worker'),verifier=child('verifier');
-  const final:CampaignWorkerFinal={reservation:attempt.reservation,contract_run,outcome:result.outcome,ended_at:new Date().toISOString(),result_sha256,evidence,
+  const final:CampaignWorkerFinal={reservation:attempt.reservation,contract_run,outcome:campaignAttemptOutcome(result.outcome,contract_run),ended_at:new Date().toISOString(),result_sha256,evidence,
     runtime_effect_id:canonicalMessageDigest({request:attempt.request,contract_run,worker,verifier,result_sha256}),
     evidence_refs:[canonicalMessageDigest({result_sha256,evidence}),...[worker,verifier].filter(x=>x!==null).map(x=>canonicalMessageDigest({...x.observation}))]};
   persistPlanningRecord(f.root,f.intent,canonicalMessageDigest({dispatch,part:'final'}).slice(7),final);

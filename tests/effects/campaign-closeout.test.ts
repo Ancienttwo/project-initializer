@@ -25,8 +25,8 @@ import { runCampaignCloseoutProviderAttempt } from '../../src/effects/automation
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
-async function fixture() {
-  const f = await historicalPlanningFixture(); roots.push(f.root, f.home);
+async function fixture(recoveryBudget = false) {
+  const f = await historicalPlanningFixture(false, false, undefined, true, recoveryBudget ? { max_provider_failures: 10 } : {}); roots.push(f.root, f.home);
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
   const step = { repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
     campaign_id: f.intent.campaign_id, group_number: 1 as const, intent_sha256: f.intent.intent_sha256, idempotency_key: 'closeout-fixture', env: f.env };
@@ -108,8 +108,8 @@ test('shared lifecycle refuses audit while published Tasks lack cleanup receipts
   expect(readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env).current).toEqual(before.current);
 }, 60_000);
 
-async function acquired() {
-  const f = await historicalPlanningFixture(false, false, undefined, true, { max_agent_turns: 40, max_runner_invocations: 40 }); roots.push(f.root, f.home);
+async function acquired(recoveryBudget = false) {
+  const f = await historicalPlanningFixture(false, false, undefined, true, { max_agent_turns: 40, max_runner_invocations: 40, ...(recoveryBudget ? { max_provider_failures: 10 } : {}) }); roots.push(f.root, f.home);
   const result = installHistoricalBoundDispatch(f);
   if (!('worker_handoff' in result) || !result.worker_handoff || !result.envelope) throw new Error(JSON.stringify(result));
   roots.push(result.envelope.worktree_path);
@@ -144,14 +144,14 @@ for (const event of [{type:'thread.started',thread_id:'fixture-'+role}, ...(${de
 }
 
 
-test.each(['normal', 'source-drift', 'release-crash'])('worker publication closeout mode=%s', async (mode) => {
+test.each(['normal', 'source-drift', 'release-crash', 'cleanup-crash', 'target-advance', 'open-recovery', 'read-recovery', 'cleanup-fetch-crash'])('worker publication closeout mode=%s', async (mode) => {
   const sourceDrift = mode === 'source-drift';
-  const f = await acquired(); const env = installProviderFixture(f); const worktree = f.envelope.worktree_path;
+  const f = await acquired(mode === 'read-recovery'); const env = installProviderFixture(f); const worktree = f.envelope.worktree_path;
   const git = (root: string, ...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const attempt = installHistoricalAttempt(f, f.historical);
   for (const role of ['worker', 'verifier'] as const) {
     writeFileSync(join(worktree, `${role}.prompt.md`), 'Fixture prompt');
-    const invocation = prepareCampaignCodexInvocation({repo_root:f.root,worktree,prompt_path:`${role}.prompt.md`,env,
+    const invocation = await prepareCampaignCodexInvocation({ deadline_ms: Date.now() + 10000, repo_root:f.root,worktree,prompt_path:`${role}.prompt.md`,env,
       identity:{dispatch_id:f.input.selector.dispatch_id,role,task_id:f.envelope.task_id,task_revision:f.envelope.task_revision,claim_id:f.envelope.claim_id,lease_generation:f.envelope.generation,binding_generation:f.historical.acquired.offer.binding_generation}});
     const child = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/run-bounded-verifier-command.ts'), '--deadline-ms', String(Date.now() + 10_000),
       '--log', join(worktree, `${role}.stdout`), '--stderr-log', join(worktree, `${role}.stderr`), '--result', join(worktree, `${role}.result`),
@@ -183,12 +183,13 @@ test.each(['normal', 'source-drift', 'release-crash'])('worker publication close
   const slot = manifest.slots.find(value => value.task_id === f.envelope.task_id)!;
   const adopted = manifest.receipt.issues.find(value => value.slot === slot.slot)!;
   const observation = listProviderIssueObservations(f.root).find(value => value.observation_sha256 === adopted.source_observation_sha256)!;
-  let comment = ''; let closed = false; const calls: string[] = [];
+  let comment = ''; let closed = false; let recovered = false; const calls: string[] = [];
   const github_runner = (args: readonly string[]) => {
     calls.push(args.join(' '));
+    if (args[1] === 'graphql' && mode === 'read-recovery' && !recovered) throw new Error('integration read interrupted');
     if (args[1] === 'graphql') return { stdout: JSON.stringify({ data: { repository: { id: 'R_fixture', pullRequest: {
       number: 1, url: receipt.pr_url, headRefOid: head, headRefName: f.envelope.branch, baseRefName: 'main', baseRefOid: merge,
-      body: replacePublicationMarker('Fixture PR', receipt), createdAt: receipt.created_at, state: 'MERGED', mergedAt: new Date().toISOString(), mergeCommit: { oid: merge },
+      body: replacePublicationMarker('Fixture PR', receipt), createdAt: receipt.created_at, state: mode === 'open-recovery' && !recovered ? 'OPEN' : 'MERGED', mergedAt: mode === 'open-recovery' && !recovered ? null : new Date().toISOString(), mergeCommit: mode === 'open-recovery' && !recovered ? null : { oid: merge },
     } } } }) };
     if (args[2] === 'POST') { comment = args.find(arg => arg.startsWith('body='))!.slice(5); return { stdout: '{"id":1}' }; }
     if (args[2] === 'PATCH') { closed = true; return { stdout: '{}' }; }
@@ -200,6 +201,11 @@ test.each(['normal', 'source-drift', 'release-crash'])('worker publication close
       '--expected-worktree', expected.worktree, '--expected-head', expected.head_sha, '--expected-target', expected.target_oid, '--expected-merge', expected.merge_commit_sha],
       { cwd: root, env: { ...env, REPO_HARNESS_TARGET_REPO_ROOT: root, REPO_HARNESS_BUN_BIN: '' }, encoding: 'utf8' });
   } };
+  if (mode === 'open-recovery' || mode === 'read-recovery') {
+    expect(() => runCampaignCloseout(input)).toThrow();
+    expect(closed).toBe(false); expect(existsSync(worktree)).toBe(true);
+    recovered = true;
+  }
   if (sourceDrift) {
     expect(() => runCampaignCloseout(input)).toThrow('Issue source changed');
     expect(closed).toBe(false); expect(existsSync(worktree)).toBe(true);
@@ -214,6 +220,19 @@ test.each(['normal', 'source-drift', 'release-crash'])('worker publication close
     expect(() => runCampaignCloseout(input)).toThrow('lease owner does not match publication receipt');
     expect(readLease(f.root, f.envelope.task_id).record?.generation).toBe(remaining.generation + 1);
     writeLeaseOwnerDurably(f.root, f.envelope.task_id, remaining);
+  }
+  if (mode === 'cleanup-fetch-crash') {
+    expect(() => runCampaignCloseout({ ...input, crash_hook: phase => { if (phase === 'after_cleanup_fetch') throw new Error('cleanup fetch crash'); } })).toThrow('cleanup fetch crash');
+    expect(existsSync(worktree)).toBe(true);
+  }
+  if (mode === 'cleanup-crash') {
+    expect(() => runCampaignCloseout({ ...input, cleanup: (root, topology) => { input.cleanup(root, topology); throw new Error('after deletion crash'); } })).toThrow('after deletion crash');
+    expect(existsSync(worktree)).toBe(false);
+  }
+  if (mode === 'target-advance') {
+    expect(() => runCampaignCloseout({ ...input, cleanup: () => { throw new Error('before deletion crash'); } })).toThrow('before deletion crash');
+    git(f.root, 'commit', '--allow-empty', '-qm', 'legitimate later main');
+    git(f.root, 'push', 'origin', 'main');
   }
   expect(runCampaignCloseout(input).disposition).toBe('complete');
   expect(closed).toBe(true); expect(existsSync(worktree)).toBe(false);
@@ -268,12 +287,12 @@ test('lost close response uses the exact reserved read and never resends PATCH',
   expect(calls).toEqual(['PATCH', 'GET']);
 }, 60_000);
 
-test('unknown readback retains the reservation and neither phase is resent', async () => {
-  const f = await fixture(); let calls = 0;
+test('unknown readback is retried under a new reservation without resending mutation', async () => {
+  const f = await fixture(true); let calls = 0;
   const input = { ...f.provider, github_runner: () => { calls++; throw new Error('transport unavailable'); } };
   expect(() => runCampaignCloseoutProviderAttempt(input)).toThrow('readback is unknown');
   expect(() => runCampaignCloseoutProviderAttempt(input)).toThrow('readback is unknown');
-  expect(calls).toBe(2); expect(f.ledger().reserved_provider_calls).toBe(2);
+  expect(calls).toBe(3); expect(f.ledger().reserved_provider_calls).toBe(0);
 }, 60_000);
 
 test('a moved remote ref is preserved by compare-and-delete and leaves reconciliation pending', async () => {
@@ -354,3 +373,53 @@ test('a known comment is read back by exact id beyond the first hundred', async 
   } });
   expect(paths[1]).toBe(`repos/${f.intent.provider_repository}/issues/comments/501`);
 }, 60_000);
+
+for (const interrupted of [false, true]) test(`readback recovery confirms mutation once after interruption=${interrupted}`, async () => {
+  const f = await fixture(true); const calls: string[] = []; let failRead = true;
+  const input = { ...f.provider, github_runner: (args: readonly string[]) => {
+    calls.push(args[2]!);
+    if (args[2] === 'POST') return { stdout: '{"id":123}' };
+    if (failRead) throw new Error('network unavailable');
+    return { stdout: '{"id":123,"body":"Exact fixture closure marker"}' };
+  } };
+  expect(() => runCampaignCloseoutProviderAttempt({ ...input, crash_hook: phase => {
+    if (interrupted && phase === 'after_readback_started') throw new Error('read started crash');
+  } })).toThrow();
+  failRead = false;
+  const receipt = runCampaignCloseoutProviderAttempt(input);
+  expect(receipt.readback_stdout).toContain('Exact fixture closure marker');
+  expect(calls.filter(x => x === 'POST')).toHaveLength(1);
+  expect(calls.filter(x => x === 'GET')).toHaveLength(interrupted ? 1 : 2);
+  const ledger = f.ledger();
+  expect(ledger.reserved_provider_calls).toBe(0);
+  expect(runCampaignCloseoutProviderAttempt(input)).toEqual(receipt);
+  expect(f.ledger()).toEqual(ledger);
+}, 60000);
+
+test('read recovery stops at the original upper-bound budget and never repeats mutation', async () => {
+  const f = await fixture(); let calls = 0;
+  const input = { ...f.provider, github_runner: () => { calls++; throw new Error('unavailable'); } };
+  expect(() => runCampaignCloseoutProviderAttempt(input)).toThrow('readback is unknown');
+  expect(() => runCampaignCloseoutProviderAttempt(input)).toThrow('budget_exhausted');
+  expect(calls).toBe(2);
+  expect(f.ledger().reserved_provider_calls).toBe(0);
+}, 60000);
+
+test('interrupted recovery read is charged once and advances only the read generation', async () => {
+  const f = await fixture(true); let calls = 0; let available = false;
+  const input = { ...f.provider, github_runner: (args: readonly string[]) => {
+    calls++;
+    if (args[2] === 'POST') return { stdout: '{"id":123}' };
+    if (!available) throw new Error('unavailable');
+    return { stdout: '{"id":123,"body":"Exact fixture closure marker"}' };
+  } };
+  expect(() => runCampaignCloseoutProviderAttempt(input)).toThrow('readback is unknown');
+  expect(() => runCampaignCloseoutProviderAttempt({ ...input, crash_hook: phase => { if (phase === 'after_recovery_read_started') throw new Error('recovery crash'); } })).toThrow('recovery crash');
+  available = true;
+  const result = runCampaignCloseoutProviderAttempt(input);
+  expect(result.readback_generation).toBe(2);
+  expect(calls).toBe(3);
+  const ledger = f.ledger();
+  runCampaignCloseoutProviderAttempt(input);
+  expect(f.ledger()).toEqual(ledger);
+}, 60000);

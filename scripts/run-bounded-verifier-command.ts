@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
-import { closeSync, openSync, writeFileSync, writeSync } from 'fs';
+import { constants, closeSync, openSync, writeFileSync, writeSync } from 'fs';
 import { createHash } from 'crypto';
 import { spawn } from 'child_process';
 
 type Result = {
+  started: boolean;
+  termination_cause: 'completed' | 'deadline' | 'cancelled' | 'output_error';
   output_sha256?: { stdout: string; stderr: string };
   output_complete?: boolean;
   duration_ms: number;
@@ -32,6 +34,8 @@ const deadlineMs = Number(option('--deadline-ms'));
 const logPath = option('--log');
 const resultPath = option('--result');
 const stderrPath = argv.slice(0, separator).includes('--stderr-log') ? option('--stderr-log') : null;
+const outputLimit = argv.slice(0, separator).includes('--max-output-bytes') ? Number(option('--max-output-bytes')) : null;
+if (outputLimit !== null && (!Number.isSafeInteger(outputLimit) || outputLimit < 1 || stderrPath === null)) usage();
 const command = argv[separator + 1];
 const args = argv.slice(separator + 2);
 if (!Number.isFinite(deadlineMs)) usage();
@@ -63,12 +67,24 @@ function scrubHarnessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 
 const startedAt = Date.now();
 let timedOut = false;
+let cancellationSignal: NodeJS.Signals | null = null;
 let terminating = false;
 let forcedTerminationSent = false;
 let forcedTerminationConfirmDeadlineMs = 0;
 let forceTermination: Promise<void> | undefined;
-const logFd = openSync(logPath, 'w');
-const stderrFd = stderrPath === null ? logFd : openSync(stderrPath, 'w');
+const logFd = openSync(logPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+const stderrFd = stderrPath === null ? logFd : openSync(stderrPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+// Refusal happens at the actual spawn boundary, including time spent opening logs.
+if (Date.now() >= deadlineMs) {
+  closeSync(logFd);
+  if (stderrFd !== logFd) closeSync(stderrFd);
+  const emptyHash = `sha256:${createHash('sha256').digest('hex')}`;
+  const result: Result = { ...(stderrPath !== null ? { output_complete: true, output_sha256: { stdout: emptyHash, stderr: emptyHash } } : {}), started: false, termination_cause: 'deadline', duration_ms: Date.now() - startedAt,
+    timed_out: true, exit_code: 124, signal: null,
+    process_group_quiescence: { scope: 'unsupported', state: 'unknown' } };
+  writeFileSync(resultPath, `${JSON.stringify(result)}\n`, { flag: 'wx', mode: 0o600 });
+  process.exit(124);
+}
 const child = spawn(command, args, {
   detached: process.platform !== 'win32',
   stdio: stderrPath === null ? ['ignore', logFd, stderrFd] : ['ignore', 'pipe', 'pipe'],
@@ -78,11 +94,14 @@ const child = spawn(command, args, {
 const stdoutHash = createHash('sha256');
 const stderrHash = createHash('sha256');
 let outputError = false;
+let outputBytes = 0;
 let outputClosed = false;
 const closed = new Promise<void>(resolve => child.once('close', () => { outputClosed = true; resolve(); }));
 if (stderrPath !== null) {
   for (const [stream, fd, hash] of [[child.stdout!, logFd, stdoutHash], [child.stderr!, stderrFd, stderrHash]] as const) {
     stream.on('data', (bytes: Buffer) => {
+      outputBytes += bytes.length;
+      if (outputLimit !== null && outputBytes > outputLimit) { outputError = true; beginTermination(); return; }
       hash.update(bytes);
       try { let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset); }
       catch { outputError = true; beginTermination(); }
@@ -144,6 +163,7 @@ function beginTermination(): void {
 
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(signal, () => {
+    cancellationSignal ??= signal;
     beginTermination();
   });
 }
@@ -174,14 +194,16 @@ if (forceTermination) await forceTermination;
 closeSync(logFd);
 if (stderrFd !== logFd) closeSync(stderrFd);
 const result: Result = {
+  started: child.pid !== undefined,
+  termination_cause: cancellationSignal ? 'cancelled' : timedOut ? 'deadline' : outputError ? 'output_error' : 'completed',
   ...(stderrPath !== null ? { output_sha256: { stdout: `sha256:${stdoutHash.digest('hex')}`, stderr: `sha256:${stderrHash.digest('hex')}` }, output_complete: outputClosed && !outputError } : {}),
   duration_ms: Date.now() - startedAt,
   timed_out: timedOut,
-  exit_code: timedOut ? 124 : completion.code ?? 1,
-  signal: completion.signal,
+  exit_code: cancellationSignal ? ({ SIGINT: 130, SIGTERM: 143, SIGHUP: 129 }[cancellationSignal as 'SIGINT' | 'SIGTERM' | 'SIGHUP']) : timedOut ? 124 : outputError ? 1 : completion.code ?? 1,
+  signal: cancellationSignal ?? completion.signal,
   process_group_quiescence: process.platform === 'win32' || !child.pid
     ? { scope: 'unsupported', state: 'unknown' }
     : { scope: 'posix_process_group', state: processGroupExists() ? 'active' : 'quiescent' },
 };
-writeFileSync(resultPath, `${JSON.stringify(result)}\n`);
+writeFileSync(resultPath, `${JSON.stringify(result)}\n`, { flag: 'wx', mode: 0o600 });
 process.exit(result.exit_code);

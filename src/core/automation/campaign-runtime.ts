@@ -64,3 +64,14 @@ export function validateCampaignCodexInvocation(input: unknown): CampaignCodexIn
   }
   return value;
 }
+
+/** Acceptance failure cannot project worker execution completion as task success. */
+export function campaignAttemptOutcome(
+  outcome: Exclude<import('../engineers/automation-attempt').TaskAutomationAttemptOutcome, 'started'>,
+  contract: { status: 'pass' | 'fail'; failure_class: string | null },
+) {
+  if (contract.status === 'fail' && (outcome === 'completed' || outcome === 'not_reproducible')) {
+    return 'permanent_failure' as const;
+  }
+  return outcome;
+}

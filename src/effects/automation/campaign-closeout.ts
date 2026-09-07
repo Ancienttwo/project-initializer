@@ -1,6 +1,8 @@
 import { execFileSync } from 'child_process';
 import { randomUUID } from 'crypto';
+import { existsSync } from 'fs';
 import { automationDigest } from '../../core/automation/budget';
+import { campaignRuntimeRecordKey } from '../../core/automation/campaign-runtime';
 import { messageSha256 } from '../../core/messages/mechanics';
 import { allCampaignIssueTasksMerged, campaignIssueMembers, campaignCloseoutKey, type CampaignCloseoutProviderRequest } from '../../core/automation/campaign-closeout';
 import type { WorkEnvelopeV1 } from '../fleet/acquire';
@@ -42,10 +44,11 @@ export interface CampaignCleanupReceiptV1 {
 export function runCampaignCloseout(input: {
   readonly selector: unknown; readonly host: 'codex' | 'claude'; readonly session_id: string;
   readonly remote: string; readonly env?: NodeJS.ProcessEnv; readonly github_runner?: GithubCommandRunner;
-  readonly crash_hook?: (phase: 'after_merge_persisted') => void;
+  readonly crash_hook?: (phase: 'after_merge_persisted' | 'after_cleanup_fetch') => void;
   readonly cleanup: (root: string, expected: ExactWorktreeCleanup) => unknown;
 }) {
-  const { root, intent, envelope: work, writable_inactive: writableInactive } = readCompletedCampaignWorker(input.selector, input.env);
+  const completed = readCompletedCampaignWorker(input.selector, input.env);
+  const { root, intent, envelope: work, writable_inactive: writableInactive } = completed;
   const authority = requireCampaignPlanningAuthority(root, intent, input.env);
   const parent = readPlanningRecord<{ host: string; session_id: string }>(root, intent, 'parent');
   if (authority.policy.mode !== 'active' || authority.grant.campaign?.local_parent_host !== input.host
@@ -96,7 +99,7 @@ export function runCampaignCloseout(input: {
       repo_root: root, task_id: work.task_id, expected_claim_id: work.claim_id, expected_generation: work.generation,
       publication_id: stored.publication_id, expected_head_sha: stored.head_sha, remote: stored.remote,
       fetch_target: createCampaignCloseoutFetch({ ...mergeStep.binding, operation: 'git_read', request_sha256: automationDigest({ task: work.task_id, phase: 'fetch' }), idempotency_key: `closeout-fetch:${work.task_id}` }),
-      observe_integration: createCampaignCloseoutIntegrationObserver({ root, intent, deadline_at: budget.deadline_at, budget_read: createCampaignProviderExecutor(mergeStep.binding, input.github_runner).read }),
+      observe_integration: createCampaignCloseoutIntegrationObserver({ root, intent, deadline_at: budget.deadline_at, budget_read: createCampaignProviderExecutor(mergeStep.binding, input.github_runner, 'refresh').read }),
       before_integration_release: proof => {
         requireCampaignPlanningAuthority(root, intent, input.env);
         if (proof.integration_state !== 'merged' || !proof.merge_commit_sha) throw new Error('campaign closure requires an actual merged PR');
@@ -114,7 +117,17 @@ export function runCampaignCloseout(input: {
   const { slots: memberSlots, members } = campaignIssueMembers({ slots: authority.manifest.slots, issues: authority.manifest.receipt.issues }, issue.provider_issue_id);
   const proofs = members.map(member => read<ReconcilePublicationResult>(campaignCloseoutKey(member.task_id, 'merge')));
   if (!allCampaignIssueTasksMerged(members.map(member => member.task_id), proofs)) return { disposition: 'waiting_issue_members' as const };
-  if (!writableInactive) return { disposition: 'cleanup_pending_runtime_inactivity' as const };
+  const terminalEvidence = (['worker', 'verifier'] as const).map(role => read(campaignRuntimeRecordKey(completed.selector.dispatch_id, role, 'terminal')));
+  const prerequisite = read<{ dispatch_id: string; work_sha256: string; final_sha256: string; head_sha: string; terminal_evidence_sha256: string }>(key('cleanup-prerequisite'));
+  const prerequisiteMatches = prerequisite?.dispatch_id === completed.selector.dispatch_id
+    && prerequisite.work_sha256 === automationDigest(work) && prerequisite.final_sha256 === automationDigest(completed.final)
+    && prerequisite.head_sha === stored.head_sha && terminalEvidence.every(Boolean)
+    && prerequisite.terminal_evidence_sha256 === automationDigest(terminalEvidence);
+  // Deleted streams may only be replaced by evidence committed before this exact deletion.
+  if (!writableInactive && !(prerequisiteMatches && !existsSync(work.worktree_path))) {
+    if (completed.unsupported_command_effects) return { disposition: 'cleanup_unsupported_command_inactivity' as const, attention_owner: 'operator' as const };
+    return { disposition: 'cleanup_pending_runtime_inactivity' as const };
+  }
   const { step, admission, binding } = budgetStep('cleanup');
   const targetKey = key('cleanup-target');
   let cleanupTarget = read<{ oid: string }>(targetKey);
@@ -122,15 +135,32 @@ export function runCampaignCloseout(input: {
     const ref = `refs/repo-harness/observations/closeout/${work.task_id}/${randomUUID()}`;
     createCampaignCloseoutFetch({ ...binding, operation: 'git_read', request_sha256: automationDigest({ task: work.task_id, phase: 'cleanup-fetch' }),
       idempotency_key: `closeout-current-main:${work.task_id}` })(['fetch', '--no-tags', '--no-write-fetch-head', stored.remote, `+refs/heads/${integration.evidence.target_ref}:${ref}`]);
+    input.crash_hook?.('after_cleanup_fetch');
     cleanupTarget = { oid: git(['rev-parse', `${ref}^{commit}`]) };
     for (const proof of proofs) git(['merge-base', '--is-ancestor', proof!.merge_commit_sha!, cleanupTarget.oid]);
     save(targetKey, cleanupTarget);
   }
-  if (git(['rev-parse', `${integration.evidence.target_ref}^{commit}`]) !== cleanupTarget.oid) throw new Error('current local main differs from closeout observation');
+  const localTarget = git(['rev-parse', `${integration.evidence.target_ref}^{commit}`]);
+  if (localTarget !== cleanupTarget.oid) {
+    git(['merge-base', '--is-ancestor', cleanupTarget.oid, localTarget]);
+    const revisionKey = key(`cleanup-target:${localTarget}`);
+    let refreshed = read<{ oid: string }>(revisionKey);
+    if (!refreshed) {
+      const ref = `refs/repo-harness/observations/closeout/${work.task_id}/${localTarget}`;
+      createCampaignCloseoutFetch({ ...binding, operation: 'git_read', request_sha256: automationDigest({ task: work.task_id, target: localTarget }),
+        idempotency_key: `closeout-current-main:${work.task_id}:${localTarget}` })(['fetch', '--no-tags', '--no-write-fetch-head', stored.remote, `+refs/heads/${integration.evidence.target_ref}:${ref}`]);
+      refreshed = { oid: git(['rev-parse', `${ref}^{commit}`]) };
+      if (refreshed.oid !== localTarget) throw new Error('current local main differs from closeout observation');
+      for (const proof of proofs) git(['merge-base', '--is-ancestor', proof!.merge_commit_sha!, refreshed.oid]);
+      save(revisionKey, refreshed);
+    }
+    if (refreshed.oid !== localTarget) throw new Error('cleanup target revision differs');
+    cleanupTarget = refreshed;
+  }
   for (const proof of proofs) git(['merge-base', '--is-ancestor', proof!.merge_commit_sha!, cleanupTarget.oid]);
   const issueKey = campaignCloseoutKey(issue.provider_issue_id, 'issue-intent');
   if (!read(issueKey)) {
-    const provider = createCampaignProviderExecutor(binding, input.github_runner);
+    const provider = createCampaignProviderExecutor(binding, input.github_runner, 'refresh');
     const observed = JSON.parse(provider.read(['api', '--method', 'GET', `repos/${intent.provider_repository}/issues/${issue.issue_number}`], campaignCloseoutReadOptions(budget.deadline_at)).stdout);
     if (String(observed.id) !== issue.provider_issue_id || observed.number !== issue.issue_number || observed.state !== 'open'
       || typeof observed.title !== 'string' || typeof observed.body !== 'string'
@@ -151,7 +181,14 @@ export function runCampaignCloseout(input: {
   const currentBudget = readAutomationBudgetStatus(root, budget.automation_run_id, input.env);
   if (currentBudget.stop_receipt || currentBudget.current.open_reservation_sha256s.length || Date.now() >= Date.parse(budget.deadline_at)) throw new Error('cleanup_pending: campaign is stopped or unresolved');
   requireCampaignPlanningAuthority(root, intent, input.env);
-  cleanupExactWorktree(root, topology, () => input.cleanup(root, topology));
+  cleanupExactWorktree(root, topology, () => {
+    if (!prerequisite) {
+      if (!writableInactive) throw new Error('cleanup requires current supervised inactive evidence');
+      save(key('cleanup-prerequisite'), { dispatch_id: completed.selector.dispatch_id,
+        work_sha256: automationDigest(work), final_sha256: automationDigest(completed.final), head_sha: stored.head_sha, terminal_evidence_sha256: automationDigest(terminalEvidence) });
+    } else if (!prerequisiteMatches) throw new Error('cleanup prerequisite identity differs');
+    return input.cleanup(root, topology);
+  });
   const receipt: CampaignCleanupReceiptV1 = { protocol: 1, kind: 'repo-harness-campaign-cleanup', disposition: 'completed', task_id: work.task_id,
     task_revision: work.task_revision, publication_id: stored.publication_id, provider_issue_id: issue.provider_issue_id, integration, topology };
   save(key('complete'), receipt);

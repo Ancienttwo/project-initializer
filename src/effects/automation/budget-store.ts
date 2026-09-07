@@ -2649,3 +2649,103 @@ export function listAutomationBudgetRuns(repoRoot: string): readonly string[] {
     return fail('automation_budget_store_unavailable', 'cannot list automation budget runs', error);
   }
 }
+
+/** Read a previously admitted operation without re-running admission or minting a reservation. */
+export function readAutomationReservationByKey(repoRoot: string, runId: string, idempotencyKey: string, env?: NodeJS.ProcessEnv): AutomationBudgetReservationV1 | null {
+  const paths = runPaths(resolve(repoRoot), runId);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    lockedStatus(resolve(repoRoot), paths, runId, automationStoreNow(), env);
+    const path = join(paths.reservations, `${keyDigest(idempotencyKey)}.json`);
+    if (!existsSync(path)) return null;
+    const value = parse(readRaw(path, 'automation reservation'), validateAutomationReservation, 'automation reservation');
+    if (value.idempotency_key !== idempotencyKey || value.automation_run_id !== runId) fail('automation_budget_store_conflict', 'stored reservation lookup identity differs');
+    return value;
+  });
+}
+
+/** Durable read observations share the budget's identity and single unresolved slot. */
+export function runCampaignProviderRead<T>(input: ReserveCampaignProviderBudgetInput & {
+  readonly observation_mode: 'replay' | 'refresh';
+  readonly observation_request_sha256: string;
+  readonly invoke: (timeoutMs: number) => T;
+  readonly classify_failure: (error: unknown) => 'read_failed' | 'read_transient_failure' | null;
+}): T {
+  if (input.operation !== 'git_read' && input.operation !== 'github_read') fail('automation_budget_store_invalid', 'read recovery requires a read operation');
+  const paths = runPaths(resolve(input.repo_root), input.automation_run_id);
+  const identity = automationDigest({ step: input.step_admission_sha256, key: input.idempotency_key });
+  return withExclusiveDirectoryLock(paths.common, `${relative(paths.common, paths.run)}/provider-read.lock`, () => {
+    const directory = join(paths.run, 'campaign-read-observations');
+    ensureDirectory(paths.common, directory);
+    const load = <V>(part: string): V | null => {
+      const path = join(directory, `${identity}-${part}.json`);
+      if (!existsSync(path)) return null;
+      const raw = readRaw(path, 'read observation');
+      const value = JSON.parse(raw);
+      if (value.record_sha256 !== automationDigest(value.record) || raw !== bytes(value)) fail('automation_budget_store_invalid', 'read observation digest differs');
+      return value.record as V;
+    };
+    const save = (part: string, record: unknown) => {
+      const path = join(directory, `${identity}-${part}.json`);
+      const content = bytes({ record, record_sha256: automationDigest(record) });
+      if (!writeExclusive(path, content, 'read observation') && readRaw(path, 'read observation') !== content) fail('automation_budget_store_conflict', 'read request identity differs');
+    };
+    save('request', { step: input.step_admission_sha256, operation: input.operation, request_sha256: input.request_sha256,
+      campaign_id: input.campaign_id, group_number: input.group_number, intent_sha256: input.intent_sha256, budget: input.expected_budget_sha256 });
+    type Observation = { outcome: 'returned'; result: T } | { outcome: 'read_failed' | 'read_transient_failure'; detail: string };
+    for (let generation = 0; ; generation++) {
+      const key = `${identity}:${generation}`;
+      const priorRequest = load<{ request_sha256: string }>(`${generation}-request`);
+      const observationRequest = priorRequest ?? { request_sha256: input.observation_request_sha256 };
+      save(`${generation}-request`, observationRequest);
+      if (input.observation_mode === 'replay' && observationRequest.request_sha256 !== input.observation_request_sha256) fail('automation_budget_store_conflict', 'replayed read request differs');
+      const request = { ...input, request_sha256: automationDigest({ logical_request: input.request_sha256, observation: observationRequest, generation }), idempotency_key: key };
+      const stored = readAutomationReservationByKey(input.repo_root, input.automation_run_id, key, input.env);
+      if (stored && (stored.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND || !('request_sha256' in stored.campaign_context)
+        || stored.campaign_context.request_sha256 !== request.request_sha256 || stored.campaign_context.operation !== input.operation
+        || stored.campaign_context.step_admission_sha256 !== input.step_admission_sha256)) fail('automation_budget_store_conflict', 'read reservation binding differs');
+      const reservation = stored as CampaignAutomationBudgetReservationV1 | null;
+      const observed = load<Observation>(`${generation}-result`);
+      const started = load<{ reservation_sha256: string }>(`${generation}-started`);
+      if (observed || started) {
+        if (!reservation || started?.reservation_sha256 !== reservation.reservation_sha256) fail('automation_budget_store_conflict', 'read observation lost its reservation');
+        if (observed) {
+          recordCampaignProviderOutcome({ ...input, reservation, outcome: observed.outcome,
+            result_sha256: automationDigest(observed.outcome === 'returned' ? observed.result : observed) });
+          if (observed.outcome === 'returned' && input.observation_mode === 'replay') return observed.result;
+        } else {
+          reconcileAutomationReservation({ ...input, reservation, resolution: 'reconciled_reserved', outcome: 'no_progress',
+            reason: 'interrupted read observation charged at its reserved upper bound',
+            evidence_refs: [{ ref: `controller-run:${input.automation_run_id}`, sha256: automationDigest(started) }] });
+        }
+        continue;
+      }
+      if (observationRequest.request_sha256 !== input.observation_request_sha256) {
+        if (input.observation_mode !== 'refresh') fail('automation_budget_store_conflict', 'replayed read request differs');
+        if (reservation) reconcileAutomationReservation({ ...input, reservation, resolution: 'reconciled_reserved', outcome: 'no_progress',
+          reason: 'superseded read reservation charged at its reserved upper bound',
+          evidence_refs: [{ ref: `controller-run:${input.automation_run_id}`, sha256: automationDigest(observationRequest) }] });
+        continue;
+      }
+      const admitted = reservation ?? reserveCampaignProviderBudget(request).reservation;
+      const status = readAutomationBudgetStatus(input.repo_root, input.automation_run_id, input.env);
+      const remaining = Date.parse(admitted.deadline_at) - Date.parse(automationStoreNow());
+      if (status.stop_receipt || remaining <= 0 || status.current.open_reservation_sha256s.length !== 1
+        || status.current.open_reservation_sha256s[0] !== admitted.reservation_sha256) fail('automation_budget_refused', 'read observation is stopped or no longer owned');
+      save(`${generation}-started`, { reservation_sha256: admitted.reservation_sha256 });
+      let result: T;
+      try { result = input.invoke(Math.min(remaining, 30_000)); }
+      catch (error) {
+        const outcome = input.classify_failure(error);
+        if (outcome) {
+          const failure = { outcome, detail: error instanceof Error ? error.message : String(error) };
+          save(`${generation}-result`, failure);
+          recordCampaignProviderOutcome({ ...input, reservation: admitted, outcome, result_sha256: automationDigest(failure) });
+        }
+        throw error;
+      }
+      save(`${generation}-result`, { outcome: 'returned', result });
+      recordCampaignProviderOutcome({ ...input, reservation: admitted, outcome: 'returned', result_sha256: automationDigest(result) });
+      return result;
+    }
+  }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
