@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 03:56
+> **Related Plan**: plans/archive/plan-20260908-0336-brc6a-live-network-evidence.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-0356
+> **Archive Projection V1**: `plans/plan-20260908-0336-brc6a-live-network-evidence.md` => `plans/archive/plan-20260908-0336-brc6a-live-network-evidence.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0336-brc6a-live-network-evidence.notes.md` => `tasks/archive/notes-20260908-0356-brc6a-live-network-evidence.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0336-brc6a-live-network-evidence.contract.md` => `tasks/archive/contract-20260908-0356-brc6a-live-network-evidence.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0336-brc6a-live-network-evidence.review.md` => `tasks/archive/review-20260908-0356-brc6a-live-network-evidence.md`
+
 # Task Review: brc6a-live-network-evidence
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-0336-brc6a-live-network-evidence.md
-> **Contract**: tasks/contracts/20260908-0336-brc6a-live-network-evidence.contract.md
-> **Notes File**: tasks/notes/20260908-0336-brc6a-live-network-evidence.notes.md
+> **Plan**: plans/archive/plan-20260908-0336-brc6a-live-network-evidence.md
+> **Contract**: tasks/archive/contract-20260908-0356-brc6a-live-network-evidence.md
+> **Notes File**: tasks/archive/notes-20260908-0356-brc6a-live-network-evidence.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 03:36
 > **Recommendation**: pass
