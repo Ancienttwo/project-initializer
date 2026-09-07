@@ -1,3 +1,4 @@
+import { resolveCampaignGroupBaseline } from './campaign-fresh-audit';
 import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
 import { issueBatchMetadataAuthoringSchema } from '../../core/automation/issue-batch-reconcile';
 import { resolve } from 'path';
@@ -134,7 +135,8 @@ function context(input: StartIssueBatchAuthoringInput, readBinding: IssueAuthori
   const bindingResult = readBinding(repoRoot);
   if (bindingResult.error || !bindingResult.binding?.profileDir || !bindingResult.binding.profileDirectory) fail('issue_authoring_profile_mismatch', `ChatGPT browser binding is unavailable: ${bindingResult.error ?? bindingResult.path}`);
   if (bindingResult.binding.profileDirectory !== authorization.campaign.chrome_profile_directory) fail('issue_authoring_profile_mismatch', 'ChatGPT browser profile does not match the campaign authorization');
-  return { repoRoot, status, authorization, externalPolicy, binding: bindingResult.binding };
+  const baseMain = resolveCampaignGroupBaseline(repoRoot, status.campaign, status.events, input.group_number, input.env);
+  return { repoRoot, status, authorization, externalPolicy, binding: bindingResult.binding, baseMain };
 }
 
 function browserInput(repoRoot: string, prompt: string, profileDir: string, profileDirectory: string, input: StartIssueBatchAuthoringInput): IssueAuthoringBrowserInput {
@@ -203,7 +205,7 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
   const draft = {
     campaign_id: input.campaign_id, group_number: input.group_number,
     repository_id: value.status.campaign.repository_id, provider_repository: value.externalPolicy.github.repository,
-    target_ref: value.status.campaign.target_ref, base_main_sha: value.status.campaign.target_revision,
+    target_ref: value.status.campaign.target_ref, base_main_sha: value.baseMain,
     slots, allowed_issue_kinds: value.authorization.campaign!.allowed_issue_kinds,
     authoring_policy_sha256: value.externalPolicy.policy_revision,
     authoring_parent: value.authorization.campaign!.local_parent_host,
@@ -224,7 +226,7 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
   const value = context(input, deps.readBinding);
   const intent = readIssueBatchIntent(value.repoRoot, input.campaign_id, input.group_number, input.intent_sha256);
   if (intent.repository_id !== value.status.campaign.repository_id || intent.provider_repository !== value.externalPolicy.github.repository
-    || intent.target_ref !== value.status.campaign.target_ref || intent.base_main_sha !== value.status.campaign.target_revision
+    || intent.target_ref !== value.status.campaign.target_ref || intent.base_main_sha !== value.baseMain
     || intent.chrome_profile_directory !== value.authorization.campaign!.chrome_profile_directory) fail('issue_authoring_invalid', 'issue batch intent binding is stale');
   assertIssueAuthoringSourceSession(value.repoRoot, input.campaign_id, input.group_number, intent.intent_sha256, input.source_session_ref);
   const requested = exactSlots(input.requested_slots, intent);

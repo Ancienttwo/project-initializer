@@ -70,18 +70,8 @@ describe('issue batch provider observer', () => {
     expect(result.receipt.source_revisions).toEqual([result.observations[0]!.source_revision]);
   });
 
-  test('never treats issue-number selection as a complete batch snapshot and makes no provider call', () => {
-    const { root, intent, env } = fixture({ kind: 'issue_numbers', issue_numbers: [7] });
-    let calls = 0;
-    try {
-      observeIssueBatch({ repo_root: root, intent, env, runner: () => { calls += 1; return { stdout: '{}' }; }, now: () => new Date('2026-09-05T00:01:00.000Z') });
-      throw new Error('expected observer failure');
-    } catch (error) {
-      expect(error).toBeInstanceOf(IssueBatchObserverError);
-      expect((error as IssueBatchObserverError).code).toBe('issue_provider_snapshot_incomplete');
-      expect((error as IssueBatchObserverError).receipt?.outcome).toBe('incomplete');
-    }
-    expect(calls).toBe(0);
+  test('rejects issue-number selection during campaign creation before provider access', () => {
+    expect(() => fixture({ kind: 'issue_numbers', issue_numbers: [7] })).toThrow('complete repository Issue snapshot');
   });
 
   test('persists typed incomplete evidence when provider pagination is bounded', () => {

@@ -112,14 +112,14 @@ Core audit protocol/group projection; group snapshot/observation store and budge
 Focused core audit, effect audit, campaign-store, authoring, audit-budget and campaign CLI checks plus type and six required integrity commands. Real provider proof is not claimed by fakes. Freeze one source subject and use one /check acceptance. No full suite. Archive with --no-merge.
 
 ## Task Breakdown
-- [ ] Implement complete group snapshot and fresh audit observation/protocol.
-- [ ] Wire audit budget, CLI, lifecycle acceptance and authoring group baseline.
+- [x] Implement complete group snapshot and fresh audit observation/protocol.
+- [x] Wire audit budget, CLI, lifecycle acceptance and authoring group baseline.
 - [ ] Verify model-free failure/sequencing/accounting cases, document actual limits and archive.
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Implement complete group snapshot and fresh audit observation/protocol.
-- [ ] Wire audit budget, CLI, lifecycle acceptance and authoring group baseline.
+- [x] Implement complete group snapshot and fresh audit observation/protocol.
+- [x] Wire audit budget, CLI, lifecycle acceptance and authoring group baseline.
 - [ ] Verify model-free failure/sequencing/accounting cases, document actual limits and archive.

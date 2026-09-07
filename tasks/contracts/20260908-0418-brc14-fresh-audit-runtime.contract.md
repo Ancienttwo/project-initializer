@@ -21,7 +21,7 @@ Implement complete group snapshot, budgeted fresh audit observation, shared-stor
 
 ## Scope
 
-- In scope: core/effect audit and group projection, audit budget operation, campaign CLI/store/authoring callers, focused tests and integration-base artifacts.
+- In scope: core/effect audit and group projection, audit budget operation, campaign CLI/store/authoring callers, focused tests and integration-base artifacts; user-authorized observer selection-policy and campaign-step capability-registry fixture alignment.
 - Out of scope: GPT calls, BRC6a probes, main WIP, global install/release and fake trusted revision authority.
 
 ## Stop Conditions
@@ -143,7 +143,7 @@ exit_criteria:
     {
       "id": "audit-regressions",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/unit/campaign-fresh-audit.test.ts tests/effects/campaign-fresh-audit.test.ts tests/effects/development-campaign-store.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/cli/development-campaign.test.ts tests/effects/issue-batch-shadow-budget.test.ts",
+      "command": "bun test --timeout 60000 tests/unit/campaign-fresh-audit.test.ts tests/effects/campaign-fresh-audit.test.ts tests/effects/development-campaign-store.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/cli/development-campaign.test.ts tests/effects/issue-batch-shadow-budget.test.ts tests/effects/issue-batch-observer.test.ts tests/effects/campaign-planning.test.ts tests/effects/campaign-step.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",

@@ -1,0 +1,23 @@
+# BRC14 fresh audit runtime
+
+## Implemented boundary
+
+The campaign audit command builds a complete ordered slot snapshot from the published adoption manifest and validated per-Task cleanup. Completed merges must be ancestors of the current target. Unfilled and not-planned slots remain explicit. Immutable snapshots bind the intent, adoption, publication and final main SHA.
+
+`campaign audit` reserves the existing campaign provider budget for the `audit` operation, then uses a fresh browser consult with explicit GitHub selection and the user's current default model. Audit does not consume an authoring round. A same-key retry reuses durable observations without browser access. Unresolved outcomes retain their reservation and block another provider call through the existing reconciliation gate. Completed malformed output is retained with a digest and charged as provider failure.
+
+The answer is strictly parsed as one JSON object covering every slot. Authoring session reuse across campaign groups is rejected. The observation is always `unverified`: a model answer, including an echoed SHA or an accepted recommendation, is not trusted revision evidence. The CLI returns a nonzero status for that observation. No active-admission gate is removed.
+
+The shared campaign store consumes typed evidence for begin-audit and accept-group transitions; naked or stale references cannot advance lifecycle state. Ordered group progress derives from canonical lifecycle events. Later authoring baselines require the previous accepted audit snapshot. Group skipping, exceeding the grant and early completion fail closed.
+
+## Scope and remaining acceptance
+
+This is a model-free implementation slice, not a real BRC14 audit completion. Trusted exact-version provenance and a real accepted group remain unavailable. BRC6a re-probing was stopped by the user. No live GPT/browser requests, global installation, release, GitHub writes or stopped budget reuse were performed here. BRC14/BRC15a/BRC15 are not marked complete by these tests.
+
+No dependencies were added. The two new source files separate the pure snapshot/answer/event protocol from Git, durable stores and browser effects; CLI, lifecycle store and authoring consumers share these invariants. The two new test files exercise pure validation and effect-level admission/replay independently.
+
+## Verification scope
+
+Named tests cover fresh audit, campaign store, authoring, observer, planning, heartbeat, shadow budget and CLI, plus TypeScript and the six repository integrity checks. No full suite is required by this bounded contract. The contract's final prepare-acceptance run and receipt own the exact accepted subject; development logs do not imply final acceptance.
+
+Two old fixture failures reproduced on integration baseline `67d3e858`: Issue-number selection now fails at campaign creation, and heartbeat authoring requires a committed capability registry. User-authorized fixture alignment updates those inputs/assertions without relaxing production gates. The heartbeat out-of-group case now expects the shared group-sequence error before provider access.

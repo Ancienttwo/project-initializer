@@ -3,39 +3,23 @@
 > **Status**: Active
 > **Plan**: plans/plan-20260908-0418-brc14-fresh-audit-runtime.md
 > **Contract**: tasks/contracts/20260908-0418-brc14-fresh-audit-runtime.contract.md
-> **Review**: tasks/reviews/20260908-0418-brc14-fresh-audit-runtime.review.md
-> **Last Updated**: 2026-09-08 04:18
 > **Lifecycle**: notes
+> **Substantive Change SHA256**: `sha256:d3f3ee5a167b4f638824f4cc2dafbde747517d653bd09bf32d160aa3eeb347e2`
 
 ## Design Decisions
 
-- ...
+- Snapshot ownership, audit observations and remaining authority limits are documented in `docs/researches/20260908-brc14-fresh-audit-runtime.md`.
+- Reuse exact authorization binding and existing budget reconciliation. Durable observation replay precedes browser binding; new dispatch still validates authorization/profile. No new budget authority or dependency.
+- Cross-group authoring-session reuse is rejected. Unverified audit output never advances lifecycle or rolls back main.
 
-## Deviations From Plan Or Spec
+## Authorized Fixture Alignment
 
-- None recorded.
+Two inherited failures reproduced on accepted integration `67d3e858` with `bun test --timeout 60000 tests/effects/issue-batch-observer.test.ts tests/effects/campaign-step.test.ts -t 'never treats issue-number selection|real observer counts identity'`: 0 pass, 2 fail, 27 filtered (`/tmp/brc14-baseline-fixture-check.log`). Observer selection failed during campaign creation; heartbeat fixture lacked a committed capability registry. The user authorized continuing with both repairs. Tests now use the current contract; no production guard was relaxed. The out-of-group heartbeat expects the new shared sequence error before I/O.
 
-## Tradeoffs Considered
+## Verification
 
-| Option | Decision | Reason |
-|--------|----------|--------|
-| ... | ... | ... |
+The initial combined prepare run `run-20260908T045842-1718` passed focused tests, TypeScript and five integrity commands; task-sync required the substantive digest above. Its overall status remains failed. A committed contract and final prepare/AcceptanceReceipt own final evidence. No full suite or live provider was invoked.
 
-## Open Questions
+## Remaining Product Boundary
 
-- None.
-
-## Evidence Links
-
-- Checks: `.ai/harness/checks/latest.json`
-- Run snapshots: `.ai/harness/runs/`
-
-## Promotion Filter
-
-Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset files only when all three hold: hard to reverse, surprising without local context, and a real trade-off existed. If any one is missing, keep it in this notes file instead.
-
-## Promotion Candidates
-
-- Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
-- Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
-- Promote to harness asset files only after verification across more than one task or fixture.
+Implementation acceptance is separate from real BRC14 completion. The trusted revision producer remains absent, so active acceptance and later groups stay blocked. The user stopped further BRC6a probes; no new provider budget is inferred. Main seven-file WIP hashes matched the pre-integration snapshot.

@@ -130,7 +130,14 @@ describe('GPT Pro issue batch authoring effect', () => {
       now: () => observedAt,
       consult: async (input) => result(input, 'session-group-1'),
     });
-    const second = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 2, env: f.env }, {
+    let skippedCalls = 0;
+    await expect(startIssueBatchAuthoring({repo_root:f.root,campaign_id:'campaign-1',group_number:2,env:f.env}, {
+      readBinding:readBrowserBinding,consult:async input=>{skippedCalls++;return result(input,'skipped');},
+    })).rejects.toThrow('current lifecycle group');
+    expect(skippedCalls).toBe(0);
+    expect(existsSync(join(issueBatchGroupStoreRoot(f.root,'campaign-1',2),'intent.json'))).toBe(false);
+    const other = fixture(2);
+    const second = await startIssueBatchAuthoring({ repo_root: other.root, campaign_id: 'campaign-1', group_number: 1, env: other.env }, {
       readBinding: readBrowserBinding,
       now: () => observedAt,
       consult: async (input) => result(input, 'session-group-2'),
