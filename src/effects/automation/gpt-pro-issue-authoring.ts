@@ -20,8 +20,6 @@ import { readCampaignExternalSourcesPolicyAtRevision } from './development-campa
 import { requireManualGithubPolicy } from '../external-sources/policy';
 import { assertIssueAuthoringSourceSession, persistIssueAuthoringSession, persistIssueBatchIntent, readIssueBatchIntent } from './issue-batch-store';
 
-const GPT_PRO_MODEL = 'gpt-5.5-pro';
-
 export class GptProIssueAuthoringError extends Error {
   constructor(readonly code: 'issue_authoring_invalid' | 'issue_authoring_state_invalid' | 'issue_authoring_profile_mismatch' | 'issue_authoring_reconciliation_required', message: string) {
     super(message);
@@ -34,7 +32,7 @@ export interface IssueAuthoringBrowserInput {
   readonly title: string;
   readonly prompt: string;
   readonly provider: 'oracle';
-  readonly model: string;
+  readonly chatgptApp: 'GitHub';
   readonly requireSecretScan: true;
   readonly gitleaksBin?: string;
   readonly profileDir: string;
@@ -142,7 +140,7 @@ function context(input: StartIssueBatchAuthoringInput, readBinding: IssueAuthori
 function browserInput(repoRoot: string, prompt: string, profileDir: string, profileDirectory: string, input: StartIssueBatchAuthoringInput): IssueAuthoringBrowserInput {
   return {
     repoRoot, title: `${input.campaign_id} group ${input.group_number} issue authoring`, prompt,
-    provider: 'oracle', model: GPT_PRO_MODEL, requireSecretScan: true, gitleaksBin: input.gitleaks_bin,
+    provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin,
     profileDir, profileDirectory, dryRun: input.dry_run === true,
   };
 }

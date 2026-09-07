@@ -112,6 +112,20 @@ function writeFakeGitleaks(dir: string, version = '8.30.0'): string {
 // oracle used with a profile binding must answer --help/--debug-help.
 const FAKE_ORACLE_HELP = 'Usage: oracle --engine browser --browser-archive never --write-output <p> --browser-follow-up <t> --followup <id> --browser-model-strategy current --browser-cookie-path <path> --copy-profile <dir> --browser-chrome-profile <name> --chatgpt-url <url> --heartbeat <seconds>';
 
+function sessionDescriptorFixture(id: string, parent: string | null = null): string[] {
+  const descriptor = JSON.stringify({ protocol: 1, kind: 'oracle-session', sessionId: id, parentSessionId: parent });
+  const metadata = JSON.stringify({ id, browser: { modelSelection: { strategy: 'current', resolvedLabel: '6 Pro', verified: false } } });
+  return [
+    'SESSION=""', 'PREV=""',
+    'for a in "$@"; do',
+    '  if [ "$PREV" = "--write-session" ]; then SESSION="$a"; fi',
+    '  PREV="$a"', 'done',
+    `mkdir -p "$ORACLE_HOME_DIR/sessions/${id}"`,
+    `printf '%s\\n' '${metadata}' > "$ORACLE_HOME_DIR/sessions/${id}/meta.json"`,
+    `if [ -n "$SESSION" ]; then printf '%s\\n' '${descriptor}' > "$SESSION"; fi`,
+  ];
+}
+
 function writeFakeOracle(path: string, opts: { help?: string; sessionLine?: string; body?: string[] } = {}): string {
   writeFileSync(path, [
     '#!/bin/sh',
@@ -1266,8 +1280,8 @@ describe('chatgpt browser command', () => {
         expect(output).toContain('ORACLE_REMOTE_HOST:');
         const meta = JSON.parse(readFileSync(join(repoRoot, '.ai/harness/chatgpt/sessions', payload.sessionId, 'meta.json'), 'utf-8'));
         expect(meta.browser.conversationUrl).toBe('https://chatgpt.com/c/fake-conversation');
-        expect(meta.providerSessionId).toBe('oracle_fake_123');
-        // Completed output and a provider handle do not prove model or Pro effort.
+        expect(meta.providerSessionId).toBeUndefined();
+        // Completed output alone proves neither provider identity nor model/effort.
         expect(meta.model.verified).toBe(false);
         expect(meta.oracle.binary).toBe(oraclePath);
         expect(meta.oracle.captureStatus).toBe('completed');
@@ -1668,7 +1682,7 @@ describe('chatgpt browser command', () => {
         expect(payload.status).toBe('recoverable');
         expect(payload.error.code).toBe('ORACLE_CAPTURE_INCOMPLETE');
         const meta = JSON.parse(readFileSync(join(repoRoot, '.ai/harness/chatgpt/sessions', payload.sessionId, 'meta.json'), 'utf-8'));
-        expect(meta.providerSessionId).toBe('oracle_recover_789');
+        expect(meta.providerSessionId).toBeUndefined();
         expect(meta.oracle.captureStatus).toBe('recoverable');
       } finally {
         rmSync(binDir, { recursive: true, force: true });
@@ -2139,6 +2153,7 @@ describe('chatgpt browser command', () => {
             'case "$1" in',
             '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
             'esac',
+            ...sessionDescriptorFixture('oracle_followup_456', 'oracle_upstream_123'),
             'ARGS="$*"',
             'OUT=""',
             'PREV=""',
@@ -2173,6 +2188,9 @@ describe('chatgpt browser command', () => {
         // providerSessionId reflects what oracle returned for the reopened run.
         expect(followupMeta.parentProviderSessionId).toBe('oracle_upstream_123');
         expect(followupMeta.providerSessionId).toBe('oracle_followup_456');
+        expect(followupMeta.oracle.observation.modelSelection).toMatchObject({ strategy: 'current', resolvedLabel: '6 Pro', verified: false });
+        expect(followupMeta.model.verified).toBe(false);
+        expect(followupMeta.model.requested).toBeUndefined();
       } finally {
         rmSync(binDir, { recursive: true, force: true });
       }
