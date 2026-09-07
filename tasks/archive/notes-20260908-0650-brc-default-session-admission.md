@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-08 06:50
+> **Related Plan**: plans/archive/plan-20260908-0556-brc-default-session-admission.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-0650
+> **Archive Projection V1**: `plans/plan-20260908-0556-brc-default-session-admission.md` => `plans/archive/plan-20260908-0556-brc-default-session-admission.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0556-brc-default-session-admission.notes.md` => `tasks/archive/notes-20260908-0650-brc-default-session-admission.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0556-brc-default-session-admission.contract.md` => `tasks/archive/contract-20260908-0650-brc-default-session-admission.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0556-brc-default-session-admission.review.md` => `tasks/archive/review-20260908-0650-brc-default-session-admission.md`
+
 # Default-model campaign session admission decisions
 
 The user-selected UI model is configuration authority; backend model identity remains unverified. Session/app evidence is a separate authority and must not be represented by renaming the old model boolean.

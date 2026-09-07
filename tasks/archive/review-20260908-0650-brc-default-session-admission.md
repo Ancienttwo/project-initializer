@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 06:50
+> **Related Plan**: plans/archive/plan-20260908-0556-brc-default-session-admission.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-0650
+> **Archive Projection V1**: `plans/plan-20260908-0556-brc-default-session-admission.md` => `plans/archive/plan-20260908-0556-brc-default-session-admission.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0556-brc-default-session-admission.notes.md` => `tasks/archive/notes-20260908-0650-brc-default-session-admission.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0556-brc-default-session-admission.contract.md` => `tasks/archive/contract-20260908-0650-brc-default-session-admission.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0556-brc-default-session-admission.review.md` => `tasks/archive/review-20260908-0650-brc-default-session-admission.md`
+
 # Task Review: brc-default-session-admission
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-0556-brc-default-session-admission.md
-> **Contract**: tasks/contracts/20260908-0556-brc-default-session-admission.contract.md
-> **Notes File**: tasks/notes/20260908-0556-brc-default-session-admission.notes.md
+> **Plan**: plans/archive/plan-20260908-0556-brc-default-session-admission.md
+> **Contract**: tasks/archive/contract-20260908-0650-brc-default-session-admission.md
+> **Notes File**: tasks/archive/notes-20260908-0650-brc-default-session-admission.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 05:56
 > **Recommendation**: pass

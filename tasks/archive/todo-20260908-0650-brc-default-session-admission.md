@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-08 06:50
+> **Related Plan**: plans/archive/plan-20260908-0556-brc-default-session-admission.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260908-0650
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-08 05:56
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
