@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 04:15
+> **Related Plan**: plans/archive/plan-20260908-0403-brc-next-stage-integration.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-0415
+> **Archive Projection V1**: `plans/plan-20260908-0403-brc-next-stage-integration.md` => `plans/archive/plan-20260908-0403-brc-next-stage-integration.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0403-brc-next-stage-integration.notes.md` => `tasks/archive/notes-20260908-0415-brc-next-stage-integration.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0403-brc-next-stage-integration.contract.md` => `tasks/archive/contract-20260908-0415-brc-next-stage-integration.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0403-brc-next-stage-integration.review.md` => `tasks/archive/review-20260908-0415-brc-next-stage-integration.md`
+
 # Task Contract: brc-next-stage-integration
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-0403-brc-next-stage-integration.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-0403-brc-next-stage-integration.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 04:03
-> **Review File**: `tasks/reviews/20260908-0403-brc-next-stage-integration.review.md`
-> **Notes File**: `tasks/notes/20260908-0403-brc-next-stage-integration.notes.md`
+> **Review File**: `tasks/archive/review-20260908-0415-brc-next-stage-integration.md`
+> **Notes File**: `tasks/archive/notes-20260908-0415-brc-next-stage-integration.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-0403-brc-next-stage-integration.md`
+- Source plan: `plans/archive/plan-20260908-0403-brc-next-stage-integration.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-0403-brc-next-stage-integration.review.md`
-- Notes file: `tasks/notes/20260908-0403-brc-next-stage-integration.notes.md`
+- Review file: `tasks/archive/review-20260908-0415-brc-next-stage-integration.md`
+- Notes file: `tasks/archive/notes-20260908-0415-brc-next-stage-integration.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -97,10 +107,10 @@ allowed_paths:
   - tasks/archive/review-20260908-0251-brc15a-provider-verification-evidence.md
   - tasks/archive/todo-20260908-0205-brc15a-adoption-alignment.md
   - tasks/archive/todo-20260908-0251-brc15a-provider-verification-evidence.md
-  - tasks/contracts/20260908-0403-brc-next-stage-integration.contract.md
-  - tasks/notes/20260908-0403-brc-next-stage-integration.notes.md
+  - tasks/archive/contract-20260908-0415-brc-next-stage-integration.md
+  - tasks/archive/notes-20260908-0415-brc-next-stage-integration.md
   - tasks/reviews/20260908-0143-brc15a-adoption-alignment.pre-fix.log
-  - tasks/reviews/20260908-0403-brc-next-stage-integration.review.md
+  - tasks/archive/review-20260908-0415-brc-next-stage-integration.md
   - tasks/todos.md
   - tests/cli/chatgpt-browser.test.ts
   - tests/cli/development-campaign.test.ts
@@ -159,7 +169,7 @@ exit_criteria:
     - docs/researches/20260908-brc-next-stage-integration.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-0403-brc-next-stage-integration.notes.md
+    - tasks/archive/notes-20260908-0415-brc-next-stage-integration.md
 ```
 
 ## Verification Plan

@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 04:15
+> **Related Plan**: plans/archive/plan-20260908-0403-brc-next-stage-integration.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-0415
+> **Archive Projection V1**: `plans/plan-20260908-0403-brc-next-stage-integration.md` => `plans/archive/plan-20260908-0403-brc-next-stage-integration.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0403-brc-next-stage-integration.notes.md` => `tasks/archive/notes-20260908-0415-brc-next-stage-integration.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0403-brc-next-stage-integration.contract.md` => `tasks/archive/contract-20260908-0415-brc-next-stage-integration.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0403-brc-next-stage-integration.review.md` => `tasks/archive/review-20260908-0415-brc-next-stage-integration.md`
+
 # Implementation Notes: brc-next-stage-integration
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-0403-brc-next-stage-integration.md
-> **Contract**: tasks/contracts/20260908-0403-brc-next-stage-integration.contract.md
-> **Review**: tasks/reviews/20260908-0403-brc-next-stage-integration.review.md
+> **Plan**: plans/archive/plan-20260908-0403-brc-next-stage-integration.md
+> **Contract**: tasks/archive/contract-20260908-0415-brc-next-stage-integration.md
+> **Review**: tasks/archive/review-20260908-0415-brc-next-stage-integration.md
 > **Last Updated**: 2026-09-08 04:03
 > **Lifecycle**: notes
 
