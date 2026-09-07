@@ -2013,7 +2013,7 @@ export interface ReserveCampaignAuthoringBudgetInput {
   readonly campaign_id: string;
   readonly group_number: 1 | 2 | 3;
   readonly intent_sha256: string;
-  readonly operation: CampaignAuthoringOperation | 'challenge';
+  readonly operation: CampaignAuthoringOperation | 'challenge' | 'audit';
   readonly step_admission_sha256?: string | null;
   readonly idempotency_key: string;
   readonly env?: NodeJS.ProcessEnv;

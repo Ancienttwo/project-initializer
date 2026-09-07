@@ -1,3 +1,4 @@
+import { requireCampaignGroupTransition, resolveCampaignAuthorizedTarget } from './campaign-fresh-audit';
 import { requireCampaignCleanupComplete } from './campaign-planning-proof';
 import { constants, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path';
@@ -207,7 +208,7 @@ function reconcileLaggingCurrentProjection(
   atomic(value.current, Buffer.from(`${canonicalDevelopmentCampaignCurrentBytes(current)}\n`, 'utf8'));
 }
 
-function readExactAuthorityBinding(repoRoot: string, campaign: DevelopmentCampaignDefinitionV1, env: NodeJS.ProcessEnv) {
+export function readExactAuthorityBinding(repoRoot: string, campaign: DevelopmentCampaignDefinitionV1, env: NodeJS.ProcessEnv) {
   const grant = readStoredProgramAuthorization(repoRoot, campaign.authorization_sha256, env);
   if (grant.campaign === null || grant.campaign.campaign_id !== campaign.campaign_id
     || grant.authorization_id !== campaign.authorization_id || grant.repository_id !== campaign.repository_id
@@ -224,12 +225,18 @@ export function assertAuthorityBinding(repoRoot: string, campaign: DevelopmentCa
   let target: string;
   try { target = execFileSync('git', ['rev-parse', '--verify', `${grant.target_ref}^{commit}`], { cwd: repoRoot, encoding: 'utf8' }).trim(); }
   catch (error) { return fail('campaign_authorization_stale', `cannot resolve authorized target ref ${grant.target_ref}`, error); }
-  if (target !== grant.target_revision) fail('campaign_authorization_stale', 'authorized target ref moved');
+  if (target !== grant.target_revision) {
+    const location = paths(repoRoot, campaign.campaign_id);
+    const events = existsSync(location.definition) ? rebuild(location, campaign).events : [];
+    if (target !== resolveCampaignAuthorizedTarget(repoRoot, campaign, events, env)) fail('campaign_authorization_stale', 'authorized target ref moved');
+  }
   return grant;
 }
 
-function requireMutationPolicy(repoRoot: string, campaign: DevelopmentCampaignDefinitionV1, env: NodeJS.ProcessEnv) {
-  const grant = assertAuthorityBinding(repoRoot, campaign, env);
+function requireMutationPolicy(repoRoot: string, campaign: DevelopmentCampaignDefinitionV1, env: NodeJS.ProcessEnv, operation?: DevelopmentCampaignOperation) {
+  const grant = operation === 'begin_group_audit' || operation === 'accept_group'
+    ? readExactAuthorityBinding(repoRoot, campaign, env) : assertAuthorityBinding(repoRoot, campaign, env);
+  if (Date.parse(grant.expires_at) <= Date.now()) fail('campaign_authorization_stale', 'campaign authorization expired');
   const policy = readDevelopmentCampaignPolicyAtRevision(repoRoot, campaign.target_revision);
   if (policy.mode === 'off') fail('campaign_mode_disabled', 'development_campaign.mode is off at the authorized target revision');
   if (grant.campaign === null) fail('campaign_authorization_stale', 'campaign authorization payload is missing');
@@ -272,7 +279,7 @@ function appendLocked(value: ReturnType<typeof paths>, campaign: DevelopmentCamp
     const grant = readExactAuthorityBinding(input.repo_root, campaign, input.env ?? process.env);
     if (Date.parse(grant.expires_at) > Date.now()) fail('campaign_authorization_stale', 'campaign authorization has not expired');
   } else if (!RECORDING_OPERATIONS.has(input.operation)) {
-    requireMutationPolicy(input.repo_root, campaign, input.env ?? process.env);
+    requireMutationPolicy(input.repo_root, campaign, input.env ?? process.env, input.operation);
   }
   prepare(value);
   const rebuilt = rebuild(value, campaign);
@@ -300,6 +307,7 @@ function appendLocked(value: ReturnType<typeof paths>, campaign: DevelopmentCamp
     return { event: stored, current: rebuilt.current ?? foldDevelopmentCampaignCurrent(campaign, [stored]) };
   }
   if ((previous?.current_sha256 ?? null) !== input.expected_current_sha256) fail('campaign_conflict', 'campaign current revision changed');
+  requireCampaignGroupTransition(input.repo_root, campaign, rebuilt.events, input.operation, input.evidence_refs ?? [], input.env);
   const event = build((previous?.revision ?? 0) + 1, previous, previous?.current_event_sha256 ?? null);
   const bytes = Buffer.from(`${canonicalDevelopmentCampaignEventBytes(event)}\n`, 'utf8');
   immutable(join(value.events, `${String(event.revision).padStart(8, '0')}-${event.event_sha256.slice('sha256:'.length)}.json`), bytes);

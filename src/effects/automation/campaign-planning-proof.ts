@@ -1,3 +1,4 @@
+import { resolveCampaignGroupBaseline } from './campaign-fresh-audit';
 import { assertCampaignCleanupReceipt, campaignCloseoutKey } from '../../core/automation/campaign-closeout';
 import { execFileSync } from 'child_process';
 import { lstatSync, readFileSync, realpathSync } from 'fs';
@@ -36,7 +37,7 @@ export function planningArtifactBytes(root: string, path: string): string {
   return readFileSync(file, 'utf8');
 }
 export function requireCampaignPlanningAuthority(root: string, intent: IssueBatchIntentV1, env: NodeJS.ProcessEnv = process.env) {
-  const { campaign, current } = readDevelopmentCampaignStatus(root, intent.campaign_id, env);
+  const { campaign, current, events } = readDevelopmentCampaignStatus(root, intent.campaign_id, env);
   if (!['authorized', 'group_preparing', 'group_running', 'group_auditing', 'group_accepted'].includes(current.state)) throw new CampaignPlanningError('human_attention_required', `campaign lifecycle does not permit planning: ${current.state}`);
   const grant = readStoredProgramAuthorization(root, campaign.authorization_sha256, env);
   const p = readIssueBatchAdoptionArtifact(root, intent, 'publication') as unknown as CampaignPublicationV1 | null;
@@ -44,7 +45,7 @@ export function requireCampaignPlanningAuthority(root: string, intent: IssueBatc
   const target = planningGit(root, ['rev-parse', '--verify', `${intent.target_ref}^{commit}`]);
   try { planningGit(root, ['merge-base', '--is-ancestor', p.materialized_commit, target]); }
   catch { throw new CampaignPlanningError('human_attention_required', 'campaign materialization is not canonical'); }
-  if (p.base_main_sha !== intent.base_main_sha || repoHarnessRepoIdFor(root) !== intent.repository_id || grant.repository_id !== intent.repository_id || grant.target_ref !== intent.target_ref || grant.target_revision !== intent.base_main_sha || grant.merge_mode !== 'manual' || !grant.campaign || grant.campaign.campaign_id !== intent.campaign_id || intent.group_number > grant.campaign.group_count || Date.parse(grant.expires_at) <= Date.now()) throw new CampaignPlanningError('human_attention_required', 'campaign planning authorization is stale');
+  if (p.base_main_sha !== intent.base_main_sha || repoHarnessRepoIdFor(root) !== intent.repository_id || grant.repository_id !== intent.repository_id || grant.target_ref !== intent.target_ref || grant.target_revision !== campaign.target_revision || intent.base_main_sha !== resolveCampaignGroupBaseline(root, campaign, events, intent.group_number, env) || grant.merge_mode !== 'manual' || !grant.campaign || grant.campaign.campaign_id !== intent.campaign_id || intent.group_number > grant.campaign.group_count || Date.parse(grant.expires_at) <= Date.now()) throw new CampaignPlanningError('human_attention_required', 'campaign planning authorization is stale');
   const original = at(root, p.materialized_commit, p.manifest_path);
   if (at(root, target, p.manifest_path) !== original) throw new CampaignPlanningError('source_stale', 'canonical adoption manifest differs');
   const manifest = JSON.parse(original) as { protocol: number; kind: string; projection_sha256: string; receipt: CampaignIssueBatchAdoptionReceiptV1; slots: { slot: string; task_id: string; work_package_id: string }[]; evidence: unknown; publication_policy: unknown };

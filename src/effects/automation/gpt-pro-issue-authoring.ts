@@ -1,3 +1,6 @@
+import { resolveCampaignGroupBaseline } from './campaign-fresh-audit';
+import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
+import { issueBatchMetadataAuthoringSchema } from '../../core/automation/issue-batch-reconcile';
 import { resolve } from 'path';
 
 import { automationDigest, type ProgramAuthorizationV1 } from '../../core/automation/budget';
@@ -18,8 +21,6 @@ import { readCampaignExternalSourcesPolicyAtRevision } from './development-campa
 import { requireManualGithubPolicy } from '../external-sources/policy';
 import { assertIssueAuthoringSourceSession, persistIssueAuthoringSession, persistIssueBatchIntent, readIssueBatchIntent } from './issue-batch-store';
 
-const GPT_PRO_MODEL = 'gpt-5.5-pro';
-
 export class GptProIssueAuthoringError extends Error {
   constructor(readonly code: 'issue_authoring_invalid' | 'issue_authoring_state_invalid' | 'issue_authoring_profile_mismatch' | 'issue_authoring_reconciliation_required', message: string) {
     super(message);
@@ -32,7 +33,7 @@ export interface IssueAuthoringBrowserInput {
   readonly title: string;
   readonly prompt: string;
   readonly provider: 'oracle';
-  readonly model: string;
+  readonly chatgptApp: 'GitHub';
   readonly requireSecretScan: true;
   readonly gitleaksBin?: string;
   readonly profileDir: string;
@@ -101,7 +102,7 @@ function providerIssueUrl(value: string | undefined, repository: string): string
   return parsed.toString();
 }
 
-export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prompt_sha256' | 'intent_sha256'>, operation: IssueAuthoringOperation, requestedSlots: readonly IssueBatchSlot[], providerIssueId: string | null, providerIssueUrl: string | null): string {
+export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prompt_sha256' | 'intent_sha256'>, operation: IssueAuthoringOperation, requestedSlots: readonly IssueBatchSlot[], providerIssueId: string | null, providerIssueUrl: string | null, capabilityIds: readonly string[]): string {
   const action = operation === 'initial'
     ? `Create exactly one GitHub Issue for each listed slot: ${requestedSlots.join(', ')}.`
     : operation === 'fill_missing'
@@ -118,6 +119,7 @@ export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prom
     'The title prefix is display-only. The body marker below is the sole slot authority. Copy it exactly; do not add hashes, digests, or extra keys inside the marker.',
     markerExamples(intent, requestedSlots),
     'Each Issue body must also state the audit baseline and contain exactly one fenced ```json metadata object with protocol=1, kind=repo-harness-campaign-issue-metadata, issue_kind, primary_capability, priority, depends_on_slots, and suspected_paths.',
+    `Metadata schema (use only these exact capability IDs; never invent names): ${JSON.stringify(issueBatchMetadataAuthoringSchema(capabilityIds, intent.slots))}`,
     'Do not claim success for an Issue you did not observe GitHub create or update. Return a concise action log; the local controller will independently read GitHub.',
   ].join('\n\n');
 }
@@ -133,13 +135,14 @@ function context(input: StartIssueBatchAuthoringInput, readBinding: IssueAuthori
   const bindingResult = readBinding(repoRoot);
   if (bindingResult.error || !bindingResult.binding?.profileDir || !bindingResult.binding.profileDirectory) fail('issue_authoring_profile_mismatch', `ChatGPT browser binding is unavailable: ${bindingResult.error ?? bindingResult.path}`);
   if (bindingResult.binding.profileDirectory !== authorization.campaign.chrome_profile_directory) fail('issue_authoring_profile_mismatch', 'ChatGPT browser profile does not match the campaign authorization');
-  return { repoRoot, status, authorization, externalPolicy, binding: bindingResult.binding };
+  const baseMain = resolveCampaignGroupBaseline(repoRoot, status.campaign, status.events, input.group_number, input.env);
+  return { repoRoot, status, authorization, externalPolicy, binding: bindingResult.binding, baseMain };
 }
 
 function browserInput(repoRoot: string, prompt: string, profileDir: string, profileDirectory: string, input: StartIssueBatchAuthoringInput): IssueAuthoringBrowserInput {
   return {
     repoRoot, title: `${input.campaign_id} group ${input.group_number} issue authoring`, prompt,
-    provider: 'oracle', model: GPT_PRO_MODEL, requireSecretScan: true, gitleaksBin: input.gitleaks_bin,
+    provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin,
     profileDir, profileDirectory, dryRun: input.dry_run === true,
   };
 }
@@ -202,7 +205,7 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
   const draft = {
     campaign_id: input.campaign_id, group_number: input.group_number,
     repository_id: value.status.campaign.repository_id, provider_repository: value.externalPolicy.github.repository,
-    target_ref: value.status.campaign.target_ref, base_main_sha: value.status.campaign.target_revision,
+    target_ref: value.status.campaign.target_ref, base_main_sha: value.baseMain,
     slots, allowed_issue_kinds: value.authorization.campaign!.allowed_issue_kinds,
     authoring_policy_sha256: value.externalPolicy.policy_revision,
     authoring_parent: value.authorization.campaign!.local_parent_host,
@@ -210,7 +213,7 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
     chrome_profile_directory: value.authorization.campaign!.chrome_profile_directory,
     created_at: createdAt, expires_at: value.authorization.expires_at,
   };
-  const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null);
+  const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null, readCampaignCapabilityIdsAtRevision(value.repoRoot, draft.base_main_sha));
   const intent = buildIssueBatchIntent({ ...draft, prompt_sha256: messageSha256(prompt) });
   persistIssueBatchIntent(value.repoRoot, intent);
   return prepareBudgetedAuthoring(input, value.authorization, intent, 'initial', prompt, null,
@@ -223,7 +226,7 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
   const value = context(input, deps.readBinding);
   const intent = readIssueBatchIntent(value.repoRoot, input.campaign_id, input.group_number, input.intent_sha256);
   if (intent.repository_id !== value.status.campaign.repository_id || intent.provider_repository !== value.externalPolicy.github.repository
-    || intent.target_ref !== value.status.campaign.target_ref || intent.base_main_sha !== value.status.campaign.target_revision
+    || intent.target_ref !== value.status.campaign.target_ref || intent.base_main_sha !== value.baseMain
     || intent.chrome_profile_directory !== value.authorization.campaign!.chrome_profile_directory) fail('issue_authoring_invalid', 'issue batch intent binding is stale');
   assertIssueAuthoringSourceSession(value.repoRoot, input.campaign_id, input.group_number, intent.intent_sha256, input.source_session_ref);
   const requested = exactSlots(input.requested_slots, intent);
@@ -231,7 +234,7 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
   const locator = input.operation === 'edit_issue' ? providerIssueUrl(input.provider_issue_url, intent.provider_repository) : null;
   if (input.operation === 'edit_issue' && (requested.length !== 1 || providerIssueId === null || locator === null)) fail('issue_authoring_invalid', 'edit_issue requires one slot, provider_issue_id, and an exact provider_issue_url');
   if (input.operation === 'fill_missing' && (input.provider_issue_id !== undefined || input.provider_issue_url !== undefined)) fail('issue_authoring_invalid', 'fill_missing forbids provider_issue_id and provider_issue_url');
-  const prompt = buildIssueAuthoringPrompt(intent, input.operation, requested, providerIssueId, locator);
+  const prompt = buildIssueAuthoringPrompt(intent, input.operation, requested, providerIssueId, locator, readCampaignCapabilityIdsAtRevision(value.repoRoot, intent.base_main_sha));
   return prepareBudgetedAuthoring(input, value.authorization, intent, input.operation, prompt, input.source_session_ref,
     () => deps.followup({
       ...browserInput(value.repoRoot, prompt, value.binding.profileDir, value.binding.profileDirectory!, input),

@@ -1,3 +1,4 @@
+import { resolveCampaignGroupBaseline } from './campaign-fresh-audit';
 import {
   buildExternalSourceRefreshReceipt,
   buildProviderIssueObservation,
@@ -73,7 +74,7 @@ export function requireIssueBatchAuthority(input: { readonly repo_root: string; 
     && intent.campaign_id === campaign.campaign_id
     && intent.repository_id === status.campaign.repository_id && intent.repository_id === authorization.repository_id
     && intent.target_ref === status.campaign.target_ref && intent.target_ref === authorization.target_ref
-    && intent.base_main_sha === status.campaign.target_revision && intent.base_main_sha === authorization.target_revision
+    && intent.base_main_sha === resolveCampaignGroupBaseline(input.repo_root, status.campaign, status.events, intent.group_number, input.env) && status.campaign.target_revision === authorization.target_revision
     && intent.group_number >= 1 && intent.group_number <= campaign.group_count
     && JSON.stringify(intent.slots) === JSON.stringify(expectedSlots)
     && JSON.stringify(intent.allowed_issue_kinds) === JSON.stringify(campaign.allowed_issue_kinds)

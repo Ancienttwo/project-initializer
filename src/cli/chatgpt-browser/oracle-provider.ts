@@ -1,3 +1,4 @@
+import { readOracleSessionEvidence, type OracleSessionEvidence } from './oracle-session-evidence';
 import { spawn, spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
@@ -5,7 +6,7 @@ import { tmpdir } from 'os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 import type { BrowserConsultInput, BrowserImportedArtifact, PromptBundle } from './types';
 
-export interface OracleProviderResult {
+export interface OracleProviderResult extends OracleSessionEvidence {
   status: 'completed' | 'recoverable' | 'failed';
   output: string;
   conversationUrl?: string;
@@ -231,9 +232,10 @@ function probeBrowserThinkingTime(binary: string): boolean {
  * is oracle's authoritative `--write-output` answer file (an internal managed path,
  * distinct from the user's repo-relative `--write-output` copy-out).
  */
-export function buildOracleCommand(input: BrowserConsultInput, answerPath?: string): string[] {
+export function buildOracleCommand(input: BrowserConsultInput, answerPath?: string, sessionPath?: string): string[] {
   const args = ['--engine', 'browser', '--browser-archive', 'never', '--prompt', input.prompt];
   if (answerPath) args.push('--write-output', answerPath);
+  if (sessionPath) args.push('--write-session', sessionPath);
   if (input.providerSessionId) args.push('--followup', input.providerSessionId);
   if (input.model) args.push('--model', input.model, '--browser-model-strategy', 'select');
   else args.push('--browser-model-strategy', 'current');
@@ -351,10 +353,6 @@ function buildOracleEnv(oracleHomeDir: string): NodeJS.ProcessEnv {
 
 function extractConversationUrl(text: string): string | undefined {
   return text.match(/https:\/\/chatgpt\.com\/c\/[^\s)]+/)?.[0];
-}
-
-function extractProviderSessionId(text: string): string | undefined {
-  return text.match(/\b(?:oracle[_ -]?session|session(?: id)?)[:=]\s*([A-Za-z0-9_.:-]+)/i)?.[1];
 }
 
 interface OracleProcessResult {
@@ -600,7 +598,8 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
     const oracleHomeDir = resolveOracleHomeDir(input);
     mkdirSync(oracleHomeDir, { recursive: true });
     const answerPath = join(answerDir, 'answer.md');
-    const args = buildOracleCommand(providerInput, answerPath);
+    const sessionPath = join(answerDir, 'session.json');
+    const args = buildOracleCommand(providerInput, answerPath, sessionPath);
     const command = [resolution.binary, ...args];
     const result = await runOracleProcess(resolution.binary, args, {
       cwd: runCwd,
@@ -612,12 +611,15 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
     const log = [stdout, stderr ? `\n[stderr]\n${stderr}` : ''].filter(Boolean).join('\n').trimEnd();
     const oracleVersion = resolvedOracleVersion;
     const conversationUrl = extractConversationUrl(log);
-    const providerSessionId = extractProviderSessionId(log);
+    const evidence = readOracleSessionEvidence(sessionPath, oracleHomeDir, input.providerSessionId);
+    const providerSessionId = evidence.providerSessionId;
 
     // Pre/at-start failures are safe to surface as failed; the prompt never landed.
     if (result.error) {
       return {
         status: 'failed',
+        ...evidence,
+        conversationUrl,
         output: log || result.error.message,
         command,
         oracleBinary: resolution.binary,
@@ -634,6 +636,7 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
       if (log.includes(ORACLE_SESSION_ALREADY_RUNNING_MARKER)) {
         return {
           status: 'failed',
+          ...evidence,
           output: log,
           command,
           oracleBinary: resolution.binary,
@@ -649,6 +652,7 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
       }
       return {
         status: 'failed',
+        ...evidence,
         output: log || `oracle exited with status ${result.status ?? result.signal ?? 'unknown'}`,
         command,
         oracleBinary: resolution.binary,
@@ -666,6 +670,7 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
     if (answer.trim().length === 0) {
       return {
         status: 'recoverable',
+        ...evidence,
         output: [
           'Oracle exited successfully but produced no answer file.',
           'The prompt may have been submitted; do not auto-retry on another provider.',
@@ -687,6 +692,7 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
 
     return {
       status: 'completed',
+      ...evidence,
       output: answer.trimEnd(),
       conversationUrl,
       providerSessionId,

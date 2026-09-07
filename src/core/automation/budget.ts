@@ -1074,10 +1074,10 @@ const OUTCOMES: readonly AutomationOutcome[] = Object.freeze(['progress', 'no_pr
 
 export type CampaignAuthoringOperation = 'initial' | 'fill_missing' | 'edit_issue';
 export type CampaignCloseoutOperation = 'github_comment_attempt' | 'github_close_attempt' | 'git_ref_delete_attempt';
-export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation;
+export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'audit' | 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation;
 export function campaignProviderForOperation(operation: CampaignProviderOperation): 'github' | 'git' | 'gpt-pro' {
   switch (operation) {
-    case 'initial': case 'fill_missing': case 'edit_issue': case 'challenge': return 'gpt-pro';
+    case 'initial': case 'fill_missing': case 'edit_issue': case 'challenge': case 'audit': return 'gpt-pro';
     case 'github_read': case 'github_comment': case 'github_close': case 'github_comment_attempt': case 'github_close_attempt': return 'github';
     case 'git_read': case 'git_ref_delete_attempt': return 'git';
     default: return invalid('unsupported campaign Provider operation');
@@ -1105,7 +1105,7 @@ interface CampaignReservationContextBase {
 }
 
 export type CampaignAutomationReservationContextV1 = CampaignReservationContextBase & (
-  | { readonly operation: CampaignAuthoringOperation | 'challenge' }
+  | { readonly operation: CampaignAuthoringOperation | 'challenge' | 'audit' }
   | { readonly operation: 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation; readonly request_sha256: string }
 );
 
@@ -1114,6 +1114,7 @@ const CAMPAIGN_PROVIDER_OPERATIONS: readonly CampaignProviderOperation[] = Objec
   'fill_missing',
   'edit_issue',
   'challenge',
+  'audit',
   'git_read',
   'github_read',
   'github_comment',

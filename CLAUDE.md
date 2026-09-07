@@ -107,26 +107,26 @@ explicit requirement for that new subject; a cache miss alone is not a trigger.
 <!-- BEGIN ARCHITECTURE CONTRACT -->
 ## Architecture Contract
 
-- Functional block: `src/effects/architecture`
-- Capability ID: `runtime-harness-global-runtime-reconciliation`
-- Matched prefix: `src/effects/architecture`
+- Functional block: `src/effects/automation`
+- Capability ID: `runtime-harness-automation-budget`
+- Matched prefix: `src/effects/automation`
 - Architecture domain: `runtime-harness`
-- Architecture capability: `global-runtime-reconciliation`
-- Architecture module: `docs/architecture/modules/runtime-harness/global-runtime-reconciliation.md`
-- Last architecture event: 2026-09-04T07:42:27+0800
-- Last changed path: `src/effects/architecture/archctx-provider.ts`
+- Architecture capability: `automation-budget`
+- Architecture module: `docs/architecture/modules/runtime-harness/automation-budget.md`
+- Last architecture event: 2026-09-08T05:10:12+0800
+- Last changed path: `src/effects/automation/campaign-capability-registry.ts`
 - Severity: low
 - Change type: source-change
 - Module responsibility: Keep this block aligned with the local boundary described by surrounding human-owned context.
-- Entrypoints: `src/effects/architecture`
+- Entrypoints: `src/effects/automation`
 - Allowed dependencies: Follow root `AGENTS.md` / `CLAUDE.md` and this local contract.
 - Forbidden dependencies: Do not cross sibling app/service/package boundaries without an architecture snapshot or explicit plan.
-- Runtime path: `src/effects/architecture`
+- Runtime path: `src/effects/automation`
 - LSP/tooling profile: `typescript-lsp`
 - Verification: Use root required checks plus local commands recorded in this capability contract.
 - Latest snapshot: `(none yet)`
-- Semantic diagram source: `docs/architecture/modules/runtime-harness/global-runtime-reconciliation.md`
-- Pending architecture request: `(none)`
+- Semantic diagram source: `docs/architecture/modules/runtime-harness/automation-budget.md`
+- Pending architecture request: `docs/architecture/requests/runtime-harness-automation-budget.md`
 
 ## Active Workstreams
 
@@ -134,7 +134,7 @@ explicit requirement for that new subject; a cache miss alone is not a trigger.
 
 ## Current Session Projection
 
-- Durable progress lives under `tasks/workstreams/runtime-harness/global-runtime-reconciliation`.
+- Durable progress lives under `tasks/workstreams/runtime-harness/automation-budget`.
 - `tasks/current.md` is the ignored local derived status read model; it is not a live lock or task source.
 - `tasks/todos.md` is the deferred-goal ledger; current execution slices stay in the active plan's `## Task Breakdown`.
 <!-- END ARCHITECTURE CONTRACT -->

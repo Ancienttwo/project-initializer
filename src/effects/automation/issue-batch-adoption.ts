@@ -3,7 +3,7 @@ import { observeShadowAdoption } from './issue-batch-shadow-adoption';
 import type { GithubCommandRunner } from '../external-sources/github';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
-import { capabilityRegistryFromArchcontextNodes } from '../../core/capabilities/registry';
+import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
 import { automationDigest } from '../../core/automation/budget';
 import { buildIssueBatchAdoption, IssueBatchAdoptionError, type IssueBatchAdoptionInput } from '../../core/automation/issue-batch-adoption';
 import { buildConnectorChallenge, renderConnectorChallenge, validateConnectorChallenge, verifyConnectorChallenge, type ConnectorChallengeV1 } from '../../core/automation/connector-challenge';
@@ -67,14 +67,6 @@ function challengeAt(root: string, intent: IssueBatchIntentV1, session: string):
     { kind: 'text_line', path: file.path, line: 1, expected: content.split('\n')[0]! },
     { kind: 'file_sha256', path: file.path, line: null, expected: createHash('sha256').update(content).digest('hex') },
   ] });
-}
-function capabilityIds(root: string, intent: IssueBatchIntentV1): readonly string[] {
-  const paths = git(root, ['ls-tree', '-r', '--name-only', intent.base_main_sha, '.archcontext/model/nodes']).trim().split('\n').filter(p => p.endsWith('.yaml'));
-  const resolution = capabilityRegistryFromArchcontextNodes(paths.map(path => ({ path, value: Bun.YAML.parse(readAt(root, intent.base_main_sha, path)) })), {
-    repoRoot: root, isExistingDirectory: path => { try { return git(root, ['cat-file', '-t', `${intent.base_main_sha}:${path}`]).trim() === 'tree'; } catch { return false; } },
-  });
-  if (resolution.status !== 'valid') fail('exact main capability registry is unavailable');
-  return resolution.registry.capabilities.map(c => `capability.${c.domain}.${c.name}`);
 }
 /** Consume the latest BRC5 reconciliation projection; never count its events as budget usage. */
 function priorReconciliation(root: string, intent: IssueBatchIntentV1) {
@@ -239,7 +231,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
     const admission = reserveCampaignAuthoringBudget({ ...binding, operation: 'challenge', idempotency_key: challenge.challenge_sha256 });
     if (admission.disposition === 'replayed') fail('challenge reservation already exists; reconcile its exact result before continuing');
     const result = await deps.followup({ repoRoot: input.repo_root, sessionId: session.session_ref, title: `Campaign ${intent.campaign_id} readback`, prompt: renderConnectorChallenge(challenge, intent.provider_repository),
-      provider: 'oracle', model: 'gpt-5.5-pro', requireSecretScan: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
+      provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
     response = { response: result.output ?? '', response_session_ref: result.sessionId, model_verified: result.meta.model.verified === true, status: result.status, reservation: admission.reservation };
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'response', { ...response });
   }
@@ -263,7 +255,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   requireIssueBatchAuthority({ repo_root: input.repo_root, intent, env: input.env, now: now() });
   const prior = priorReconciliation(input.repo_root, intent);
   if (mode === 'shadow') {
-    const capabilities = capabilityIds(input.repo_root, intent);
+    const capabilities = readCampaignCapabilityIdsAtRevision(input.repo_root, intent.base_main_sha);
     const observed = observeShadowAdoption({ binding, intent, prior, observe: deps.observe, runner: deps.runner, now, validate: snapshot => {
       const reconciliation = reconcileIssueBatchSlots({ intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, ...prior, current_main_sha: intent.base_main_sha });
       if (reconciliation.invalid_slots.length || reconciliation.unexpected_issue_ids.length) fail('invalid or unexpected slots require BRC5 reconciliation before adoption');
@@ -286,7 +278,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   const snapshot = observeAdoption(input, intent, deps, budget.budget, 'pre-seal');
   const reconciliation = reconcileIssueBatchSlots({ intent, snapshot_receipt: snapshot.receipt, observations: snapshot.observations, ...prior, current_main_sha: intent.base_main_sha });
   if (reconciliation.invalid_slots.length || reconciliation.unexpected_issue_ids.length) fail('invalid or unexpected slots require BRC5 reconciliation before adoption');
-  const capabilities = capabilityIds(input.repo_root, intent);
+  const capabilities = readCampaignCapabilityIdsAtRevision(input.repo_root, intent.base_main_sha);
   for (const slot of reconciliation.slots.filter(s => s.state === 'complete')) {
     const observation = snapshot.observations.find(o => o.observation_sha256 === slot.observation_sha256)!;
     const metadata = parseIssueBatchMetadata(observation.body);
