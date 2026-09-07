@@ -23,7 +23,7 @@ const limits: ProgramBudgetLimitV1 = Object.freeze({ max_agent_turns: 10, max_su
 function policy(mode: 'off' | 'shadow' | 'active' = 'shadow', external: 'off' | 'manual' = 'manual', maximumGroupCount: 1 | 2 | 3 = 3) {
   return {
     development_campaign: mode === 'off' ? { version: 1, mode } : { version: 1, mode, limits: { maximum_group_count: maximumGroupCount, maximum_issues_per_group: 10, maximum_parallel_tasks: 3 } },
-    external_sources: external === 'off' ? { version: 1, mode: 'off' } : { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'issue_numbers', issue_numbers: [1] }, limits: { max_pages: 1, max_issues: 1, max_body_bytes: 1024, max_total_bytes: 4096, deadline_ms: 1000 } } },
+    external_sources: external === 'off' ? { version: 1, mode: 'off' } : { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 1, max_issues: 1, max_body_bytes: 1024, max_total_bytes: 4096, deadline_ms: 1000 } } },
   };
 }
 

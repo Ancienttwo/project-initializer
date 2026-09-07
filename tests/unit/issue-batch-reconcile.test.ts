@@ -51,6 +51,9 @@ function receipt(observations: readonly ReturnType<typeof observation>[], outcom
 describe('BRC5 issue batch reconciliation', () => {
   test('accepts only one exact strict metadata fence', () => {
     expect(parseIssueBatchMetadata(body('01'))).toMatchObject({ issue_kind: 'bugfix', priority: 50 });
+    for (const priority of ['"P1"', '-1', '101', '0.5']) {
+      expect(parseIssueBatchMetadata(body('01').replace('"priority":50', `"priority":${priority}`))).toBeNull();
+    }
     expect(parseIssueBatchMetadata(`${body('01')}\n\`\`\`json\n{}\n\`\`\``)).toBeNull();
     expect(parseIssueBatchMetadata(`${renderIssueBatchMarker('campaign-1', 1, '01')}\n\`\`\`json\n{"protocol":1,"kind":"repo-harness-campaign-issue-metadata","issue_kind":"bugfix","primary_capability":"runtime","priority":50,"depends_on_slots":[],"suspected_paths":[],"extra":true}\n\`\`\``)).toBeNull();
   });
