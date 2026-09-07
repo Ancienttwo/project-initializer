@@ -19,3 +19,16 @@ No new product API, dependency or runtime authority is added. The new research f
 The contract names combined authoring, metadata reconciliation, policy/store, campaign CLI, ChatGPT browser and descriptor suites plus TypeScript and six repository-integrity checks. Final execution results are held in the canonical prepared evidence and projected review. No full suite or additional Connector experiment is required for this merge boundary.
 
 Next implementation ownership is BRC14 fresh audit and ordered group baseline consumption, followed by the BRC15 model-free matrix. The historical `brc14-readiness` branch is research input only: it predates current main's admission correction and must not be merged as production code. BRC14/BRC15 remain pending until their actual criteria are implemented and tested; stopping diagnostics does not waive their evidence boundary.
+
+## BRC14 next work-package map
+
+Read-only tracing confirms four owning boundaries on the integrated candidate:
+
+- `development-campaign-store.ts#appendDevelopmentCampaignEvent` guards cleanup for begin/prepare/complete, but accept_group has no typed fresh-audit consumer. Opaque event evidence_refs alone cannot authorize acceptance.
+- `gpt-pro-issue-authoring.ts#startIssueBatchAuthoring` and continuation still use campaign.target_revision for every group; current lifecycle must own the group number and previous accepted audit must own the next baseline.
+- `campaign-closeout.ts` cleanup receipts bind individual Task merge/topology proof, not a complete group snapshot. Audit input must include every adopted/unfilled slot and a single final target revision with merge ancestry checked.
+- `core/automation/budget.ts` and budget-store provider operations have no audit operation. Audit must charge provider calls without incrementing authoring rounds, run in a fresh session and reject reuse of any group authoring session.
+
+The next coherent package therefore owns complete group-closeout snapshot production, actual fresh-audit observation, shared-store acceptance/complete gating and rolling-baseline consumption together. A standalone caller-authored trusted receipt would create false authority and is not sufficient. Missing trusted revision evidence must remain unverified; model-free tests can prove rejection, sequencing and accounting without claiming a real accepted audit. No new BRC6a probe is a prerequisite for implementing those paths.
+
+Targeted scenarios: wrong SHA, missing version proof, reused authoring session, omitted/unfilled slots, naked accept_group, duplicate CAS acceptance, G2/G3 baselines, skipped groups/Group4/early complete, audit charging independent of authoring rounds, and bounded unverified retry with no main rollback. The older readiness worktree also contains unrelated active/untracked BRC15a artifacts, so the next package needs its own isolated worktree based on this integration candidate.
