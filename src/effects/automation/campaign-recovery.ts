@@ -60,7 +60,7 @@ function observe(context: Context, owner: LeaseOwnerRecord): LeaseReclaimEvidenc
     }
     try {
       const current = observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...child.observation });
-      return { role, inactive: exact(current, terminal) && current.state === 'terminal' ? true : null, invocation, started, terminal };
+      return { role, inactive: exact(current, terminal) && current.state === 'terminal' && current.runtime_effect_inactive === true ? true : null, invocation, started, terminal };
     } catch { return { role, inactive: null, invocation, started, terminal }; }
   });
   const binding = readEngineerBindingStatus(root, handoff.acquired.offer.engineer_id, handoff.acquired.offer.engineer_contract_revision);

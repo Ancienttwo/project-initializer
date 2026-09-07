@@ -87,11 +87,15 @@ export function observeCampaignCodexTerminal(input: {
   if (provider?.operation_types.some(type => !['agent_message', 'reasoning', 'command_execution', 'file_change', 'todo_list', 'error'].includes(type))) {
     reason = 'provider turn includes an operation outside the managed terminal evidence scope';
   }
+  // A completed command may leave detached descendants outside the observed group.
+  // Provider completion remains usable; it cannot authorize a new writable owner.
+  const runtimeEffectInactive = reason === null && provider !== null && !provider.operation_types.includes('command_execution') ? true : null;
   const body = { protocol: 1 as const, kind: 'repo-harness-campaign-codex-terminal' as const,
     invocation_sha256: invocation.invocation_sha256, identity: invocation.identity,
     stdout_sha256: bytesSha(stdout), stderr_sha256: bytesSha(stderr), exit_code: input.exit_code,
     timed_out: input.timed_out === true, process_group_quiescence: quiescence,
     final_response: provider?.final_response ?? null, provider_thread_id: provider?.thread_id ?? null, terminal_event_sha256: provider?.terminal_event_sha256 ?? null,
+    runtime_effect_inactive: runtimeEffectInactive,
     state: reason === null && provider !== null ? 'terminal' as const : 'unknown' as const, reason };
   return Object.freeze({ ...body, terminal_sha256: canonicalMessageDigest(body) });
 }

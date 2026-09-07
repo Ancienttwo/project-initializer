@@ -76,7 +76,7 @@ test('a raw command launch never becomes provider-terminal evidence after retire
   expect(readLease(f.root, f.envelope.task_id).record!.generation).toBe(f.envelope.generation);
 }, 60_000);
 
-function installProviderFixture(f: Awaited<ReturnType<typeof acquired>>, finalVerdict: 'pass' | 'fail' = 'pass') {
+function installProviderFixture(f: Awaited<ReturnType<typeof acquired>>, finalVerdict: 'pass' | 'fail' = 'pass', detachedCommand = false) {
   const profiles = join(f.root, '.codex/agents'); mkdirSync(profiles, { recursive: true });
   for (const [name, sandbox] of [['fast-worker', 'workspace-write'], ['gatekeeper', 'read-only']]) {
     writeFileSync(join(profiles, `${name}.toml`), `model = "fixture-model"\nsandbox_mode = "${sandbox}"\nmodel_reasoning_effort = "high"\ndeveloper_instructions = "Fixture role"\n`);
@@ -86,16 +86,47 @@ function installProviderFixture(f: Awaited<ReturnType<typeof acquired>>, finalVe
   const executable = join(bin, 'codex');
   writeFileSync(executable, `#!${process.execPath}
 import { writeFileSync } from 'fs';
+import { spawn } from 'child_process';
 if (process.argv.includes('--version')) { console.log('codex-cli 1.0.0'); process.exit(0); }
 const role = process.env.CONTRACT_RUN_ROLE;
+if (${detachedCommand} && role === 'worker') {
+  const child = spawn(process.execPath, ['-e', "const fs = require('fs'); const timer = setInterval(() => fs.appendFileSync('detached-writes.txt', 'x'), 20); setTimeout(() => { clearInterval(timer); }, 30000);"], { detached: true, stdio: 'ignore' });
+  writeFileSync('detached.pid', String(child.pid)); child.unref();
+}
 if (role === 'worker') writeFileSync(process.env.CONTRACT_RUN_ATTEMPT_RESULT, JSON.stringify({ outcome:'completed', evidence_paths:['src/index.ts'] }));
 const text = role === 'verifier' ? JSON.stringify({ verdict:${JSON.stringify(finalVerdict)}, review:'Fixture review' }) : 'Worker finished';
 console.error('fixture diagnostic');
-for (const event of [{type:'thread.started',thread_id:'fixture-'+role}, {type:'item.completed',item:{id:'message',type:'agent_message',text}}, {type:'turn.completed',usage:{input_tokens:10,cached_input_tokens:0,output_tokens:2}}]) console.log(JSON.stringify(event));
+for (const event of [{type:'thread.started',thread_id:'fixture-'+role}, ...(${detachedCommand} && role === 'worker' ? [{type:'item.completed',item:{id:'command',type:'command_execution',status:'completed',exit_code:0}}] : []), {type:'item.completed',item:{id:'message',type:'agent_message',text}}, {type:'turn.completed',usage:{input_tokens:10,cached_input_tokens:0,output_tokens:2}}]) console.log(JSON.stringify(event));
 `);
   chmodSync(executable, 0o700);
   return { ...f.env, PATH: `${bin}:${process.env.PATH}` };
 }
+
+test('detached command effects remain ineligible for reclaim after provider completion', async () => {
+  const f = await acquired();
+  const env = installProviderFixture(f, 'pass', true);
+  writeFileSync(join(f.envelope.worktree_path, 'selector.json'), JSON.stringify(f.input.selector));
+  try {
+    const run = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/contract-run.ts'), 'run', '--repo', f.envelope.worktree_path,
+      '--contract', f.envelope.plan.contract_path, '--campaign-handoff', 'selector.json', '--campaign-provider', 'codex-exec',
+      '--out', '.ai/harness/detached-provider-test', '--json'], { cwd: f.envelope.worktree_path, env, encoding: 'utf8' });
+    expect(run.status, run.stdout + run.stderr).toBe(0);
+    const terminal = readPlanningRecord<any>(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'terminal'));
+    expect(terminal.state).toBe('terminal');
+    expect(terminal.process_group_quiescence.state).toBe('quiescent');
+    const path = join(f.envelope.worktree_path, 'detached-writes.txt');
+    const before = readFileSync(path, 'utf8').length;
+    await Bun.sleep(100);
+    expect(readFileSync(path, 'utf8').length).toBeGreaterThan(before);
+    retireCampaignDispatch({ ...f.input, env });
+    const now = () => new Date(Date.now() + 60_000);
+    expect(observeCampaignReclaimEligibility({ ...f.input, env, now }).evidence.runtime_effect_inactive).toBeNull();
+    expect(() => recoverCampaignDispatch({ ...f.input, env, now })).toThrow('not reclaimable');
+    expect(readLease(f.root, f.envelope.task_id).record!.generation).toBe(f.envelope.generation);
+  } finally {
+    try { process.kill(Number(readFileSync(join(f.envelope.worktree_path, 'detached.pid'), 'utf8')), 'SIGKILL'); } catch { /* Fixture descendant may already have exited. */ }
+  }
+}, 60_000);
 
 for (const verdict of ['pass', 'fail'] as const) test(`typed Codex process binds invocation evidence and consumes the explicit ${verdict} verdict`, async () => {
   const f = await acquired();
