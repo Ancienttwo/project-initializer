@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-07 12:14
+> **Related Plan**: plans/archive/plan-20260907-0554-brc10-lifecycle.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260907-1214
+> **Archive Projection V1**: `plans/plan-20260907-0554-brc10-lifecycle.md` => `plans/archive/plan-20260907-0554-brc10-lifecycle.md`
+> **Archive Projection V1**: `tasks/notes/20260907-0554-brc10-lifecycle.notes.md` => `tasks/archive/notes-20260907-1214-brc10-lifecycle.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-0554-brc10-lifecycle.contract.md` => `tasks/archive/contract-20260907-1214-brc10-lifecycle.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-0554-brc10-lifecycle.review.md` => `tasks/archive/review-20260907-1214-brc10-lifecycle.md`
+
 # Task Contract: brc10-lifecycle
 
-> **Status**: Active
-> **Plan**: plans/plan-20260907-0554-brc10-lifecycle.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260907-0554-brc10-lifecycle.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-07 11:03
-> **Review File**: `tasks/reviews/20260907-0554-brc10-lifecycle.review.md`
-> **Notes File**: `tasks/notes/20260907-0554-brc10-lifecycle.notes.md`
+> **Review File**: `tasks/archive/review-20260907-1214-brc10-lifecycle.md`
+> **Notes File**: `tasks/archive/notes-20260907-1214-brc10-lifecycle.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -37,10 +47,10 @@ A typed provider terminal detached from the actual executable/argv/output or a s
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260907-0554-brc10-lifecycle.md`
+- Source plan: `plans/archive/plan-20260907-0554-brc10-lifecycle.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260907-0554-brc10-lifecycle.review.md`
-- Notes file: `tasks/notes/20260907-0554-brc10-lifecycle.notes.md`
+- Review file: `tasks/archive/review-20260907-1214-brc10-lifecycle.md`
+- Notes file: `tasks/archive/notes-20260907-1214-brc10-lifecycle.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -63,11 +73,11 @@ A typed provider terminal detached from the actual executable/argv/output or a s
 ```yaml
 allowed_paths:
   - tasks/todos.md
-  - plans/plan-20260907-0554-brc10-lifecycle.md
+  - plans/archive/plan-20260907-0554-brc10-lifecycle.md
   - plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md
-  - tasks/contracts/20260907-0554-brc10-lifecycle.contract.md
-  - tasks/reviews/20260907-0554-brc10-lifecycle.review.md
-  - tasks/notes/20260907-0554-brc10-lifecycle.notes.md
+  - tasks/archive/contract-20260907-1214-brc10-lifecycle.md
+  - tasks/archive/review-20260907-1214-brc10-lifecycle.md
+  - tasks/archive/notes-20260907-1214-brc10-lifecycle.md
   - docs/researches/20260907-brc10-provider-terminal-readiness.md
   - docs/researches/20260907-brc10-lifecycle.md
   - docs/architecture/.projection-manifest.json
@@ -152,7 +162,7 @@ exit_criteria:
     - docs/spec.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260907-0554-brc10-lifecycle.notes.md
+    - tasks/archive/notes-20260907-1214-brc10-lifecycle.md
 ```
 
 ## Verification Plan
