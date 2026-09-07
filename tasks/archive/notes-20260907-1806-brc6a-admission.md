@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-07 18:06
+> **Related Plan**: plans/archive/plan-20260907-1706-brc6a-admission.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260907-1806
+> **Archive Projection V1**: `plans/plan-20260907-1706-brc6a-admission.md` => `plans/archive/plan-20260907-1706-brc6a-admission.md`
+> **Archive Projection V1**: `tasks/notes/20260907-1706-brc6a-admission.notes.md` => `tasks/archive/notes-20260907-1806-brc6a-admission.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-1706-brc6a-admission.contract.md` => `tasks/archive/contract-20260907-1806-brc6a-admission.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-1706-brc6a-admission.review.md` => `tasks/archive/review-20260907-1806-brc6a-admission.md`
+
 # Implementation Notes: brc6a-admission
 
 > **Status**: Active
-> **Plan**: plans/plan-20260907-1706-brc6a-admission.md
-> **Contract**: tasks/contracts/20260907-1706-brc6a-admission.contract.md
-> **Review**: tasks/reviews/20260907-1706-brc6a-admission.review.md
+> **Plan**: plans/archive/plan-20260907-1706-brc6a-admission.md
+> **Contract**: tasks/archive/contract-20260907-1806-brc6a-admission.md
+> **Review**: tasks/archive/review-20260907-1806-brc6a-admission.md
 > **Last Updated**: 2026-09-07 17:06
 > **Lifecycle**: notes
 

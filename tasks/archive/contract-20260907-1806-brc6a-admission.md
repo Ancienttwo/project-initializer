@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-07 18:06
+> **Related Plan**: plans/archive/plan-20260907-1706-brc6a-admission.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260907-1806
+> **Archive Projection V1**: `plans/plan-20260907-1706-brc6a-admission.md` => `plans/archive/plan-20260907-1706-brc6a-admission.md`
+> **Archive Projection V1**: `tasks/notes/20260907-1706-brc6a-admission.notes.md` => `tasks/archive/notes-20260907-1806-brc6a-admission.md`
+> **Archive Projection V1**: `tasks/contracts/20260907-1706-brc6a-admission.contract.md` => `tasks/archive/contract-20260907-1806-brc6a-admission.md`
+> **Archive Projection V1**: `tasks/reviews/20260907-1706-brc6a-admission.review.md` => `tasks/archive/review-20260907-1806-brc6a-admission.md`
+
 # Task Contract: brc6a-admission
 
-> **Status**: Active
-> **Plan**: plans/plan-20260907-1706-brc6a-admission.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260907-1706-brc6a-admission.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-07 17:06
-> **Review File**: `tasks/reviews/20260907-1706-brc6a-admission.review.md`
-> **Notes File**: `tasks/notes/20260907-1706-brc6a-admission.notes.md`
+> **Review File**: `tasks/archive/review-20260907-1806-brc6a-admission.md`
+> **Notes File**: `tasks/archive/notes-20260907-1806-brc6a-admission.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -44,10 +54,10 @@ The fix is wrong if an old challenge receipt permits new Task/Lease/child work, 
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260907-1706-brc6a-admission.md`
+- Source plan: `plans/archive/plan-20260907-1706-brc6a-admission.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260907-1706-brc6a-admission.review.md`
-- Notes file: `tasks/notes/20260907-1706-brc6a-admission.notes.md`
+- Review file: `tasks/archive/review-20260907-1806-brc6a-admission.md`
+- Notes file: `tasks/archive/notes-20260907-1806-brc6a-admission.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -69,10 +79,10 @@ The fix is wrong if an old challenge receipt permits new Task/Lease/child work, 
 
 ```yaml
 allowed_paths:
-  - plans/plan-20260907-1706-brc6a-admission.md
-  - tasks/contracts/20260907-1706-brc6a-admission.contract.md
-  - tasks/reviews/20260907-1706-brc6a-admission.review.md
-  - tasks/notes/20260907-1706-brc6a-admission.notes.md
+  - plans/archive/plan-20260907-1706-brc6a-admission.md
+  - tasks/archive/contract-20260907-1806-brc6a-admission.md
+  - tasks/archive/review-20260907-1806-brc6a-admission.md
+  - tasks/archive/notes-20260907-1806-brc6a-admission.md
   - tasks/notes/brc6a-admission-pre-fix.log
   - docs/researches/20260907-brc6a-admission.md
   - docs/architecture/
