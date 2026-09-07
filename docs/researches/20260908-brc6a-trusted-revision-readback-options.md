@@ -1,0 +1,86 @@
+# BRC6a：可信版本读回的证据边界与最小验证方案
+
+> Status: Research complete; producer capability unproven; BRC6a remains pending.
+> Subject: repo-harness `33c5012e1185a695fdaf54a7bb84fc613cfb653b`.
+> Scope: source/docs investigation, existing focused tests and disposable Git experiments. No GPT invocation, Issue mutation, runtime change, new receipt schema or activation.
+
+## 结论
+
+当前没有已证实可直接接入的 exact-revision producer。`requireCampaignActiveAdmission()` 的拒绝应保留。BRC10 正在修复 authoring metadata、模型验证投影与完整快照配置；这些修复解决可采纳性，不解决本报告的版本来源证明。
+
+下一刀应是**生产者能力探针**，先证明现有 Connector 能输出什么，再决定 verifier 实现。优先尝试原始 Git 对象读回，而非继续增加内容抽样、先建新服务或先定义无人能生产的 receipt。探针需要另行批准的一次只读 provider 调用；本轮没有执行它。其成功也不得自动打开 active admission。
+
+## P1 — 当前权威和可观察事实
+
+| 层次 | 当前来源 | 能证明什么 | 不能证明什么 |
+| --- | --- | --- | --- |
+| 本地目标 | `issue-batch-adoption.ts#challengeAt` 在 `intent.base_main_sha` 上调用 Git | 本地期望来自指定 commit | Connector 读取的 revision |
+| 模型与会话 | Oracle `BrowserRunResult` 的 modelSelection、conversationId、promptSubmitted；repo-harness browser session | 对应宿主观察，取决于正确投影和绑定 | GitHub 实际读取的对象或整个审计范围 |
+| 内容回答 | `connector-challenge.ts#verifyConnectorChallenge` | 三项答案匹配、响应 digest、echo SHA 匹配 | SHA 是观察所得而非 prompt 回显；答案来自哪个工具 |
+| 原始传输结果 | `oracle-provider.ts#OracleProviderResult` 与 Oracle `src/browser/types.ts#BrowserRunResult` | 答案、artifact、会话和模型等当前暴露字段 | 当前类型中没有 typed Connector call→resolved commit→returned bytes 的完整读回记录 |
+| 活动准入 | `campaign-revision-admission.ts` | 没有可信 producer 时拒绝新 active 工作 | 不是已经交付 producer 的证明 |
+
+Oracle 检查对象为本机隔离候选 `26e12021f9593d7ac4ede7b252099653f1b4aca8`。未读取浏览器 cookie、未控制 BRC10 的标签页、未将其运行中对话当本轮证据。
+
+`oracle-provider.ts#stageScanBoundOracleFiles` 已校验扫描后 staging bytes，但 campaign authoring 的 `browserInput` 当前没有输入文件。这只能支持未来 snapshot delivery 的部分本地链；不能把本地 staging digest 说成模型已收到或已经读完文件。
+
+## P2 — 反例与可证性
+
+1. 现有单测 `unchanged old answers with a new echoed SHA prove content only` 已证明：更换 expected SHA，复用旧答案并回显新 SHA，仍能得到 `challenge_verified`。它明确不产生 `observed_main_sha`。
+2. 本轮创建 disposable Git repo，两个不同 commit 指向同一个 tree。即使比对整个工作树内容，也不能区分这两个 commit。metadata-only commit、revert、未改采样路径均不能靠扩大样本彻底排除。
+3. 对原始 commit bytes 使用 Git framing `commit <byte-length>\0<bytes>` 重算 object ID：旧对象匹配旧 SHA，但不匹配新 SHA；新对象匹配新 SHA。**这说明对象验证可以修补内容等价无法识别 commit 的缺陷，不说明现有 Connector 可以生产这些 bytes。**
+4. 只返回 commit 对象仍不够：必须从其 tree 逐层绑定 path、mode、blob，再绑定返回的文件 bytes。拿到新 commit 元数据后读取旧的不同文件 bytes，应被链验证拒绝。旧文件 bytes 若在新 commit 中确实相同，则并非内容陈旧错误，但读取渠道仍未被证明。
+5. 模型是否“认真阅读并理解所有代码”不是 Git、签名或 tool log 能机械证明的属性。验收必须明确测量输入来源、交付和覆盖范围，不能把可观察输入证据升级成理解保证。当前 exact-SHA/Connector 要求不在本轮改写。
+
+本轮对象实验结果：
+
+- old commit: `bc40850ac863b690209d61033065cd87057d74ef`
+- new commit: `8dd6f56c51f8ef49cb0ac69cfd6620648a46f599`
+- shared tree: `bfa746742dd9c99f309f8a2ebcbb09a7154d68b4`
+- different commits / same content / old raw object rejected for new commit / new raw object accepted：全部断言通过。
+
+可复现方法：在临时目录 `git init`，用 `hash-object -w --stdin` 写一个 blob，再用 `mktree` 建 tree；以该 tree 调两次 `commit-tree`，第二次以第一次为 parent。用 `cat-file commit <sha>` 取得原始 bytes（不可 trim 或 Unicode 归一化），按上述 framing 计算当前仓库对象格式的 digest。固定 SHA 是本次实验身份，不要求重跑因时间戳变化仍生成相同 SHA。
+
+## P3 — 方案比较与决定
+
+| 方向 | 价值 | 未闭环点 / 决定 |
+| --- | --- | --- |
+| 多抽文件、diff 选档、fresh chat、SHA echo | 可提高部分错误检出率 | same-tree different-commit 反例仍存在；不作为 producer |
+| 原始 commit→tree→blob 对象读回 | 验证内容与 exact commit 的对象链；可经现有回答通道传输，理论上无需新签名服务 | Connector 是否能取得并无损输出原始对象未知；不能独立证明 Connector 调用来源。优先能力探针，暂不建设产品 verifier |
+| Oracle 捕获 provider-origin 工具调用记录 | 可把当前会话的 request/ref、resolved commit、返回 bytes 关联起来 | 当前暴露类型不提供该链；工具名截图、模型文本或调用参数中的 SHA 不够。需要真实 request/result 及会话绑定样本，不能靠推测解析 UI 文本 |
+| 本地 pinned snapshot 经已有 Oracle 文件通道交付 | Git 来源和扫描后 staging 有既存基础 | 改变“通过 Connector 读 exact main”的读取方式；还缺会话内交付确认、完整性/截断及覆盖证明。必须经产品合同变更，不能静默替代 |
+| Responses API + 可审计 read tool | 官方有包含 arguments/output 的 `mcp_call` 记录，可以观察工具结果进入模型上下文 | 是不同传输、模型/成本/权限与 Issue 写入口边界，不等同当前 ChatGPT Pro/Oracle。需要独立授权和设计，不作自动 fallback |
+
+信任模型必须写清：本地 Git snapshot 和受管 host 是当前可信计算基；模型文本不可信。如果要求抵抗控制 host 的恶意操作者，仅添加 host 自签 receipt 没有增益，必须另有认证来源。Git 对象 digest 验证使用仓库实际 object format；不把 commit 签名状态当成 provider 阅读证明。
+
+十倍规模首先受限于原始对象/文件传输量和模型上下文。不能把一个文件的 Merkle proof 推广为整个 audit scope；不能以截断后的成功回答声称覆盖完整。审计范围内有 LFS、submodule、binary 或超限文件时，须明确受支持的交付规则或保持 incomplete，不追踪本地 worktree 路径悄悄补数据。
+
+## 最小下一刀：一次只读生产者能力探针
+
+这是后续提案，不是本轮执行授权；不新增 service、MCP tool、持久化 schema 或运行开关。
+
+1. 用获准的 disposable repo 固定两份 same-tree/different-commit 和一份 changed-blob fixture。锁定新会话、目标 repo、expected SHA、预算和只读权限。prompt 只给目标，不附所需原始对象或预期答案；若禁止预先写入 fixture，先复用已有可验证对象对。
+2. 要求现有 Connector 返回原始 commit bytes 及一个指定文件的完整 tree/blob 路径证据，以可无损编码传输；缺字段、截断、未知 object format 或工具不支持均记录 unavailable，不让模型补造 JSON metadata。
+3. 由本地 Git 验证 bytes 和引用链；分别记录 source-object verification 与工具调用/会话 provenance。并行保留宿主实际暴露的调用记录；没有 provider-origin trace 时如实记录缺口。
+4. 若只能证明对象链，提交 Owner 决定是否将“版本绑定内容已取得”作为明确的可观察验收边界；**当前 BRC6a 不自动完成，原 Connector/exact-SHA 要求不降标**。若现有传输不产对象且不产调用证据，就停止此路线，选择合同修订或新传输，不增加抽样轮数来冒充证明。
+5. 仅在真实 producer 及语义决策冻结后实施：owning evidence type/validator、persisted intent/session/result 绑定、active admission 消费者、BRC14 fresh-session/final-main/coverage 消费者。优先复用现有 intent/store 和预算；共享 authoring/adoption 文件先与 BRC10 协调。旧 challenge 保持内容观察含义，不能在旧记录上补标新证据。
+
+### 未来实现必须拒绝的反例
+
+- 新 expected SHA 配旧 commit raw bytes；wrong repository、wrong path、changed mode、缺 tree/blob、bytes 被裁剪或重编码。
+- 正确新 commit 对象拼接错误旧 blob；仅正确 commit header 而覆盖范围缺文件。
+- 正确对象来自另一会话、另一 intent、历史 receipt replay；audit 复用 authoring session。
+- prompt 内 echo SHA、模型自述 Connector 调用、通知 receipt、GitHub commit signature 或本地 fetch 被当作远端阅读证据。
+- provider timeout/unknown、工具 response 分页或 artifact 不完整、final main 在验收前移动。
+
+正向验收也必须包含真实支持的 producer → durable raw evidence → verifier → consumer，不以 fake receipt unit test 代替。新外部调用须走现有 reserve/settle/reconciliation；producer 失败不影响历史 settlement/cleanup 权限。
+
+## 本轮验证与完成边界
+
+现有 `tests/unit/connector-challenge.test.ts` 与 `tests/effects/brc6a-admission.test.ts` 在独立 worktree 执行：11 pass、0 fail、26 assertions。未修改源码和测试，没有 full-suite、GPT、Issue 或授权写入。报告是可复核方案，BRC6a/BRC14/BRC15 状态不变。
+
+## 官方资料核对（2026-09-08）
+
+- [OpenAI GitHub app](https://help.openai.com/en/articles/11145903-connecting-github-t-chatgpt-deep-research)：当前说明为按需读取，不建立 ChatGPT 同步索引；GitHub 自身搜索索引是另一回事。因此历史“stale Connector/index”只保留为旧探针及陈旧读取威胁，不宣称当前产品必有 Connector index。本文未发现该页承诺可导出的 exact-commit 工具回执；文档未承诺不等于技术上绝不可能。该页描述的 GitHub app 也不能用来否定本机 canary 已观察到的具体写入通道，两者产品表面未证明相同。
+- [GitHub Git commits](https://docs.github.com/en/rest/git/commits)：commit 绑定 tree，签名 verification 是 commit 签名校验。JSON 响应、字段 `sha` 或签名布尔值不能直接当 raw object 字节；不能假定 API 总提供可无损重建的 raw object。
+- [OpenAI MCP/Connectors API](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)：Responses 的 `mcp_call` 包含调用参数和工具结果，官方说明结果进入模型 context。这支持新传输的可观察性方向，不证明当前 Oracle browser 已有同等证据，也不证明本仓库的目标模型和 app 权限已兼容。
