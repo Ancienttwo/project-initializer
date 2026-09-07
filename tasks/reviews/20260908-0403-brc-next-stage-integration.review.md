@@ -1,16 +1,16 @@
 # Task Review: brc-next-stage-integration
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260908-0403-brc-next-stage-integration.md
 > **Contract**: tasks/contracts/20260908-0403-brc-next-stage-integration.contract.md
 > **Notes File**: tasks/notes/20260908-0403-brc-next-stage-integration.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 04:03
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:0ff35c3b694d0ee499beb47ff32f039142f57209b31fc1157a479108f4450bd0
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 38c26b2ada6a3071df40745b8eed6e06315695b6
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-review
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:0ff35c3b694d0ee499beb47ff32f039142f57209b31fc1157a479108f4450bd0
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 38c26b2ada6a3071df40745b8eed6e06315695b6
+> **Verification Evidence SHA256**: sha256:362e9db3111a1bc28784334de34c2cb4da28438b158b529c15a599989e0193e6
+> **Issued At**: 2026-09-07T20:14:39.500Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Integration PASS f513afd4: frozen registry and strict metadata combine with GitHub app selection and user-default model; descriptor-only identity and unverified boundaries preserved. Canonical13/13 checks passed on published main38c26b2a; no GPT calls. BRC14 ownership map is next-stage scope, not runtime completion.
 - Findings: none
 
 ## Behavior Diff Notes
