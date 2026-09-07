@@ -1,6 +1,7 @@
-import { accessSync, constants, lstatSync, readFileSync, realpathSync } from 'fs';
+import { accessSync, constants, lstatSync, readFileSync, realpathSync, mkdtempSync, rmSync } from 'fs';
 import { delimiter, isAbsolute, join, relative, resolve } from 'path';
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
+import { tmpdir } from 'os';
 import { createHash } from 'crypto';
 import { canonicalMessageDigest } from '../../core/messages/mechanics';
 import { validateCampaignCodexInvocation, type CampaignCodexInvocation, type CampaignRuntimeIdentity } from '../../core/automation/campaign-runtime';
@@ -28,10 +29,38 @@ function codexOnPath(env: NodeJS.ProcessEnv): string {
   throw new Error('campaign Codex executable is unavailable on host PATH');
 }
 
+/** Local preparation is supervised under the same absolute deadline as the turn. */
+async function probeCampaignCodexVersion(executable: string, deadline: number, env: NodeJS.ProcessEnv): Promise<string> {
+  if (Date.now() >= deadline) throw new Error('campaign preparation deadline expired');
+  const dir = mkdtempSync(join(tmpdir(), 'campaign-version-'));
+  const stdout = join(dir, 'stdout'); const stderr = join(dir, 'stderr'); const result = join(dir, 'result.json');
+  const child = spawn(process.execPath, [resolve(import.meta.dir, '../../../scripts/run-bounded-verifier-command.ts'),
+    '--deadline-ms', String(deadline), '--log', stdout, '--stderr-log', stderr, '--result', result,
+    '--max-output-bytes', '65536', '--', executable, '--version'], { env, stdio: 'ignore' });
+  let cancelled = false;
+  const cancel = () => { cancelled = true; child.kill('SIGTERM'); };
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, cancel);
+  try {
+    const exit = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject); child.once('exit', resolve);
+    });
+    const observation = JSON.parse(readFileSync(result, 'utf8'));
+    if (cancelled || exit !== 0 || observation.exit_code !== 0 || observation.termination_cause !== 'completed'
+      || observation.output_complete !== true || observation.process_group_quiescence?.state !== 'quiescent') {
+      throw new Error(`campaign version probe failed: ${cancelled ? 'cancelled' : observation.termination_cause}`);
+    }
+    return readFileSync(stdout, 'utf8').trim();
+  } finally {
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.off(signal, cancel);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 /** Called by the actual contract-run invocation boundary before child admission. */
-export function prepareCampaignCodexInvocation(input: {
-  repo_root: string; worktree: string; prompt_path: string; identity: CampaignRuntimeIdentity; env?: NodeJS.ProcessEnv;
-}): CampaignCodexInvocation {
+export async function prepareCampaignCodexInvocation(input: {
+  repo_root: string; worktree: string; prompt_path: string; identity: CampaignRuntimeIdentity; deadline_ms: number; env?: NodeJS.ProcessEnv;
+}): Promise<CampaignCodexInvocation> {
+  if (!Number.isFinite(input.deadline_ms) || Date.now() >= input.deadline_ms) throw new Error('campaign preparation deadline expired');
   const root = realpathSync(input.repo_root);
   const profileRef = `.codex/agents/${input.identity.role === 'worker' ? 'fast-worker' : 'gatekeeper'}.toml`;
   const profileBytes = regular(root, profileRef);
@@ -45,7 +74,8 @@ export function prepareCampaignCodexInvocation(input: {
   }
   const prompt = regular(realpathSync(input.worktree), input.prompt_path);
   const executable = codexOnPath(input.env ?? process.env);
-  const version = execFileSync(executable, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const version = await probeCampaignCodexVersion(executable, input.deadline_ms, input.env ?? process.env);
+  if (Date.now() >= input.deadline_ms) throw new Error('campaign preparation deadline expired');
   if (!/^codex-cli \d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version)) throw new Error('campaign Codex version is not an exact CLI version');
   const instructions = profile.developer_instructions + (input.identity.role === 'verifier'
     ? '\n\nCampaign invocation response contract: this replaces the generic opening-line format. Return only exact JSON {"verdict":"pass|fail","review":"Markdown evidence and findings"}. Consume the supplied canonical prepared evidence; do not run a second suite. Remain read-only.' : '');

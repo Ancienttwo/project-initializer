@@ -4,7 +4,9 @@ import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'fs
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { automationDigest, sealProgramAuthorization, validateAutomationReservation } from '../../src/core/automation/budget';
+import { createCampaignCloseoutFetch } from '../../src/effects/automation/campaign-closeout-provider';
 import { createCampaignProviderExecutor } from '../../src/effects/automation/campaign-provider-execution';
+import { __setAutomationClockForTests, __resetAutomationClockForTests } from '../../src/effects/automation/budget-store.internal';
 import { GithubAdapterError } from '../../src/effects/external-sources/github';
 import { mintProgramAuthorization } from '../../src/effects/automation/grant-store';
 import {
@@ -91,7 +93,7 @@ test('same-step replay cannot invoke again or change the request at an existing 
   const f = fixture(); let calls = 0;
   const runner = () => { calls++; return { stdout: '{}' }; };
   createCampaignProviderExecutor(f.binding, runner).read(['api', 'identity'], options);
-  expect(() => createCampaignProviderExecutor(f.binding, runner).read(['api', 'identity'], options)).toThrow('already admitted');
+  expect(createCampaignProviderExecutor(f.binding, runner).read(['api', 'identity'], { ...options, timeout_ms: 900 })).toEqual({ stdout: '{}' });
   expect(() => createCampaignProviderExecutor(f.binding, runner).read(['api', 'different'], options)).toThrow();
   expect(calls).toBe(1);
   expect(f.ledger().provider_calls).toBe(1);
@@ -168,4 +170,94 @@ test('a non-transient typed read error is not reclassified as a transient result
   expect(() => provider.read(['invalid'], options)).toThrow('invalid provider response');
   expect(provider.read(['next-explicit-read'], options).stdout).toBe('observed');
   expect(f.status().current.consumed.provider_failures).toBe(1);
+});
+
+
+test('shared read recovery retries known failure once and replays its successful observation', () => {
+  const f = fixture(); let calls = 0;
+  const runner = () => { if (++calls === 1) throw new GithubAdapterError('invalid_response', 'failed read'); return { stdout: 'recovered' }; };
+  expect(() => createCampaignProviderExecutor(f.binding, runner).read(['identity'], options)).toThrow('failed read');
+  expect(createCampaignProviderExecutor(f.binding, runner).read(['identity'], options).stdout).toBe('recovered');
+  expect(createCampaignProviderExecutor(f.binding, runner).read(['identity'], options).stdout).toBe('recovered');
+  expect(calls).toBe(2);
+  expect(f.ledger().provider_calls).toBe(2);
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(0);
+});
+
+test('shared read recovery settles interrupted observation before a metered new read', () => {
+  const f = fixture(); let calls = 0;
+  const runner = () => { if (++calls === 1) throw new Error('lost read result'); return { stdout: 'recovered' }; };
+  expect(() => createCampaignProviderExecutor(f.binding, runner).read(['identity'], options)).toThrow('lost read result');
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(1);
+  expect(createCampaignProviderExecutor(f.binding, runner).read(['identity'], options).stdout).toBe('recovered');
+  expect(createCampaignProviderExecutor(f.binding, runner).read(['identity'], options).stdout).toBe('recovered');
+  expect(calls).toBe(2);
+  expect(f.ledger().provider_calls).toBe(2);
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(0);
+});
+
+test('shared fetch recovers a failed remote read and meters each explicit refresh', () => {
+  const f = fixture();
+  const remote = join(f.repo, '..', 'remote.git');
+  execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: f.repo });
+  const binding = { ...f.binding, operation: 'git_read' as const, request_sha256: digest('fetch'), idempotency_key: 'fetch' };
+  expect(() => createCampaignCloseoutFetch(binding)(['fetch', 'origin'])).toThrow();
+  execFileSync('git', ['init', '--bare', '-q', remote]);
+  createCampaignCloseoutFetch(binding)(['fetch', 'origin']);
+  createCampaignCloseoutFetch(binding)(['fetch', 'origin']);
+  expect(f.ledger().provider_calls).toBe(3);
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(0);
+});
+
+
+test('shared read recovery obeys exhausted budget without issuing a new read', () => {
+  const f = fixture(1); let calls = 0;
+  const runner = () => { calls++; throw new Error('interrupted read'); };
+  expect(() => createCampaignProviderExecutor(f.binding, runner).read(['identity'], options)).toThrow('interrupted read');
+  expect(() => createCampaignProviderExecutor(f.binding, runner).read(['identity'], options)).toThrow();
+  expect(calls).toBe(1);
+  expect(f.ledger().provider_calls).toBe(1);
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(0);
+});
+
+test('shared read recovery cannot issue another read after its absolute deadline', () => {
+  const f = fixture(); let calls = 0;
+  const runner = () => { calls++; throw new Error('interrupted read'); };
+  expect(() => createCampaignProviderExecutor(f.binding, runner).read(['identity'], options)).toThrow('interrupted read');
+  const prior = process.env.REPO_HARNESS_TEST_CLOCK_SEAM;
+  process.env.REPO_HARNESS_TEST_CLOCK_SEAM = '1';
+  try {
+    __setAutomationClockForTests(() => new Date(Date.now() + 4_000_000));
+    expect(() => createCampaignProviderExecutor(f.binding, runner).read(['identity'], options)).toThrow();
+    expect(calls).toBe(1);
+  } finally {
+    __resetAutomationClockForTests();
+    if (prior === undefined) delete process.env.REPO_HARNESS_TEST_CLOCK_SEAM;
+    else process.env.REPO_HARNESS_TEST_CLOCK_SEAM = prior;
+  }
+});
+
+
+test('explicit fresh observation sees provider progress after a successful negative read', () => {
+  const f = fixture(); let calls = 0;
+  const runner = () => ({ stdout: ++calls === 1 ? 'OPEN' : 'MERGED' });
+  expect(createCampaignProviderExecutor(f.binding, runner, 'refresh').read(['pull-request'], options).stdout).toBe('OPEN');
+  expect(createCampaignProviderExecutor(f.binding, runner, 'refresh').read(['pull-request'], options).stdout).toBe('MERGED');
+  expect(calls).toBe(2);
+  expect(f.ledger().provider_calls).toBe(2);
+});
+
+
+test('fresh fetch after a lost caller result populates a new exact temporary ref', () => {
+  const f = fixture();
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--allow-empty', '-qm', 'base'], { cwd: f.repo });
+  const oid = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.repo, encoding: 'utf8' }).trim();
+  const binding = { ...f.binding, operation: 'git_read' as const, request_sha256: digest('logical-fetch'), idempotency_key: 'fetch' };
+  for (const suffix of ['before-crash', 'after-crash']) {
+    const ref = `refs/observations/${suffix}`;
+    createCampaignCloseoutFetch(binding)(['fetch', '--no-write-fetch-head', f.repo, `HEAD:${ref}`]);
+    expect(execFileSync('git', ['rev-parse', ref], { cwd: f.repo, encoding: 'utf8' }).trim()).toBe(oid);
+  }
+  expect(f.ledger().provider_calls).toBe(2);
+  expect(f.status().current.open_reservation_sha256s).toHaveLength(0);
 });

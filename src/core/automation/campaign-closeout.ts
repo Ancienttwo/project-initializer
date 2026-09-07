@@ -38,6 +38,8 @@ export interface CampaignCloseoutProviderReceipt {
   readonly reservation_sha256: string;
   readonly mutation_returned: boolean;
   readonly readback_stdout: string;
+  readonly readback_reservation_sha256: string;
+  readonly readback_generation: number;
   readonly observed_at: string;
 }
 

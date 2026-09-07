@@ -12,7 +12,7 @@ import { resumeReclaimedEngineerTask } from '../engineers/acquire';
 import { readLease, withTaskLock } from '../state/coordination-lease-store';
 import { readEngineerBindingStatus } from '../engineers/binding-store';
 import { readClaimActorReceipt, validateClaimActorReceiptLive } from '../engineers/claim-actor-store';
-import { readCampaignWorkerHandoff, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation, type CampaignWorkerFinal } from './campaign-worker';
+import { readCampaignWorkerHandoff, settleObservedCampaignFailure, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation, type CampaignWorkerFinal } from './campaign-worker';
 import { observeCampaignCodexTerminal } from './campaign-runtime';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
@@ -21,15 +21,20 @@ const key = (dispatch: string, part: string) => canonicalMessageDigest({ dispatc
 const exact = (a: unknown, b: unknown) => canonicalMessageBytes({ value: a }) === canonicalMessageBytes({ value: b });
 type Context = ReturnType<typeof readCampaignWorkerHandoff>;
 
+function assertRecoveryParent(context: Context, input: { host: 'codex' | 'claude'; session_id: string; env?: NodeJS.ProcessEnv }): void {
+  const { root, intent } = context;
+  const authority = requireCampaignPlanningAuthority(root, intent, input.env);
+  const parent = readPlanningRecord<{ host: string; session_id: string }>(root, intent, 'parent');
+  if (authority.policy.mode !== 'active' || authority.grant.campaign?.local_parent_host !== input.host
+    || parent?.host !== input.host || parent.session_id !== input.session_id) throw new Error('campaign retirement requires its authorized local parent');
+}
+
 /** Retirement is a durable admission fence, not an assertion that an OS process died. */
 export function retireCampaignDispatch(input: { selector: unknown; host: 'codex' | 'claude'; session_id: string; env?: NodeJS.ProcessEnv }) {
   const context = readCampaignWorkerHandoff(input.selector);
   const { root, intent, selector } = context;
   return withCampaignPlanningLock(root, intent, () => {
-    const authority = requireCampaignPlanningAuthority(root, intent, input.env);
-    const parent = readPlanningRecord<{ host: string; session_id: string }>(root, intent, 'parent');
-    if (authority.policy.mode !== 'active' || authority.grant.campaign?.local_parent_host !== input.host
-      || parent?.host !== input.host || parent.session_id !== input.session_id) throw new Error('campaign retirement requires its authorized local parent');
+    assertRecoveryParent(context, input);
     const prior = readPlanningRecord(root, intent, key(selector.dispatch_id, 'retired'));
     if (prior) return prior;
     const record = { dispatch_id: selector.dispatch_id, host: input.host, session_id: input.session_id };
@@ -110,13 +115,22 @@ export function recoverCampaignDispatch(input: {
   crash_hook?: (boundary: 'after_intent' | 'after_lease_write' | 'after_bind' | 'after_token' | 'after_actor' | 'after_recovered') => void;
 }) {
   const context = readCampaignWorkerHandoff(input.selector);
-  const final = readPlanningRecord<CampaignWorkerFinal>(context.root, context.intent, key(context.selector.dispatch_id, 'final'));
-  if (!final) throw new Error('trusted exact revision readback is unavailable; recovery without a persisted final cannot rebind');
-  // Validate the original reservation and any existing result charge before changing ownership.
-  // A null usage is the supported crash boundary between durable final and settlement.
-  readAutomationUsageForResult({ repo_root: context.root, reservation: final.reservation,
+  assertRecoveryParent(context, input);
+  const storedFinal = readPlanningRecord<CampaignWorkerFinal>(context.root, context.intent, key(context.selector.dispatch_id, 'final'));
+  const validateUsage = (final: CampaignWorkerFinal) => readAutomationUsageForResult({ repo_root: context.root, reservation: final.reservation,
     evidence_refs: [{ ref: `campaign-worker:${context.selector.dispatch_id}:result`, sha256: final.result_sha256 }], env: input.env });
+  // Validate existing authority before publishing retirement or settlement effects.
+  if (storedFinal) validateUsage(storedFinal);
+  const failed = settleObservedCampaignFailure(input.selector, input.env);
+  const final = storedFinal ?? failed;
+  if (!final) throw new Error('trusted exact revision readback is unavailable; recovery without a persisted final cannot rebind');
+  if (!storedFinal) validateUsage(final);
   retireCampaignDispatch(input);
+  if (failed && !readPlanningRecord(context.root, context.intent, key(context.selector.dispatch_id, 'recovery-intent'))) {
+    const eligibility = observeCampaignReclaimEligibility(input);
+    if (eligibility.classification !== 'reclaimable') return { envelope: context.handoff.acquired.envelope,
+      receipt: context.handoff.acquired.receipt, final: failed, disposition: 'settled_failure_runtime_unresolved' as const };
+  }
   const { root, intent, selector, handoff } = context;
   const previous = handoff.acquired.envelope;
   return withCampaignPlanningLock(root, intent, () => {

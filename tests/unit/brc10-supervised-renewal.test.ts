@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -50,3 +50,43 @@ test('forced termination reports observed scope without claiming remote provider
   expect(receipt.process_group_quiescence).toEqual(process.platform === 'win32'
     ? { scope: 'unsupported', state: 'unknown' } : { scope: 'posix_process_group', state: 'quiescent' });
 }, 10_000);
+
+test('expired deadline refuses command admission before any side effect', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'brc-expired-')); roots.push(root);
+  const marker = join(root, 'ran'); const result = join(root, 'result.json');
+  const child = Bun.spawn([process.execPath, runner, '--deadline-ms', '1', '--log', join(root, 'log'), '--result', result,
+    '--', '/bin/sh', '-c', 'printf ran > "$1"', 'sh', marker], { stdout: 'ignore', stderr: 'pipe' });
+  expect(await child.exited).toBe(124);
+  expect(existsSync(marker)).toBe(false);
+  expect(JSON.parse(readFileSync(result, 'utf8'))).toMatchObject({ termination_cause: 'deadline', started: false });
+});
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+  test(`supervisor preserves ${signal} cancellation when child exits successfully`, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'brc-cancel-')); roots.push(root);
+    const ready = join(root, 'ready'); const result = join(root, 'result.json');
+    const code = `process.on('SIGTERM', () => { process.stdout.write('done'); process.exit(0); }); await Bun.write(${JSON.stringify(ready)}, 'ready'); await Bun.sleep(15000);`;
+    const child = Bun.spawn([process.execPath, runner, '--deadline-ms', String(Date.now() + 5000), '--log', join(root, 'out'), '--stderr-log', join(root, 'err'), '--result', result,
+      '--', process.execPath, '-e', code], { stdout: 'ignore', stderr: 'pipe' });
+    try {
+      const limit = Date.now() + 3000;
+      while (!existsSync(ready) && Date.now() < limit && child.exitCode === null) await Bun.sleep(10);
+      expect(existsSync(ready)).toBe(true);
+      child.kill(signal);
+      expect(await child.exited).not.toBe(0);
+      expect(JSON.parse(readFileSync(result, 'utf8'))).toMatchObject({ termination_cause: 'cancelled', signal, timed_out: false, output_complete: true });
+    } finally { if (child.exitCode === null) { child.kill('SIGKILL'); await child.exited; } }
+  }, 10000);
+}
+
+test('supervisor refuses result and log symlinks without overwriting their targets', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'brc-result-path-')); roots.push(root);
+  const victim = join(root, 'victim'); writeFileSync(victim, 'preserve');
+  const result = join(root, 'result'); symlinkSync(victim, result);
+  const child = Bun.spawn([process.execPath, runner, '--deadline-ms', String(Date.now() + 2000), '--log', join(root, 'log'), '--result', result,
+    '--', '/bin/sh', '-c', 'exit 0'], { stdout: 'ignore', stderr: 'ignore' });
+  expect(await child.exited).not.toBe(0); expect(readFileSync(victim, 'utf8')).toBe('preserve');
+  const log = join(root, 'linked-log'); symlinkSync(victim, log);
+  const refused = Bun.spawn([process.execPath, runner, '--deadline-ms', '1', '--log', log, '--result', join(root, 'result2'), '--', '/bin/true'], { stdout: 'ignore', stderr: 'ignore' });
+  expect(await refused.exited).not.toBe(0); expect(readFileSync(victim, 'utf8')).toBe('preserve');
+});

@@ -1,3 +1,4 @@
+import { readTaskAutomationAttemptCurrent } from '../../src/effects/engineers/automation-attempt-store';
 import { afterEach, expect, test } from 'bun:test';
 import { rmSync, writeFileSync, readFileSync, mkdirSync, chmodSync } from 'fs';
 import { join } from 'path';
@@ -7,7 +8,7 @@ import { campaignRuntimeRecordKey } from '../../src/core/automation/campaign-run
 import { historicalPlanningFixture, installHistoricalBoundDispatch, installHistoricalAttempt, installHistoricalChild, installHistoricalFinal } from '../helpers/historical-campaign-lifecycle';
 import { prepareCampaignCodexInvocation } from '../../src/effects/automation/campaign-runtime';
 import { persistPlanningRecord } from '../../src/effects/automation/campaign-planning-store';
-import { bindCampaignWorker } from '../../src/effects/automation/campaign-worker';
+import { bindCampaignWorker, readCompletedCampaignWorker } from '../../src/effects/automation/campaign-worker';
 import { retireCampaignDispatch, observeCampaignReclaimEligibility, recoverCampaignDispatch } from '../../src/effects/automation/campaign-recovery';
 import { ensureCampaignAuthoringBudget, readAutomationBudgetStatus } from '../../src/effects/automation/budget-store';
 import { readLease } from '../../src/effects/state/coordination-lease-store';
@@ -46,7 +47,7 @@ test('historical liveness remains observable but a no-final recovery cannot mint
 test('recovery resumes every persisted boundary without a new worktree or second generation', async () => {
   const f = await acquired();
   const env = installProviderFixture(f);
-  runHistoricalProvider(f, env, 'pass', false);
+  await runHistoricalProvider(f, env, 'pass', false);
   const instant = new Date(Date.now() + 60_000); const now = () => instant;
   const source = join(f.envelope.worktree_path, 'src/index.ts');
   writeFileSync(source, 'preserved dirty work\n');
@@ -111,7 +112,8 @@ test('detached command effects remain ineligible for reclaim after provider comp
   const env = installProviderFixture(f, 'pass', true);
   writeFileSync(join(f.envelope.worktree_path, 'selector.json'), JSON.stringify(f.input.selector));
   try {
-    runHistoricalProvider(f, env, 'pass', false);
+    await runHistoricalProvider(f, env, 'pass', true);
+    expect(readCompletedCampaignWorker(f.input.selector, env).unsupported_command_effects).toBe(true);
     const terminal = readPlanningRecord<any>(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'terminal'));
     expect(terminal.state).toBe('terminal');
     expect(terminal.process_group_quiescence.state).toBe('quiescent');
@@ -133,7 +135,7 @@ for (const verdict of ['pass', 'fail'] as const) test(`typed Codex process binds
   const f = await acquired();
   const env = installProviderFixture(f, verdict);
   writeFileSync(join(f.envelope.worktree_path, 'selector.json'), JSON.stringify(f.input.selector));
-  runHistoricalProvider(f, env, verdict, true);
+  await runHistoricalProvider(f, env, verdict, true);
   for (const role of ['worker', 'verifier'] as const) {
     const intent = readPlanningRecord<any>(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, role, 'intent'));
     const started = readPlanningRecord<any>(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, role, 'started'));
@@ -155,6 +157,7 @@ for (const verdict of ['pass', 'fail'] as const) test(`typed Codex process binds
   const recovered = recoverCampaignDispatch({ ...f.input, now });
   expect(recovered.disposition).toBe('settled_final');
   expect(recovered.final!.contract_run.status).toBe(verdict);
+  expect(readTaskAutomationAttemptCurrent(f.root, f.historical.acquired.offer.work_package_id, f.historical.acquired.offer.work_package_revision)?.last_outcome).toBe(verdict === 'fail' ? 'permanent_failure' : 'completed');
   expect(recoverCampaignDispatch({ ...f.input, now }).envelope.claim_id).toBe(recovered.envelope.claim_id);
 }, 60_000);
 
@@ -162,7 +165,7 @@ test('a started typed invocation without its terminal refuses reclaim and keeps 
   const f = await acquired(); const env = installProviderFixture(f);
   installHistoricalAttempt(f, f.historical);
   writeFileSync(join(f.envelope.worktree_path, 'prompt.md'), 'Fixture prompt');
-  const invocation = prepareCampaignCodexInvocation({ repo_root: f.root, worktree: f.envelope.worktree_path, prompt_path: 'prompt.md', env,
+  const invocation = await prepareCampaignCodexInvocation({ deadline_ms: Date.now() + 10000,  repo_root: f.root, worktree: f.envelope.worktree_path, prompt_path: 'prompt.md', env,
     identity: { dispatch_id: f.input.selector.dispatch_id, claim_id: f.envelope.claim_id, lease_generation: f.envelope.generation,
       task_id: f.envelope.task_id, task_revision: f.envelope.task_revision, binding_generation: f.historical.acquired.offer.binding_generation, role: 'worker' } });
   persistPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'intent'), invocation);
@@ -193,7 +196,7 @@ test('two OS recovery callers without a final cannot mint any next generation', 
 test('a durable final interrupted before settlement is charged once after exact rebind', async () => {
   const f = await acquired(); const env = installProviderFixture(f);
   const worktree = f.envelope.worktree_path;
-  runHistoricalProvider(f, env, 'pass', false);
+  await runHistoricalProvider(f, env, 'pass', false);
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
   expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current.open_reservation_sha256s).toHaveLength(1);
   const instant = new Date(Date.now() + 60_000); const now = () => instant;
@@ -205,12 +208,12 @@ test('a durable final interrupted before settlement is charged once after exact 
 }, 60_000);
 
 /** Run model-free provider processes, then install their observed historical journal facts. */
-function runHistoricalProvider(f: Awaited<ReturnType<typeof acquired>>, env: NodeJS.ProcessEnv, verdict: 'pass' | 'fail', settle: boolean) {
+async function runHistoricalProvider(f: Awaited<ReturnType<typeof acquired>>, env: NodeJS.ProcessEnv, verdict: 'pass' | 'fail', settle: boolean) {
   const attempt = installHistoricalAttempt(f, f.historical);
   const worktree = f.envelope.worktree_path;
   for (const role of ['worker', 'verifier'] as const) {
     writeFileSync(join(worktree, `${role}.prompt.md`), 'Fixture prompt');
-    const invocation = prepareCampaignCodexInvocation({ repo_root: f.root, worktree, prompt_path: `${role}.prompt.md`, env,
+    const invocation = await prepareCampaignCodexInvocation({ deadline_ms: Date.now() + 10000,  repo_root: f.root, worktree, prompt_path: `${role}.prompt.md`, env,
       identity: { dispatch_id: f.input.selector.dispatch_id, claim_id: f.envelope.claim_id, lease_generation: f.envelope.generation,
         task_id: f.envelope.task_id, task_revision: f.envelope.task_revision, binding_generation: f.historical.acquired.offer.binding_generation, role } });
     const child = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/run-bounded-verifier-command.ts'), '--deadline-ms', String(Date.now() + 10_000),
@@ -225,7 +228,7 @@ function runHistoricalProvider(f: Awaited<ReturnType<typeof acquired>>, env: Nod
 
 test('two OS callers settle the historical final under one recovered generation', async () => {
   const f = await acquired(); const env = installProviderFixture(f);
-  runHistoricalProvider(f, env, 'pass', false);
+  await runHistoricalProvider(f, env, 'pass', false);
   const instant = new Date(Date.now() + 60_000).toISOString();
   const entry = join(import.meta.dir, '../../src/effects/automation/campaign-recovery.ts');
   const invoke = async () => {
@@ -244,3 +247,30 @@ test('two OS callers settle the historical final under one recovered generation'
   expect(new Set(recovered.map(result => result.envelope.claim_id))).toEqual(new Set([owner.claim_id]));
   for (const result of recovered) expect(result.disposition).toBe('settled_final');
 }, 60_000);
+
+test.each([false, true])('known failed child settles once without writable rebind, expired=%s', async expired => {
+  const f = await acquired(); const env = installProviderFixture(f);
+  const attempt = installHistoricalAttempt(f, f.historical);
+  const worktree = f.envelope.worktree_path;
+  writeFileSync(join(worktree, 'failed.prompt'), 'fixture');
+  const invocation = await prepareCampaignCodexInvocation({ repo_root: f.root, worktree, prompt_path: 'failed.prompt', env, deadline_ms: Date.now() + 10000,
+    identity: { dispatch_id: f.input.selector.dispatch_id, role: 'worker', task_id: f.envelope.task_id, task_revision: f.envelope.task_revision,
+      claim_id: f.envelope.claim_id, lease_generation: f.envelope.generation, binding_generation: f.historical.acquired.offer.binding_generation } });
+  const result = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/run-bounded-verifier-command.ts'), '--deadline-ms', expired ? '1' : String(Date.now() + 3000),
+    '--log', join(worktree, 'failed.out'), '--stderr-log', join(worktree, 'failed.err'), '--result', join(worktree, 'failed.result'), '--', '/bin/sh', '-c', 'exit 7']);
+  expect(result.status).toBe(expired ? 124 : 7);
+  installHistoricalChild(f, f.historical, invocation, { ...JSON.parse(readFileSync(join(worktree, 'failed.result'), 'utf8')), role: 'worker', command: 'codex-exec:worker', stdout_path: 'failed.out', stderr_path: 'failed.err' });
+  const before = readLease(f.root, f.envelope.task_id).record!;
+  const recovered = recoverCampaignDispatch(f.input);
+  expect(recovered.disposition).toBe('settled_failure_runtime_unresolved');
+  writeFileSync(join(worktree, 'failure-selector.json'), JSON.stringify(f.input.selector));
+  const cli = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/contract-run.ts'), 'recover', '--repo', worktree,
+    '--campaign-handoff', 'failure-selector.json', '--campaign-parent-host', f.input.host, '--campaign-parent-session', f.input.session_id, '--json'], { env: f.env, encoding: 'utf8' });
+  expect(cli.status).toBe(1); expect(JSON.parse(cli.stdout).disposition).toBe('settled_failure_runtime_unresolved');
+  expect(recovered.final?.outcome).toBe('permanent_failure');
+  expect(readLease(f.root, f.envelope.task_id).record).toEqual(before);
+  const budget = readAutomationBudgetStatus(f.root, attempt.reservation.automation_run_id, f.env).current;
+  expect(budget.open_reservation_sha256s).toHaveLength(0);
+  recoverCampaignDispatch(f.input);
+  expect(readAutomationBudgetStatus(f.root, attempt.reservation.automation_run_id, f.env).current).toEqual(budget);
+}, 60000);
