@@ -1,3 +1,4 @@
+import { assertCampaignCleanupReceipt, campaignCloseoutKey } from '../../core/automation/campaign-closeout';
 import { execFileSync } from 'child_process';
 import { lstatSync, readFileSync, realpathSync } from 'fs';
 import { join, relative } from 'path';
@@ -142,5 +143,21 @@ export function campaignTaskPlanProof(root: string, taskId: string, taskRevision
     return proof;
   } catch (error) {
     return { ok: false, code: 'plan_not_projectable', error: error instanceof Error ? error.message : String(error), candidates: proof.ok ? [proof.proof.plan_path] : [] };
+  }
+}
+
+/** A new audit/group cannot outrun any published group's exact cleanup receipts. */
+export function requireCampaignCleanupComplete(root: string, campaignId: string): void {
+  for (const intent of storedPlanningIntents(root).filter(value => value.campaign_id === campaignId)) {
+    const publication = readIssueBatchAdoptionArtifact(root, intent, 'publication') as unknown as CampaignPublicationV1 | null;
+    if (!publication) continue;
+    for (const taskId of publication.task_ids) {
+      const receipt = readPlanningRecord<{ protocol: number; kind: string; task_id: string }>(root, intent, campaignCloseoutKey(taskId, 'complete'));
+      if (!receipt || receipt.protocol !== 1 || receipt.kind !== 'repo-harness-campaign-cleanup' || receipt.task_id !== taskId) {
+        throw new CampaignPlanningError('human_attention_required', `cleanup_pending: ${taskId}`);
+      }
+      try { assertCampaignCleanupReceipt(receipt, taskId); }
+      catch { throw new CampaignPlanningError('human_attention_required', `cleanup_pending: invalid receipt for ${taskId}`); }
+    }
   }
 }

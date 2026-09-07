@@ -1,3 +1,4 @@
+import { requireCampaignCleanupComplete } from './campaign-planning-proof';
 import { constants, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { execFileSync } from 'child_process';
@@ -358,6 +359,7 @@ export function appendDevelopmentCampaignEvent(input: AppendDevelopmentCampaignE
   return withExclusiveDirectoryLock(value.common, value.lock, () => {
     if (!existsSync(value.definition)) fail('campaign_not_found', 'development campaign is missing');
     const campaign = parse(value.definition, validateDevelopmentCampaignDefinition, canonicalDevelopmentCampaignDefinitionBytes);
+    if (['begin_group_audit', 'prepare_group', 'complete'].includes(input.operation)) requireCampaignCleanupComplete(repoRoot, input.campaign_id);
     return Object.freeze({ campaign, ...appendLocked(value, campaign, { ...input, repo_root: repoRoot }) });
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }

@@ -1073,7 +1073,25 @@ const OPERATION_KINDS: readonly AutomationOperationKind[] = Object.freeze(['acqu
 const OUTCOMES: readonly AutomationOutcome[] = Object.freeze(['progress', 'no_progress', 'provider_failure', 'transient_failure', 'completed']);
 
 export type CampaignAuthoringOperation = 'initial' | 'fill_missing' | 'edit_issue';
-export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'github_read' | 'github_comment' | 'github_close';
+export type CampaignCloseoutOperation = 'github_comment_attempt' | 'github_close_attempt' | 'git_ref_delete_attempt';
+export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation;
+export function campaignProviderForOperation(operation: CampaignProviderOperation): 'github' | 'git' | 'gpt-pro' {
+  switch (operation) {
+    case 'initial': case 'fill_missing': case 'edit_issue': case 'challenge': return 'gpt-pro';
+    case 'github_read': case 'github_comment': case 'github_close': case 'github_comment_attempt': case 'github_close_attempt': return 'github';
+    case 'git_read': case 'git_ref_delete_attempt': return 'git';
+    default: return invalid('unsupported campaign Provider operation');
+  }
+}
+/** A closeout attempt always owns its mutation and one mandatory verification read. */
+export function campaignProviderCallReservation(operation: CampaignProviderOperation): number {
+  campaignProviderForOperation(operation);
+  return operation === 'github_comment_attempt' || operation === 'github_close_attempt' || operation === 'git_ref_delete_attempt' ? 2 : 1;
+}
+export function campaignProviderOperationReservation(operation: CampaignProviderOperation, tokens: Pick<AutomationMetricVectorV1, 'input_tokens' | 'output_tokens' | 'cost_micros'>): AutomationMetricVectorV1 {
+  const calls = campaignProviderCallReservation(operation);
+  return Object.freeze({ ...automationOperationReservation('provider_invocation', tokens), agent_turns: calls, runner_invocations: calls, provider_failures: calls });
+}
 export const CAMPAIGN_AUTHORING_OPERATIONS: readonly CampaignAuthoringOperation[] = Object.freeze(['initial', 'fill_missing', 'edit_issue']);
 export function isCampaignAuthoringOperation(operation: CampaignProviderOperation): operation is CampaignAuthoringOperation {
   return (CAMPAIGN_AUTHORING_OPERATIONS as readonly string[]).includes(operation);
@@ -1088,7 +1106,7 @@ interface CampaignReservationContextBase {
 
 export type CampaignAutomationReservationContextV1 = CampaignReservationContextBase & (
   | { readonly operation: CampaignAuthoringOperation | 'challenge' }
-  | { readonly operation: 'github_read' | 'github_comment' | 'github_close'; readonly request_sha256: string }
+  | { readonly operation: 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation; readonly request_sha256: string }
 );
 
 const CAMPAIGN_PROVIDER_OPERATIONS: readonly CampaignProviderOperation[] = Object.freeze([
@@ -1096,16 +1114,20 @@ const CAMPAIGN_PROVIDER_OPERATIONS: readonly CampaignProviderOperation[] = Objec
   'fill_missing',
   'edit_issue',
   'challenge',
+  'git_read',
   'github_read',
   'github_comment',
   'github_close',
+  'github_comment_attempt',
+  'github_close_attempt',
+  'git_ref_delete_attempt',
 ]);
 
 export function validateCampaignAutomationReservationContext(
   value: CampaignAutomationReservationContextV1,
 ): CampaignAutomationReservationContextV1 {
   if (value === null || typeof value !== 'object') invalid('campaign reservation context must be an object');
-  const github = value.operation === 'github_read' || value.operation === 'github_comment' || value.operation === 'github_close';
+  const github = campaignProviderForOperation(value.operation) !== 'gpt-pro';
   const expected = ['campaign_id', 'group_number', 'intent_sha256', 'operation', 'step_admission_sha256', ...(github ? ['request_sha256'] : [])].sort();
   if (JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(expected)) invalid('campaign reservation context fields are invalid');
   if (!CAMPAIGN_PROVIDER_OPERATIONS.includes(value.operation)) invalid('campaign reservation operation is unsupported');
@@ -1167,8 +1189,7 @@ export function validateAutomationReservation(value: AutomationBudgetReservation
       invalid('campaign automation reservation fields are invalid');
     }
     const context = validateCampaignAutomationReservationContext(value.campaign_context);
-    const github = context.operation === 'github_read' || context.operation === 'github_comment' || context.operation === 'github_close';
-    if (value.operation !== 'provider_invocation' || value.provider !== (github ? 'github' : 'gpt-pro')) {
+    if (value.operation !== 'provider_invocation' || value.provider !== campaignProviderForOperation(context.operation)) {
       invalid('campaign reservation provider does not match its operation');
     }
     reservation = Object.freeze({
@@ -1572,7 +1593,7 @@ export function foldCampaignBudgetLedger(
         || reservation.budget_sha256 !== event.budget_sha256) invalid('campaign usage does not resolve its exact reservation');
       if (reservation.kind === CAMPAIGN_AUTOMATION_RESERVATION_KIND) {
         assertBinding(reservation);
-        if (event.resolution !== 'reconciled_not_started') calls += 1;
+        if (event.resolution !== 'reconciled_not_started') calls += campaignProviderCallReservation(reservation.campaign_context.operation);
       } else if (active !== null) invalid('generic reservation cannot bypass the active campaign step');
       completedReservations.add(event.reservation_sha256);
     } else {
@@ -1601,7 +1622,7 @@ export function foldCampaignBudgetLedger(
   let reservedCalls = 0;
   for (const r of open) {
     if (r.step_index !== index + 1 || r.previous_ledger_sha256 !== chain) invalid('campaign open reservation does not occupy the next ledger position');
-    if (r.kind === CAMPAIGN_AUTOMATION_RESERVATION_KIND) { assertBinding(r); reservedCalls += 1; }
+    if (r.kind === CAMPAIGN_AUTOMATION_RESERVATION_KIND) { assertBinding(r); reservedCalls += campaignProviderCallReservation(r.campaign_context.operation); }
     else if (active !== null) invalid('generic reservation cannot bypass the active campaign step');
   }
   return Object.freeze({ controller_steps: steps, provider_calls: calls, reserved_provider_calls: reservedCalls, active_step: active });

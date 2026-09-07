@@ -298,6 +298,11 @@ function receiptForPointer(repoRoot: string, pointer: CurrentPublicationPointerV
 }
 
 interface PublicationValidationEnvironment {
+  /** Campaign supplies its budget-owned live Provider transport. */
+  readonly fetch_target?: (args: readonly string[]) => void;
+  readonly observe_integration?: (repoRoot: string, prNumber: number) => ProviderPullRequestIntegrationV1;
+  /** Persist a consuming transaction proof before the reviewing Lease is released. */
+  readonly before_integration_release?: (result: ReconcilePublicationResult) => void;
   readonly gh_bin?: string;
   readonly git_bin?: string;
   readonly merge_seal_path?: string;
@@ -574,6 +579,7 @@ export interface ReconcilePublicationInput extends PublicationValidationEnvironm
 
 export interface ReconcilePublicationResult {
   readonly classification: 'integrated';
+  readonly merge_commit_sha: string | null;
   readonly integration_state: PublicationIntegrationState;
   readonly attention: 'superseded_attention' | null;
   readonly fetched_target_oid: string;
@@ -666,7 +672,9 @@ function integrationReceiptAndProvider(
   let receipt = readPublicationReceiptCache(repoRoot, pointer.publication_id, environment.git_bin ?? 'git');
   const proof = receipt === null ? integrationJournalProof(repoRoot, pointer, environment.git_bin) : null;
   const prNumber = receipt?.pr_number ?? proof!.evidence.provider_pr_number;
-  const provider = observeProviderPullRequestIntegration(repoRoot, prNumber, environment.gh_bin);
+  const provider = environment.observe_integration
+    ? environment.observe_integration(repoRoot, prNumber)
+    : observeProviderPullRequestIntegration(repoRoot, prNumber, environment.gh_bin);
   if (receipt === null) {
     let marker: PublicationReceiptV1 | null;
     try { marker = decodePublicationMarker(provider.body); } catch (error) {
@@ -703,6 +711,7 @@ function fetchProviderTarget(
   targetRef: string,
   publicationId: string,
   gitBin = 'git',
+  fetchTarget?: (args: readonly string[]) => void,
 ): { readonly fetchedOid: string; readonly observationRef: string } {
   if (remote.trim() === '' || remote.startsWith('-') || /[\0\r\n]/u.test(remote)) {
     throw failure('publication_incomplete', 'remote is unsafe');
@@ -714,12 +723,9 @@ function fetchProviderTarget(
   }
   const publicationKey = publicationId.slice('sha256:'.length);
   const temporaryRef = `refs/repo-harness/observations/tmp/${publicationKey}/${randomUUID()}`;
-  gitOutput(
-    repoRoot,
-    gitBin,
-    ['fetch', '--no-tags', '--no-write-fetch-head', remote, `+refs/heads/${targetRef}:${temporaryRef}`],
-    `cannot fetch provider target ${remote}/${targetRef}`,
-  );
+  const fetchArgs = ['fetch', '--no-tags', '--no-write-fetch-head', remote, `+refs/heads/${targetRef}:${temporaryRef}`];
+  if (fetchTarget) fetchTarget(fetchArgs);
+  else gitOutput(repoRoot, gitBin, fetchArgs, `cannot fetch provider target ${remote}/${targetRef}`);
   const fetchedOid = gitOutput(
     repoRoot,
     gitBin,
@@ -899,6 +905,7 @@ export function reconcilePublication(input: ReconcilePublicationInput): Reconcil
       initialLive.receipt.target_ref,
       initialLive.receipt.publication_id,
       input.git_bin ?? 'git',
+      input.fetch_target,
     );
     const mergeMode = classifyPublicationMerge(input.repo_root, initialLive.receipt.head_sha, fetched.fetchedOid);
 
@@ -920,6 +927,18 @@ export function reconcilePublication(input: ReconcilePublicationInput): Reconcil
       }
       if (live.provider.base_sha !== fetched.fetchedOid) {
         throw failure('provider_unavailable', `provider target moved after fetch: observed ${live.provider.base_sha}, fetched ${fetched.fetchedOid}`, undefined, { fetched_target_oid: fetched.fetchedOid });
+      }
+      if (live.provider.merge_commit_sha !== initialLive.provider.merge_commit_sha) {
+        throw failure('provider_unavailable', 'provider merge commit changed during reconcile');
+      }
+      if (live.provider.state === 'MERGED') {
+        const mergeCommit = live.provider.merge_commit_sha;
+        if (mergeCommit === null) throw failure('integration_unproven', 'provider merge commit is unavailable');
+        try {
+          execFileSync(input.git_bin ?? 'git', ['merge-base', '--is-ancestor', mergeCommit, fetched.fetchedOid], { cwd: input.repo_root, stdio: 'ignore' });
+        } catch (error) {
+          throw failure('integration_unproven', 'actual provider merge commit is not reachable from fetched target', error);
+        }
       }
       assertCanonicalCompletedAt(input.repo_root, record, fetched.fetchedOid);
       if (mergeMode === 'unmerged') {
@@ -948,15 +967,18 @@ export function reconcilePublication(input: ReconcilePublicationInput): Reconcil
         integration_state: integrationState,
       });
       persistIntegrationObservation(input.repo_root, evidence);
-      removeLease(input.repo_root, input.task_id, input.expected_claim_id);
-      return Object.freeze({
+      const result = Object.freeze({
         classification: 'integrated' as const,
+        merge_commit_sha: live.provider.merge_commit_sha,
         integration_state: integrationState,
         attention: live.provider.state === 'OPEN' && mergeMode === 'absorbed' ? 'superseded_attention' as const : null,
         fetched_target_oid: fetched.fetchedOid,
         observation_ref: fetched.observationRef,
         evidence,
       });
+      input.before_integration_release?.(result);
+      removeLease(input.repo_root, input.task_id, input.expected_claim_id);
+      return result;
     });
   } catch (error) {
     throw asLifecycleError(error, 'cannot reconcile publication integration');

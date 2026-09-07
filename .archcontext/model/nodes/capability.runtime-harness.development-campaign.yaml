@@ -5,6 +5,7 @@ name: Development Campaign
 status: active
 summary: Owns the host-authorized, policy-bounded campaign journal that will route externally authored repair Issues into existing execution authorities without replacing them.
 responsibilities:
+  - Close only fully evidenced adopted Issues and retain cleanup_pending until exact branch and worktree cleanup is durable.
   - Reuse one host-owned ProgramAuthorizationV1 campaign payload and never mint a second campaign authorization protocol.
   - Read activation and limits from the exact authorized target revision so candidate bytes cannot widen their own authority.
   - Require external source intake before campaign startup and fail every mutation while development_campaign mode is off.
@@ -20,6 +21,10 @@ responsibilities:
   - Keep Task, Lease, Claim, Work Graph, semantic acceptance and delivery publication authority in their existing capabilities.
 source:
   include:
+    - "src/core/automation/campaign-closeout.ts"
+    - "src/effects/automation/campaign-closeout.ts"
+    - "src/effects/automation/campaign-closeout-provider.ts"
+    - "src/effects/automation/campaign-not-planned.ts"
     - "src/core/automation/campaign-runtime.ts"
     - "src/effects/automation/campaign-runtime.ts"
     - "src/effects/automation/campaign-recovery.ts"

@@ -76,7 +76,9 @@ export interface ProviderPullRequestStateV1 {
  * a post-merge base advance is normal and must not invalidate publication
  * identity.
  */
-export interface ProviderPullRequestIntegrationV1 extends ProviderPullRequestV1, ProviderPullRequestStateV1 {}
+export interface ProviderPullRequestIntegrationV1 extends ProviderPullRequestV1, ProviderPullRequestStateV1 {
+  readonly merge_commit_sha: string | null;
+}
 
 export interface MergeSealEvidenceV1 {
   readonly path: string;
@@ -240,6 +242,28 @@ export function observeProviderPullRequestState(
   }
 }
 
+/** Shared decoder for the CLI and budget-owned Campaign transport observations. */
+export function providerIntegrationFromJson(
+  providerRepoId: string, value: unknown, prNumber: number,
+): ProviderPullRequestIntegrationV1 {
+  const immutable = providerPrFromJson(providerRepoId, value, prNumber);
+  const record = asRecord(value, 'provider PR integration state');
+  const state = requiredString(record.state, 'provider PR state');
+  if (record.mergedAt !== null && (typeof record.mergedAt !== 'string' || !Number.isFinite(Date.parse(record.mergedAt)))) {
+    throw incomplete('provider PR mergedAt is invalid');
+  }
+  let mergeCommit: string | null = null;
+  if (record.mergeCommit !== null) {
+    const commit = asRecord(record.mergeCommit, 'provider PR mergeCommit');
+    mergeCommit = requiredString(commit.oid, 'provider PR mergeCommit oid');
+    if (!/^[a-f0-9]{40}$/u.test(mergeCommit)) throw incomplete('provider PR mergeCommit oid is invalid');
+  }
+  if (state === 'MERGED' && (record.mergedAt === null || mergeCommit === null)) {
+    throw incomplete('merged provider PR lacks actual merge evidence');
+  }
+  return Object.freeze({ ...immutable, state, merged_at: record.mergedAt as string | null, merge_commit_sha: mergeCommit });
+}
+
 export function observeProviderPullRequestIntegration(
   repoRoot: string,
   prNumber: number,
@@ -250,15 +274,9 @@ export function observeProviderPullRequestIntegration(
     const providerRepoId = observeProviderRepoId(repoRoot, ghBin);
     const value = ghJson(repoRoot, ghBin, [
       'pr', 'view', String(prNumber),
-      '--json', 'number,url,headRefOid,headRefName,baseRefName,baseRefOid,body,createdAt,state,mergedAt',
+      '--json', 'number,url,headRefOid,headRefName,baseRefName,baseRefOid,body,createdAt,state,mergedAt,mergeCommit',
     ]);
-    const immutable = providerPrFromJson(providerRepoId, value, prNumber);
-    const record = asRecord(value, 'provider PR integration state');
-    const state = requiredString(record.state, 'provider PR state');
-    if (record.mergedAt !== null && typeof record.mergedAt !== 'string') {
-      throw incomplete('provider PR mergedAt is invalid');
-    }
-    return Object.freeze({ ...immutable, state, merged_at: record.mergedAt as string | null });
+    return providerIntegrationFromJson(providerRepoId, value, prNumber);
   } catch (error) {
     if (error instanceof PublicationReceiptError) throw error;
     throw incomplete('provider PR integration observation failed', error);

@@ -296,3 +296,29 @@ export function settleRecoveredCampaignWorkerFinal(selectorValue: unknown, env?:
   settleCampaignFinal({ root, selector, handoff, final, env });
   return final;
 }
+
+/** Immutable completed antecedent; a reviewing Lease remains the live closeout owner. */
+export function readCompletedCampaignWorker(value: unknown, env?: NodeJS.ProcessEnv) {
+  const context = readCampaignWorkerHandoff(value);
+  const { root, intent, selector, handoff } = context;
+  const final = readPlanningRecord<CampaignWorkerFinal>(root, intent, key(selector.dispatch_id, 'final'));
+  if (!final || final.contract_run.status !== 'pass' || final.outcome !== 'completed') throw new Error('campaign closeout requires a completed passing final');
+  const settled = readAutomationUsageForResult({ repo_root: root, reservation: final.reservation,
+    evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env });
+  if (!settled) throw new Error('campaign final has no exact budget settlement');
+  const recovered = readPlanningRecord<{ envelope: Acquisition['envelope']; receipt: Acquisition['receipt'] }>(root, intent, key(selector.dispatch_id, 'recovered'));
+  const completed = recovered ?? handoff.acquired;
+  if (completed.envelope.task_id !== handoff.acquired.envelope.task_id || completed.envelope.task_revision !== handoff.acquired.envelope.task_revision
+    || completed.envelope.worktree_path !== handoff.acquired.envelope.worktree_path || completed.envelope.branch !== handoff.acquired.envelope.branch
+    || completed.envelope.generation !== handoff.acquired.envelope.generation + (recovered ? 1 : 0)) throw new Error('completed campaign antecedent differs');
+  const receipt = readClaimActorReceipt(root, completed.envelope.task_id, completed.envelope.claim_id);
+  if (!receipt || !exact(receipt, completed.receipt)) throw new Error('completed campaign ClaimActor differs');
+  const writableInactive = (['worker', 'verifier'] as const).every(role => {
+    const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
+    const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation }>(root, intent, key(selector.dispatch_id, `child-${role}`));
+    if (!invocation || !child) return false;
+    try { return observeCampaignCodexTerminal({ invocation, worktree: completed.envelope.worktree_path, ...child.observation }).runtime_effect_inactive === true; }
+    catch { return false; }
+  });
+  return { ...context, envelope: completed.envelope, receipt: completed.receipt, final, writable_inactive: writableInactive };
+}
