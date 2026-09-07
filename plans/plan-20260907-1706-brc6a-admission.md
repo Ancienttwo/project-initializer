@@ -143,4 +143,3 @@ One bounded Git change set. No stored data is migrated or rewritten. Reverting r
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
-

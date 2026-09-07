@@ -9,7 +9,7 @@ import { recoverCampaignDispatch } from '../../src/effects/automation/campaign-r
 import { readTaskAutomationAttemptCurrent } from '../../src/effects/engineers/automation-attempt-store';
 import { readPlanningRecord } from '../../src/effects/automation/campaign-planning-store';
 import { issueBatchGroupStoreRoot } from '../../src/effects/automation/issue-batch-store';
-import { canonicalMessageDigest } from '../../src/core/messages/mechanics';
+import { canonicalMessageBytes, canonicalMessageDigest } from '../../src/core/messages/mechanics';
 import { processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
 import { readLease } from '../../src/effects/state/coordination-lease-store';
 const roots: string[] = [];
@@ -111,9 +111,10 @@ test.each(['reservation', 'result'] as const)('recovery rejects altered %s autho
   const dispatch = f.result.worker_handoff.dispatch_id;
   const path = join(issueBatchGroupStoreRoot(f.root, f.intent.campaign_id, 1), 'planning', `${canonicalMessageDigest({ dispatch, part: 'final' }).slice(7)}.json`);
   const changed = field === 'result' ? { ...final, result_sha256: '0'.repeat(64) } : { ...final, reservation: { ...final.reservation, attempt: 999 } };
-  writeFileSync(path, JSON.stringify(changed));
+  const basis = { intent_sha256: f.intent.intent_sha256, record: changed };
+  writeFileSync(path, `${canonicalMessageBytes({ ...basis, record_sha256: canonicalMessageDigest(basis) })}\n`);
   const before = readLease(f.root, f.result.envelope.task_id);
-  expect(() => recoverCampaignDispatch({ selector: f.result.worker_handoff, host: f.executeInput.host, session_id: f.executeInput.session_id, env: f.env })).toThrow();
+  expect(() => recoverCampaignDispatch({ selector: f.result.worker_handoff, host: f.executeInput.host, session_id: f.executeInput.session_id, env: f.env })).toThrow(field === 'reservation' ? 'automation reservation digest' : 'exact observed result');
   expect(readLease(f.root, f.result.envelope.task_id)).toEqual(before);
   expect(readPlanningRecord(f.root, f.intent, canonicalMessageDigest({ dispatch, part: 'retired' }).slice(7))).toBeNull();
 });
