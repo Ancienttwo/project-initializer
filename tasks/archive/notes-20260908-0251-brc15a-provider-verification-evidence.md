@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 02:51
+> **Related Plan**: plans/archive/plan-20260908-0205-brc15a-provider-verification-evidence.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-0251
+> **Archive Projection V1**: `plans/plan-20260908-0205-brc15a-provider-verification-evidence.md` => `plans/archive/plan-20260908-0205-brc15a-provider-verification-evidence.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0205-brc15a-provider-verification-evidence.notes.md` => `tasks/archive/notes-20260908-0251-brc15a-provider-verification-evidence.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0205-brc15a-provider-verification-evidence.contract.md` => `tasks/archive/contract-20260908-0251-brc15a-provider-verification-evidence.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0205-brc15a-provider-verification-evidence.review.md` => `tasks/archive/review-20260908-0251-brc15a-provider-verification-evidence.md`
+
 # Implementation Notes: brc15a-provider-verification-evidence
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-0205-brc15a-provider-verification-evidence.md
-> **Contract**: tasks/contracts/20260908-0205-brc15a-provider-verification-evidence.contract.md
-> **Review**: tasks/reviews/20260908-0205-brc15a-provider-verification-evidence.review.md
+> **Plan**: plans/archive/plan-20260908-0205-brc15a-provider-verification-evidence.md
+> **Contract**: tasks/archive/contract-20260908-0251-brc15a-provider-verification-evidence.md
+> **Review**: tasks/archive/review-20260908-0251-brc15a-provider-verification-evidence.md
 > **Last Updated**: 2026-09-08 02:06
 > **Lifecycle**: notes
 
