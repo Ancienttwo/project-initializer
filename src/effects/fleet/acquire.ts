@@ -1,3 +1,4 @@
+import { canonicalMessageBytes } from '../../core/messages/mechanics';
 /**
  * Read-side fleet offers and the acquisition seam.
  *
@@ -65,6 +66,8 @@ import {
   type ClaimTokenV1,
   type ClaimTokenWriteInput,
 } from '../state/coordination-claim-token';
+import { validateLeaseReclaimEligibility } from '../../core/state/lease-liveness';
+import { readClaimTokenForTask } from '../state/coordination-claim-token';
 import { readLease, type LeaseRead } from '../state/coordination-lease-store';
 import { resolveBoard } from '../state/resolve-board';
 import { campaignTaskPlanProof } from '../automation/campaign-planning-proof';
@@ -611,7 +614,7 @@ function revalidateOffer(
 
 function topologyMatches(
   topology: WorktreeTopology,
-  start: ContractWorktreeStartV1,
+  start: Pick<ContractWorktreeStartV1, 'worktree_path' | 'branch'>,
 ): boolean {
   return topology.worktrees.some((entry) => (
     entry.path === start.worktree_path
@@ -917,4 +920,52 @@ export function validateFleetWorkEnvelope(root: string, work: WorkEnvelopeV1, en
   if (!repo || realpathSync(repo.path) !== realpathSync(root)) throw new Error('WorkEnvelope repository authorization is no longer current');
   const authority = revalidateClaimAuthority(work, repo, { env }, deps);
   if (!authority.ok) throw new Error(authority.result.message);
+}
+
+/** Rebind only the exact worktree retained by an evidence-gated generation change. */
+export function resumeReclaimedFleetWork(input: {
+  repo_root: string; previous: WorkEnvelopeV1; claim_id: string;
+  receipt: import('../../core/state/lease-liveness').LeaseReclaimEligibilityReceiptV1;
+  env?: NodeJS.ProcessEnv; crash_hook?: (boundary: 'after_bind' | 'after_token') => void;
+}): WorkEnvelopeV1 {
+  const deps = acquisitionDependencies();
+  const previous = input.previous;
+  const registry = deps.readRegistry({ env: input.env, adoptedOnly: true });
+  const repo = registeredWritableRepo(registry, previous);
+  if (!repo || realpathSync(repo.path) !== realpathSync(input.repo_root)) throw new Error('reclaimed work repository authority differs');
+  const receipt = validateLeaseReclaimEligibility(input.receipt);
+  if (receipt.classification !== 'reclaimable' || receipt.task_id !== previous.task_id || receipt.task_revision !== previous.task_revision
+    || receipt.claim_id !== previous.claim_id || receipt.lease_generation !== previous.generation) throw new Error('reclaimed work receipt differs from original envelope');
+  const authority = revalidateClaimAuthority(previous, repo, { env: input.env }, deps);
+  if (!authority.ok) throw new Error(authority.result.message);
+  const start = { worktree_path: previous.worktree_path, branch: previous.branch };
+  if (!topologyMatches(deps.topology(repo.path), start)) throw new Error('reclaimed worktree topology differs');
+  const checkOwner = () => {
+    const owner = deps.readLease(repo.path, previous.task_id).record;
+    if (!owner || owner.claim_id !== input.claim_id || owner.generation !== previous.generation + 1
+      || owner.task_revision !== previous.task_revision || owner.stolen_from?.claim_id !== previous.claim_id
+      || !owner.stolen_from.reason.startsWith('automatic-reclaim:') || !owner.stolen_from.reason.endsWith(`:${receipt.receipt_sha256}`)
+      || (owner.state !== 'reserving' && owner.state !== 'bound')) throw new Error('reclaimed work no longer owns its exact next generation');
+    if (owner.state === 'bound' && (owner.execution_worktree !== previous.worktree_path || owner.branch !== previous.branch || owner.unit_ref !== previous.unit_ref)) {
+      throw new Error('reclaimed work is already bound elsewhere');
+    }
+    return owner;
+  };
+  const owner = checkOwner();
+  const tokenRead = readClaimTokenForTask(previous.worktree_path, previous.task_id);
+  if (tokenRead.outcome !== 'found' || ![previous.claim_id, input.claim_id].includes(tokenRead.token.claim_id)
+    || canonicalMessageBytes({ token: tokenRead.token }) !== canonicalMessageBytes({ token: { ...previous.claim_token, claim_id: tokenRead.token.claim_id } })) throw new Error('reclaimed worktree carries an unknown claim token');
+  if (owner.state === 'reserving') {
+    const bound = deps.bind({ claimId: input.claim_id, worktree: previous.worktree_path, branch: previous.branch, unitRef: previous.unit_ref }, deps.sprintDependencies(repo.path));
+    if (bound.exitCode !== 0) throw new Error(commandMessage(bound));
+  }
+  input.crash_hook?.('after_bind');
+  const token = deps.writeToken(repo.path, { task_id: previous.task_id, claim_id: input.claim_id, worktree: previous.worktree_path,
+    sprint: previous.sprint_path, task: authority.task, unit_ref: previous.unit_ref });
+  input.crash_hook?.('after_token');
+  const finalAuthority = revalidateClaimAuthority(previous, repo, { env: input.env }, deps);
+  if (!finalAuthority.ok) throw new Error(finalAuthority.result.message);
+  if (!topologyMatches(deps.topology(repo.path), start)) throw new Error('reclaimed worktree topology changed after token publication');
+  checkOwner();
+  return Object.freeze({ ...previous, claim_id: input.claim_id, generation: previous.generation + 1, claim_token: Object.freeze({ ...token }) });
 }

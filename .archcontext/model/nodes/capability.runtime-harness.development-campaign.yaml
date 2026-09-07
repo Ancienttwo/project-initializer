@@ -20,6 +20,10 @@ responsibilities:
   - Keep Task, Lease, Claim, Work Graph, semantic acceptance and delivery publication authority in their existing capabilities.
 source:
   include:
+    - "src/core/automation/campaign-runtime.ts"
+    - "src/effects/automation/campaign-runtime.ts"
+    - "src/effects/automation/campaign-recovery.ts"
+    - "src/effects/automation/campaign-worker.ts"
     - "src/core/automation/campaign-planning.ts"
     - "src/effects/automation/campaign-planning.ts"
     - "src/effects/automation/campaign-planning-proof.ts"

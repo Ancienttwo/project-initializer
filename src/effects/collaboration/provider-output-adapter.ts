@@ -18,6 +18,7 @@
  * Zero delivery-plane write (D1): this module only reads.
  */
 import { realpathSync } from 'fs';
+import { canonicalMessageDigest } from '../../core/messages/mechanics';
 
 import { CollaborationError } from '../../core/collaboration/common';
 import {
@@ -67,6 +68,8 @@ export interface CodexExecUsageV1 {
 
 export interface CodexExecStructuredOutputV1 {
   readonly thread_id: string;
+  readonly terminal_event_sha256: string;
+  readonly operation_types: readonly string[];
   readonly final_response: string;
   readonly usage: CodexExecUsageV1;
 }
@@ -136,6 +139,28 @@ export function parseCodexExecStructuredOutput(stdout: string): CodexExecStructu
   if (starts.length !== 1 || completions.length !== 1 || messages.length === 0) {
     reject('adapter_payload_not_json', 'provider output lacks one complete Codex turn and final agent message');
   }
+  if (events[0] !== starts[0] || events[events.length - 1] !== completions[0]
+    || events.some(event => event.type === 'error' || event.type === 'turn.failed')) {
+    reject('adapter_payload_not_json', 'provider output does not end in one ordered successful Codex turn');
+  }
+  const pending = new Set<string>();
+  const operationTypes = new Set<string>();
+  for (const event of events) {
+    if (!['item.started', 'item.updated', 'item.completed'].includes(event.type as string)) continue;
+    const item = record(event.item);
+    if (!item || typeof item.id !== 'string' || typeof item.type !== 'string') {
+      reject('adapter_payload_not_json', 'provider output contains an unidentified Codex operation');
+    }
+    operationTypes.add(item.type);
+    if (event.type === 'item.started') {
+      if (pending.has(item.id)) reject('adapter_payload_not_json', 'provider output starts an operation twice');
+      pending.add(item.id);
+    } else if (event.type === 'item.completed') {
+      if (item.status === 'in_progress') reject('adapter_payload_not_json', 'provider output completes an active operation');
+      pending.delete(item.id);
+    }
+  }
+  if (pending.size) reject('adapter_payload_not_json', 'provider output leaves an operation active at turn completion');
   const threadId = starts[0]!.thread_id;
   const usage = record(completions[0]!.usage);
   const inputTokens = nonNegativeInteger(usage?.input_tokens);
@@ -147,6 +172,8 @@ export function parseCodexExecStructuredOutput(stdout: string): CodexExecStructu
   }
   return Object.freeze({
     thread_id: threadId,
+    terminal_event_sha256: canonicalMessageDigest({ event: completions[0]! }),
+    operation_types: Object.freeze([...operationTypes].sort()),
     final_response: messages[messages.length - 1]!,
     usage: Object.freeze({
       input_tokens: inputTokens,

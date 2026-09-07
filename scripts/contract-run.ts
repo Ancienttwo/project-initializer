@@ -10,13 +10,16 @@ import { createHash } from "crypto";
 // whichever copy of this file is executing, canonical or projected.
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
-type Mode = "dry-run" | "run" | "preflight";
+type Mode = "dry-run" | "run" | "preflight" | "recover";
 
 interface Options {
   mode: Mode;
   repo: string;
   contract: string;
   campaignHandoff?: string;
+  campaignProvider?: "codex-exec";
+  campaignParentHost?: "claude" | "codex";
+  campaignParentSession?: string;
   workerCommand?: string;
   verifierCommand?: string;
   out?: string;
@@ -77,6 +80,8 @@ interface ChildResult {
   timed_out?: boolean;
   process_group_quiescence?: { scope: 'posix_process_group' | 'unsupported'; state: 'quiescent' | 'active' | 'unknown' };
   renewal_failure?: string;
+  output_sha256?: { stdout: string; stderr: string };
+  output_complete?: boolean;
 }
 
 // Canonical anti-extras clause injected into every runner-reachable surface (worker
@@ -100,6 +105,8 @@ function usage(): string {
     "  bun scripts/contract-run.ts dry-run --contract <contract-file> [--repo <path>] [--out <dir>] [--runner <label>] [--effort <tier>] [--json]",
     "  bun scripts/contract-run.ts run --contract <contract-file> --worker-command <cmd> --verifier-command <cmd> [--repo <path>] [--out <dir>] [--max-runner-invocations <n>] [--runner <label>] [--effort <tier>] [--json]",
     "",
+    "recover --campaign-handoff <file> --campaign-parent-host <codex|claude> --campaign-parent-session <id> fences and recovers the exact retained worktree without spawning a child.",
+    "--campaign-provider codex-exec uses the tracked Codex role profiles and records managed invocation evidence.",
     "--campaign-handoff <selector-json-file> binds run to an acquired campaign worker. The local parent supplies commands; exact ownership is checked before child execution.",
     "",
     "preflight asserts the contract is a self-sufficient execution brief (Goal, Scope,",
@@ -129,7 +136,7 @@ function usage(): string {
 function parseArgs(argv: string[]): Options {
   let mode: Mode = "dry-run";
   let index = 0;
-  if (argv[0] === "run" || argv[0] === "dry-run" || argv[0] === "preflight") {
+  if (argv[0] === "run" || argv[0] === "dry-run" || argv[0] === "preflight" || argv[0] === "recover") {
     mode = argv[0];
     index = 1;
   }
@@ -154,6 +161,22 @@ function parseArgs(argv: string[]): Options {
         break;
       case "--campaign-handoff":
         opts.campaignHandoff = requireValue(argv, ++index, arg);
+        index++;
+        break;
+      case "--campaign-parent-host": {
+        const host = requireValue(argv, ++index, arg);
+        if (host !== "claude" && host !== "codex") throw new CliError("contract-run: campaign parent host must be claude or codex", 2);
+        opts.campaignParentHost = host;
+        index++;
+        break;
+      }
+      case "--campaign-parent-session":
+        opts.campaignParentSession = requireValue(argv, ++index, arg);
+        index++;
+        break;
+      case "--campaign-provider":
+        if (requireValue(argv, ++index, arg) !== "codex-exec") throw new CliError("contract-run: campaign provider must be codex-exec", 2);
+        opts.campaignProvider = "codex-exec";
         index++;
         break;
       case "--worker-command":
@@ -193,8 +216,23 @@ function parseArgs(argv: string[]): Options {
     }
   }
 
+  if (opts.mode === "recover") {
+    if (!opts.campaignHandoff || !opts.campaignParentHost || !opts.campaignParentSession
+      || opts.workerCommand || opts.verifierCommand || opts.campaignProvider || opts.runner || opts.effort || opts.out || opts.maxRunnerInvocations !== undefined) {
+      throw new CliError("contract-run: recover requires campaign handoff, parent host and parent session, and excludes execution overrides", 2);
+    }
+    return opts;
+  }
+  if (opts.campaignParentHost || opts.campaignParentSession) throw new CliError("contract-run: campaign parent identity is only used by recover", 2);
   if (!opts.contract) {
     throw new CliError("contract-run: --contract is required", 2);
+  }
+  if (opts.campaignProvider) {
+    if (!opts.campaignHandoff || opts.mode !== "run" || opts.workerCommand || opts.verifierCommand || opts.runner || opts.effort) {
+      throw new CliError("contract-run: --campaign-provider requires a campaign handoff and excludes command or runner overrides", 2);
+    }
+    opts.workerCommand = "codex-exec:worker";
+    opts.verifierCommand = "codex-exec:verifier";
   }
   if (opts.mode === "run" && (!opts.workerCommand || !opts.verifierCommand)) {
     throw new CliError("contract-run: run requires --worker-command and --verifier-command", 2);
@@ -627,16 +665,14 @@ async function runChild(
   env: NodeJS.ProcessEnv,
   deadlineMs: number | null,
   renewal?: { interval_ms: number; renew: () => unknown },
+  invocation?: { executable: string; argv: readonly string[] },
 ): Promise<ChildResult> {
   const stdoutPath = join(runDir, `${role}.stdout.log`);
   const stderrPath = join(runDir, `${role}.stderr.log`);
   const childEnv = { ...process.env, ...env, CONTRACT_RUN_ROLE: role };
 
   if (deadlineMs !== null) {
-    // wall_time_minutes is non-null: ride the existing bounded process runner instead of
-    // reimplementing deadline/process-group termination here. It writes combined
-    // stdout+stderr to one log (its own process-group-aware kill logic needs a single
-    // stream), so stderr_path stays present but empty in this branch.
+    // Provider JSONL must remain separate from diagnostics to preserve terminal evidence.
     const boundedResultPath = join(runDir, `${role}.bounded-result.json`);
     // A reused output directory cannot supply this invocation's supervisor proof.
     rmSync(boundedResultPath, { force: true });
@@ -651,10 +687,9 @@ async function runChild(
         stdoutPath,
         "--result",
         boundedResultPath,
+        ...(invocation ? ["--stderr-log", stderrPath] : []),
         "--",
-        "/bin/sh",
-        "-c",
-        command,
+        ...(invocation ? [invocation.executable, ...invocation.argv] : ["/bin/sh", "-c", command]),
       ],
       { cwd: repo, stdio: "ignore", env: childEnv },
     );
@@ -672,17 +707,21 @@ async function runChild(
       });
     } finally { if (timer) clearInterval(timer); }
     if (!existsSync(stdoutPath)) writeFileSync(stdoutPath, "");
-    writeFileSync(stderrPath, "");
+    if (!invocation || !existsSync(stderrPath)) writeFileSync(stderrPath, "");
     let exitCode: number | null = wrapperExit;
     let timedOut = false;
     let quiescence: ChildResult["process_group_quiescence"] = { scope: "unsupported", state: "unknown" };
+    let outputProof: Pick<ChildResult, "output_sha256" | "output_complete"> = {};
     if (existsSync(boundedResultPath)) {
       try {
         const bounded = JSON.parse(readFileSync(boundedResultPath, "utf-8")) as {
           exit_code: number;
           timed_out: boolean;
+          output_sha256?: { stdout: string; stderr: string };
+          output_complete?: boolean;
           process_group_quiescence?: ChildResult["process_group_quiescence"];
         };
+        if (invocation) outputProof = { output_sha256: bounded.output_sha256, output_complete: bounded.output_complete };
         exitCode = bounded.exit_code;
         timedOut = bounded.timed_out === true;
         const observed = bounded.process_group_quiescence;
@@ -692,6 +731,7 @@ async function runChild(
       }
     }
     return {
+      ...outputProof,
       role,
       command,
       exit_code: exitCode,
@@ -703,6 +743,7 @@ async function runChild(
     };
   }
 
+  if (invocation) throw new CliError("contract-run: provider invocation requires a bounded supervisor", 1);
   const result = spawnSync(command, {
     cwd: repo,
     shell: true,
@@ -782,7 +823,7 @@ async function buildRun(opts: Options) {
   const campaign = opts.campaignHandoff && briefPreflight.ok
     ? (await import(pathToFileURL(join(packageRoot, "src/effects/automation/campaign-worker.ts")).href)).bindCampaignWorker({
       selector: JSON.parse(readFileSync(repoPath(repo, opts.campaignHandoff), "utf8")), worktree: repo, contract: repoRelative(repo, contractPath),
-      worker_command: opts.workerCommand!, verifier_command: opts.verifierCommand!, env: process.env,
+      worker_command: opts.workerCommand!, verifier_command: opts.verifierCommand!, provider: opts.campaignProvider, env: process.env,
     }) as ReturnType<typeof import("../src/effects/automation/campaign-worker").bindCampaignWorker>
     : null;
   if (campaign) {
@@ -841,6 +882,7 @@ async function buildRun(opts: Options) {
   writePrompt(verifierPrompt, "Contract Verifier Task", [
     `Contract: ${repoRelative(repo, contractPath)}`,
     `Review file: ${reviewFile || "(none)"}`,
+    ...(opts.campaignProvider ? ['Return your final response as exact JSON {"verdict":"pass|fail","review":"Markdown review and evidence references"}. The parent persists this response; do not write files.'] : []),
     `Role mode: ${delegation.roles.verifier?.mode ?? "read_only"}`,
     `Role purpose: ${delegation.roles.verifier?.purpose ?? "exit_criteria_review"}`,
     "",
@@ -901,6 +943,7 @@ async function buildRun(opts: Options) {
 
   if (opts.mode === "run" && briefPreflight.ok) {
     if (consume("worker")) {
+      const invocation = opts.campaignProvider ? campaign!.prepareChild("worker", repoRelative(repo, workerPrompt)) : undefined;
       campaign?.beforeChild("worker", opts.workerCommand!);
       const worker = await runChild(
         "worker",
@@ -910,6 +953,7 @@ async function buildRun(opts: Options) {
         { ...baseEnv, CONTRACT_RUN_PROMPT: baseEnv.CONTRACT_RUN_WORKER_PROMPT },
         wallTimeDeadlineMs,
         campaign?.renewal_interval_ms ? { interval_ms: campaign.renewal_interval_ms, renew: campaign.renew } : undefined,
+        invocation,
       );
       children.push(worker);
       campaign?.afterChild(worker);
@@ -919,6 +963,7 @@ async function buildRun(opts: Options) {
       }
     }
     if (status === "pass" && consume("verifier")) {
+      const invocation = opts.campaignProvider ? campaign!.prepareChild("verifier", repoRelative(repo, verifierPrompt)) : undefined;
       campaign?.beforeChild("verifier", opts.verifierCommand!);
       const verifier = await runChild(
         "verifier",
@@ -928,13 +973,18 @@ async function buildRun(opts: Options) {
         { ...baseEnv, CONTRACT_RUN_PROMPT: baseEnv.CONTRACT_RUN_VERIFIER_PROMPT },
         wallTimeDeadlineMs,
         campaign?.renewal_interval_ms ? { interval_ms: campaign.renewal_interval_ms, renew: campaign.renew } : undefined,
+        invocation,
       );
       children.push(verifier);
-      campaign?.afterChild(verifier);
+      const verdict = campaign?.afterChild(verifier);
+      if (verdict) {
+        writeFileSync(join(runDir, 'verifier-review.md'), verdict.review);
+        if (verdict.verdict === 'fail') { status = 'fail'; failureClass = 'verifier_rejected'; }
+      }
       if (verifier.exit_code !== 0) {
         status = "fail";
         failureClass = verifier.timed_out ? "wall_time_exceeded" : "verifier_failed";
-      } else if (reviewFile && !existsSync(repoPath(repo, reviewFile))) {
+      } else if (!opts.campaignProvider && reviewFile && !existsSync(repoPath(repo, reviewFile))) {
         status = "fail";
         failureClass = "missing_review";
       }
@@ -1001,6 +1051,15 @@ async function buildRun(opts: Options) {
 
 try {
   const opts = parseArgs(process.argv.slice(2));
+  if (opts.mode === "recover") {
+    const packageRoot = basename(SCRIPT_DIR) === "helpers" && basename(dirname(SCRIPT_DIR)) === "templates" && basename(dirname(dirname(SCRIPT_DIR))) === "assets"
+      ? resolve(SCRIPT_DIR, "../../..") : resolve(SCRIPT_DIR, "..");
+    const { recoverCampaignDispatch } = await import(pathToFileURL(join(packageRoot, "src/effects/automation/campaign-recovery.ts")).href);
+    const recovered = recoverCampaignDispatch({ selector: JSON.parse(readFileSync(repoPath(resolve(opts.repo), opts.campaignHandoff!), "utf8")),
+      host: opts.campaignParentHost!, session_id: opts.campaignParentSession!, env: process.env });
+    console.log(JSON.stringify(recovered, null, 2));
+    process.exit(recovered.disposition === "reconciliation_required" ? 1 : 0);
+  }
   const { manifest, manifestPath } = await buildRun(opts);
   if (opts.json) {
     console.log(JSON.stringify(manifest, null, 2));

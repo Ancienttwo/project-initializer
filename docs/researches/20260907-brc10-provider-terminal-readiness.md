@@ -1,6 +1,6 @@
 # BRC10 provider terminal evidence readiness
 
-Status: research only; the full BRC10 lifecycle plan remains Draft and the Sprint row remains pending.
+Status: historical design investigation. The parent has specified and implemented the producer/fence/recovery boundary in [BRC10 lifecycle](20260907-brc10-lifecycle.md); final acceptance remains with that work-package. The gaps below describe the pre-implementation baseline, not prerequisites delegated to the user.
 
 Source baseline: `22e009e6fd401d0fc51fe79c041c5f5a4e42ca65` (PR #337), based on accepted main `188ae3529695623022c015c0cae0f7ec0b1304a4`. This investigation does not extend PR #337's supervised-renewal acceptance to reclaim or recovery.
 

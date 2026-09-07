@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
-import { closeSync, openSync, writeFileSync } from 'fs';
+import { closeSync, openSync, writeFileSync, writeSync } from 'fs';
+import { createHash } from 'crypto';
 import { spawn } from 'child_process';
 
 type Result = {
+  output_sha256?: { stdout: string; stderr: string };
+  output_complete?: boolean;
   duration_ms: number;
   timed_out: boolean;
   exit_code: number;
@@ -11,7 +14,7 @@ type Result = {
 };
 
 function usage(): never {
-  process.stderr.write('Usage: run-bounded-verifier-command.ts --deadline-ms <epoch-ms> --log <path> --result <path> -- <command> [args...]\n');
+  process.stderr.write('Usage: run-bounded-verifier-command.ts --deadline-ms <epoch-ms> --log <path> [--stderr-log <path>] --result <path> -- <command> [args...]\n');
   process.exit(2);
 }
 
@@ -28,6 +31,7 @@ function option(name: string): string {
 const deadlineMs = Number(option('--deadline-ms'));
 const logPath = option('--log');
 const resultPath = option('--result');
+const stderrPath = argv.slice(0, separator).includes('--stderr-log') ? option('--stderr-log') : null;
 const command = argv[separator + 1];
 const args = argv.slice(separator + 2);
 if (!Number.isFinite(deadlineMs)) usage();
@@ -64,11 +68,28 @@ let forcedTerminationSent = false;
 let forcedTerminationConfirmDeadlineMs = 0;
 let forceTermination: Promise<void> | undefined;
 const logFd = openSync(logPath, 'w');
+const stderrFd = stderrPath === null ? logFd : openSync(stderrPath, 'w');
 const child = spawn(command, args, {
   detached: process.platform !== 'win32',
-  stdio: ['ignore', logFd, logFd],
+  stdio: stderrPath === null ? ['ignore', logFd, stderrFd] : ['ignore', 'pipe', 'pipe'],
   env: scrubHarnessEnv(process.env),
 });
+
+const stdoutHash = createHash('sha256');
+const stderrHash = createHash('sha256');
+let outputError = false;
+let outputClosed = false;
+const closed = new Promise<void>(resolve => child.once('close', () => { outputClosed = true; resolve(); }));
+if (stderrPath !== null) {
+  for (const [stream, fd, hash] of [[child.stdout!, logFd, stdoutHash], [child.stderr!, stderrFd, stderrHash]] as const) {
+    stream.on('data', (bytes: Buffer) => {
+      hash.update(bytes);
+      try { let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset); }
+      catch { outputError = true; beginTermination(); }
+    });
+    stream.on('error', () => { outputError = true; });
+  }
+}
 
 function terminate(signal: NodeJS.Signals): void {
   if (!child.pid) return;
@@ -142,10 +163,18 @@ const completion = await leaderCompletion.then(async (result) => {
   return result;
 });
 
+if (stderrPath !== null && !outputClosed) {
+  let streamTimer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([closed, new Promise<void>(resolve => { streamTimer = setTimeout(resolve, Math.max(0, deadlineMs - Date.now())); })]);
+  if (streamTimer) clearTimeout(streamTimer);
+  if (!outputClosed) { timedOut = true; outputError = true; child.stdout?.destroy(); child.stderr?.destroy(); beginTermination(); }
+}
 clearTimeout(deadlineTimer);
 if (forceTermination) await forceTermination;
 closeSync(logFd);
+if (stderrFd !== logFd) closeSync(stderrFd);
 const result: Result = {
+  ...(stderrPath !== null ? { output_sha256: { stdout: `sha256:${stdoutHash.digest('hex')}`, stderr: `sha256:${stderrHash.digest('hex')}` }, output_complete: outputClosed && !outputError } : {}),
   duration_ms: Date.now() - startedAt,
   timed_out: timedOut,
   exit_code: timedOut ? 124 : completion.code ?? 1,

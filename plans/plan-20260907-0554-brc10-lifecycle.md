@@ -1,6 +1,6 @@
 # Plan: BRC10 campaign lease liveness and controller recovery
 
-> **Status**: Draft
+> **Status**: Executing
 > **Created**: 20260907-0554
 > **Slug**: brc10-lifecycle
 > **Planning Source**: waza-think
@@ -97,60 +97,51 @@ See captured planning output.
 
 ## Captured Planning Output
 
-## Goal and completion boundary
+## Goal and authority
 
-Complete the Sprint BRC10 row after BRC9 and PR #336: current-owner renewal while the actual campaign child runs; evidence-gated reclaim; and crash recovery from the existing append-only campaign records without another owner or duplicate child. Successful prerequisite tests alone cannot close BRC10.
+Complete BRC10 on main a3fb4db2, retaining the already accepted renewal implementation. User explicitly authorized autonomous implementation, acceptance and PR merge and corrected the mistaken decision to wait for an implementation interface. The parent owns the provider integration choice. No further approval is needed for this work-package.
 
-## P1 — Observed map
+## P1 and P2
 
-`campaign-acquisition.ts` owns budget-before-acquire and stores the actual acquired WorkEnvelope/ClaimActor handoff. `campaign-worker.ts` validates that handoff, persists launch before spawn, and records child observations/final before settling budget and attempts. `scripts/contract-run.ts` executes both children synchronously, preventing an in-process renewal timer. `run-bounded-verifier-command.ts` supervises the POSIX process group but currently returns no typed quiescence evidence. Its Windows group probe cannot prove tree termination.
+The current campaign handoff owns exact Task/Claim/Lease/binding and existing planning journal identity. contract-run owns real child spawn. The bounded supervisor owns deadline and POSIX group observations. Existing Codex JSONL parsing owns typed thread/turn output for the read-only collaboration consumer. None of these alone proves a campaign invocation terminal state. Reclaim already uses the Task lock and the existing steal transition, but its reserving result has no Fleet resume consumer.
 
-`coordination-lease-liveness-store.ts` already owns append-only renewals, generation CAS and deterministic current projections. `coordination-lease-reclaim.ts` consumes five evidence fields under the existing Task lock and uses the existing steal transition. Steal returns a new reserving Lease. Ordinary Fleet acquire requires an available task and creates another worktree; it cannot resume that reserving Lease.
+Data flow:
 
-## P2 — Concrete flow and crash boundaries
+    tracked role configuration -> direct Codex invocation -> bounded supervisor
+                 |                         |                       |
+                 +-> campaign journal <--- typed terminal <-------+
+                             |
+                    dispatch admission fence
+                             |
+               existing reclaim/steal under Task lock
+                             |
+                 exact original-worktree Fleet rebind
 
-Authorization and parent identity -> acquisition budget reservation -> real acquired handoff -> dispatch launch and runtime identity -> supervised worker/verifier with fenced renewals -> durable terminal observations -> attempt final -> budget settlement.
+## P3 and concrete direction
 
-Recovery reads those exact records and current authority. A launch with no verifiable terminal observation stays attention. A stored final can finish settlement without launching either child. Reclaim first persists a generation-bound intent with a preselected new claim ID; after the existing steal transition, recovery resumes only that exact reserving/bound generation, writes the token and ClaimActor, and records the recovered envelope. Crashes after intent, steal, bind, token or actor publication replay their exact durable identities. Any foreign generation or changed authority stops recovery.
+Add a typed Codex execution mode to existing contract-run: `--campaign-provider codex-exec` requires `--campaign-handoff` and excludes caller worker/verifier shell commands. Standalone explicit-command execution keeps its existing semantics and does not gain automatic positive provider-inactivity evidence. This is an explicit invocation choice, never availability fallback.
 
-## P3 — Direction and invariants
+Use the current tracked `.codex/agents/fast-worker.toml` and `.codex/agents/gatekeeper.toml` for worker/verifier model, effort, instructions and sandbox. Read TOML with the installed runtime parser, check regular tracked source and expected workspace-write/read-only scopes, and bind exact configuration bytes. Discover the real Codex executable on host PATH and record canonical path, executable digest and reported version. Spawn it directly through the existing bounded supervisor with fixed exec/JSON/ephemeral/strict/ignore-user-config arguments, exact model/effort and the generated contract prompt. Do not change read-only delegated capability or claim Provider-native role identity. The worker prompt remains the sole execution-boundary injection owner.
 
-Use existing Lease, budget and campaign journal authorities; add no scheduler, daemon or parallel persistence root. Keep Task election in its existing lock. Campaign records are written outside Task-lock callbacks; recovery must not invert existing binding/campaign/Task lock order.
+The supervisor must support separate stdout/stderr capture for typed JSONL while preserving existing combined-log callers. The actual invocation records its identity and intended argv before spawn, then persists started and terminal observations in the existing campaign planning journal. Reuse the existing structured Codex JSONL parser, extending its result to expose thread identity and terminal event digest and reject invalid event ordering/incomplete operations. Parser consumers continue to read bytes captured by their real invocation boundary; arbitrary shell stdout is never admitted as Codex evidence. The terminal receipt binds dispatch/role/Claim/generation/binding, executable and role configuration, exact output digest, provider thread/terminal identity, exit/timeout and process-group scope. Unsupported or incomplete observations remain unknown. A completed provider turn and quiescent local group prove only the managed invocation's scope; unsupported remote operation evidence cannot become inactive.
 
-Add an explicitly granted liveness policy to campaign authorization. Historical grants remain readable without synthesized defaults; new execution requires a validated policy before acquisition or dispatch effects. Renewal uses its interval and TTL, current Task/Claim/generation/binding, and an effect identity durably recorded before spawn.
+Persist a dispatch retirement fence under the same campaign planning lock used to admit a child. Child admission checks that fence before recording started; renewal also refuses retired dispatches. Reclaim may fence a crashed controller without declaring its OS process dead: any already-started invocation still independently blocks takeover until its terminal evidence is present. A started record is written before the spawn side effect, so a crash in that gap remains unknown rather than incorrectly never-started. Arm an initial exact-generation liveness observation before admission; do not loosen renew's active-child constraint.
 
-Make the bounded child path asynchronous so the owner can renew during execution. A failed renewal cancels through the existing supervisor and suppresses the next child. Persist typed process-group quiescence and scope from the supervisor's actual observation; unsupported Windows tree proof, missing receipts and termination-confirmation timeout remain unknown. Leader exit, PID absence, deadline expiry and sending SIGKILL are never positive quiescence evidence.
+The reclaim observer consumes the retirement fence, all admitted invocation terminal records, current ClaimActor/binding/Lease, and current publication state. It computes the existing five evidence fields and revision from those persisted producers. Completing/reviewing, active effects, malformed data and unknown evidence never reach steal. It does not read the unrelated generic AutomationControllerRun as campaign authority.
 
-Create an internal `resumeReclaimedFleetLease` boundary using existing Fleet post-claim authority/topology checks, bind, token writer and Engineer ClaimActor builder. It accepts only the exact journal-authorized new generation and original worktree/branch/unit. It does not claim, provision, project the plan again or execute a child. Keep old historical receipts immutable.
+Persist one reclaim intent with a preselected new Claim ID before invoking existing automaticReclaimLease. Replay uses that exact intent; foreign generation refuses. Implement restricted Fleet resume using the existing post-claim authority/topology checks, bindLeaseRecord, claim-token writer, ClaimActor producer and WorkEnvelope validator. Rebind the original worktree/branch/unit only; never acquire another Task, create/project a worktree, reset dirty source or spawn a replacement child during recovery. Preserve old receipts. A persisted final may settle once after exact authority rebind; missing final does not invent a successful result.
 
-Active provider operations and completing/reviewing publication preserve ownership. Remote-provider terminal state must come from its owning producer, never from local child exit. Missing provider authority yields unknown/attention. The source investigation confirmed that `campaign-provider-execution.ts` records terminal outcomes only for GitHub adapter calls, while standalone child execution reserves `provider: null` and does not register its internal provider operations. `AgentRuntimeEffectV2` currently covers notify/wake operations, not this child. Before this plan becomes Approved, the parent must settle how the actual invocation boundary supplies evidence; the current arbitrary shell command cannot be treated as an observed provider transport. This is a design dependency, not permission to insert a caller-supplied boolean, parse stdout, or add a fixture-only success path. Renewal and journal replay can proceed in a separately accepted slice while full BRC10 remains incomplete.
+At 10x scale, journal scans and filesystem validation dominate. Preserve correctness under existing locks rather than caching ownership. No new service, dependency, scheduler or persistence root is needed. Rollback stops new typed dispatch/reclaim and retains all immutable evidence.
 
-At 10x tasks the first bottleneck is serial filesystem evidence validation and lock hold time. Do not cache ownership authority to improve throughput. Rollback stops new campaign dispatch and retains all journals; reverting source must not rewrite historical grants, Lease records or external effects.
+## File ownership and scope
 
-## Scope inventory
-
-Expected to exceed eight files. Owning sources: `src/core/automation/budget.ts`, `src/effects/automation/campaign-acquisition.ts`, `src/effects/automation/campaign-worker.ts`, a campaign-specific liveness/recovery consumer in `src/effects/automation/`, `src/effects/fleet/acquire.ts`, `src/effects/engineers/acquire.ts`, `scripts/contract-run.ts`, `scripts/run-bounded-verifier-command.ts`, and generated helper mirrors. Existing state/core primitives change only if an observed recovery invariant requires it. One new campaign consumer is justified by acquisition, runner and recovery sharing the same journal identity; it creates no new authority.
-
-Tests: existing campaign acquisition/worker and contract-run tests; new lifecycle and recovery integration tests with real local Task/Lease/budget/journal stores and bounded fake external operations; process supervisor regressions; existing #286 generation/classification tests. Dedicated research and workflow artifacts record acceptance. Keep shared campaign boundary prose untouched until accepted conclusions require promotion.
-
-## Acceptance matrix
-
-- Current owner renews more than once during a real long-running child. Old claim/generation/binding or revoked authority cannot renew; renewal failure stops further dispatch.
-- Expired active provider, descendant process, completing/reviewing, missing terminal evidence and unsupported platform evidence cause attention or protected outcomes with no Lease mutation.
-- All affirmative reclaim inputs derive from persisted real producer evidence. Two competing OS processes obtain exactly one new generation.
-- Crash after renewal fsync, reclaim intent, steal, bind, token, actor receipt and final settlement recovers exact state. Old receipts cannot create another generation; worker/verifier invocation counters never increment on recovery.
-- Recovery checks current canonical Task revision, authorization, binding, worktree topology and exact branch/unit before mutation. Dirty work remains preserved; stale/foreign state is not repaired opportunistically.
-- Supervisor reports remaining descendants and unconfirmed termination truthfully; Windows unknown is covered separately from POSIX success.
-- Existing BRC9 admission, complete-attempt reservation, transient retry and same-key settlement behavior remains covered.
+This work-package intentionally spans more than eight files: existing campaign-worker/acquisition/planning store consumers, one campaign runtime evidence consumer, one campaign recovery consumer, Fleet/Engineer rebind boundaries, the existing Codex output parser, contract-run and bounded supervisor plus their helper mirrors, and focused unit/effect/runner tests. New files own shared invocation/recovery invariants; they are not parallel authorities. Workflow artifacts and dedicated BRC10 research document the final design. Do not change BRC13/14 product code in this package.
 
 ## Verification and delivery
 
-Use named focused tests for the affected runner, campaign, Fleet/Engineer and #286 boundaries, typecheck, helper mirror checks, and the six root repository-integrity commands. Freeze implementation and target before canonical `verify-sprint --prepare-acceptance`; deterministic unchanged criteria may be reused. Do not add an unconditional local full suite: CI supplies the required full integration gate. Final semantic review runs once for this work-package, followed by acceptance, canonical finish, publication-range task-sync binding, PR CI, authorized merge and main readback.
+Named checks cover typed real-process invocation, managed provider event parsing and identity joins, incomplete/failed/timed-out/foreign invocation refusal, raw-shell non-promotion, active/publication protection, never-started fencing, two OS reclaimers, and crash replay after intent/steal/bind/token/ClaimActor/final settlement without a duplicate child. Retain the existing renewal regression and BRC9 worker/acquisition/retry tests, plus Lease/Fleet/Engineer affected tests, typecheck, helper parity and all six integrity checks. Local fake provider executables exercise the actual process transport; use a bounded installed Codex smoke run in a disposable checkout to distinguish protocol integration from fake coverage. Existing Codex credentials are used by its own auth path; no credentials are requested or copied into repository artifacts.
 
-No provider credentials are required for local deterministic lifecycle verification. Real BRC15 Canary target/profile and BRC6a Connector revision attestation remain separate delivery requirements; they are not silently waived by BRC10 acceptance.
-
-## Annotations
-<!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
+Freeze implementation and target before canonical prepare; perform one semantic acceptance review, finish, bind publication evidence, and follow PR/main CI through authorized merge. CI supplies the full integration gate; do not duplicate it locally without an uncovered risk. BRC10 remains pending until the entire recovery matrix is accepted. BRC6a and real Canary execution remain subsequent work, not substitutes for this slice.
 
 ## Task Breakdown
-- [ ] Execute captured plan: BRC10 campaign lease liveness and controller recovery
+- [ ] Implement and verify the real campaign invocation, lifecycle fence and reclaim/rebind recovery boundary; accept and merge BRC10.
