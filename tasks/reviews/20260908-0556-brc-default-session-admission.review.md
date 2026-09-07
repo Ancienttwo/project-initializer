@@ -1,16 +1,16 @@
 # Task Review: brc-default-session-admission
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260908-0556-brc-default-session-admission.md
 > **Contract**: tasks/contracts/20260908-0556-brc-default-session-admission.contract.md
 > **Notes File**: tasks/notes/20260908-0556-brc-default-session-admission.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 05:56
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:2500a290f607ac51c0854cb2cd3507eb58cc32710ca784ba37a5657be66aad9c
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 38c26b2ada6a3071df40745b8eed6e06315695b6
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-review
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:2500a290f607ac51c0854cb2cd3507eb58cc32710ca784ba37a5657be66aad9c
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 38c26b2ada6a3071df40745b8eed6e06315695b6
+> **Verification Evidence SHA256**: sha256:be0980f9681d465a7c6cb5d8aa05cc0b6b6836e4b287f7e21377baee1f191510
+> **Issued At**: 2026-09-07T22:49:43.144Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Independent Deep check PASS for d1369b5b..95e5f603. Base, architecture, security and four adversarial angles reviewed structured Oracle session admission, protocol 2 cutover, all authoring/adoption/recovery consumers and unchanged active fail-closed boundary. Two pre-egress defects fixed with failing-before/passing-after regressions; canonical run run-20260908T064323-53799 passed 13/13 including 165 focused tests, typecheck and six integrity checks. No live provider calls, model injection or new exact-version claim.
 - Findings: none
 
 ## Behavior Diff Notes
