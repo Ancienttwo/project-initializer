@@ -3,6 +3,7 @@ import {
   canonicalMessageDigest,
 } from '../messages/mechanics';
 import {
+  REPAIR_CAMPAIGN_ISSUE_KINDS,
   declaredIssueBatchSlot,
   parseIssueBatchMarker,
   validateIssueBatchIntent,
@@ -18,6 +19,24 @@ import {
 } from '../external-sources/issue-observation';
 
 export const ISSUE_BATCH_METADATA_KIND = 'repo-harness-campaign-issue-metadata' as const;
+const PRIORITY_MINIMUM = 0;
+const PRIORITY_MAXIMUM = 100;
+const METADATA_FIELDS = ['protocol', 'kind', 'issue_kind', 'primary_capability', 'priority', 'depends_on_slots', 'suspected_paths'] as const;
+
+export function issueBatchMetadataAuthoringSchema(capabilityIds: readonly string[], slots: readonly string[]) {
+  return {
+    type: 'object', additionalProperties: false, required: METADATA_FIELDS,
+    properties: {
+      protocol: { const: 1 }, kind: { const: ISSUE_BATCH_METADATA_KIND },
+      issue_kind: { enum: REPAIR_CAMPAIGN_ISSUE_KINDS },
+      primary_capability: { enum: capabilityIds },
+      priority: { type: 'integer', minimum: PRIORITY_MINIMUM, maximum: PRIORITY_MAXIMUM },
+      depends_on_slots: { type: 'array', uniqueItems: true, items: { enum: slots }, description: 'Lexicographically sorted; do not include the issue own slot.' },
+      suspected_paths: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 }, description: 'Lexicographically sorted existing repo-relative paths at the frozen revision.' },
+    },
+  };
+}
+
 export const ISSUE_BATCH_RECONCILIATION_KIND = 'repo-harness-issue-batch-reconciliation' as const;
 
 export interface IssueBatchMetadataV1 {
@@ -103,12 +122,12 @@ export function parseIssueBatchMetadata(body: string): IssueBatchMetadataV1 | nu
   let candidate: unknown;
   try { candidate = JSON.parse(fences[0]![1]!); } catch { return null; }
   const value = record(candidate);
-  if (!value || !exact(value, ['protocol', 'kind', 'issue_kind', 'primary_capability', 'priority', 'depends_on_slots', 'suspected_paths'])) return null;
+  if (!value || !exact(value, METADATA_FIELDS)) return null;
   if (value.protocol !== 1 || value.kind !== ISSUE_BATCH_METADATA_KIND) return null;
   if (value.issue_kind !== 'bugfix' && value.issue_kind !== 'test_gap') return null;
   if (typeof value.primary_capability !== 'string' || value.primary_capability.trim() === '') return null;
   const priority = value.priority;
-  if (typeof priority !== 'number' || !Number.isSafeInteger(priority) || priority < 0 || priority > 100) return null;
+  if (typeof priority !== 'number' || !Number.isSafeInteger(priority) || priority < PRIORITY_MINIMUM || priority > PRIORITY_MAXIMUM) return null;
   const depends = sortedUniqueStrings(value.depends_on_slots);
   const paths = sortedUniqueStrings(value.suspected_paths);
   if (!depends || !paths) return null;

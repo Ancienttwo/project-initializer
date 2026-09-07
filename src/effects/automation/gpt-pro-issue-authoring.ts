@@ -1,3 +1,5 @@
+import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
+import { issueBatchMetadataAuthoringSchema } from '../../core/automation/issue-batch-reconcile';
 import { resolve } from 'path';
 
 import { automationDigest, type ProgramAuthorizationV1 } from '../../core/automation/budget';
@@ -101,7 +103,7 @@ function providerIssueUrl(value: string | undefined, repository: string): string
   return parsed.toString();
 }
 
-export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prompt_sha256' | 'intent_sha256'>, operation: IssueAuthoringOperation, requestedSlots: readonly IssueBatchSlot[], providerIssueId: string | null, providerIssueUrl: string | null): string {
+export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prompt_sha256' | 'intent_sha256'>, operation: IssueAuthoringOperation, requestedSlots: readonly IssueBatchSlot[], providerIssueId: string | null, providerIssueUrl: string | null, capabilityIds: readonly string[]): string {
   const action = operation === 'initial'
     ? `Create exactly one GitHub Issue for each listed slot: ${requestedSlots.join(', ')}.`
     : operation === 'fill_missing'
@@ -118,6 +120,7 @@ export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prom
     'The title prefix is display-only. The body marker below is the sole slot authority. Copy it exactly; do not add hashes, digests, or extra keys inside the marker.',
     markerExamples(intent, requestedSlots),
     'Each Issue body must also state the audit baseline and contain exactly one fenced ```json metadata object with protocol=1, kind=repo-harness-campaign-issue-metadata, issue_kind, primary_capability, priority, depends_on_slots, and suspected_paths.',
+    `Metadata schema (use only these exact capability IDs; never invent names): ${JSON.stringify(issueBatchMetadataAuthoringSchema(capabilityIds, intent.slots))}`,
     'Do not claim success for an Issue you did not observe GitHub create or update. Return a concise action log; the local controller will independently read GitHub.',
   ].join('\n\n');
 }
@@ -210,7 +213,7 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
     chrome_profile_directory: value.authorization.campaign!.chrome_profile_directory,
     created_at: createdAt, expires_at: value.authorization.expires_at,
   };
-  const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null);
+  const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null, readCampaignCapabilityIdsAtRevision(value.repoRoot, draft.base_main_sha));
   const intent = buildIssueBatchIntent({ ...draft, prompt_sha256: messageSha256(prompt) });
   persistIssueBatchIntent(value.repoRoot, intent);
   return prepareBudgetedAuthoring(input, value.authorization, intent, 'initial', prompt, null,
@@ -231,7 +234,7 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
   const locator = input.operation === 'edit_issue' ? providerIssueUrl(input.provider_issue_url, intent.provider_repository) : null;
   if (input.operation === 'edit_issue' && (requested.length !== 1 || providerIssueId === null || locator === null)) fail('issue_authoring_invalid', 'edit_issue requires one slot, provider_issue_id, and an exact provider_issue_url');
   if (input.operation === 'fill_missing' && (input.provider_issue_id !== undefined || input.provider_issue_url !== undefined)) fail('issue_authoring_invalid', 'fill_missing forbids provider_issue_id and provider_issue_url');
-  const prompt = buildIssueAuthoringPrompt(intent, input.operation, requested, providerIssueId, locator);
+  const prompt = buildIssueAuthoringPrompt(intent, input.operation, requested, providerIssueId, locator, readCampaignCapabilityIdsAtRevision(value.repoRoot, intent.base_main_sha));
   return prepareBudgetedAuthoring(input, value.authorization, intent, input.operation, prompt, input.source_session_ref,
     () => deps.followup({
       ...browserInput(value.repoRoot, prompt, value.binding.profileDir, value.binding.profileDirectory!, input),

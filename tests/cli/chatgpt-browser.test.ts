@@ -1267,6 +1267,8 @@ describe('chatgpt browser command', () => {
         const meta = JSON.parse(readFileSync(join(repoRoot, '.ai/harness/chatgpt/sessions', payload.sessionId, 'meta.json'), 'utf-8'));
         expect(meta.browser.conversationUrl).toBe('https://chatgpt.com/c/fake-conversation');
         expect(meta.providerSessionId).toBe('oracle_fake_123');
+        // Completed output and a provider handle do not prove model or Pro effort.
+        expect(meta.model.verified).toBe(false);
         expect(meta.oracle.binary).toBe(oraclePath);
         expect(meta.oracle.captureStatus).toBe('completed');
         expect(meta.output.artifacts).toEqual([]);
