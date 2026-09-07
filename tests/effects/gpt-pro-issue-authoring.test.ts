@@ -1,3 +1,4 @@
+import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -48,14 +49,32 @@ function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5, validRegistry = tru
   return { root, env, revision };
 }
 
-function result(input: BrowserConsultInput, sessionId: string, status: BrowserConsultResult['status'] = 'completed', verified = false): BrowserConsultResult {
+function result(input: BrowserConsultInput & { sessionId?: string }, sessionId: string, status: BrowserConsultResult['status'] = 'completed', verified = false): BrowserConsultResult {
   return {
     sessionId, status, paths: { sessionDir: sessionId, prompt: 'prompt.md', transcript: 'transcript.md', output: 'output.md', events: 'events.jsonl', artifactsDir: 'artifacts' },
-    meta: { version: 1, sessionId, engine: 'chatgpt-browser', provider: 'oracle', status, repo: input.repoRoot, createdAt: observedAt, updatedAt: observedAt, model: { requested: input.model, verified }, browser: { mode: 'manual-login', transport: 'copy_profile', chatgptUrl: 'https://chatgpt.com/', profileDir: input.profileDir, profileDirectory: input.profileDirectory }, input: { promptPath: 'prompt.md', files: [], followups: 0 }, output: { outputPath: 'output.md', transcriptPath: 'transcript.md', artifactsDir: 'artifacts', artifacts: [] }, diagnostics: { dryRun: false, reattachable: true, lastCaptureAt: observedAt } },
+    meta: { ...(verified ? campaignBrowserMetadata({ sessionId, repoRoot: input.repoRoot, profileDir: input.profileDir!, profileDirectory: input.profileDirectory!, sourceSessionId: input.sessionId, status }) : {}), version: 1, sessionId, engine: 'chatgpt-browser', provider: 'oracle', status, repo: input.repoRoot, createdAt: observedAt, updatedAt: observedAt, model: { requested: input.model, verified: false }, browser: { ...(verified ? { chatgptApp: 'GitHub' } : {}), mode: 'manual-login', transport: 'copy_profile', chatgptUrl: 'https://chatgpt.com/', profileDir: input.profileDir, profileDirectory: input.profileDirectory }, input: { promptPath: 'prompt.md', files: [], followups: 0 }, output: { outputPath: 'output.md', transcriptPath: 'transcript.md', artifactsDir: 'artifacts', artifacts: [] }, diagnostics: { dryRun: false, reattachable: true, lastCaptureAt: observedAt } },
   };
 }
 
 describe('GPT Pro issue batch authoring effect', () => {
+  test('admits the user default model from completed Oracle session and GitHub evidence', async () => {
+    const f = fixture();
+    const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, {
+      readBinding: readBrowserBinding, now: () => observedAt,
+      consult: async input => {
+        const value = result(input, 'default-session', 'completed', false);
+        return { ...value, meta: { ...value.meta,
+          providerSessionId: 'oracle-default',
+          browser: { ...value.meta.browser, chatgptApp: 'GitHub' },
+          oracle: { observation: { source: 'oracle-session-metadata' as const, sessionId: 'oracle-default', parentSessionId: null,
+            appSelection: { status: 'selected', app: 'GitHub', pluginId: 'plugin:github', source: 'chatgpt-composer-pill', capturedAt: observedAt } } },
+        } };
+      },
+    });
+    expect(started.browser.meta.model.verified).toBe(false);
+    expect(started.session.verification).toBe('verified');
+  });
+
   test('dry-run leaves no automation budget ledger', async () => {
     const f = fixture();
     const before = readdirSync(join(f.root, '.git', 'repo-harness')).sort();

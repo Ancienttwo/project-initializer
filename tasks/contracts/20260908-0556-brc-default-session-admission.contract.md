@@ -148,7 +148,7 @@ exit_criteria:
     {
       "id": "focused-regression",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/unit/campaign-browser-session.test.ts tests/unit/connector-challenge.test.ts tests/unit/issue-batch-adoption.test.ts tests/unit/oracle-session-evidence.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/campaign-step.test.ts tests/effects/campaign-fresh-audit.test.ts tests/cli/chatgpt-browser.test.ts",
+      "command": "bun test --timeout 60000 tests/unit/campaign-browser-session.test.ts tests/unit/connector-challenge.test.ts tests/unit/issue-batch-adoption.test.ts tests/unit/issue-batch.test.ts tests/unit/oracle-session-evidence.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/campaign-step.test.ts tests/effects/campaign-fresh-audit.test.ts tests/cli/chatgpt-browser.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",

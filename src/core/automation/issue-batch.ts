@@ -1,3 +1,4 @@
+import { validateCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from './campaign-browser-session';
 import {
   assertMessageExactKeys,
   assertMessageInteger,
@@ -37,8 +38,8 @@ export interface IssueBatchIntentV1 {
   readonly intent_sha256: string;
 }
 
-export interface IssueAuthoringSessionV1 {
-  readonly protocol: 1;
+export interface IssueAuthoringSessionV2 {
+  readonly protocol: 2;
   readonly kind: typeof ISSUE_AUTHORING_SESSION_KIND;
   readonly intent_sha256: string;
   readonly operation: IssueAuthoringOperation;
@@ -48,6 +49,7 @@ export interface IssueAuthoringSessionV1 {
   readonly source_session_ref: string | null;
   readonly browser_status: 'completed' | 'running' | 'recoverable' | 'incomplete_capture' | 'failed' | 'cancelled' | 'dry_run';
   readonly verification: 'verified' | 'unverified';
+  readonly browser_evidence: CampaignBrowserSessionEvidenceV1 | null;
   readonly created_at: string;
   readonly session_sha256: string;
 }
@@ -160,32 +162,35 @@ export function validateIssueBatchIntent(value: unknown): IssueBatchIntentV1 {
   return built;
 }
 
-export function buildIssueAuthoringSession(input: Omit<IssueAuthoringSessionV1, 'protocol' | 'kind' | 'session_sha256'>): IssueAuthoringSessionV1 {
+export function buildIssueAuthoringSession(input: Omit<IssueAuthoringSessionV2, 'protocol' | 'kind' | 'session_sha256' | 'verification'>): IssueAuthoringSessionV2 {
   if (!['initial', 'fill_missing', 'edit_issue'].includes(input.operation)) invalid('authoring operation is invalid');
   const requested = requestedSlots(input.requested_slots);
   const providerIssueId = input.provider_issue_id === null ? null : opaque(input.provider_issue_id, 'provider_issue_id');
   if ((input.operation === 'edit_issue') !== (providerIssueId !== null)) invalid('edit_issue requires provider_issue_id and other operations forbid it');
   if (input.operation === 'edit_issue' && requested.length !== 1) invalid('edit_issue requires exactly one slot');
   if (!['completed', 'running', 'recoverable', 'incomplete_capture', 'failed', 'cancelled', 'dry_run'].includes(input.browser_status)) invalid('browser_status is invalid');
-  if (input.verification !== 'verified' && input.verification !== 'unverified') invalid('verification is invalid');
+  let evidence: CampaignBrowserSessionEvidenceV1 | null;
+  try { evidence = input.browser_evidence === null ? null : validateCampaignBrowserSessionEvidence(input.browser_evidence); }
+  catch { return invalid('session browser evidence is invalid'); }
+  if (evidence !== null && (input.browser_status !== 'completed' || evidence.session_ref !== input.session_ref || evidence.source_session_ref !== input.source_session_ref)) invalid('session verification evidence binding differs');
   assertMessageTimestamp(input.created_at, 'created_at', invalid);
   const basis = {
-    protocol: 1 as const, kind: ISSUE_AUTHORING_SESSION_KIND,
+    protocol: 2 as const, kind: ISSUE_AUTHORING_SESSION_KIND,
     intent_sha256: digest(input.intent_sha256, 'intent_sha256'), operation: input.operation,
     requested_slots: requested, provider_issue_id: providerIssueId,
     session_ref: opaque(input.session_ref, 'session_ref'),
     source_session_ref: input.source_session_ref === null ? null : opaque(input.source_session_ref, 'source_session_ref'),
-    browser_status: input.browser_status, verification: input.verification, created_at: input.created_at,
+    browser_status: input.browser_status, verification: evidence === null ? 'unverified' : 'verified', browser_evidence: evidence, created_at: input.created_at,
   } as const;
   return Object.freeze({ ...basis, session_sha256: canonicalMessageDigest(basis) });
 }
 
-export function validateIssueAuthoringSession(value: unknown): IssueAuthoringSessionV1 {
+export function validateIssueAuthoringSession(value: unknown): IssueAuthoringSessionV2 {
   const input = record(value, 'issue authoring session');
-  assertMessageExactKeys(input, ['protocol', 'kind', 'intent_sha256', 'operation', 'requested_slots', 'provider_issue_id', 'session_ref', 'source_session_ref', 'browser_status', 'verification', 'created_at', 'session_sha256'], 'issue authoring session', invalid);
-  if (input.protocol !== 1 || input.kind !== ISSUE_AUTHORING_SESSION_KIND) invalid('issue authoring session protocol is unsupported');
-  const built = buildIssueAuthoringSession(input as unknown as Omit<IssueAuthoringSessionV1, 'protocol' | 'kind' | 'session_sha256'>);
-  if (input.session_sha256 !== built.session_sha256) invalid('issue authoring session digest is stale');
+  assertMessageExactKeys(input, ['protocol', 'kind', 'intent_sha256', 'operation', 'requested_slots', 'provider_issue_id', 'session_ref', 'source_session_ref', 'browser_status', 'verification', 'browser_evidence', 'created_at', 'session_sha256'], 'issue authoring session', invalid);
+  if (input.protocol !== 2 || input.kind !== ISSUE_AUTHORING_SESSION_KIND) invalid('issue authoring session protocol is unsupported');
+  const built = buildIssueAuthoringSession(input as unknown as Omit<IssueAuthoringSessionV2, 'protocol' | 'kind' | 'session_sha256'>);
+  if (input.session_sha256 !== built.session_sha256 || input.verification !== built.verification) invalid('issue authoring session digest or projection is stale');
   return built;
 }
 
@@ -209,9 +214,9 @@ export function declaredIssueBatchSlot(intent: IssueBatchIntentV1, body: string)
   return marker.slot as IssueBatchSlot;
 }
 
-export function requireVerifiedIssueAuthoringSession(session: IssueAuthoringSessionV1): void {
-  if (session.verification !== 'verified') throw new IssueBatchProtocolError('issue_authoring_session_unverified', 'issue authoring session is unverified and cannot be adopted');
+export function requireVerifiedIssueAuthoringSession(session: IssueAuthoringSessionV2): void {
+  if (validateIssueAuthoringSession(session).verification !== 'verified') throw new IssueBatchProtocolError('issue_authoring_session_unverified', 'issue authoring session is unverified and cannot be adopted');
 }
 
 export const canonicalIssueBatchIntentBytes = (value: IssueBatchIntentV1): string => canonicalMessageBytes(validateIssueBatchIntent(value) as unknown as Record<string, unknown>);
-export const canonicalIssueAuthoringSessionBytes = (value: IssueAuthoringSessionV1): string => canonicalMessageBytes(validateIssueAuthoringSession(value) as unknown as Record<string, unknown>);
+export const canonicalIssueAuthoringSessionBytes = (value: IssueAuthoringSessionV2): string => canonicalMessageBytes(validateIssueAuthoringSession(value) as unknown as Record<string, unknown>);

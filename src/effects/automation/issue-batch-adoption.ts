@@ -1,3 +1,4 @@
+import { readCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from '../../core/automation/campaign-browser-session';
 import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { observeShadowAdoption } from './issue-batch-shadow-adoption';
 import type { GithubCommandRunner } from '../external-sources/github';
@@ -6,7 +7,7 @@ import { createHash } from 'crypto';
 import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
 import { automationDigest } from '../../core/automation/budget';
 import { buildIssueBatchAdoption, IssueBatchAdoptionError, type IssueBatchAdoptionInput } from '../../core/automation/issue-batch-adoption';
-import { buildConnectorChallenge, renderConnectorChallenge, validateConnectorChallenge, verifyConnectorChallenge, type ConnectorChallengeV1 } from '../../core/automation/connector-challenge';
+import { buildConnectorChallenge, renderConnectorChallenge, validateConnectorChallenge, verifyConnectorChallenge, type ConnectorChallengeV2 } from '../../core/automation/connector-challenge';
 import { parseIssueBatchMetadata, reconcileIssueBatchSlots } from '../../core/automation/issue-batch-reconcile';
 import { requireVerifiedIssueAuthoringSession, type IssueBatchIntentV1 } from '../../core/automation/issue-batch';
 import { canonicalMessageBytes, canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
@@ -52,7 +53,7 @@ export interface IssueBatchAdoptionDependencies {
 function fail(message: string): never { throw new IssueBatchAdoptionError('issue_adoption_reconciliation_required', message); }
 function git(root: string, args: string[]): string { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
 function readAt(root: string, sha: string, path: string): string { return git(root, ['show', `${sha}:${path}`]); }
-function challengeAt(root: string, intent: IssueBatchIntentV1, session: string): ConnectorChallengeV1 {
+function challengeAt(root: string, intent: IssueBatchIntentV1, session: string, providerSession: string): ConnectorChallengeV2 {
   const entries = git(root, ['ls-tree', '-rz', '--full-tree', intent.base_main_sha]).split('\0').filter(Boolean).map(row => {
     const separator = row.indexOf('\t'); return { mode: row.slice(0, 6), path: row.slice(separator + 1) };
   }).filter(row => row.mode === '100644' && !row.path.startsWith('.') && row.path.includes('/')).sort((a, b) => a.path.localeCompare(b.path));
@@ -62,7 +63,7 @@ function challengeAt(root: string, intent: IssueBatchIntentV1, session: string):
   if (content.includes('\0') || !content.length) fail('challenge text target is not readable UTF-8 text');
   const directory = file.path.slice(0, file.path.lastIndexOf('/'));
   const listing = git(root, ['ls-tree', '-z', '--name-only', `${intent.base_main_sha}:${directory}`]).split('\0').filter(Boolean).sort().join('\n');
-  return buildConnectorChallenge({ intent_sha256: intent.intent_sha256, base_main_sha: intent.base_main_sha, source_session_ref: session, targets: [
+  return buildConnectorChallenge({ intent_sha256: intent.intent_sha256, base_main_sha: intent.base_main_sha, source_session_ref: session, source_provider_session_ref: providerSession, targets: [
     { kind: 'directory_entries', path: directory, line: null, expected: listing },
     { kind: 'text_line', path: file.path, line: 1, expected: content.split('\n')[0]! },
     { kind: 'file_sha256', path: file.path, line: null, expected: createHash('sha256').update(content).digest('hex') },
@@ -110,7 +111,7 @@ function publicationPolicyAt(root: string, intent: IssueBatchIntentV1, path: str
   return policy as CampaignPublicationPolicy;
 }
 
-interface ResponseEvidence { readonly response: string; readonly response_session_ref: string; readonly model_verified: boolean; readonly status: IssueAuthoringBrowserResult['status']; readonly reservation: Parameters<typeof appendAutomationUsage>[0]['reservation'] }
+interface ResponseEvidence { readonly response: string; readonly response_session_ref: string; readonly response_session_evidence: CampaignBrowserSessionEvidenceV1 | null; readonly status: IssueAuthoringBrowserResult['status']; readonly reservation: Parameters<typeof appendAutomationUsage>[0]['reservation'] }
 
 interface AdoptionObservationEvidence {
   readonly admission_sha256: string;
@@ -221,7 +222,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   if (!session || session.browser_status !== 'completed') fail('completed initial authoring session is required');
   requireVerifiedIssueAuthoringSession(session);
   const storedChallenge = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'challenge');
-  const challenge = storedChallenge ? validateConnectorChallenge(storedChallenge as unknown as ConnectorChallengeV1) : challengeAt(input.repo_root, intent, session.session_ref);
+  const challenge = storedChallenge ? validateConnectorChallenge(storedChallenge as unknown as ConnectorChallengeV2) : challengeAt(input.repo_root, intent, session.session_ref, session.browser_evidence!.provider_session_ref);
   if (challenge.source_session_ref !== session.session_ref) fail('challenge session differs from source session');
   persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'challenge', { ...challenge });
   const browser = deps.readBinding(input.repo_root);
@@ -232,7 +233,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
     if (admission.disposition === 'replayed') fail('challenge reservation already exists; reconcile its exact result before continuing');
     const result = await deps.followup({ repoRoot: input.repo_root, sessionId: session.session_ref, title: `Campaign ${intent.campaign_id} readback`, prompt: renderConnectorChallenge(challenge, intent.provider_repository),
       provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
-    response = { response: result.output ?? '', response_session_ref: result.sessionId, model_verified: result.meta.model.verified === true, status: result.status, reservation: admission.reservation };
+    response = { response: result.output ?? '', response_session_ref: result.sessionId, response_session_evidence: readCampaignBrowserSessionEvidence(result, { repoRoot: input.repo_root, profileDir: browser.binding.profileDir, profileDirectory: intent.chrome_profile_directory, sourceSessionId: session.session_ref, parentProviderSessionId: session.browser_evidence!.provider_session_ref }), status: result.status, reservation: admission.reservation };
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'response', { ...response });
   }
   const completed = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'completed-response') as unknown as ResponseEvidence | null;
@@ -246,12 +247,12 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
       catch { return fail('challenge response is still unresolved; reservation remains open'); }
       if (recovered.meta.status !== 'completed' || recovered.meta.sessionId !== response.response_session_ref || recovered.meta.sourceSessionId !== session.session_ref
         || recovered.meta.repo !== input.repo_root || recovered.meta.browser.profileDirectory !== intent.chrome_profile_directory) fail('challenge response is still unresolved or its session binding differs');
-      response = { ...response, status: 'completed', response: recovered.output, model_verified: recovered.meta.model.verified };
+      response = { ...response, status: 'completed', response: recovered.output, response_session_evidence: readCampaignBrowserSessionEvidence({ sessionId: recovered.meta.sessionId, status: recovered.meta.status, meta: recovered.meta }, { repoRoot: input.repo_root, profileDir: browser.binding.profileDir, profileDirectory: intent.chrome_profile_directory, sourceSessionId: session.session_ref, parentProviderSessionId: session.browser_evidence!.provider_session_ref }) };
     }
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'completed-response', { ...response });
   }
   appendAutomationUsage({ repo_root: input.repo_root, reservation: response.reservation, env: input.env, outcome: 'progress', evidence_refs: [{ ref: `provider-run:${response.response_session_ref}`, sha256: automationDigest(response) }] });
-  verifyConnectorChallenge({ challenge, response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified });
+  verifyConnectorChallenge({ challenge, response: response.response, response_session_ref: response.response_session_ref, response_session_evidence: response.response_session_evidence });
   requireIssueBatchAuthority({ repo_root: input.repo_root, intent, env: input.env, now: now() });
   const prior = priorReconciliation(input.repo_root, intent);
   if (mode === 'shadow') {
@@ -270,7 +271,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
     const adoptionInput: IssueBatchAdoptionInput = { intent, session, snapshot: { snapshot_receipt: observed.finalSnapshot.receipt,
       observations: observed.finalSnapshot.observations, prior_observations: observed.snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots },
       capability_ids: capabilities, authorization_sha256: authorization.authorization_sha256, terminal: observed.terminal, challenge,
-      challenge_response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified };
+      challenge_response: response.response, response_session_ref: response.response_session_ref, response_session_evidence: response.response_session_evidence };
     const adopted = buildIssueBatchAdoption(adoptionInput);
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy, shadow_budget_artifact: observed.artifact });
     return { ...adopted, publication: null };
@@ -293,7 +294,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   if (JSON.stringify(finalSnapshot.observations.map(o => o.source_revision).sort()) !== JSON.stringify(sealSources.source_revisions)) fail('provider sources changed after authoring seal');
   const readonlyContinuation = verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal });
   const adoptionInput: IssueBatchAdoptionInput = { intent, session, snapshot: { snapshot_receipt: finalSnapshot.receipt, observations: finalSnapshot.observations, prior_observations: snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots }, capability_ids: capabilities,
-    authorization_sha256: authorization.authorization_sha256, terminal, challenge, challenge_response: response.response, response_session_ref: response.response_session_ref, model_verified: response.model_verified };
+    authorization_sha256: authorization.authorization_sha256, terminal, challenge, challenge_response: response.response, response_session_ref: response.response_session_ref, response_session_evidence: response.response_session_evidence };
   const adopted = buildIssueBatchAdoption(adoptionInput);
   persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy,
     readonly_continuation: readonlyContinuation });

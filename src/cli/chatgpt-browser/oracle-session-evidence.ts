@@ -6,6 +6,7 @@ export interface OracleSessionEvidence {
   observation?: {
     source: 'oracle-session-metadata';
     sessionId: string;
+    parentSessionId: string | null;
     modelSelection?: unknown;
     appSelection?: unknown;
     thinkingSelection?: unknown;
@@ -36,7 +37,7 @@ export function readOracleSessionEvidence(path: string, oracleHome: string, pare
     return {
       providerSessionId: handle.sessionId,
       observation: {
-        source: 'oracle-session-metadata', sessionId: handle.sessionId,
+        source: 'oracle-session-metadata', sessionId: handle.sessionId, parentSessionId: handle.parentSessionId as string | null,
         modelSelection: observation.modelSelection,
         appSelection: observation.appSelection,
         thinkingSelection: observation.thinkingSelection,

@@ -14,7 +14,7 @@ describe('BRC6 adoption authority', () => {
   test('rejects stale terminal, model status and cross-session challenge', () => {
     const f = makeAdoptionInput();
     expect(() => buildIssueBatchAdoption({ ...f, authorization_sha256: 'f'.repeat(64) })).toThrow('terminal');
-    expect(() => buildIssueBatchAdoption({ ...f, model_verified: false })).toThrow();
+    expect(() => buildIssueBatchAdoption({ ...f, response_session_evidence: null })).toThrow();
     expect(() => buildIssueBatchAdoption({ ...f, challenge: { ...f.challenge, source_session_ref: 'other' } })).toThrow('challenge source');
   });
   test.each(['unsupported-kind', 'unknown-capability', 'cycle', 'missing-dependency', 'incomplete-snapshot'])('rejects %s', kind => {

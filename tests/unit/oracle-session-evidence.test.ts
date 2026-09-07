@@ -30,3 +30,9 @@ test('rejects wrong-session metadata and missing descriptor', () => {
   expect(readOracleSessionEvidence(f.path, f.root).evidenceError).toContain('mismatch');
   expect(readOracleSessionEvidence(join(f.root, 'missing'), f.root).providerSessionId).toBeUndefined();
 });
+
+test('projects the exact descriptor parent for a followup', () => {
+  const f = fixture({ parentSessionId: 'source-provider' });
+  expect(readOracleSessionEvidence(f.path, f.root, 'source-provider').observation?.parentSessionId).toBe('source-provider');
+  expect(readOracleSessionEvidence(f.path, f.root, 'foreign-provider').providerSessionId).toBeUndefined();
+});

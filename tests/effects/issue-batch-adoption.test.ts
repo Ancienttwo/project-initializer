@@ -1,3 +1,4 @@
+import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
 import { createAdoptionRepository } from '../helpers/campaign-adoption-repository';
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
 import { afterEach, describe, expect, test } from 'bun:test';
@@ -123,7 +124,7 @@ test('recoverable challenge reads its exact completed session without another ad
   await expect(adoptIssueBatch(f.input, deps)).rejects.toThrow('unresolved');
   const challenge = readIssueBatchAdoptionArtifact(f.root, f.intent, 'challenge')!;
   const response = JSON.stringify({ base_main_sha: f.intent.base_main_sha, answers: (challenge.targets as { expected: string }[]).map(t => t.expected) });
-  const result = await adoptIssueBatch(f.input, { ...deps, readSession: () => ({ output: response, meta: { repo: f.root, sessionId: 'recoverable', sourceSessionId: 'initial', status: 'completed', model: { verified: true }, browser: { profileDirectory: 'Profile 1' } } }) });
+  const result = await adoptIssueBatch(f.input, { ...deps, readSession: () => ({ output: response, meta: campaignBrowserMetadata({ repoRoot: f.root, sessionId: 'recoverable', sourceSessionId: 'initial', profileDir: f.home, profileDirectory: 'Profile 1' }) }) });
   expect(result.receipt.connector_evidence).toBe('challenge_verified'); expect(calls).toBe(1);
 });
 

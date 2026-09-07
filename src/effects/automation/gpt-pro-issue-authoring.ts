@@ -1,3 +1,4 @@
+import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
 import { resolveCampaignGroupBaseline } from './campaign-fresh-audit';
 import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
 import { issueBatchMetadataAuthoringSchema } from '../../core/automation/issue-batch-reconcile';
@@ -12,7 +13,7 @@ import {
   buildIssueBatchIntent,
   renderIssueBatchMarker,
   type IssueAuthoringOperation,
-  type IssueAuthoringSessionV1,
+  type IssueAuthoringSessionV2,
   type IssueBatchIntentV1,
   type IssueBatchSlot,
 } from '../../core/automation/issue-batch';
@@ -43,7 +44,7 @@ export interface IssueAuthoringBrowserInput {
 
 export interface IssueAuthoringBrowserResult {
   readonly sessionId: string;
-  readonly status: IssueAuthoringSessionV1['browser_status'];
+  readonly status: IssueAuthoringSessionV2['browser_status'];
   readonly meta: { readonly model: { readonly verified?: boolean } };
 }
 
@@ -147,11 +148,13 @@ function browserInput(repoRoot: string, prompt: string, profileDir: string, prof
   };
 }
 
-function persistSession(repoRoot: string, intent: IssueBatchIntentV1, operation: IssueAuthoringOperation, requestedSlots: readonly IssueBatchSlot[], providerIssueId: string | null, sourceSessionRef: string | null, result: IssueAuthoringBrowserResult, createdAt: string): IssueAuthoringSessionV1 {
+function persistSession(repoRoot: string, intent: IssueBatchIntentV1, operation: IssueAuthoringOperation, requestedSlots: readonly IssueBatchSlot[], providerIssueId: string | null, sourceSessionRef: string | null, result: IssueAuthoringBrowserResult, createdAt: string, profileDir: string): IssueAuthoringSessionV2 {
+  const parent = sourceSessionRef === null ? null : assertIssueAuthoringSourceSession(repoRoot, intent.campaign_id, intent.group_number, intent.intent_sha256, sourceSessionRef).browser_evidence;
+  const evidence = readCampaignBrowserSessionEvidence(result, { repoRoot, profileDir, profileDirectory: intent.chrome_profile_directory, sourceSessionId: sourceSessionRef, parentProviderSessionId: parent?.provider_session_ref ?? null });
   return persistIssueAuthoringSession(repoRoot, intent.campaign_id, intent.group_number, buildIssueAuthoringSession({
     intent_sha256: intent.intent_sha256, operation, requested_slots: requestedSlots, provider_issue_id: providerIssueId,
     session_ref: result.sessionId, source_session_ref: sourceSessionRef, browser_status: result.status,
-    verification: result.meta.model.verified === true ? 'verified' : 'unverified', created_at: createdAt,
+    browser_evidence: evidence, created_at: createdAt,
   }));
 }
 
@@ -163,7 +166,7 @@ function prepareBudgetedAuthoring<Result extends IssueAuthoringBrowserResult>(
   prompt: string,
   sourceSessionRef: string | null,
   invoke: () => Promise<Result>,
-  persist: (result: Result) => IssueAuthoringSessionV1,
+  persist: (result: Result) => IssueAuthoringSessionV2,
 ) {
   const admission = input.dry_run === true ? null : (() => {
     const status = ensureCampaignAuthoringBudget({ repo_root: input.repo_root, authorization, env: input.env });
@@ -218,7 +221,7 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
   persistIssueBatchIntent(value.repoRoot, intent);
   return prepareBudgetedAuthoring(input, value.authorization, intent, 'initial', prompt, null,
     () => deps.consult(browserInput(value.repoRoot, prompt, value.binding.profileDir, value.binding.profileDirectory!, input)),
-    (result) => persistSession(value.repoRoot, intent, 'initial', slots, null, null, result, createdAt),
+    (result) => persistSession(value.repoRoot, intent, 'initial', slots, null, null, result, createdAt, value.binding.profileDir),
   ).execute();
 }
 
@@ -240,7 +243,7 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
       ...browserInput(value.repoRoot, prompt, value.binding.profileDir, value.binding.profileDirectory!, input),
       sessionId: input.source_session_ref,
     }),
-    (result) => persistSession(value.repoRoot, intent, input.operation, requested, providerIssueId, input.source_session_ref, result, (deps.now ?? (() => new Date().toISOString()))()),
+    (result) => persistSession(value.repoRoot, intent, input.operation, requested, providerIssueId, input.source_session_ref, result, (deps.now ?? (() => new Date().toISOString()))(), value.binding.profileDir),
   );
 }
 

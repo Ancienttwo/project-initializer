@@ -1,3 +1,4 @@
+import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { execFileSync } from 'child_process';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'fs';
@@ -62,11 +63,11 @@ function runCampaignStep(input: Parameters<typeof runCampaignStepEffect>[0], dep
 const hex = (seed: string): string => new Bun.CryptoHasher('sha256').update(seed).digest('hex');
 const limits: ProgramBudgetLimitV1 = { max_agent_turns: 10, max_successful_acquisitions: 2, max_runner_invocations: 10, max_provider_failures: 2, max_consecutive_no_progress_steps: 2, max_repair_cycles: 2, max_wall_clock_seconds: 3600, max_input_tokens: null, max_output_tokens: null, max_cost_micros: null };
 
-function browserResult(input: BrowserConsultInput, sessionId: string, status: BrowserConsultResult['status'], verified = true): BrowserConsultResult {
+function browserResult(input: BrowserConsultInput & { sessionId?: string }, sessionId: string, status: BrowserConsultResult['status'], verified = true): BrowserConsultResult {
   return {
     sessionId, status,
     paths: { sessionDir: sessionId, prompt: 'prompt.md', transcript: 'transcript.md', output: 'output.md', events: 'events.jsonl', artifactsDir: 'artifacts' },
-    meta: { version: 1, sessionId, engine: 'chatgpt-browser', provider: 'oracle', status, repo: input.repoRoot, createdAt: at, updatedAt: at, model: { requested: input.model, verified }, browser: { mode: 'manual-login', transport: 'copy_profile', chatgptUrl: 'https://chatgpt.com/', profileDir: input.profileDir, profileDirectory: input.profileDirectory }, input: { promptPath: 'prompt.md', files: [], followups: 0 }, output: { outputPath: 'output.md', transcriptPath: 'transcript.md', artifactsDir: 'artifacts', artifacts: [] }, diagnostics: { dryRun: false, reattachable: true, lastCaptureAt: at } },
+    meta: { ...(verified ? campaignBrowserMetadata({ sessionId, repoRoot: input.repoRoot, profileDir: input.profileDir!, profileDirectory: input.profileDirectory!, sourceSessionId: input.sessionId, status }) : {}), version: 1, sessionId, engine: 'chatgpt-browser', provider: 'oracle', status, repo: input.repoRoot, createdAt: at, updatedAt: at, model: { requested: input.model, verified: false }, browser: { ...(verified ? { chatgptApp: 'GitHub' } : {}), mode: 'manual-login', transport: 'copy_profile', chatgptUrl: 'https://chatgpt.com/', profileDir: input.profileDir, profileDirectory: input.profileDirectory }, input: { promptPath: 'prompt.md', files: [], followups: 0 }, output: { outputPath: 'output.md', transcriptPath: 'transcript.md', artifactsDir: 'artifacts', artifacts: [] }, diagnostics: { dryRun: false, reattachable: true, lastCaptureAt: at } },
   };
 }
 
@@ -366,7 +367,7 @@ describe('durable campaign heartbeat step', () => {
     const f = await fixture();
     const before = snapshot(f.intent, [{ id: '201', number: 1, slot: '01', valid: false }]);
     before.observations.forEach((entry) => writeProviderIssueObservation(f.root, entry));
-    await runCampaignStep(input(f, 'repair-baseline-edit'), { ...browserDependencies, now: () => new Date(later), observe: () => before, followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => browserResult(browserInput, 'session-edit-unverified', 'completed', false) });
+    await runCampaignStep(input(f, 'repair-baseline-edit'), { ...browserDependencies, now: () => new Date(later), observe: () => before, followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => browserResult(browserInput, 'session-edit', 'completed') });
     const repairedInvalid = snapshot(f.intent, [{ id: '201', number: 1, slot: '01', body_override: `${renderIssueBatchMarker(f.intent.campaign_id, 1, '01')}\nstill invalid` }], '2026-09-05T00:11:00.000Z');
     repairedInvalid.observations.forEach((entry) => writeProviderIssueObservation(f.root, entry));
     const baseline = await runCampaignStep(input(f, 'repair-baseline-observe'), { ...browserDependencies, now: () => new Date('2026-09-05T00:11:00.000Z'), observe: () => repairedInvalid, followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => browserResult(browserInput, 'session-fill-after-repair', 'completed') });

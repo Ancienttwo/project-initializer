@@ -1,3 +1,4 @@
+import { campaignBrowserMetadata } from './campaign-browser-session';
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
@@ -38,7 +39,7 @@ export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'acti
   const created = createDevelopmentCampaign({ repo_root: root, campaign, idempotency_key: 'start', env });
   appendDevelopmentCampaignEvent({ repo_root: root, campaign_id: campaign.campaign_id, expected_current_sha256: created.current.current_sha256, idempotency_key: 'prepare', operation: 'prepare_group', observed_at: AT, env });
   const readBinding = () => ({ path: 'binding', binding: { profileDir: home, profileDirectory: 'Profile 1' } });
-  const started = await startIssueBatchAuthoring({ repo_root: root, campaign_id: campaign.campaign_id, group_number: 1, env }, { readBinding, now: () => AT, consult: async () => ({ sessionId: 'initial', status: 'completed', meta: { model: { verified: true } } }) });
+  const started = await startIssueBatchAuthoring({ repo_root: root, campaign_id: campaign.campaign_id, group_number: 1, env }, { readBinding, now: () => AT, consult: async () => ({ sessionId: 'initial', status: 'completed', meta: campaignBrowserMetadata({ sessionId: 'initial', repoRoot: root, profileDir: home, profileDirectory: 'Profile 1' }) }) });
   const input = { repo_root: root, campaign_id: campaign.campaign_id, group_number: 1, intent_sha256: started.intent.intent_sha256, sprint_path: SPRINT, publication_policy_path: 'plans/policies/publication.json', env };
   let calls = 0;
   const deps: IssueBatchAdoptionDependencies = { readBinding, readSession: () => { throw new Error('unresolved'); }, now: () => new Date(AT), observe: () => makeSnapshot(started.intent, undefined, { primary_capability: capability, ...metadata }), followup: async request => {
@@ -48,7 +49,7 @@ export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'acti
       ? git(root, ['ls-tree', '--name-only', `${revision}:${t.path}`]).split('\n').sort().join('\n')
       : t.kind === 'text_line' ? git(root, ['show', `${revision}:${t.path}`]).split('\n')[t.line - 1]
       : createHash('sha256').update(execFileSync('git', ['show', `${revision}:${t.path}`], { cwd: root })).digest('hex'));
-    return { sessionId: 'challenge', status: 'completed', output: JSON.stringify({ base_main_sha: revision, answers }), meta: { model: { verified: true } } };
+    return { sessionId: 'challenge', status: 'completed', output: JSON.stringify({ base_main_sha: revision, answers }), meta: campaignBrowserMetadata({ sessionId: 'challenge', sourceSessionId: 'initial', repoRoot: root, profileDir: home, profileDirectory: 'Profile 1' }) };
   } };
   return { root, home, env, intent: started.intent, authorization, input, deps, calls: () => calls };
 }

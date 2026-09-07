@@ -14,6 +14,7 @@ responsibilities:
   - Serialize mutation across processes and treat identical replay as idempotent while rejecting conflicting replay.
   - Persist an exact repository/ref/base-SHA IssueBatchIntent before every initial GPT Pro browser call, then keep fill and edit follow-ups bound to that immutable intent and session lineage.
   - Keep Issue creation and body edits inside the secret-scanned GPT Pro browser lane; local code may only observe provider state and must never infer success from browser completion or timeout.
+  - Bind default-model authoring and readback to completed Oracle descriptor, exact profile and GitHub app evidence; keep model identity and revision proof independent.
   - Reconcile complete provider snapshots against exact body markers and strict metadata; unavailable, incomplete, ambiguous and drifted sources fail closed.
   - Reserve every heartbeat mutation durably before invocation and separate orphan reason comments from not_planned closure across steps.
   - Validate exact-SHA readback and consume the existing budget terminal before projecting adopted slots into canonical Sprint and WorkGraph schemas.
@@ -22,6 +23,7 @@ responsibilities:
   - Keep Task, Lease, Claim, Work Graph, semantic acceptance and delivery publication authority in their existing capabilities.
 source:
   include:
+    - "src/core/automation/campaign-browser-session.ts"
     - "src/core/automation/campaign-fresh-audit.ts"
     - "src/effects/automation/campaign-fresh-audit.ts"
     - "src/core/automation/campaign-closeout.ts"
