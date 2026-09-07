@@ -362,6 +362,23 @@ predict_archive_manifest() {
     }
     git -C "$scratch_repo" update-ref "refs/heads/$target_branch" "refs/remotes/origin/$target_branch"
   fi
+  if [[ "$outcome" == "Completed" && "$evidence_mode" == "current" ]]; then
+    local review_base review_ref review_oid
+    review_base="$("$REPO_HARNESS_BUN_BIN" -e '
+      const policy = JSON.parse(await Bun.file(".ai/harness/policy.json").text());
+      const value = policy?.worktree_strategy?.review_base;
+      if (typeof value !== "string" || !value.trim()) process.exit(2);
+      process.stdout.write(value);
+    ')" || { rm -rf "$scratch"; return 1; }
+    review_oid="$(git rev-parse --verify "$review_base^{commit}")" || { rm -rf "$scratch"; return 1; }
+    review_ref="$(git rev-parse --symbolic-full-name "$review_base")" || { rm -rf "$scratch"; return 1; }
+    # A local clone maps source heads to origin refs; it does not preserve the
+    # source's remote-tracking target used by its exact acceptance receipt.
+    git -C "$scratch_repo" fetch --quiet --no-tags "$source_repo" "$review_oid" || { rm -rf "$scratch"; return 1; }
+    if [[ -n "$review_ref" ]]; then
+      git -C "$scratch_repo" update-ref "$review_ref" "$review_oid" || { rm -rf "$scratch"; return 1; }
+    fi
+  fi
   if [[ -d .ai/harness/checks ]]; then
     mkdir -p "$scratch_repo/.ai/harness/checks"
     cp -Rp .ai/harness/checks/. "$scratch_repo/.ai/harness/checks/"

@@ -28,7 +28,7 @@ import { buildLeaseLivenessPolicy } from '../../src/core/state/lease-liveness';
 
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-export async function readyFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true) {
+export async function readyFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number } = {}, nonReproducible = false) {
   const capability = 'capability.runtime-harness.fixture';
   const inventory = readFileSync(join(import.meta.dir, '../fixtures/repair-campaign/protected-capabilities.json'), 'utf8');
   const otherCapability = 'capability.runtime-harness.second';
@@ -38,7 +38,7 @@ export async function readyFixture(twoEngineers = false, requiredReview = false,
     files['src/second/index.ts'] = 'export {};';
     files['.archcontext/model/nodes/second.yaml'] = JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: otherCapability, kind: 'capability', name: 'Second', status: 'active', summary: 'Second fixture capability', responsibilities: ['Own second fixture'], source: { include: ['src/second/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } });
   }
-  const f = await createAdoptionRepository('active', 1, capability, {}, files, { max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
+  const f = await createAdoptionRepository('active', 1, capability, {}, files, { ...budgetLimits, max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
     ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) });
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {
@@ -90,6 +90,11 @@ export async function readyFixture(twoEngineers = false, requiredReview = false,
     const step = runCampaignPlanningStep({ ...input, idempotency_key: `plan-${index}` }, deps);
     if (!('job' in step) || !step.job) throw new Error(JSON.stringify(step));
     const job = step.job;
+    if (nonReproducible) {
+      expect(runCampaignPlanningStep({ ...input, idempotency_key: `reject-${index}`, result: { job_sha256: job.job_sha256,
+        outcome: 'not_reproducible', explanation: 'Local observation contradicts the Issue claim.', surfaces: null, characterization: null } }, deps)).toMatchObject({ outcome: 'not_reproducible' });
+      continue;
+    }
     const plan = `plans/plan-repair-${index}.md`; const contract = `tasks/contracts/repair-${index}.contract.md`;
     const source = twoEngineers && index === 1 ? 'src/second/index.ts' : 'src/index.ts';
     const guard = `tests/guard-${index}.test.ts`; const evidence = `tasks/evidence/pre-${index}.txt`;
@@ -98,6 +103,6 @@ export async function readyFixture(twoEngineers = false, requiredReview = false,
     writeFileSync(join(f.root, contract), `# Contract\n> **Plan**: ${plan}\n> **Task Profile**: bugfix\n${requiredReview ? "> **Review File**: tasks/reviews/required-review.md\n" : ""}\n## Goal\nRepair the observed empty-input behavior.\n\n## Why\nMissing validation lets the defect recur.\n\n## Scope\n- In scope: local empty-input guard.\n- Out of scope: other behavior.\n\n## Allowed Paths\n\n\`\`\`yaml\nallowed_paths:\n  - ${source}\n  - ${guard}\n\`\`\`\n\n## Root Cause Evidence\n- root_cause: src/index.ts:1 accepts empty input.\n- repro: bun test ${guard}\n- regression_guard: ${guard}\n- pre_fix_failure_artifact: ${evidence}\n\n## Exit Criteria\n\`\`\`yaml\nexit_criteria:\n  files_exist:\n    - ${guard}\n\`\`\`\n\n## Verification Plan\n\`\`\`json\n{"protocol":1,"checks":[{"id":"guard-${index}","kind":"package_test","path":"${guard}","cwd":".","phase":"verification","cost":"normal","evidence_policy":"current_exact","necessity":"Covers the root cause guard.","inputs":{"env":[]}}]}\n\`\`\`\n`);
     expect(runCampaignPlanningStep({ ...input, idempotency_key: `admit-${index}`, result: { job_sha256: job.job_sha256, outcome: 'plan_ready', explanation: 'The local evidence justifies a bounded repair.', surfaces: { paths: [source, guard], cli_commands: [], mcp_tools: [], public_exports: [], protocol_kinds: [], capability_nodes: [] }, characterization: null } }, deps)).toMatchObject({ outcome: 'plan_ready' });
   }
-  git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'ready plans']);
+  if (!nonReproducible) { git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'ready plans']); }
   return { ...f, executeInput: input, secondAuthorization };
 }

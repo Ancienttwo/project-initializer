@@ -610,7 +610,7 @@ describe('claim verbs', () => {
     return {
       ...live,
       newClaimId: () => queue.shift() ?? randomUUID(),
-      coordination: { ...live.coordination, appendResumedReceipt },
+      coordination: { ...live.coordination, appendResumedReceipt, assertWorktreeBinding: () => {} },
     };
   }
 

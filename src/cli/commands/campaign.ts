@@ -1,3 +1,5 @@
+import { runCampaignNotPlanned } from '../../effects/automation/campaign-not-planned';
+import { runCampaignCloseout } from '../../effects/automation/campaign-closeout';
 import { Command } from 'commander';
 import { AutomationBudgetStoreError } from '../../effects/automation/budget-store';
 import { adoptIssueBatch } from '../../effects/automation/issue-batch-adoption';
@@ -179,6 +181,48 @@ export async function runCampaignAdopt(raw: { readonly repo?: string; readonly c
 
 export function buildCampaignCommand(): Command {
   const command = new Command('campaign').description('Operate the authorized development campaign state machine');
+  command.command('close-not-planned')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--artifact <path>', 'Committed typed not_planned decision')
+    .requiredOption('--contract <path>', 'Acceptance contract covering decision and falsifier')
+    .requiredOption('--host <host>', 'Authorized local parent host')
+    .requiredOption('--session-id <id>', 'Authorized local parent session')
+    .action(raw => {
+      try {
+        if (raw.host !== 'codex' && raw.host !== 'claude') throw new CampaignArgumentError('--host must be codex or claude');
+        output(runCampaignNotPlanned({ root: resolve(raw.repo), artifact_path: required(raw.artifact, '--artifact'), contract_path: required(raw.contract, '--contract'),
+          host: raw.host, session_id: required(raw.sessionId, '--session-id'), verify_acceptance: (root, contract) => {
+            const result = runHelper({ helper: 'acceptance-receipt', args: ['verify', '--contract', contract, '--format', 'json'],
+              cwd: root, trustedPackage: true, stdio: 'pipe' });
+            if (result.exitCode !== 0) throw new Error(result.stderr || 'not_planned local acceptance verification failed');
+            return JSON.parse(result.stdout ?? '');
+          } }));
+      } catch (error) { outputError(error); }
+    });
+  command.command('closeout')
+    .requiredOption('--request <path>', 'Stored Campaign worker selector JSON')
+    .requiredOption('--host <host>', 'Authorized local parent host')
+    .requiredOption('--session-id <id>', 'Authorized local parent session')
+    .option('--remote <name>', 'Publication remote', 'origin')
+    .action(raw => {
+      try {
+        if (raw.host !== 'codex' && raw.host !== 'claude') throw new CampaignArgumentError('--host must be codex or claude');
+        const result = runCampaignCloseout({ selector: requestJson(raw.request), host: raw.host, session_id: required(raw.sessionId, '--session-id'),
+          remote: required(raw.remote, '--remote'), cleanup: (root, expected) => {
+            const result = runHelper({ helper: 'contract-worktree', cwd: root, trustedPackage: true, stdio: 'pipe', args: ['cleanup',
+              '--slug', expected.branch, '--target', expected.target_ref, '--expected-worktree', expected.worktree,
+              '--expected-head', expected.head_sha, '--expected-target', expected.target_oid, '--expected-merge', expected.merge_commit_sha] });
+            if (result.exitCode !== 0) throw new Error(result.stderr || 'exact cleanup actuator failed');
+            const receipt = JSON.parse((result.stdout ?? '').trim().split('\n').at(-1)!);
+            if (receipt.kind !== 'repo-harness-exact-local-cleanup' || receipt.worktree !== expected.worktree || receipt.branch !== expected.branch
+              || receipt.head_sha !== expected.head_sha || receipt.target_oid !== expected.target_oid || receipt.merge_commit_sha !== expected.merge_commit_sha
+              || receipt.worktree_removed !== true || receipt.branch_deleted !== true) throw new Error('exact cleanup actuator receipt differs');
+            return receipt;
+          } });
+        output(result);
+        if (result.disposition !== 'complete') process.exitCode = 1;
+      } catch (error) { outputError(error); }
+    });
   command.command('start')
     .option('--repo <path>', 'Repository root', '.')
     .requiredOption('--authorization-sha256 <digest>', 'Stored ProgramAuthorizationV1 digest')
