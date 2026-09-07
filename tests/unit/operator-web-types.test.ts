@@ -21,7 +21,7 @@ const snapshotDigest = `sha256:${'c'.repeat(64)}`;
 
 function validFleetPayload(): Record<string, unknown> {
   return {
-    protocol: 3,
+    protocol: 4,
     kind: 'operator_fleet_snapshot',
     registry_revision: `sha256:${'d'.repeat(64)}`,
     sequence: 1,
@@ -55,7 +55,7 @@ function validFleetPayload(): Record<string, unknown> {
           delivery_state: 'pending',
           runtime_reachability: 'unknown',
           effect_sha256: null,
-          failure_class: null,
+          delivery_evidence: { candidate_count: 0, latest: null }, failure_class: null,
         },
         snapshot_consistency: 'stable',
         error: null,
@@ -284,5 +284,38 @@ describe('operator browser payload contracts', () => {
     expect(isOperatorMessageKey('error.not_a_real_operator_code.message')).toBe(false);
     expect(translate('en', 'error.untranslated').length).toBeGreaterThan(0);
     expect(translate('zh', 'error.untranslated')).not.toBe(translate('en', 'error.untranslated'));
+  });
+});
+
+
+describe('notification delivery evidence protocol', () => {
+  const latest = { adapter_kind: 'tmux-cli-agent', effect_state: 'stopped', receipt_kind: null,
+    observed_at: '2026-09-07T00:00:00.000Z', observation_sequence: 2, observation_sha256: `sha256:${'e'.repeat(64)}` } as const;
+  function payload(evidence: unknown) {
+    const value = validFleetPayload();
+    const card = (value.repositories as { cards: Record<string, unknown>[] }[])[0]!.cards[0]!;
+    (card.inbox as Record<string, unknown>).delivery_evidence = evidence;
+    return { value, card };
+  }
+  test('accepts exact single, zero, multiple and failed observations', () => {
+    for (const evidence of [{ candidate_count: 0, latest: null }, { candidate_count: 2, latest: null }, { candidate_count: 1, latest }]) {
+      const { value } = payload(evidence);
+      expect(decodeOperatorFleetSnapshot(value).repositories[0]!.cards[0]!.inbox.delivery_evidence).toEqual(evidence);
+    }
+    const { value, card } = payload(null);
+    card.error = { code: 'repo_runtime_effect_unreadable', message: 'unavailable' };
+    card.column = null;
+    expect(decodeOperatorFleetSnapshot(value).repositories[0]!.cards[0]!.inbox.delivery_evidence).toBeNull();
+  });
+  test('rejects old protocol and missing, inconsistent or malformed evidence', () => {
+    const invalid = [undefined, null, { candidate_count: -1, latest: null }, { candidate_count: 1, latest: null }, { candidate_count: 2, latest },
+      ...[{ adapter_kind: 'claude' }, { effect_state: 'working' }, { receipt_kind: 'ack' }, { observed_at: 'yesterday' }, { observed_at: '2026-09-07' }, { observation_sequence: -1 }, { observation_sha256: 'opaque' }].map(delta => ({ candidate_count: 1, latest: { ...latest, ...delta } }))];
+    for (const evidence of invalid) expect(() => decodeOperatorFleetSnapshot(payload(evidence).value)).toThrow(OperatorPayloadError);
+    const old = payload({ candidate_count: 0, latest: null }).value;
+    old.protocol = 3;
+    expect(() => decodeOperatorFleetSnapshot(old)).toThrow(OperatorPayloadError);
+    const failed = payload({ candidate_count: 0, latest: null });
+    failed.card.error = { code: 'repo_runtime_effect_unreadable', message: 'unavailable' };
+    expect(() => decodeOperatorFleetSnapshot(failed.value)).toThrow(OperatorPayloadError);
   });
 });

@@ -1,3 +1,4 @@
+import type { FleetBoardDeliveryEvidenceV1 } from '../../core/fleet/board';
 import { createHash, randomUUID } from 'crypto';
 import {
   closeSync, constants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync,
@@ -392,6 +393,7 @@ export const observeAgentRuntimeEffects = listAgentRuntimeEffects;
 export function agentRuntimeCapabilityStatusFor(repoRoot: string, hostId: string, adapter: AgentRuntimeAdapterKind) { return Object.freeze({ capability: readAgentRuntimeCapability(repoRoot, hostId, adapter) }); }
 
 export interface TaskAgentRuntimeProjectionV1 {
+  readonly delivery_evidence: FleetBoardDeliveryEvidenceV1;
   readonly delivery_state: RuntimeDeliveryState;
   readonly runtime_reachability: RuntimeReachability;
   readonly effect_sha256: string | null;
@@ -405,16 +407,33 @@ export function projectTaskAgentRuntimeState(input: {
   readonly current_claim: { readonly claim_id: string; readonly generation: number } | null;
   readonly statuses?: readonly AgentRuntimeEffectStatus[];
 }): TaskAgentRuntimeProjectionV1 {
-  if (input.current_claim === null) return Object.freeze({ delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null });
+  if (input.current_claim === null) return Object.freeze({ delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null, delivery_evidence: Object.freeze({ candidate_count: 0, latest: null }) });
   const candidates = (input.statuses ?? listAgentRuntimeEffects(input.repo_root)).filter(({ intent }) => {
     if (intent.operation !== 'notify_inbox') return false;
     const ref = intent.message_ref;
     return ref.kind === 'task_message' && ref.task_id === input.task_id && ref.task_revision === input.task_revision
       && ref.claim_id === input.current_claim!.claim_id && ref.lease_generation === input.current_claim!.generation;
   });
-  if (candidates.length === 0) return Object.freeze({ delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null });
-  if (candidates.length !== 1) return Object.freeze({ delivery_state: 'reconciliation_required', runtime_reachability: 'unknown', effect_sha256: null, failure_class: 'unknown' });
+  if (candidates.length === 0) return Object.freeze({ delivery_state: 'pending', runtime_reachability: 'unknown', effect_sha256: null, failure_class: null, delivery_evidence: Object.freeze({ candidate_count: 0, latest: null }) });
+  if (candidates.length !== 1) return Object.freeze({ delivery_state: 'reconciliation_required', runtime_reachability: 'unknown', effect_sha256: null, failure_class: 'unknown', delivery_evidence: Object.freeze({ candidate_count: candidates.length, latest: null }) });
   const status = candidates[0];
+  // Supplied statuses must describe one exact immutable observation/current pair.
+  let observation: AgentRuntimeEffectObservationV2;
+  try { observation = validateAgentRuntimeEffectObservation(status.observation); }
+  catch (error) { throw mapped(error, 'agent_runtime_effect_unreadable', 'Task notification observation is malformed'); }
+  if (canonicalAgentRuntimeEffectCurrentBytes(buildAgentRuntimeEffectCurrent(observation)) !== canonicalAgentRuntimeEffectCurrentBytes(status.current)
+    || observation.effect_id !== status.intent.effect_id || observation.intent_sha256 !== status.intent.intent_sha256
+    || observation.adapter.adapter_kind !== status.intent.endpoint_fence.adapter_kind) {
+    fail('agent_runtime_effect_unreadable', 'Task notification observation does not match its current intent');
+  }
+  const deliveryEvidence = Object.freeze({ candidate_count: 1, latest: Object.freeze({
+    adapter_kind: observation.adapter.adapter_kind,
+    effect_state: observation.state,
+    receipt_kind: observation.receipt_kind,
+    observed_at: observation.observed_at,
+    observation_sequence: observation.sequence,
+    observation_sha256: observation.observation_sha256,
+  }) });
   let reachability: RuntimeReachability = 'unknown';
   try {
     const capability = readAgentRuntimeCapability(input.repo_root, status.intent.endpoint_fence.host_id, status.intent.endpoint_fence.adapter_kind);
@@ -431,7 +450,7 @@ export function projectTaskAgentRuntimeState(input: {
     const entry = readTaskMessageDelivery({ repo_root: input.repo_root, task_id: ref.task_id, message_id: ref.message_id, recipient: { kind: 'claim', claim_id: ref.claim_id, generation: ref.lease_generation } });
     delivery = entry.receipt?.delivery_state === 'acknowledged' ? 'acknowledged' : entry.receipt?.delivery_state === 'delivered' ? 'delivered' : 'reconciliation_required';
   }
-  return Object.freeze({ delivery_state: delivery, runtime_reachability: reachability, effect_sha256: status.current.current_sha256, failure_class: status.observation.failure_class === 'none' ? null : status.observation.failure_class });
+  return Object.freeze({ delivery_evidence: deliveryEvidence, delivery_state: delivery, runtime_reachability: reachability, effect_sha256: status.current.current_sha256, failure_class: status.observation.failure_class === 'none' ? null : status.observation.failure_class });
 }
 
 export const AGENT_RUNTIME_OFFER_WAKE_MAX_DEBOUNCE_MS = 3_600_000;

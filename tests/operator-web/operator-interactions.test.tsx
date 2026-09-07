@@ -288,7 +288,7 @@ describe('operator web interactions', () => {
     expect(row.textContent).toContain('reconciliation required');
 
     await act(async () => row.click());
-    expect(paneText()).toContain('Delivery and runtime evidence');
+    expect(paneText()).toContain('Message delivery evidence');
     expect(paneText()).toContain(`sha256:${'9'.repeat(64)}`);
     expect(paneText()).toContain('adapter_unavailable');
   });
@@ -1550,5 +1550,47 @@ describe('operator web composer target truth', () => {
     expect(panel).toContain('waits for the next claimant');
     expect(panel).toContain('no current claim');
     expect(sendButton().textContent).toBe('Send to the next claimant');
+  });
+});
+
+
+describe('notification evidence detail', () => {
+  const working = stableSnapshot.repositories[0]!.cards.find(card => card.task_id === fixtureTasks.working.task_id)!;
+  const observation = working.inbox.delivery_evidence!.latest!;
+  test.each([
+    ['stopped', 'Notification stopped'], ['superseded', 'Notification superseded'],
+  ] as const)('renders %s without an active delivery claim and copies its source observation', async (state, label) => {
+    const snapshot: OperatorFleetSnapshotV1 = { ...stableSnapshot, repositories: [{ ...stableSnapshot.repositories[0]!, cards: [{ ...working,
+      inbox: { ...working.inbox, delivery_state: 'pending', delivery_evidence: { candidate_count: 1, latest: { ...observation, effect_state: state } } },
+    }] }] };
+    await mount(<OperatorApp initialState={projectSnapshotViewState(snapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.working.task_label).click());
+    const section = document.querySelector('[aria-labelledby="detail-delivery-heading"]')!;
+    expect(section.textContent).toContain(label);
+    expect(section.textContent).not.toContain('pending');
+    expect(section.textContent).toContain('not worker activity or completion');
+    const details = section.querySelector('details')!;
+    expect(details.open).toBe(false);
+    await act(async () => details.querySelector('summary')!.click());
+    expect(section.querySelector('time')?.getAttribute('datetime')).toBe(observation.observed_at);
+    let copied = '';
+    Object.defineProperty(window.navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { copied = text; } } });
+    const copyButtons = details.querySelectorAll('button');
+    await act(async () => (copyButtons[copyButtons.length - 1] as HTMLButtonElement).click());
+    expect(copied).toBe(observation.observation_sha256);
+  });
+  test.each([
+    ['no claim', null, { candidate_count: 0, latest: null }, null, 'No current Claim.'],
+    ['empty', working.claim_id, { candidate_count: 0, latest: null }, null, 'No notification records'],
+    ['multiple', working.claim_id, { candidate_count: 2, latest: null }, null, '2 notification records'],
+    ['unavailable', working.claim_id, null, { code: 'repo_runtime_effect_unreadable' as const, message: 'unavailable' }, 'Delivery evidence is unavailable'],
+  ] as const)('distinguishes %s', async (_name, claimId, evidence, error, expected) => {
+    const snapshot: OperatorFleetSnapshotV1 = { ...stableSnapshot, repositories: [{ ...stableSnapshot.repositories[0]!, cards: [{ ...working,
+      claim_id: claimId, generation: claimId === null ? null : working.generation, error,
+      inbox: { ...working.inbox, delivery_evidence: evidence },
+    }] }] };
+    await mount(<OperatorApp initialState={projectSnapshotViewState(snapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.working.task_label).click());
+    expect(paneText()).toContain(expected);
   });
 });

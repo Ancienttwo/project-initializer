@@ -5,6 +5,7 @@ import { CarrotMark, DunkieMark, HookMark } from './marks';
 import {
   DEFAULT_OPERATOR_LOCALE,
   formatRelativeAge,
+  relativeAge,
   isOperatorMessageKey,
   translate,
   useLocale,
@@ -809,6 +810,10 @@ function TaskDetail({
   readonly t: OperatorTranslate;
 }) {
   const label = taskDisplayLabel(card);
+  const evidence = card.inbox.delivery_evidence;
+  const observation = evidence?.latest ?? null;
+  const observationAge = observation === null ? null : relativeAge(observation.observed_at, Date.now());
+  const terminalNotice = observation?.effect_state === 'stopped' || observation?.effect_state === 'superseded';
   return (
     <>
       {revisionChangedFrom && (
@@ -849,11 +854,32 @@ function TaskDetail({
       </section>
       <section className="detail-block" aria-labelledby="detail-delivery-heading">
         <h3 className="detail-eyebrow" id="detail-delivery-heading">{t('detail.deliveryRuntime')}</h3>
-        <CopyValue label={t('field.effectSha')} value={card.inbox.effect_sha256} t={t} />
+        <p className="detail-description">{t('deliveryEvidence.explanation')}</p>
+        {evidence === null ? <p>{t('deliveryEvidence.unavailable')}</p>
+          : evidence.candidate_count === 0 ? <p>{t(card.claim_id === null ? 'deliveryEvidence.noClaim' : 'deliveryEvidence.empty')}</p>
+          : evidence.candidate_count > 1 ? <p>{t('deliveryEvidence.multiple', { count: evidence.candidate_count })}</p>
+          : null}
+        {observation && <dl className="detail-list">
+          <div><dt>{t('deliveryEvidence.adapter')}</dt><dd>{observation.adapter_kind}</dd></div>
+          <div><dt>{t('deliveryEvidence.phase')}</dt><dd>{t(`effect.${observation.effect_state}` as OperatorMessageKey)}</dd></div>
+          <div><dt>{t('deliveryEvidence.observedAt')}</dt><dd><time dateTime={observation.observed_at} title={observation.observed_at}>{observationAge && t('deliveryEvidence.observedAgo', { age: t(observationAge.key, { count: observationAge.count }) })}</time></dd></div>
+          <div><dt>{t('deliveryEvidence.receipt')}</dt><dd>{t(`receipt.${observation.receipt_kind ?? 'none'}` as OperatorMessageKey)}</dd></div>
+        </dl>}
+        <details>
+          <summary>{t('deliveryEvidence.identifiers')}</summary>
+          <CopyValue label={t('field.effectSha')} value={card.inbox.effect_sha256} t={t} />
+          {observation && <>
+            <dl className="detail-list">
+              <div><dt>{t('deliveryEvidence.sequence')}</dt><dd>{observation.observation_sequence}</dd></div>
+              <div><dt>{t('deliveryEvidence.observedAt')}</dt><dd><time dateTime={observation.observed_at}>{observation.observed_at}</time></dd></div>
+            </dl>
+            <CopyValue label={t('deliveryEvidence.observationSha')} value={observation.observation_sha256} t={t} />
+          </>}
+        </details>
         <dl className="detail-list">
           <div>
             <dt>{t('field.deliveryState')}</dt>
-            <dd>{t(`delivery.${card.inbox.delivery_state}` as OperatorMessageKey)}</dd>
+            <dd>{terminalNotice ? t(`effect.${observation.effect_state}` as OperatorMessageKey) : t(`delivery.${card.inbox.delivery_state}` as OperatorMessageKey)}</dd>
           </div>
           <div>
             <dt>{t('field.runtimeReachability')}</dt>

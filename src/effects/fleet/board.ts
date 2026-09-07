@@ -172,6 +172,7 @@ function emptyInbox(): FleetBoardInboxSummaryV1 {
     runtime_reachability: 'unknown',
     effect_sha256: null,
     failure_class: null,
+    delivery_evidence: null,
   });
 }
 

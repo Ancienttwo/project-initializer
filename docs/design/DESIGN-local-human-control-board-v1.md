@@ -129,3 +129,24 @@
 ## Preview Attachment (可選)
 
 - Preview path/link: primary implementation reference is source code at `Ancienttwo/repo-harness-page@ffe3ff1b14284e5712b0b0f82534e33c4fabfe6b`; browser acceptance screenshots are produced by this work package.
+
+
+## Message delivery evidence (Fleet protocol 4)
+
+TaskDetail consumes required `inbox.delivery_evidence` from the same notify effect
+selection as the existing delivery summary. A single candidate exposes only
+adapter kind, effect phase, receipt kind, observation time, observation sequence
+and observation digest. Source identifiers remain inside expandable details,
+with the existing copy interaction. Observation time describes notification
+observation, not worker activity, completion or ACK time.
+
+No current Claim and no notifications have count 0 and no latest observation.
+Multiple effects retain the exact count and the existing reconciliation verdict;
+two different messages are not called duplicate runs. A card observation error
+has null evidence and an unavailable message. Stopped/superseded effects display
+their terminal notice even when the unchanged delivery mapping is pending.
+
+Fleet protocol 4 and the bundled browser ship together; the decoder rejects
+protocol 3, missing evidence and inconsistent count/latest or error/null pairs.
+The evidence is an immutable, allowlisted snapshot projection with no new reads,
+stores, routes, controls, background refresh or raw endpoint identifiers.

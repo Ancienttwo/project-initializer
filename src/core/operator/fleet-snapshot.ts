@@ -84,6 +84,17 @@ function projectCard(card: FleetBoardCardV1): OperatorFleetCardV1 {
       repair_actions: Object.freeze(card.feedback.repair_actions.map((action) => action)),
     }),
     inbox: Object.freeze({
+      delivery_evidence: card.inbox.delivery_evidence === null ? null : Object.freeze({
+        candidate_count: card.inbox.delivery_evidence.candidate_count,
+        latest: card.inbox.delivery_evidence.latest === null ? null : Object.freeze({
+          adapter_kind: card.inbox.delivery_evidence.latest.adapter_kind,
+          effect_state: card.inbox.delivery_evidence.latest.effect_state,
+          receipt_kind: card.inbox.delivery_evidence.latest.receipt_kind,
+          observed_at: card.inbox.delivery_evidence.latest.observed_at,
+          observation_sequence: card.inbox.delivery_evidence.latest.observation_sequence,
+          observation_sha256: card.inbox.delivery_evidence.latest.observation_sha256,
+        }),
+      }),
       unread_count: card.inbox.unread_count,
       addressed_to_current_claim: card.inbox.addressed_to_current_claim,
       delivery_state: card.inbox.delivery_state,

@@ -207,10 +207,10 @@ code, .mono-value { font-family: var(--font-mono); }
 .detail-pane__header h2 { font-size: 18px; overflow-wrap: anywhere; }
 .detail-pane__id { color: var(--text-muted); font-size: 11px; }
 .detail-eyebrow { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
-.detail-pane__body { display: grid; align-content: start; gap: 18px; overflow: auto; padding: 18px 20px 24px; }
+.detail-pane__body { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 18px; overflow: auto; padding: 18px 20px 24px; }
 .detail-quiet { color: var(--text-muted); font-size: 12px; }
 .detail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.detail-block { display: grid; gap: 9px; }
+.detail-block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; }
 .cause-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .cause-item { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 9px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 12px; }
 .cause-item.tone-user { color: var(--attention-user-text); border-color: var(--attention-user-line); background: var(--attention-user-surface); }
