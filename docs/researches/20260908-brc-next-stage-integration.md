@@ -4,7 +4,7 @@
 
 On 2026-09-08 the owner stated that repeated GitHub Connector tests were sufficient and directed moving to the next phase. Further BRC6a diagnostic probes are stopped; the prepared one-call live-stream probe is not dispatched or funded. Existing successful GitHub activation/content reads are retained. This decision does not manufacture exact-version evidence or mark active admission/fresh audit accepted.
 
-This integration combines already accepted alignment `1f9be5cb` and provider/default/app `522aa04b` (tracked tree identical to accepted closeout `60d4b4dd`) on base `33c5012e`. The candidate lives in `codex/brc-next-stage-integration`; dirty main readiness WIP is preserved. Oracle candidate code stays separately isolated; no global install, GPT call, GitHub write or release occurs here.
+This integration combines already accepted alignment `1f9be5cb` and provider/default/app `522aa04b` (tracked tree identical to accepted closeout `60d4b4dd`) from base `33c5012e`, then refreshed onto published PR #352 main `38c26b2a`. The candidate lives in `codex/brc-next-stage-integration`; dirty main readiness WIP is preserved (all seven files byte-identical across the disjoint fast-forward). Oracle candidate code stays separately isolated; no global install, GPT call, GitHub write or release occurs here.
 
 ## Combined behavior and conflict resolution
 
