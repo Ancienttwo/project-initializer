@@ -239,7 +239,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
     const admission = reserveCampaignAuthoringBudget({ ...binding, operation: 'challenge', idempotency_key: challenge.challenge_sha256 });
     if (admission.disposition === 'replayed') fail('challenge reservation already exists; reconcile its exact result before continuing');
     const result = await deps.followup({ repoRoot: input.repo_root, sessionId: session.session_ref, title: `Campaign ${intent.campaign_id} readback`, prompt: renderConnectorChallenge(challenge, intent.provider_repository),
-      provider: 'oracle', model: 'gpt-5.5-pro', requireSecretScan: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
+      provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
     response = { response: result.output ?? '', response_session_ref: result.sessionId, model_verified: result.meta.model.verified === true, status: result.status, reservation: admission.reservation };
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'response', { ...response });
   }

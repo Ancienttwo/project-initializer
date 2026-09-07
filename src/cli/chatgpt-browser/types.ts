@@ -154,6 +154,8 @@ export interface BrowserSessionMeta {
     binary?: string;
     version?: string;
     captureStatus?: 'completed' | 'recoverable';
+    observation?: import('./oracle-session-evidence').OracleSessionEvidence['observation'];
+    evidenceError?: string;
   };
   error?: {
     code: string;

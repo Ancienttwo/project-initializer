@@ -154,7 +154,7 @@ export function writeBrowserSession(opts: {
   conversationUrl?: string;
   providerSessionId?: string;
   parentProviderSessionId?: string;
-  oracle?: { binary?: string; version?: string; captureStatus?: 'completed' | 'recoverable' };
+  oracle?: BrowserSessionMeta['oracle'];
   artifacts?: BrowserImportedArtifact[];
   command?: string[];
   secretScan?: PromptSecretScanReceipt;
