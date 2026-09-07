@@ -23,3 +23,9 @@ The initial combined prepare run `run-20260908T045842-1718` passed focused tests
 ## Remaining Product Boundary
 
 Implementation acceptance is separate from real BRC14 completion. The trusted revision producer remains absent, so active acceptance and later groups stay blocked. The user stopped further BRC6a probes; no new provider budget is inferred. Main seven-file WIP hashes matched the pre-integration snapshot.
+
+## Review Corrections
+
+> **Substantive Change SHA256**: `sha256:da4ca1bdf613ac900be1d34faece296975a8f25b3aef83a24f93ab21ef3d9c2d`
+
+The independent review found a stale CLI inventory and missing semantic architecture ownership. The CLI inventory now includes audit and its suite is in the contract. The development-campaign node explicitly owns both audit modules and the CLI call sink. The focused CLI run passed 4/4. The amended contract adds previously uncovered CLI coverage; the prior 13/13 run remains evidence for its original subject only.

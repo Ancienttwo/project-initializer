@@ -143,7 +143,7 @@ exit_criteria:
     {
       "id": "audit-regressions",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/unit/campaign-fresh-audit.test.ts tests/effects/campaign-fresh-audit.test.ts tests/effects/development-campaign-store.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/cli/development-campaign.test.ts tests/effects/issue-batch-shadow-budget.test.ts tests/effects/issue-batch-observer.test.ts tests/effects/campaign-planning.test.ts tests/effects/campaign-step.test.ts",
+      "command": "bun test --timeout 60000 tests/unit/campaign-fresh-audit.test.ts tests/effects/campaign-fresh-audit.test.ts tests/effects/development-campaign-store.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/cli/development-campaign.test.ts tests/cli/campaign-planning.test.ts tests/effects/issue-batch-shadow-budget.test.ts tests/effects/issue-batch-observer.test.ts tests/effects/campaign-planning.test.ts tests/effects/campaign-step.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
