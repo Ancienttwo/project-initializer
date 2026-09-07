@@ -21,7 +21,7 @@
     },
     "projectionInputDigest": "sha256:1fd238d10cebbd4be695b9df650c409623a83d04a9d02fd8331515b34a9ab9b8"
   },
-  "projectionDigest": "sha256:4ec8f1c294692ae72c6f56147daa26a61b9c85cb107bf6fa5a2a6b83444054f9",
+  "projectionDigest": "sha256:82d9ac41c8f6d1d0ba37f621e3654346e37be84835e8c62708b016c228f5114a",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -711,10 +711,10 @@
       "modelDigest": "sha256:f5235e347cc847193923cb9207f895b3df6a154bc0fbbf21e8f189f599254ea3",
       "sourceTreeDigest": "sha256:87e817142df670d757c5307a5fb4c740fa743358726590ed5d8df4fdfc9123aa",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:4ec8f1c294692ae72c6f56147daa26a61b9c85cb107bf6fa5a2a6b83444054f9"
+      "projectionDigest": "sha256:82d9ac41c8f6d1d0ba37f621e3654346e37be84835e8c62708b016c228f5114a"
     }
   },
-  "receiptDigest": "sha256:9ec8ed1e9c4378a759e629f0ef6c5c2b124ff987f512252da079e5bbe37e206e",
+  "receiptDigest": "sha256:12cb846f9720d5cab440f05457511c26def9d1124b9ec6230aef209bf80d98e5",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
