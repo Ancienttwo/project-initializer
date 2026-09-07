@@ -212,7 +212,7 @@ test.each(['normal', 'source-drift', 'release-crash'])('worker publication close
     const remaining = readLease(f.root, f.envelope.task_id).record!;
     expect(remaining.state).toBe('reviewing');
     writeLeaseOwnerDurably(f.root, f.envelope.task_id, { ...remaining, generation: remaining.generation + 1 });
-    expect(() => runCampaignCloseout(input)).toThrow('remaining reviewing Lease differs');
+    expect(() => runCampaignCloseout(input)).toThrow('lease owner does not match publication receipt');
     expect(readLease(f.root, f.envelope.task_id).record?.generation).toBe(remaining.generation + 1);
     writeLeaseOwnerDurably(f.root, f.envelope.task_id, remaining);
   }
