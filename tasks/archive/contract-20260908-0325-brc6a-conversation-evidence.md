@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 03:25
+> **Related Plan**: plans/archive/plan-20260908-0302-brc6a-conversation-evidence.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-0325
+> **Archive Projection V1**: `plans/plan-20260908-0302-brc6a-conversation-evidence.md` => `plans/archive/plan-20260908-0302-brc6a-conversation-evidence.md`
+> **Archive Projection V1**: `tasks/notes/20260908-0302-brc6a-conversation-evidence.notes.md` => `tasks/archive/notes-20260908-0325-brc6a-conversation-evidence.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-0302-brc6a-conversation-evidence.contract.md` => `tasks/archive/contract-20260908-0325-brc6a-conversation-evidence.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-0302-brc6a-conversation-evidence.review.md` => `tasks/archive/review-20260908-0325-brc6a-conversation-evidence.md`
+
 # Task Contract: brc6a-conversation-evidence
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-0302-brc6a-conversation-evidence.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-0302-brc6a-conversation-evidence.md
 > **Task Profile**: docs-only
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 03:02
-> **Review File**: `tasks/reviews/20260908-0302-brc6a-conversation-evidence.review.md`
-> **Notes File**: `tasks/notes/20260908-0302-brc6a-conversation-evidence.notes.md`
+> **Review File**: `tasks/archive/review-20260908-0325-brc6a-conversation-evidence.md`
+> **Notes File**: `tasks/archive/notes-20260908-0325-brc6a-conversation-evidence.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-0302-brc6a-conversation-evidence.md`
+- Source plan: `plans/archive/plan-20260908-0302-brc6a-conversation-evidence.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-0302-brc6a-conversation-evidence.review.md`
-- Notes file: `tasks/notes/20260908-0302-brc6a-conversation-evidence.notes.md`
+- Review file: `tasks/archive/review-20260908-0325-brc6a-conversation-evidence.md`
+- Notes file: `tasks/archive/notes-20260908-0325-brc6a-conversation-evidence.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -74,9 +84,9 @@ allowed_paths:
   - docs/researches/20260908-brc6a-conversation-history-evidence.md
   - plans/
   - tasks/todos.md
-  - tasks/contracts/20260908-0302-brc6a-conversation-evidence.contract.md
-  - tasks/reviews/20260908-0302-brc6a-conversation-evidence.review.md
-  - tasks/notes/20260908-0302-brc6a-conversation-evidence.notes.md
+  - tasks/archive/contract-20260908-0325-brc6a-conversation-evidence.md
+  - tasks/archive/review-20260908-0325-brc6a-conversation-evidence.md
+  - tasks/archive/notes-20260908-0325-brc6a-conversation-evidence.md
   - docs/architecture/.projection-manifest.json
 ```
 
@@ -133,7 +143,7 @@ exit_criteria:
     - docs/researches/20260908-brc6a-conversation-history-evidence.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-0302-brc6a-conversation-evidence.notes.md
+    - tasks/archive/notes-20260908-0325-brc6a-conversation-evidence.md
 ```
 
 ## Verification Plan
