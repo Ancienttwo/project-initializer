@@ -108,3 +108,12 @@ The regression failed before the fix (5 pass/1 fail), then the adapter and campa
 > **Substantive Change SHA256**: `sha256:2796891bf2b2eede3a950f91f74a8e1a5f9d59baecf1a5b0b289114348403664`
 
 Scoped live readback: exactly #177/#178, two requests, one filtered page, 17,642 bytes; canary evidence .canary-scratch/scoped-collection-readback.json. Labels were added only to those two Issues. No new campaign, authoring or worker was started. TypeScript and six integrity checks passed (task-sync initially needed the explicit delta fingerprint, then rechecked). Prior 14/14 acceptance is not reassigned to this delta.
+
+
+## Approved continuation design
+
+Owner approved preserving #177/#178 across budget exhaustion. Use a new campaign authorization/run and a fresh initial authoring session that edits explicitly named existing Issues instead of creating Issues. The resume request binds the old intent, verified source session, stopped quiescent budget, and exact provider IDs/URLs/slots. The old campaign must remain pre-adoption. Read and verify all old markers before editing; use the new frozen revision and capability schema. Fresh session evidence belongs solely to the new intent; old artifacts are never transplanted, reclassified or mutated. Current model selection and label-scoped reads remain unchanged. This adds an explicit operator entry to the existing authoring boundary, not a budget reset or compatibility path.
+
+> **Substantive Change SHA256**: `sha256:b856062637902add2d105960f60ca518f6d461893abf20070de1a49b95a5a85d`
+
+Continuation delta: 25 focused authoring/observer cases and TypeScript passed; six integrity checks passed after binding this fingerprint. No budget core changes, new dependencies or new product files.
