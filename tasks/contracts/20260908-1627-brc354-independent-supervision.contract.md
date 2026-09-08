@@ -73,7 +73,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 allowed_paths:
   - docs/researches/2026-09-08-brc354-independent-supervision.md
   - docs/architecture/.projection-manifest.json
-  - docs/architecture/modules/runtime-harness/automation-budget.md
+  - docs/architecture/modules/
   - deploy/campaign-container/
   - scripts/contract-run.ts
   - assets/templates/helpers/contract-run.ts
@@ -192,7 +192,8 @@ exit_criteria:
       },
       "delta_checks": [
         "cleanup-race",
-        "typecheck"
+        "typecheck",
+        "evidence-redaction"
       ]
     },
     {
@@ -302,7 +303,7 @@ exit_criteria:
     {
       "id": "source-unchanged",
       "kind": "command",
-      "command": "git diff --exit-code d2e311f4 -- src/ scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ tests/",
+      "command": "git diff --exit-code d2e311f4 -- src/core/automation/ src/effects/automation/ scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ tests/effects/brc10-lifecycle.test.ts tests/effects/campaign-closeout.test.ts tests/effects/campaign-container-live.test.ts tests/effects/campaign-containment.test.ts tests/effects/campaign-runtime-container.test.ts tests/fixtures/brc-audit/finish-failure.ts tests/fixtures/campaign-container-readback/ tests/helpers/historical-campaign-lifecycle.ts tests/unit/brc10-lifecycle.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
@@ -321,6 +322,19 @@ exit_criteria:
       "cost": "normal",
       "evidence_policy": "current_exact",
       "necessity": "Covers the only production delta since lifecycle baseline; fresh exact-container inactivity after kill races namespace exit.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "evidence-redaction",
+      "kind": "command",
+      "command": "bun test tests/evidence-event-store.test.ts tests/evidence-projection-drift.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Single directly blocking evidence projection fix: typed extensionless path arrays remain fingerprint-consistent while secret/traversal/free-text redaction remains enforced.",
       "inputs": {
         "env": []
       }

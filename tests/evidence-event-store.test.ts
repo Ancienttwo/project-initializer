@@ -476,3 +476,23 @@ describe("D6 redaction: typed-field exemption (EPC-05 gatekeeper CRITICAL fix)",
     });
   });
 });
+
+
+test("declared path arrays preserve extensionless files through ledger redaction", () => {
+  const path = "deploy/campaign-container/Dockerfile";
+  const payload = { change_assessment: { assessment: { subject_paths: [path], selected_paths: [path], reasons: [{ paths: [path] }] }, selection_packet: { subject_paths: [path] } } };
+  expect(redactPayloadStrings(payload, [])).toEqual(payload);
+  withTempRepo("evidence-extensionless-path", root => {
+    freshGenesisRepo(root);
+    const record = appendEvidenceEvent(root, baseInput({ payload: { kind: "json", value: payload } }));
+    expect(record.payload).toEqual(payload);
+  });
+});
+test("declared path arrays do not exempt known secrets, traversal or free text", () => {
+  const path = "deploy/campaign-container/Dockerfile";
+  expect(redactPayloadStrings({ subject_paths: [path] }, [path])).not.toEqual({ subject_paths: [path] });
+  for (const value of ["../" + path, "/" + path, "token=" + "a".repeat(40)]) {
+    expect(redactPayloadStrings({ subject_paths: [value] }, [])).not.toEqual({ subject_paths: [value] });
+  }
+  expect(redactPayloadStrings({ note: path }, [])).not.toEqual({ note: path });
+});
