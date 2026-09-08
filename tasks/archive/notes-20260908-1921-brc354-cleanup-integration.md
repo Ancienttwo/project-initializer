@@ -29,3 +29,9 @@ This binds the remote diff projection; it does not replace the original runtime 
 ## Integration with parallel main update
 
 Main advanced from ba09b548 to c17b004a with the separately accepted worktree-cleanup-closeout slice. The only merge conflict was generated docs/architecture/.projection-manifest.json; it was regenerated against the combined source and current CodeGraph. All four cleanup production/test paths are byte-identical to accepted f2a36aea, and the preparation/runtime/recovery/core sources are unchanged by that main update. The original Docker execution and AcceptanceReceipt retain their original subject and target. Current combined evidence is the required integrity/type/helper delta checks and new PR CI; no old receipt is relabeled as covering c17b004a.
+
+Final remote diff against c17b004a, following conflict resolution:
+
+> **Substantive Change SHA256**: `sha256:9904fa74e48c54924f945d8521694fad686fe90656fb6bcb09c9a500f305140b`
+
+TypeScript, helper parity, six integrity checks and exact cleanup source/test equality passed on the combined candidate. Final PR CI remains its own required evidence.
