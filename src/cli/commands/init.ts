@@ -335,7 +335,7 @@ function renderCompletionSummaryLabel(template: string, preset: ReportingLanguag
  * variants behind `{{#IF HERDR}}` / `{{#IF NO_HERDR}}` line markers and exactly
  * one survives rendering; the markers themselves never reach the managed block.
  */
-function selectPeerHarnessVariant(template: string, herdrAvailable: boolean): string {
+export function selectPeerHarnessVariant(template: string, herdrAvailable: boolean): string {
   const kept = herdrAvailable ? PEER_HARNESS_IF_HERDR : PEER_HARNESS_IF_NO_HERDR;
   const lines: string[] = [];
   let dropping = false;
@@ -350,6 +350,7 @@ function selectPeerHarnessVariant(template: string, herdrAvailable: boolean): st
     }
     if (!dropping) lines.push(line);
   }
+  if (dropping) throw new Error("global_working_rules_unbalanced_variant_marker");
   return lines.join("\n");
 }
 

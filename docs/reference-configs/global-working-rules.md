@@ -1,6 +1,6 @@
 # Global Working Rules
 
-Source for the managed block in user-level `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`. Keep personal preferences outside the markers and repo-specific contracts in the repo. Use the host's available tools; do not install cross-host tool-compatibility maps here. Remove equivalent personal rules only with user authorization; synchronization preserves content outside the markers.
+Source for the managed block in user-level `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`. Keep personal preferences outside the markers and repo-specific contracts in the repo. Use the host's available tools; do not install cross-host tool-compatibility maps here. Remove equivalent personal rules only with user authorization; synchronization preserves content outside the markers. The fenced text below is a template: its `{{#IF HERDR}}` / `{{#IF NO_HERDR}}` blocks are selected once during `repo-harness init` by a PATH probe for `herdr`, so exactly one variant is written and the markers themselves never reach the managed block.
 
 ```md
 # Global Working Rules

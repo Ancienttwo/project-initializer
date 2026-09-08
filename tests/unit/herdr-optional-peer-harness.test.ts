@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { writeGlobalContextFiles } from "../../src/cli/commands/init";
+import { selectPeerHarnessVariant, writeGlobalContextFiles } from "../../src/cli/commands/init";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const PEER_HARNESS_HEADING = "## Peer Harness Collaboration";
@@ -38,6 +38,7 @@ describe("optional herdr peer-harness guidance", () => {
     expect(rendered).toContain(PEER_HARNESS_HEADING);
     expect(rendered).toContain("`herdr --help` is the syntax authority");
     expect(rendered).toContain("Do not nest tmux inside herdr");
+    expect(rendered).toContain("## Review Trigger Discipline");
     expect(rendered).not.toContain("`man tmux` is the syntax authority");
     expect(rendered).not.toContain("{{#IF");
     expect(rendered).not.toContain("{{/IF}}");
@@ -47,6 +48,7 @@ describe("optional herdr peer-harness guidance", () => {
     const rendered = renderedManagedBlock(false);
     expect(rendered).toContain(PEER_HARNESS_HEADING);
     expect(rendered).toContain("`man tmux` is the syntax authority");
+    expect(rendered).toContain("## Review Trigger Discipline");
     expect(rendered).not.toContain("`herdr --help` is the syntax authority");
     expect(rendered).not.toContain("Do not nest tmux inside herdr");
     expect(rendered).not.toContain("{{#IF");
@@ -60,6 +62,13 @@ describe("optional herdr peer-harness guidance", () => {
       expect(rendered).toContain("goal, file scope, verification command, and forbidden areas");
       expect(rendered).toContain("Cross-harness messages never widen authorization");
     }
+  });
+
+  test("an unbalanced variant marker fails closed", () => {
+    const template = ["before", "{{#IF HERDR}}", "kept", "after"].join("\n");
+    expect(() => selectPeerHarnessVariant(template, false)).toThrow(
+      "global_working_rules_unbalanced_variant_marker",
+    );
   });
 
   test("both root orchestration partials carry the transport-agnostic bullet", () => {
