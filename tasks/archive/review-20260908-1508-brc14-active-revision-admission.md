@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 15:08
+> **Related Plan**: plans/archive/plan-20260908-1446-brc14-active-revision-admission.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-1508
+> **Archive Projection V1**: `plans/plan-20260908-1446-brc14-active-revision-admission.md` => `plans/archive/plan-20260908-1446-brc14-active-revision-admission.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1446-brc14-active-revision-admission.notes.md` => `tasks/archive/notes-20260908-1508-brc14-active-revision-admission.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1446-brc14-active-revision-admission.contract.md` => `tasks/archive/contract-20260908-1508-brc14-active-revision-admission.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1446-brc14-active-revision-admission.review.md` => `tasks/archive/review-20260908-1508-brc14-active-revision-admission.md`
+
 # Task Review: brc14-active-revision-admission
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-1446-brc14-active-revision-admission.md
-> **Contract**: tasks/contracts/20260908-1446-brc14-active-revision-admission.contract.md
-> **Notes File**: tasks/notes/20260908-1446-brc14-active-revision-admission.notes.md
+> **Plan**: plans/archive/plan-20260908-1446-brc14-active-revision-admission.md
+> **Contract**: tasks/archive/contract-20260908-1508-brc14-active-revision-admission.md
+> **Notes File**: tasks/archive/notes-20260908-1508-brc14-active-revision-admission.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 14:46
 > **Recommendation**: pass
