@@ -86,6 +86,7 @@ allowed_paths:
   - assets/templates/helpers/check-agent-tooling.sh
   - scripts/check-agent-tooling.sh
   - docs/reference-configs/external-tooling.md
+  - docs/reference-configs/global-working-rules.md
   - tests/
 ```
 
