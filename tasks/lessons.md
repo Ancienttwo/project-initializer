@@ -366,3 +366,6 @@ repair: 58 pass across the three named files, AGENTS restored to 260 lines.
 - Mistake pattern: a fail-fast gate presented as a full-suite result. The run looks authoritative — it iterates the whole discovered set — but the exit under `set -e` truncates it, so a single stale golden hides every regression behind it, and a branch that merges onto that `main` inherits the masked failures as its own CI signal.
 - Prevention rule: a per-file loop in a CI gate records each file's exit code, continues, and fails once at the end with the complete list of failing files. Guard the loop body against `set -e` explicitly (`|| status=1`) rather than relying on the loop to keep going, and assert the aggregate behavior in a test so the gate cannot silently regress to fail-fast.
 - Where to apply next time: any shell gate that iterates a discovered set of files, tests, or repositories — `scripts/lib/ci-run-tests.sh` and the checks under `scripts/check-*.sh` that fan out over paths.
+# Approved plan edit readiness (2026-09-07)
+
+Planning approval and execution completion are separate observations. An approved plan with open tasks must be editable; shipping still requires completion and fresh evidence. Missing plan text cannot prove either. Regression and source rationale: `docs/researches/2026-09-07-approved-plan-edit-readiness.md`.

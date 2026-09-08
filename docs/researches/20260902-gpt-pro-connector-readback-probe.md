@@ -73,3 +73,9 @@ metadata-only commit、revert 或其他相同內容的 revision 仍不能僅從�
 原實驗記錄保留為當時的 transport/內容觀測，不再當作 exact revision 讀取證明。BRC6a
 負責凍結威脅模型、可驗證證據來源與 fail-closed 消費邊界；無法提供證據就保留原驗收未滿足。
 本次文檔修正沒有修復 runtime，沒有引入新 receipt 名稱，也不以弱化驗收將缺口關閉。
+
+## 2026-09-08 Owner closeout
+
+Owner 明确指示“BRC6a可以关了，已证实可用”。Sprint 因此将 BRC6a 关闭，采用显式 GitHub app 激活后的实际内容读取作为本行完成依据，不再追加能力探针。纠正探针 conversation `6a9f0045-c728-83ea-a489-27796265282a` 的 README 首 8 行、末 4 行及回答中的 blob SHA 与本地固定 canary revision 校验一致；旧未激活调用不能据以判断 Connector 不可用。
+
+完整观察记录保留在 research commit `6cfac409`；本次决定与证据范围见 `plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md` 的 BRC6a Owner closeout。关闭任务不是生成 provider-origin resolved-commit receipt；运行时 gate 未改，fresh audit 与版本准入消费由 BRC14 的实现验收继续负责。
