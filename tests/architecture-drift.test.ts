@@ -77,7 +77,7 @@ describe('architecture drift changed set', () => {
     const cwd = fixture();
     write(cwd, 'src/first.ts', 'export const first = 1;\n');
     const anchor = commitAll(cwd, 'first');
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
 
     write(cwd, 'src/second.ts', 'export const second = 2;\n');
     const head = commitAll(cwd, 'second');
@@ -95,7 +95,7 @@ describe('architecture drift changed set', () => {
   test('reports nothing extra when the cursor is already at HEAD with a clean tree', () => {
     const cwd = fixture();
     const head = git(cwd, ['rev-parse', 'HEAD']);
-    advanceArchitectureDriftCursor(cwd, head);
+    advanceArchitectureDriftCursor(cwd, head, null);
 
     const changed = computeArchitectureDriftChangedSet(cwd);
 
@@ -109,7 +109,7 @@ describe('architecture drift changed set', () => {
     write(cwd, 'src/renamed-from.ts', 'export const moved = 1;\n');
     write(cwd, 'src/removed.ts', 'export const removed = 1;\n');
     const anchor = commitAll(cwd, 'seed rename inputs');
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
 
     git(cwd, ['mv', 'src/renamed-from.ts', 'src/renamed-to.ts']);
     unlinkSync(join(cwd, 'src/removed.ts'));
@@ -129,7 +129,7 @@ describe('architecture drift changed set', () => {
 
   test('re-anchors with a note when the stored cursor commit no longer resolves', () => {
     const cwd = fixture();
-    advanceArchitectureDriftCursor(cwd, 'b'.repeat(40));
+    advanceArchitectureDriftCursor(cwd, 'b'.repeat(40), null);
     write(cwd, 'src/after-gc.ts', 'export const value = 1;\n');
 
     const changed = computeArchitectureDriftChangedSet(cwd);
@@ -166,14 +166,14 @@ describe('architecture drift cursor slot', () => {
     const head = git(cwd, ['rev-parse', 'HEAD']);
 
     expect(readArchitectureDriftCursor(cwd)).toBeNull();
-    advanceArchitectureDriftCursor(cwd, head, new Date('2026-08-12T00:00:00.000Z'));
+    advanceArchitectureDriftCursor(cwd, head, null, new Date('2026-08-12T00:00:00.000Z'));
     expect(readArchitectureDriftCursor(cwd)).toEqual({
       version: 1,
       head_sha: head,
       updated_at: '2026-08-12T00:00:00.000Z',
     });
 
-    advanceArchitectureDriftCursor(cwd, 'a'.repeat(40), new Date('2026-08-12T01:00:00.000Z'));
+    advanceArchitectureDriftCursor(cwd, 'a'.repeat(40), head, new Date('2026-08-12T01:00:00.000Z'));
     expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe('a'.repeat(40));
   });
 
@@ -270,7 +270,7 @@ describe('resumable legacy cascade', () => {
   test('drains a 1592-path backlog across bounded retries without replaying the prefix', () => {
     const cwd = fixture();
     const anchor = git(cwd, ['rev-parse', 'HEAD']);
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
     const paths = Array.from({ length: 1592 }, (_, i) => `src/${String(i).padStart(4, '0')}.ts`);
     const changed = { cursorSha: anchor, headSha: anchor, paths, warnings: [] };
     const delivered: string[] = [];
@@ -317,7 +317,7 @@ describe('resumable legacy cascade', () => {
 
   test('manual CLI drain resumes a failed batch and preserves its JSON contract', () => {
     const cwd = fixture();
-    advanceArchitectureDriftCursor(cwd, git(cwd, ['rev-parse', 'HEAD']));
+    advanceArchitectureDriftCursor(cwd, git(cwd, ['rev-parse', 'HEAD']), null);
     write(cwd, 'a.ts', 'export const a = 1;');
     write(cwd, 'b.ts', 'export const b = 1;');
     const head = commitAll(cwd, 'backlog');
@@ -352,11 +352,11 @@ describe('resumable legacy cascade', () => {
     expect(() => drainArchitectureDriftCascade(cwd, changed, () => { throw new Error('interrupted'); }, budget)).toThrow();
     write(cwd, 'new.ts', 'export const value = 1;');
     const newHead = commitAll(cwd, 'new head');
-    advanceArchitectureDriftCursor(cwd, newHead);
+    advanceArchitectureDriftCursor(cwd, newHead, null);
     expect(() => drainArchitectureDriftCascade(cwd, changed, () => {}, budget)).toThrow('cursor changed before cascade');
     const calls: string[] = [];
     drainArchitectureDriftCascade(cwd, computeArchitectureDriftChangedSet(cwd), (path) => { calls.push(path); }, budget);
-    expect(calls).toEqual([]);
+    expect(calls).toEqual(['a.ts', 'b.ts']);
     expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(newHead);
   });
 });

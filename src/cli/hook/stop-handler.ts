@@ -725,7 +725,7 @@ export function runStopHandler(opts: StopHandlerInput): StopHandlerResult {
     // consumer acknowledged, so a retry-pending, dead-lettered, or throwing
     // drain replays the same range on the next Stop.
     if (architectureDrain.status !== 'disabled' && architectureDrain.acknowledgeSourceEvents && changedSet.headSha !== null) {
-      advanceArchitectureDriftCursor(repoRoot, changedSet.headSha, now);
+      advanceArchitectureDriftCursor(repoRoot, changedSet.headSha, changedSet.cursorSha, now);
     }
   } catch (error) {
     architectureDrainError = error instanceof Error ? error.message : String(error);

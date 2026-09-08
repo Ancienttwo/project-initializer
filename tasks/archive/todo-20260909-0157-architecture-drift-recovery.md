@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-09 01:57
+> **Related Plan**: plans/archive/plan-20260909-0130-architecture-drift-recovery.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260909-0157
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-08 22:35
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.

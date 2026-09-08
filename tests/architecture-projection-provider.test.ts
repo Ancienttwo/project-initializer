@@ -46,14 +46,14 @@ function fixture() {
   mkdirSync(join(repoRoot, '.ai', 'harness'), { recursive: true });
   mkdirSync(join(repoRoot, '.archcontext', 'model', 'nodes'), { recursive: true });
   mkdirSync(join(repoRoot, 'src', 'core'), { recursive: true });
-  writeFileSync(join(packageRoot, 'package.json'), `${JSON.stringify({ name: 'archctx', version: '0.5.7', engines: { node: '>=22.22 <26' }, bin: { archctx: './bin/archctx' } })}\n`);
+  writeFileSync(join(packageRoot, 'package.json'), `${JSON.stringify({ name: 'archctx', version: '0.5.8', engines: { node: '>=22.22 <26' }, bin: { archctx: './bin/archctx' } })}\n`);
   const binary = join(packageRoot, 'bin', 'archctx');
   writeFileSync(binary, '#!/bin/sh\nexit 99\n');
   chmodSync(binary, 0o755);
   symlinkSync(join('..', 'archctx', 'bin', 'archctx'), join(binRoot, 'archctx'));
   writeFileSync(join(repoRoot, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
     context: { capability_source: 'archcontext' },
-    architecture: { projection_provider: 'archctx', projection_apply: 'manual', projection_version: '0.5.7', projection_timeout_ms: 120000 },
+    architecture: { projection_provider: 'archctx', projection_apply: 'manual', projection_version: '0.5.8', projection_timeout_ms: 120000 },
   })}\n`);
   writeFileSync(join(repoRoot, '.archcontext', 'model', 'nodes', 'capability.test.core.yaml'), `schemaVersion: archcontext.node/v2
 kind: capability
@@ -94,7 +94,7 @@ function vendorArchctx(root: string, version: string): string {
   return binary;
 }
 
-function capabilities(version = '0.5.7') {
+function capabilities(version = '0.5.8') {
   return {
     schemaVersion: 'archcontext.capabilities/v1',
     package: { name: 'archctx', version },
@@ -211,6 +211,7 @@ describe('package-local ArchContext projection provider', () => {
   test('bounds a real provider process tree whose descendant keeps captured pipes open', () => {
     const f = fixture();
     const descendantPidPath = join(f.root, 'descendant.pid');
+    const node = resolveCompatibleNodeRuntime(process.env);
     writeFileSync(f.binary, [
       "const { spawn } = require('node:child_process');",
       "const { writeFileSync } = require('node:fs');",
@@ -225,7 +226,7 @@ describe('package-local ArchContext projection provider', () => {
       `import { archctxCapabilities } from ${JSON.stringify(providerModule)};`,
       `const started = Date.now();`,
       `try {`,
-      `  archctxCapabilities(${JSON.stringify(f.repoRoot)}, { consumerRoot: ${JSON.stringify(f.consumerRoot)}, policy: { provider: 'archctx', applyMode: 'manual', failureGate: 'advisory', requiredVersion: '${ARCHCTX_REQUIRED_VERSION}', timeoutMs: 500 }, env: { ...process.env, ARCHCTX_DESCENDANT_PID_PATH: ${JSON.stringify(descendantPidPath)} }, deadlineMs: Date.now() + 500 });`,
+      `  archctxCapabilities(${JSON.stringify(f.repoRoot)}, { consumerRoot: ${JSON.stringify(f.consumerRoot)}, policy: { provider: 'archctx', applyMode: 'manual', failureGate: 'advisory', requiredVersion: '${ARCHCTX_REQUIRED_VERSION}', timeoutMs: 500 }, env: { ...process.env, REPO_HARNESS_NODE_BIN: ${JSON.stringify(node)}, ARCHCTX_DESCENDANT_PID_PATH: ${JSON.stringify(descendantPidPath)} }, deadlineMs: Date.now() + 500 });`,
       `  process.exitCode = 2;`,
       `} catch (error) {`,
       `  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);`,
@@ -327,7 +328,7 @@ describe('package-local ArchContext projection provider', () => {
     const resolved = resolvePackageLocalArchctx(f.consumerRoot);
     expect(resolved.binaryPath).toBe(realpathSync(f.binary));
     writeFileSync(join(f.consumerRoot, 'node_modules', 'archctx', 'package.json'), '{"name":"archctx","version":"0.3.0"}\n');
-    expect(() => resolvePackageLocalArchctx(f.consumerRoot)).toThrow('expected archctx@0.5.7');
+    expect(() => resolvePackageLocalArchctx(f.consumerRoot)).toThrow('expected archctx@0.5.8');
   });
 
   test('resolves a hoisted package from an installed repo-harness package root', () => {
