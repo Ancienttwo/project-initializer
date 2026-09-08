@@ -63,7 +63,7 @@ export interface OracleProbe {
  * Oracle's browser command/output contract is release-specific. Keep this as the
  * single version authority for both consultation and browser-doctor diagnostics.
  */
-export const REQUIRED_ORACLE_VERSION = '0.18.0';
+export const REQUIRED_ORACLE_VERSION = '0.20.0';
 
 const ORACLE_TERM_GRACE_MS = 5_000;
 

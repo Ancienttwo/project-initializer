@@ -130,7 +130,7 @@ function writeFakeOracle(path: string, opts: { help?: string; sessionLine?: stri
   writeFileSync(path, [
     '#!/bin/sh',
     'case "$1" in',
-    '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+    '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
     `  --help|--debug-help) printf "%s\\n" "${opts.help ?? FAKE_ORACLE_HELP}"; exit 0;;`,
     'esac',
     ...(opts.body ?? [
@@ -386,7 +386,7 @@ describe('chatgpt browser command', () => {
         writeFileSync(oraclePath, [
           '#!/bin/sh',
           'case "$1" in',
-          '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+          '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
           'esac',
           'OUT=""',
           'FILE=""',
@@ -1076,19 +1076,19 @@ describe('chatgpt browser command', () => {
         const explicitOld = join(binDir, 'oracle-old');
         const envExact = join(binDir, 'oracle-env');
         const pathExact = join(binDir, 'oracle');
-        writeOracle(explicitOld, '0.17.0');
-        writeOracle(envExact, '0.18.0');
-        writeOracle(pathExact, '0.18.0');
+        writeOracle(explicitOld, '0.19.0');
+        writeOracle(envExact, '0.20.0');
+        writeOracle(pathExact, '0.20.0');
 
         const explicitDoctor = runChatgpt(['browser-doctor', '--repo', repoRoot, '--provider', 'oracle', '--oracle-bin', explicitOld, '--json'], ROOT, withoutConfiguredOracle);
         const explicitReadiness = JSON.parse(explicitDoctor.stdout);
         expect(explicitReadiness).toMatchObject({
           status: 'action_required',
           code: 'ORACLE_VERSION_UNSUPPORTED',
-          oracle: { resolvedFrom: '--oracle-bin', version: '0.17.0', requiredVersion: '0.18.0', versionCompatible: false },
+          oracle: { resolvedFrom: '--oracle-bin', version: '0.19.0', requiredVersion: '0.20.0', versionCompatible: false },
         });
-        expect(explicitReadiness.oracle.error.message).toContain('detected 0.17.0');
-        expect(explicitReadiness.oracle.error.message).toContain('exactly 0.18.0');
+        expect(explicitReadiness.oracle.error.message).toContain('detected 0.19.0');
+        expect(explicitReadiness.oracle.error.message).toContain('exactly 0.20.0');
 
         const executed = join(binDir, 'unexpected-execution');
         const rejectedRun = runChatgpt([
@@ -1111,17 +1111,17 @@ describe('chatgpt browser command', () => {
         });
         expect(JSON.parse(envDoctor.stdout)).toMatchObject({
           status: 'ready',
-          oracle: { resolvedFrom: 'REPO_HARNESS_ORACLE_BIN', version: '0.18.0', requiredVersion: '0.18.0', versionCompatible: true },
+          oracle: { resolvedFrom: 'REPO_HARNESS_ORACLE_BIN', version: '0.20.0', requiredVersion: '0.20.0', versionCompatible: true },
         });
 
         const repoLocalDir = join(repoRoot, 'node_modules/.bin');
         mkdirSync(repoLocalDir, { recursive: true });
-        writeOracle(join(repoLocalDir, 'oracle'), '0.18.1');
+        writeOracle(join(repoLocalDir, 'oracle'), '0.20.1');
         const repoLocalDoctor = runChatgpt(['browser-doctor', '--repo', repoRoot, '--provider', 'oracle', '--json'], ROOT, withoutConfiguredOracle);
         expect(JSON.parse(repoLocalDoctor.stdout)).toMatchObject({
           status: 'action_required',
           code: 'ORACLE_VERSION_UNSUPPORTED',
-          oracle: { resolvedFrom: 'node_modules/.bin', version: '0.18.1', requiredVersion: '0.18.0', versionCompatible: false },
+          oracle: { resolvedFrom: 'node_modules/.bin', version: '0.20.1', requiredVersion: '0.20.0', versionCompatible: false },
         });
 
         rmSync(repoLocalDir, { recursive: true, force: true });
@@ -1131,7 +1131,7 @@ describe('chatgpt browser command', () => {
         });
         expect(JSON.parse(pathDoctor.stdout)).toMatchObject({
           status: 'ready',
-          oracle: { resolvedFrom: 'PATH', version: '0.18.0', requiredVersion: '0.18.0', versionCompatible: true },
+          oracle: { resolvedFrom: 'PATH', version: '0.20.0', requiredVersion: '0.20.0', versionCompatible: true },
         });
       } finally {
         rmSync(binDir, { recursive: true, force: true });
@@ -1151,7 +1151,7 @@ describe('chatgpt browser command', () => {
         writeFileSync(oraclePath, [
           '#!/bin/sh',
           'case "$1" in',
-          '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+          '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
           'esac',
           'printf "%s\\n" "$@" > "$FAKE_ORACLE_ARGS_PATH"',
           '(',
@@ -1217,7 +1217,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             'esac',
             'ARGS="$*"',
             'OUT=""',
@@ -1587,7 +1587,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             'esac',
             'OUT=""',
             'PREV=""',
@@ -1661,7 +1661,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             'esac',
             'printf "%s\\n" "Session ID: oracle_recover_789"',
             'exit 0',
@@ -1700,7 +1700,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             'esac',
             'ARGS="$*"',
             'OUT=""',
@@ -1750,7 +1750,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             'esac',
             'PREV=""',
             'for a in "$@"; do',
@@ -1795,7 +1795,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             '  --help|--debug-help) printf "%s\\n" "Usage: oracle --engine browser --write-output <p> --browser-thinking-time <level>"; exit 0;;',
             'esac',
             'for a in "$@"; do',
@@ -1840,7 +1840,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             '  --help|--debug-help) printf "%s\\n" "Usage: oracle --engine browser --write-output <p> --browser-app <name> --browser-thinking-time <level>"; exit 0;;',
             'esac',
             'ARGS="$*"',
@@ -1878,9 +1878,9 @@ describe('chatgpt browser command', () => {
     });
   }, 30_000);
 
-  // Regression guard: the pinned oracle surface is 0.18.0 and no longer carries a
+  // Regression guard: the pinned oracle surface is 0.20.0 and no longer carries a
   // cookie-path capability, so doctor must report ready on that exact surface.
-  test('oracle doctor reports ready on the pinned 0.18.0 surface without a cookie-path flag', () => {
+  test('oracle doctor reports ready on the pinned 0.20.0 surface without a cookie-path flag', () => {
     withRepo((repoRoot) => {
       const binDir = mkdtempSync(join(tmpdir(), 'repo-harness-fake-oracle-pinned-'));
       try {
@@ -1890,7 +1890,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0";;',
+            '  --version) printf "%s\\n" "0.20.0";;',
             '  *) printf "%s\\n" "Usage: oracle --engine browser --browser-archive never --write-output <p> --browser-follow-up <t> --followup <id> --browser-model-strategy current --copy-profile <dir> --browser-chrome-profile <name> --chatgpt-url <url> --heartbeat <seconds>";;',
             'esac',
           ].join('\n'),
@@ -1900,8 +1900,8 @@ describe('chatgpt browser command', () => {
         expect(doctor.status).toBe(0);
         const readiness = JSON.parse(doctor.stdout);
         expect(readiness.status).toBe('ready');
-        expect(readiness.oracle.version).toBe('0.18.0');
-        expect(readiness.oracle.requiredVersion).toBe('0.18.0');
+        expect(readiness.oracle.version).toBe('0.20.0');
+        expect(readiness.oracle.requiredVersion).toBe('0.20.0');
         expect(readiness.oracle.versionCompatible).toBe(true);
         expect(readiness.oracle.missingCapabilities).toEqual([]);
         expect(readiness.oracle.capabilities).not.toHaveProperty('browserCookiePath');
@@ -1922,7 +1922,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0";;',
+            '  --version) printf "%s\\n" "0.20.0";;',
             '  *) printf "%s\\n" "Usage: oracle --engine browser --browser-archive never --write-output <p> --browser-follow-up <t> --followup <id> --browser-model-strategy current --browser-cookie-path <path> --copy-profile <dir> --browser-chrome-profile <name> --chatgpt-url <url> --heartbeat <seconds>";;',
             'esac',
           ].join('\n'),
@@ -1935,7 +1935,7 @@ describe('chatgpt browser command', () => {
         expect(readiness.agent_actions).toEqual([]);
         expect(readiness.oracle.installed).toBe(true);
         expect(readiness.oracle.binary).toBe(oraclePath);
-        expect(readiness.oracle.version).toBe('0.18.0');
+        expect(readiness.oracle.version).toBe('0.20.0');
         expect(readiness.oracle.capabilities).toEqual({
           browserEngine: true,
           writeOutput: true,
@@ -1995,7 +1995,7 @@ describe('chatgpt browser command', () => {
             '  if [ "$a" = "--browser-thinking-time" ]; then printf "%s\\n" "error: unknown option --browser-thinking-time" >&2; exit 1; fi',
             'done',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0";;',
+            '  --version) printf "%s\\n" "0.20.0";;',
             '  *) printf "%s\\n" "Usage: oracle --engine browser --write-output <p>";;',
             'esac',
           ].join('\n'),
@@ -2046,7 +2046,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0";;',
+            '  --version) printf "%s\\n" "0.20.0";;',
             '  *) printf "%s\\n" "Usage: oracle --engine browser --browser-archive never --write-output <p> --browser-follow-up <t> --followup <id> --browser-model-strategy current --browser-cookie-path <path> --chatgpt-url <url> --heartbeat <seconds>";;',
             'esac',
           ].join('\n'),
@@ -2078,7 +2078,7 @@ describe('chatgpt browser command', () => {
         [
           '#!/bin/sh',
           'case "$1" in',
-          '  --version) printf "%s\\n" "0.18.0";;',
+          '  --version) printf "%s\\n" "0.20.0";;',
           '  *) printf "%s\\n" "Usage: oracle --engine browser --write-output <p>";;',
           'esac',
         ].join('\n'),
@@ -2092,7 +2092,7 @@ describe('chatgpt browser command', () => {
       expect(repoLocalReadiness.oracle.resolvedFrom).toBe('node_modules/.bin');
       expect(repoLocalReadiness.agent_actions[0]).toMatchObject({
         id: 'chatgpt-oracle-upgrade-pinned',
-        command: 'bun add -D @steipete/oracle@0.18.0',
+        command: 'bun add -D @steipete/oracle@0.20.0',
       });
 
       const envSelected = runChatgpt(['browser-doctor', '--repo', repoRoot, '--provider', 'oracle', '--json'], ROOT, {
@@ -2151,7 +2151,7 @@ describe('chatgpt browser command', () => {
           [
             '#!/bin/sh',
             'case "$1" in',
-            '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
+            '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
             'esac',
             ...sessionDescriptorFixture('oracle_followup_456', 'oracle_upstream_123'),
             'ARGS="$*"',
