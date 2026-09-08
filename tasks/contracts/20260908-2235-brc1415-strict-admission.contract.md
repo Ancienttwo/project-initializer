@@ -71,6 +71,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - tests/unit/campaign-revision-evidence.test.ts
   - src/effects/automation/gpt-pro-issue-authoring.ts
   - src/cli/commands/campaign.ts
   - src/effects/external-sources/github.ts

@@ -26,3 +26,9 @@ test.each([
 ])('refuses %s',(_name,change)=>expect(readCampaignRevisionEvidence(mutate(change),expected)).toBeNull());
 test('refuses digest and session tampering',()=>{const c=capture();c.history.response.body+=' ';expect(readCampaignRevisionEvidence(c,expected)).toBeNull();expect(readCampaignRevisionEvidence(capture(),{...expected,providerSessionId:'other'})).toBeNull();});
 test('missing transport never falls back to answer',()=>expect(readCampaignRevisionEvidence(null,expected)).toBeNull());
+
+test('provider tool identity remains authoritative when user UI system hints are absent',()=>{
+ const c=mutate((b:any)=>{delete b.messages[0].metadata.system_hints;});
+ expect(readCampaignRevisionEvidence(c,expected)?.commit_sha).toBe(expected.commit);
+ expect(readCampaignRevisionEvidence(c,{...expected,connectorId:'other'})).toBeNull();
+});

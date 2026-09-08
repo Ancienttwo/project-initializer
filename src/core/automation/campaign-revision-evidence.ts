@@ -93,7 +93,7 @@ export function readCampaignRevisionEvidence(capture: unknown, expected: Revisio
     const users=messages.filter(m=>object(m.author).role==='user'); requireThat(users.length===1);
     const user=users[0]!, userMeta=object(user.metadata), content=object(user.content);
     requireThat(content.content_type==='text' && Array.isArray(content.parts) && content.parts.length===1
-      && content.parts[0]==='@GitHub '+expected.prompt && Array.isArray(userMeta.system_hints) && userMeta.system_hints.includes('plugin:'+expected.connectorId)
+      && content.parts[0]==='@GitHub '+expected.prompt
       && typeof userMeta.turn_exchange_id==='string');
     const turn=userMeta.turn_exchange_id as string;
     requireThat(turn.length>0 && userMeta.working_turn_id===turn);

@@ -117,3 +117,10 @@ Owner approved preserving #177/#178 across budget exhaustion. Use a new campaign
 > **Substantive Change SHA256**: `sha256:b856062637902add2d105960f60ca518f6d461893abf20070de1a49b95a5a85d`
 
 Continuation delta: 25 focused authoring/observer cases and TypeScript passed; six integrity checks passed after binding this fingerprint. No budget core changes, new dependencies or new product files.
+
+
+One directly blocking runtime correction: fresh provider history omitted user metadata.system_hints while preserving the actual GitHub tool connector/resource identity, exact URLs, same-turn binding and complete raw commit/ref data. The decoder incorrectly required this UI hint in addition to provider-owned tool identity. Remove only that redundant UI field requirement; do not derive or fill it. Regression is red with missing hints and valid tool identity, then green while a wrong connector still rejects. Original unavailable observation remains unchanged.
+
+> **Substantive Change SHA256**: `sha256:484b692a36453825a81427ca63fcd2949d1bcfaa13c427c47020776112abe827`
+
+UI-hint delta: 43 decoder/observation cases pass with wrong-connector rejection retained, plus TypeScript and six integrity checks. The earlier unavailable capture is not relabeled.
