@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-08 23:19
+> **Related Plan**: plans/archive/plan-20260908-2246-user-config-uninstall.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260908-2319
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-08 22:46
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.

@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { withRuntimeHostTransactionLock } from './installer/runtime-host-lock';
+import { captureConfigurationRestores } from './installer/configuration-ownership';
 /**
  * repo-harness CLI entry.
  *
@@ -9,7 +11,7 @@
 import { Command } from 'commander';
 import { randomBytes } from 'crypto';
 import { readFileSync, realpathSync } from 'fs';
-import { homedir, userInfo } from 'os';
+import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { createInterface } from 'readline/promises';
 import { fileURLToPath } from 'url';
@@ -97,7 +99,6 @@ import { runReviewSubjectCli } from './hook/review-subject';
 import { runAdoptionPlan } from './commands/adoption-plan';
 import { rollbackAdoptionTransaction } from '../effects/fs-transaction';
 import {
-  acquireExclusiveDirectoryLock,
   type ExclusiveDirectoryLockHandle,
 } from '../effects/locking/exclusive-directory-lock';
 import {
@@ -242,6 +243,7 @@ function runTransactionalProfileProjection(
     }
     try {
       const state = commitState(transaction, migrationSource);
+      captureConfigurationRestores(transaction, transactionEnv);
       commitInstallHostTransaction(transaction);
       return { result, state };
     } catch (error) {
@@ -269,27 +271,6 @@ function runtimeHostMutationPaths(env: NodeJS.ProcessEnv): readonly string[] {
   return [...new Set(paths)];
 }
 
-function withRuntimeHostTransactionLock<T>(
-  env: NodeJS.ProcessEnv | undefined,
-  run: (lock: ExclusiveDirectoryLockHandle) => T,
-): T {
-  // Resolve the protected root with the same precedence as runtime mutations.
-  // A partial injected env must not make the lock fall back to a different HOME.
-  const home = process.platform === 'win32'
-    ? userInfo().homedir
-    : env?.HOME ?? process.env.HOME ?? homedir();
-  const lock = acquireExclusiveDirectoryLock(
-    realpathSync(home),
-    '.repo-harness/transactions/global-runtime.lock',
-    { reclaimStaleOwner: true },
-  );
-  try {
-    lock.assertOwned();
-    return run(lock);
-  } finally {
-    lock.release();
-  }
-}
 
 function candidateSourceRoot(): string {
   return realpathSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
@@ -418,6 +399,7 @@ export function runTransactionalRuntimeRefresh(
       return result;
     }
     try {
+      captureConfigurationRestores(transaction, transactionEnv);
       commitInstallHostTransaction(transaction);
       return result;
     } catch (error) {
@@ -784,17 +766,21 @@ export function buildProgram(): Command {
 
   program
     .command('uninstall')
-    .description('Remove repo-harness managed hook adapters from Codex and/or Claude host config')
+    .description('Remove owned user-level configuration; preserve user changes and static history')
     .option('--target <target>', `Target host: ${TARGET_HELP}`, 'both')
     .option('--location <location>', `Install location: ${LOCATION_HELP}`, 'global')
-    .action((rawOpts: { target: string; location: string }) => {
+    .option('--dry-run', 'Preview cleanup without filesystem writes')
+    .option('--recover-interrupted', 'Restore recorded fragments after interrupted setup; overwrites later edits to those fragments')
+    .option('--json', 'Output the cleanup result as JSON')
+    .action((rawOpts: { target: string; location: string; dryRun?: boolean; recoverInterrupted?: boolean; json?: boolean }) => {
       const target = assertTarget(rawOpts.target, 'uninstall');
       const location = assertLocation(rawOpts.location, 'uninstall');
-      const uninstallAdapters = () => runUninstall({ target, location });
-      const result = location === 'global'
+      const uninstallAdapters = () => runUninstall({ target, location, dryRun: rawOpts.dryRun, recoverInterrupted: rawOpts.recoverInterrupted });
+      const result = location === 'global' && !rawOpts.dryRun
         ? withRuntimeHostTransactionLock(process.env, uninstallAdapters)
         : uninstallAdapters();
-      for (const line of result.lines) console.log(line);
+      if (rawOpts.json) console.log(JSON.stringify(result, null, 2));
+      else for (const line of result.lines) console.log(line);
       process.exit(result.exitCode);
     });
 

@@ -330,7 +330,7 @@ describe('install command (Phase 1B)', () => {
 
       const uninstall = runUninstall({ target: 'claude', location: 'global' });
       expect(uninstall.exitCode).toBe(0);
-      expect(uninstall.lines.some((l) => l.includes('[claude] removed'))).toBe(true);
+      expect(uninstall.lines.some((l) => l.includes('claude managed hooks'))).toBe(true);
       const afterUninstall = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
       expect(afterUninstall.theme).toBe('dark');
       expect(afterUninstall.hooks.UserPromptSubmit).toEqual([
@@ -339,7 +339,7 @@ describe('install command (Phase 1B)', () => {
     });
   });
 
-  test('uninstall removes managed Codex entries and preserves trust TOML', () => {
+  test('uninstall removes managed Codex entries and reverses installer TOML', () => {
     withTempHome((home) => {
       const result = runInstall({ target: 'codex', location: 'global' });
       expect(result.exitCode).toBe(0);
@@ -350,12 +350,11 @@ describe('install command (Phase 1B)', () => {
 
       const uninstall = runUninstall({ target: 'codex', location: 'global' });
       expect(uninstall.exitCode).toBe(0);
-      expect(uninstall.lines.some((l) => l.includes('[codex] removed'))).toBe(true);
-      expect(uninstall.lines.some((l) => l.includes('[codex] note: ~/.codex/config.toml [hooks.state]'))).toBe(true);
+      expect(uninstall.lines.some((l) => l.includes('codex managed hooks'))).toBe(true);
 
-      const data = JSON.parse(fs.readFileSync(hooksPath, 'utf-8'));
-      expect(data.hooks).toEqual({});
-      expect(fs.readFileSync(tomlPath, 'utf-8')).toContain('default_mode_request_user_input = true');
+
+      expect(fs.existsSync(hooksPath)).toBe(false);
+      expect(fs.existsSync(tomlPath)).toBe(false);
     });
   });
 
@@ -364,11 +363,11 @@ describe('install command (Phase 1B)', () => {
       runInstall({ target: 'both', location: 'global' });
       const first = runUninstall({ target: 'both', location: 'global' });
       expect(first.exitCode).toBe(0);
-      expect(first.lines.some((l) => l.includes('removed'))).toBe(true);
+      expect(first.lines.some((l) => l.includes('[remove]'))).toBe(true);
 
       const second = runUninstall({ target: 'both', location: 'global' });
       expect(second.exitCode).toBe(0);
-      expect(second.lines.filter((l) => l.includes('not-found')).length).toBeGreaterThanOrEqual(2);
+      expect(second.lines.some((l) => l.includes('[remove]'))).toBe(false);
     });
   });
 
@@ -399,7 +398,7 @@ describe('install command (Phase 1B)', () => {
         encoding: 'utf-8',
       });
       expect(uninstall.status).toBe(0);
-      expect(uninstall.stdout).toContain('[codex] removed');
+      expect(uninstall.stdout).toContain('codex managed hooks');
     });
   }, 30_000);
 

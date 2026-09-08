@@ -1,3 +1,4 @@
+import { configurationPaths, withConfigurationMutation } from '../installer/configuration-ownership';
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -638,7 +639,7 @@ function configureClaudeAllowedTools(actions: CodegraphAction[], env?: NodeJS.Pr
   });
 }
 
-export function configureCodegraph(opts: CodegraphConfigureOptions): CodegraphConfigureResult {
+function configureCodegraphRuntime(opts: CodegraphConfigureOptions): CodegraphConfigureResult {
   const actions: CodegraphAction[] = [];
   const initial = checkCodegraph({ repoRoot: opts.repoRoot, env: opts.env, host: opts.target });
   const binPath = initial.resolution.binPath;
@@ -709,4 +710,12 @@ export function configureCodegraph(opts: CodegraphConfigureOptions): CodegraphCo
     readOnly: false,
     actions,
   };
+}
+
+/** Keep restoration provenance for both standalone tools setup and runtime bootstrap. */
+export function configureCodegraph(opts: CodegraphConfigureOptions): CodegraphConfigureResult {
+  if (opts.location !== 'global') return configureCodegraphRuntime(opts);
+  const env = { ...process.env, ...opts.env };
+  const paths = configurationPaths(env).filter((path) => opts.target === 'both' || (opts.target === 'codex' ? path.endsWith('.toml') : !path.endsWith('.toml')));
+  return withConfigurationMutation(paths, env, () => configureCodegraphRuntime(opts));
 }

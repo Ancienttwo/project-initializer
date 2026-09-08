@@ -100,9 +100,41 @@ bootstrap path must not silently install unrelated toolchains or Claude
 marketplace plugins. The one explicit exception is OpenAI's official
 `codex@openai-codex` plugin for the Codex-host outside-review capability.
 
-`repo-harness uninstall` removes repo-harness managed Codex/Claude hook
-adapters. It intentionally does not uninstall Waza, Mermaid, Reverse Skill, the official Codex plugin, CodeGraph,
-brain config, package-manager globals, or user-authored sibling hook entries.
+`repo-harness uninstall --dry-run` previews user-level cleanup without writing
+configuration, locks or receipts. `repo-harness uninstall` applies it; `--json`
+returns `status`, `exitCode`, `dryRun` and per-path actions. `--target codex|claude`
+limits host cleanup; shared brain/profile surfaces are retired on `--target both`
+(the default). `--location local` retains its narrower Claude adapter-only scope.
+
+Cleanup removes tagged hook commands and global working-rule blocks, unchanged
+profile-owned skills/rules/agents/links, proven CodeGraph registrations, and the
+product's brain/helper configuration fields. Sibling hooks, configuration keys,
+user-edited surfaces and vault contents remain. Newly recorded Codex request-input
+and CodeGraph configuration changes restore their original values when the current
+fragment still matches the installation receipt. The private
+`~/.repo-harness/configuration-restore.json` is static installation history, retained
+for repeated uninstall and reinstall provenance; restored entries become inactive,
+and a no-op reinstall cannot reacquire ownership from history. It does not activate
+a runtime.
+
+Unproven old configuration, malformed configuration and changed owned surfaces are
+reported as `unresolved`; the command exits nonzero with `status: partial` and keeps
+remaining ownership evidence. Opaque Codex hook trust entries cannot yet be mapped
+to commands and are reported for manual resolution. A preserved shared/pre-existing
+third-party installation is not claimed as repo-harness-owned.
+
+Standalone CodeGraph configuration and global install/update share one host lock.
+Before external mutation, a private pending receipt records only selected configuration
+fragments. Interrupted setup blocks ordinary mutation and cleanup; use
+`repo-harness uninstall --recover-interrupted --dry-run` to preview restoration,
+then `repo-harness uninstall --recover-interrupted` to apply it. This explicit
+recovery restores the recorded fragments even if they were edited after interruption;
+sibling fields remain. The target must include every affected host.
+
+Package-manager globals, the official Codex plugin, independent MCP setup/workspaces,
+archives and runtime history remain. Repository unadoption and package removal are
+separate operations; this command does not enumerate other repositories or remove
+third-party packages. Remove the CLI package only after configuration cleanup.
 
 `repo-harness update` is a reconciliation command, not a best-effort package
 install. It verifies the installed package's exact `archctx` and

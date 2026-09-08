@@ -1,3 +1,4 @@
+import { writeOwnedConfiguration } from '../configuration-ownership';
 /**
  * Codex CLI hook-runtime target.
  *
@@ -59,7 +60,7 @@ function ensureRequestUserInputToml(): WriteResult['files'][number] {
 
   const desiredLine = 'default_mode_request_user_input = true';
   if (!fs.existsSync(filePath)) {
-    atomicWriteFileSync(filePath, `${desiredLine}\n`);
+    writeOwnedConfiguration(filePath, `${desiredLine}\n`);
     return { path: filePath, action: 'created' };
   }
 
@@ -80,7 +81,7 @@ function ensureRequestUserInputToml(): WriteResult['files'][number] {
   if (next === current) {
     return { path: filePath, action: 'unchanged' };
   }
-  atomicWriteFileSync(filePath, next);
+  writeOwnedConfiguration(filePath, next);
   return { path: filePath, action: 'updated' };
 }
 

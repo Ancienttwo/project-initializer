@@ -1,3 +1,4 @@
+import { configurationReceiptPath } from './configuration-ownership';
 import { createHash, randomUUID } from 'crypto';
 import {
   cpSync,
@@ -522,6 +523,7 @@ export function installProfileHostMutationPaths(env: NodeJS.ProcessEnv = process
     join(home, '.claude.json'),
     join(home, '.repo-harness', 'config.json'),
     installProfileStatePath(env),
+    configurationReceiptPath(env),
     join(home, '.agents', '.skill-lock.json'),
   ];
   for (const host of ['.codex', '.claude']) {

@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:ef2231a1deb56cba2ee06d0ffc2c2da4bb321ec9f529090bb65880408f81274f",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "4ece72acba083fc2edc26d1bf592d45d63917054",
-    "worktreeDigest": "sha256:de157d5e8dd0e27b3f610c7043bb6815bea8c264db4801cf33b3b0f7a76050cd",
-    "sourceTreeDigest": "sha256:7d1c1207e1223a1baad75f7d38ca64550a43284335a84464cefa03751ec206e5",
+    "baseHeadSha": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+    "worktreeDigest": "sha256:4c3c814a560151b0c17d6c6987738d35040d0ea6b548ca5a421287e49c7b1c85",
+    "sourceTreeDigest": "sha256:56883ff5be9da39cebdbe050a3f66ce02b48e42159475d7e9dba9d0b7b4329a2",
     "modelDigest": "sha256:15fab52dfbb29756c50b746ce12dfb5e67461b828280d38dbfa8c3190e9eb272",
-    "codeGraphDigest": "sha256:51be5619897480c12fdab5a3480bd875b91ecd99c06f0292108206f7cab02ca2",
-    "indexedWorktreeDigest": "sha256:b05f0421a424620f33e4ce82ab395ddc95ff943d7d90d33c942532930d84d879",
+    "codeGraphDigest": "sha256:ba5bddec354796948bb57c7f0bc507dff0feed01f1044d5a1a0ff520afc9337f",
+    "indexedWorktreeDigest": "sha256:6877248b15734adca188a525b7416404c599ddcda12ca7d2e5a955511fe9fb1b",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:57421f2241a39428b95b0e95db6a6c18cdc4ac111f1270cbcc8815e03a7d55c3"
+    "projectionInputDigest": "sha256:86f7c1de356c66c72dc5227c69ae0ab22751f70b066b725fcd55f1fa37342da7"
   },
-  "projectionDigest": "sha256:550234c6d3ba68f9285865f52fa04250c827b8d917099177e658d19082d30263",
+  "projectionDigest": "sha256:1481fc4c293ffbccd18b53d896959c9fe6348d02f5c684cfb49ad4f755705927",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:15fab52dfbb29756c50b746ce12dfb5e67461b828280d38dbfa8c3190e9eb272",
-      "sourceTreeDigest": "sha256:7d1c1207e1223a1baad75f7d38ca64550a43284335a84464cefa03751ec206e5",
+      "sourceTreeDigest": "sha256:56883ff5be9da39cebdbe050a3f66ce02b48e42159475d7e9dba9d0b7b4329a2",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:550234c6d3ba68f9285865f52fa04250c827b8d917099177e658d19082d30263"
+      "projectionDigest": "sha256:1481fc4c293ffbccd18b53d896959c9fe6348d02f5c684cfb49ad4f755705927"
     }
   },
-  "receiptDigest": "sha256:6d64bd4cc44a2d4fed9528e2705490a4b758d71b6d103f317908955c6dabe306",
+  "receiptDigest": "sha256:33791eb71e51ae6f3a0a2471a53c490e83bb4d07eb8ed2a7edef4377954dbc01",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -787,9 +787,9 @@
       "sourceDigest": "sha256:5c192000c887502bac2e9787d6ffb992e49a57f955b4e7b4655b7c01d18c6dd0",
       "outputDigest": "sha256:c831589b4ccffcbd58d0502102abfbecc01025326f7fa0f0e9ba60fc3dbd0cb4",
       "verifiedAgainst": {
-        "branch": "codex/verification-execution-lifecycle",
-        "commit": "3356ddcf6fc6bebf5db07410042efb7c26df4b01",
-        "committedAt": "2026-09-06T16:09:35+08:00"
+        "branch": "codex/user-config-uninstall",
+        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+        "committedAt": "2026-09-08T23:13:52+08:00"
       }
     },
     {
@@ -1027,9 +1027,9 @@
       "sourceDigest": "sha256:183d7a9ef531bb200e573b337911d503eac0d86741a87b02d5d0b60896930782",
       "outputDigest": "sha256:2e93a1f59017a07da7860cf0073e6911d9f75032b5af8be503c56087f394466a",
       "verifiedAgainst": {
-        "branch": "codex/brc342-346-acceptance",
-        "commit": "e7f36c5200f702f3478695134d2d9f00ab3825d7",
-        "committedAt": "2026-09-08T21:14:46+08:00"
+        "branch": "codex/user-config-uninstall",
+        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+        "committedAt": "2026-09-08T23:13:52+08:00"
       }
     },
     {
@@ -1044,12 +1044,12 @@
       "ownership": "mixed",
       "rendererVersion": "archcontext.docs-renderer/v4",
       "format": "markdown",
-      "sourceDigest": "sha256:c5528c7ff9467b71364ce083ab4d0bbaff0729765c1e1f8b511ae54319a88e94",
-      "outputDigest": "sha256:235db05ad6aca5f3bd47ce84257904865e2b41f0b69c00c2f50989b6e7e61313",
+      "sourceDigest": "sha256:132d8cab10d94dc2d5add313cea2a2cfa120b63b2d180ff084f4d9a0fae044bf",
+      "outputDigest": "sha256:49427c6729ca7883ed1d9f6f3b23ac6c4ed307748a6344c0e24a4bed00b701ce",
       "verifiedAgainst": {
-        "branch": "codex/brc342-346-acceptance",
-        "commit": "e7f36c5200f702f3478695134d2d9f00ab3825d7",
-        "committedAt": "2026-09-08T21:14:46+08:00"
+        "branch": "codex/user-config-uninstall",
+        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+        "committedAt": "2026-09-08T23:13:52+08:00"
       }
     },
     {
@@ -1207,9 +1207,9 @@
       "sourceDigest": "sha256:d7227e9a523c174482329de071e53fca93c9d0936dbdcc5be70065a006d7783f",
       "outputDigest": "sha256:385eae056b2e6fa98d5d9d85d6acd36191d5a705c20f9dcfd0bb5d5d2ad2e8f1",
       "verifiedAgainst": {
-        "branch": "codex/brc5-heartbeat-observation-slot-reconciliation",
-        "commit": "2463d531a14b576110e20ca7b01d0899e3f8f094",
-        "committedAt": "2026-09-05T16:31:41+08:00"
+        "branch": "codex/user-config-uninstall",
+        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+        "committedAt": "2026-09-08T23:13:52+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/brc342-346-acceptance",
-        "commit": "4ece72acba083fc2edc26d1bf592d45d63917054",
-        "committedAt": "2026-09-08T21:25:38+08:00"
+        "branch": "codex/user-config-uninstall",
+        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+        "committedAt": "2026-09-08T23:13:52+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:dc2faa5abe1e85c162bcc9a126ee79a0178c75d03c20ff97519b8b463cc2ee44",
       "outputDigest": "sha256:aa5aac73ff819f8ad0c053a57d5b1627faf2fc5bdbc18e8ab4722de0ab085d59",
       "verifiedAgainst": {
-        "branch": "codex/brc342-346-acceptance",
-        "commit": "e7f36c5200f702f3478695134d2d9f00ab3825d7",
-        "committedAt": "2026-09-08T21:14:46+08:00"
+        "branch": "codex/user-config-uninstall",
+        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
+        "committedAt": "2026-09-08T23:13:52+08:00"
       }
     },
     {

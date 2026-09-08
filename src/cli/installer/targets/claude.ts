@@ -113,7 +113,7 @@ class ClaudeTarget implements AgentTarget {
     };
   }
 
-  uninstall(loc: Location): WriteResult {
+  uninstall(loc: Location, opts: { dryRun?: boolean } = {}): WriteResult {
     const filePath = resolvePath(loc, process.cwd());
     if (!fs.existsSync(filePath)) {
       return { files: [{ path: filePath, action: 'not-found' }] };
@@ -124,7 +124,7 @@ class ClaudeTarget implements AgentTarget {
       return { files: [{ path: filePath, action: 'not-found' }] };
     }
     const next: SettingsFile = { ...data, hooks: cleaned };
-    atomicWriteFileSync(filePath, formatJson(next));
+    if (!opts.dryRun) atomicWriteFileSync(filePath, formatJson(next));
     return { files: [{ path: filePath, action: 'removed' }] };
   }
 

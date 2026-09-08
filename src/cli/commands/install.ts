@@ -1,3 +1,4 @@
+import { runUserUninstall } from '../installer/uninstall';
 /**
  * `repo-harness install|uninstall --target codex|claude|both --location global|local`
  *
@@ -25,6 +26,8 @@ export interface InstallCommandOptions {
   target: InstallTargetSpec;
   location: Location;
   profile?: InstallProfile;
+  dryRun?: boolean;
+  recoverInterrupted?: boolean;
 }
 
 export interface InstallCommandResult {
@@ -63,7 +66,7 @@ function runAdapterAction(action: AdapterAction, opts: InstallCommandOptions): I
     try {
       const result = action === 'install'
         ? target.install(opts.location, { profile: opts.profile })
-        : target.uninstall(opts.location);
+        : target.uninstall(opts.location, { dryRun: opts.dryRun });
       for (const file of result.files) {
         lines.push(`[${target.id}] ${file.action}: ${file.path}`);
       }
@@ -84,5 +87,6 @@ export function runInstall(opts: InstallCommandOptions): InstallCommandResult {
 }
 
 export function runUninstall(opts: InstallCommandOptions): InstallCommandResult {
-  return runAdapterAction('uninstall', opts);
+  if (opts.location !== 'global' && opts.recoverInterrupted) return { exitCode: 2, lines: ['--recover-interrupted requires --location global'] };
+  return opts.location === 'global' ? runUserUninstall(opts) : runAdapterAction('uninstall', opts);
 }
