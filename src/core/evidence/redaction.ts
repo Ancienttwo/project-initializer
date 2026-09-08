@@ -152,6 +152,18 @@ export function isChangeAssessmentOracleIdPath(path: readonly string[]): boolean
  * either typed exemption? Computed once, up front -- see the module doc
  * comment's "order of operations" note (classify first, then redact the
  * rest; never a post-hoc unhash). */
+/** Typed path collections also contain extensionless files such as Dockerfile.
+ * A long token inside a segment must still take the existing entropy pass. */
+function isDeclaredPathArrayEntry(path: readonly string[], value: string): boolean {
+  const index = path.at(-1), collection = path.at(-2);
+  return typeof index === 'string' && /^(?:0|[1-9][0-9]*)$/.test(index)
+    && typeof collection === 'string'
+    && ['paths', 'subject_paths', 'selected_paths', 'allowed_paths', 'files_changed', 'reviewed_paths'].includes(collection)
+    && !value.startsWith('/') && value.includes('/') && !/[\\\s]/.test(value)
+    && value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..'
+      && !new RegExp(HIGH_ENTROPY_TOKEN_SOURCE).test(segment));
+}
+
 export function isEntropyExemptLeaf(
   key: string | undefined,
   value: string,
@@ -159,6 +171,7 @@ export function isEntropyExemptLeaf(
 ): boolean {
   return isDeclaredHashValue(value)
     || isPathConventionKey(key)
+    || isDeclaredPathArrayEntry(path, value)
     || looksLikeSafeRepoRelativePath(value)
     || isRepoHarnessProtocolIdentifier(key, value)
     || isChangeAssessmentOracleIdPath(path);

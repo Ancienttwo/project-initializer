@@ -1,11 +1,13 @@
-// Process-isolated unit boundary: only admission is synthetic. All finalization,
-// locking, supervision, claims and budget stores below are the production code.
+// Process-isolated finalization regression: admission and container producer facts
+// are synthetic. Locking, terminal consumer, claims and budget stores are production code.
 import { mock, expect } from 'bun:test';
 import { join } from 'path';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync } from 'fs';
 import { execFileSync, spawnSync } from 'child_process';
 mock.module('../../../src/effects/automation/campaign-revision-admission', () => ({ requireCampaignActiveAdmission() {} }));
-const { historicalPlanningFixture, installHistoricalBoundDispatch } = await import('../../helpers/historical-campaign-lifecycle');
+const { historicalPlanningFixture, installHistoricalBoundDispatch, prepareHistoricalCodexInvocation, modeledContainerTerminal } = await import('../../helpers/historical-campaign-lifecycle');
+const runtime = await import('../../../src/effects/automation/campaign-runtime');
+mock.module('../../../src/effects/automation/campaign-runtime', () => ({ ...runtime, prepareCampaignCodexInvocation: prepareHistoricalCodexInvocation }));
 const { bindCampaignWorker } = await import('../../../src/effects/automation/campaign-worker');
 const { readAutomationBudgetStatus } = await import('../../../src/effects/automation/budget-store');
 const { readTaskAutomationAttemptCurrent } = await import('../../../src/effects/engineers/automation-attempt-store');
@@ -24,7 +26,7 @@ try {
   const failure = process.argv[2];
   for (const role of ['worker', 'verifier'] as const) {
     writeFileSync(join(worktree, `${role}.prompt`), 'fixture');
-    await worker.prepareChild(role, `${role}.prompt`, Date.now() + 10000);
+    const invocation = await worker.prepareChild(role, `${role}.prompt`, Date.now() + 10000);
     worker.beforeChild(role, input[role === 'worker' ? 'worker_command' : 'verifier_command']);
     const nonzero = failure === 'worker_nonzero' && role === 'worker';
     const text = role === 'verifier' ? JSON.stringify({ verdict: 'fail', review: 'fixture' }) : 'done';
@@ -33,7 +35,9 @@ try {
       '--log', join(worktree, `${role}.out`), '--stderr-log', join(worktree, `${role}.err`), '--result', join(worktree, `${role}.result`), '--', process.execPath, '-e',
       nonzero ? 'process.exit(7)' : `console.log(${JSON.stringify(events.map(e => JSON.stringify(e)).join('\n'))})`], { cwd: worktree });
     expect(child.status).toBe(nonzero ? 7 : 0);
-    worker.afterChild({ ...JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8')), role, command: input[role === 'worker' ? 'worker_command' : 'verifier_command'], stdout_path: `${role}.out`, stderr_path: `${role}.err` });
+    const observation = JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8'));
+    const container_receipt_sha256 = modeledContainerTerminal(invocation!.container, readFileSync(join(worktree, `${role}.out`), 'utf8'), readFileSync(join(worktree, `${role}.err`), 'utf8'), observation);
+    worker.afterChild({ container_receipt_sha256, ...JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8')), role, command: input[role === 'worker' ? 'worker_command' : 'verifier_command'], stdout_path: `${role}.out`, stderr_path: `${role}.err` });
     if (nonzero) break;
   }
   writeFileSync(join(worktree, 'final.json'), JSON.stringify({ outcome: 'completed', evidence_paths: ['src/index.ts'] }));

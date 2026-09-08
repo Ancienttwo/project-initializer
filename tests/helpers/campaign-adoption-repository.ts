@@ -18,8 +18,8 @@ import { AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, appendAutomationUsage, reconcile
 import { makeSnapshot, AT, CAP, policy } from './issue-batch-adoption-fixture';
 const SPRINT = 'plans/sprints/repair.sprint.md';
 function git(root: string, args: string[]) { return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim(); }
-export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'active', rounds = 1, capability = CAP, metadata: Record<string, unknown> = {}, files: Record<string, string> = {}, limits: { max_provider_failures?: number; max_agent_turns?: number; max_runner_invocations?: number; max_parallel_tasks?: 1 | 2 | 3; group_count?: 1 | 2 | 3; max_provider_calls?: number; max_successful_acquisitions?: number; liveness_policy?: LeaseLivenessPolicyV1 } = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-adoption-'))); const home = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-home-')));
+export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'active', rounds = 1, capability = CAP, metadata: Record<string, unknown> = {}, files: Record<string, string> = {}, limits: { max_provider_failures?: number; max_agent_turns?: number; max_runner_invocations?: number; max_parallel_tasks?: 1 | 2 | 3; group_count?: 1 | 2 | 3; max_provider_calls?: number; max_successful_acquisitions?: number; liveness_policy?: LeaseLivenessPolicyV1 } = {}, temporaryRoot = tmpdir()) {
+  const root = realpathSync(mkdtempSync(join(temporaryRoot, 'brc6-adoption-'))); const home = realpathSync(mkdtempSync(join(temporaryRoot, 'brc6-home-')));
   git(root, ['init', '-q', '-b', 'main']); git(root, ['config', 'user.name', 'Test']); git(root, ['config', 'user.email', 'test@example.invalid']);
   for (const path of ['.ai/harness', '.archcontext/model/nodes', 'src', 'plans/sprints', 'plans/policies']) mkdirSync(join(root, path), { recursive: true });
   writeFileSync(join(root, 'src/index.ts'), 'export {};\n');
