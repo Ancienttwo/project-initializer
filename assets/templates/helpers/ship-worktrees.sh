@@ -1349,7 +1349,7 @@ ship_primary_local_merge() {
 }
 
 cleanup_merged() {
-  local branch path slug merge_mode cleaned=0
+  local branch path slug merge_mode item_status cleaned=0 blocked=0 skipped=0
   ! is_linked_worktree || fail "--cleanup-merged must run from the target primary worktree"
 
   while IFS=$'\t' read -r branch path; do
@@ -1372,25 +1372,45 @@ cleanup_merged() {
     # refusing side, and negation would put it on the accepting side.
     merge_mode="$(worktree_merge_mode "$branch" "$TARGET_BRANCH")"
     if [[ "$merge_mode" == "ancestor" || "$merge_mode" == "absorbed" ]]; then
-      if ! ensure_worktree_status_for_cleanup "$path"; then
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-          run_cmd bash "$helper_dir/contract-worktree.sh" cleanup --slug "$slug" --target "$TARGET_BRANCH" --dry-run
-          cleaned=1
-          continue
+      # Keep errexit active inside the item, including scaffold discard helpers.
+      # Calling this subshell in an if/|| condition would disable that protection.
+      set +e
+      (
+        set -e
+        ensure_worktree_status_for_cleanup "$path"
+        lock_path="$(git -C "$path" rev-parse --git-path locked)"
+        if [[ -e "$lock_path" ]]; then
+          fail "linked worktree is locked, refusing cleanup: $path"
         fi
-      fi
-      guard_dirty_merged_worktree "$branch" "$path" || exit 1
-      if [[ "$DRY_RUN" -eq 1 ]]; then
-        run_cmd bash "$helper_dir/contract-worktree.sh" cleanup --slug "$slug" --target "$TARGET_BRANCH" --dry-run
+        guard_dirty_merged_worktree "$branch" "$path"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+          # run_cmd deliberately skips execution in dry-run; the guard above
+          # is therefore the read-only safety check for this preview.
+          run_cmd bash "$helper_dir/contract-worktree.sh" cleanup --slug "$slug" --target "$TARGET_BRANCH" --dry-run
+        else
+          run_cmd bash "$helper_dir/contract-worktree.sh" cleanup --slug "$slug" --target "$TARGET_BRANCH"
+        fi
+      )
+      item_status=$?
+      set -e
+      if [[ "$item_status" -eq 0 ]]; then
+        cleaned=$((cleaned + 1))
       else
-        run_cmd bash "$helper_dir/contract-worktree.sh" cleanup --slug "$slug" --target "$TARGET_BRANCH"
+        blocked=$((blocked + 1))
+        echo "[Ship] Cleanup blocked: $branch at $path (exit $item_status)" >&2
       fi
-      cleaned=1
     else
       echo "[Ship] Skipped unmerged branch: $branch"
+      skipped=$((skipped + 1))
     fi
   done < <(list_contract_worktrees "$BRANCH_PREFIX")
 
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[Ship] Cleanup summary: would-clean=$cleaned blocked=$blocked skipped=$skipped"
+  else
+    echo "[Ship] Cleanup summary: cleaned=$cleaned blocked=$blocked skipped=$skipped"
+  fi
+  [[ "$blocked" -eq 0 ]] || return 1
   if [[ "$cleaned" -eq 0 ]]; then
     if [[ -n "$SLUG_OVERRIDE" ]]; then
       echo "[Ship] No merged contract worktree to clean for slug: $SLUG_OVERRIDE"

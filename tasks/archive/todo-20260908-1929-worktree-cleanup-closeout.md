@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-08 19:29
+> **Related Plan**: plans/archive/plan-20260908-1851-worktree-cleanup-closeout.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260908-1929
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: 2026-09-08 19:26
+> **Updated**: 2026-09-08 18:52
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
@@ -59,3 +65,4 @@ Audit evidence and closure rationale: `docs/researches/20260907-deferred-goal-le
 | Run the 100 Work Packages / 10 Engineers scale benchmark against the collaborative work exchange snapshot and context packet | The C6 sprint task list named this benchmark, but the property it was there to establish — that the snapshot and packet are deterministic — was proven directly and more strongly by byte identity: two collections over the same sources render byte-identical canonical output, which holds at any size. Building a 100-package / 10-engineer fixture would have added a fixture generator and a timing harness to a slice whose acceptance was already met, so the run was deferred rather than the property left open | Determinism is proven; the scale dimension is unmeasured. Nothing establishes how collection latency, the double-read cost, or the 1,500-token packet budget behave once the store holds ~100 work packages and ~10 concurrent engineers, so a projection cost that degrades non-linearly would first appear in real use rather than in a gate | C9's real multi-agent canary runs — it is the first row with live concurrent actors to measure against — or, earlier, the first real repository whose collaboration store exceeds roughly 20 concurrent work packages |
 | Replace the `await Bun.sleep(2500)` stand-in in `tests/architecture-queue.test.ts` ("record never reclaims a live shared rotation lock at the old two-second threshold") with an observable condition on the child's lock-wait state | The test proves a real invariant — the reclaim threshold must not fire while a peer still holds the shared rotation lock — but it has no handle on the child's lock-wait state, so it approximates "the child is still waiting" by sleeping past the old two-second threshold; giving it a real handle means exposing an observable wait signal from the lock path, which is a source change outside the CI test-gate slice | The suite pays a fixed 2.5s on every run and the assertion is timing-derived rather than state-derived, so it flakes under CI load — observed on run 33980326026 — and a flake there is indistinguishable from a genuine reclaim regression | The next flake of this test, or the next work-package touching the shared rotation lock in `architecture-queue` |
 
+| Complete issue #354 protected Docker supervision consumer acceptance | Kept separate from the approved four-issue repair merge; containment worktree holds unaccepted integration | Worker-writable receipt copies cannot establish supervision provenance; BRC active remains blocked | Resume the existing containment worktree and validate exact invocation binding plus post-exit evidence replacement against its real consumer |
