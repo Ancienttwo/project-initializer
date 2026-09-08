@@ -29,3 +29,11 @@
 
 - User approved latest-main integration and bounded downstream recovery. Main dirty files were byte-verified as the duplicated dependency bump; the manifest delta contained only provenance/digest fields. Original patch preserved at .ai/harness/runs/architecture-drift-recovery/integration/main-duplicate-wip.patch before reverting duplicates and fast-forwarding main.
 - Upstream campaign commit merged without source conflicts. Generated manifest and ledger timestamp were resolved to upstream, with manifest scheduled for canonical regeneration.
+
+## Integrated publication readback
+
+The user approved integration after source acceptance. Current main includes the upstream campaign commit and the drift recovery slice. The original source-run digest above remains historical. The publication diff against parent 4893cf82021a7b8eabfde2ed9995b7cc6532bd9c is bound below; this corrects the CI task-sync metadata without changing implementation or acceptance test scope.
+
+> **Substantive Change SHA256**: `sha256:ae1da16f5e0b3d5cbc7c4036a98f6b3da225430bc69e7e25444a55b49d953f2a`
+
+Global installation was attempted but is not accepted: the CLI copy still declares archctx 0.5.7 while its resolved dependency is 0.5.8, and existing skill/agent ownership guards refused overwrite. Real downstream validation remains paused pending an identified target repository and a consistent installed runtime.
