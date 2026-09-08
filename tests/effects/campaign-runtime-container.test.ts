@@ -52,8 +52,6 @@ if(process.argv.includes('--version')){
     process.on('SIGTERM',()=>{});
     const child=cp.spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],{detached:true,stdio:'ignore'});child.unref();
     console.log('descendant-started');setInterval(()=>{},1000);
-  }else if(setting.mode==='exhaust'){
-    console.log('codex-cli 0.153.4');setInterval(()=>{},1000);
   }else{console.log('codex-cli 0.153.4');process.exit(0)}
   return;
 }
@@ -173,17 +171,36 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
         const common = realpathSync(join(f.root, '.git'));
         const probeDirectory = campaignContainerDirectory(common, { ...f.input.identity, phase: 'version' });
         const workloadDirectory = campaignContainerDirectory(common, f.input.identity);
+        const env = { ...process.env };
+        if (mode === 'exhaust') {
+          const realDocker = Bun.which('docker'); expect(realDocker).not.toBeNull();
+          const bin = mkdtempSync(join(buildRoot, 'deadline-'));
+          // Delay the first post-probe Docker call. The probe itself must have completed successfully.
+          writeFileSync(join(bin, 'docker'), `#!${process.execPath}\n
+            if(require('fs').existsSync(${JSON.stringify(join(probeDirectory, 'terminal.json'))}))
+              await Bun.sleep(Math.max(0,${f.input.deadline_ms}-Date.now()+1000));
+            const result=Bun.spawnSync([${JSON.stringify(realDocker)},...process.argv.slice(2)],{stdout:'inherit',stderr:'inherit'});
+            process.exit(result.exitCode);`, { mode: 0o755 });
+          env.PATH = bin + ':' + process.env.PATH;
+        }
         // A separate process owns preparation so a synchronous hang cannot disable the watchdog.
         const code = `import {prepareCampaignCodexInvocation} from ${JSON.stringify(join(import.meta.dir, '../../src/effects/automation/campaign-runtime.ts'))};
           try {await prepareCampaignCodexInvocation(${JSON.stringify(f.input)}); console.log(JSON.stringify({admitted:true}));}
           catch(error){console.log(JSON.stringify({admitted:false,error:error.message}));}`;
-        const child = Bun.spawn([process.execPath, '-e', code], { env: { ...process.env }, stdout: 'pipe', stderr: 'pipe' });
+        const child = Bun.spawn([process.execPath, '-e', code], { env, stdout: 'pipe', stderr: 'pipe' });
         const watchdog = setTimeout(() => child.kill('SIGKILL'), 15000);
         try {
           const streams = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
           if (mode === 'cancel') {
             while (!existsSync(join(probeDirectory, 'start.json')) && Date.now() < f.input.deadline_ms) await Bun.sleep(20);
             expect(existsSync(join(probeDirectory, 'start.json'))).toBe(true);
+            const handle = JSON.parse(readFileSync(join(probeDirectory, 'created.json'), 'utf8'));
+            let running = false;
+            while (!running && Date.now() < f.input.deadline_ms) {
+              running = JSON.parse(execFileSync('docker', ['--host', handle.endpoint, 'inspect', handle.container_id], { encoding: 'utf8', timeout: 5000 }))[0].State.Running;
+              if (!running) await Bun.sleep(20);
+            }
+            expect(running).toBe(true);
             child.kill('SIGTERM');
           }
           const exit = await child.exited; const [stdout, stderr] = await streams;
@@ -196,7 +213,7 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
             expect(result.error).toContain('deadline expired');
             expect(existsSync(probeDirectory)).toBe(false);
           } else {
-            expect(existsSync(join(probeDirectory, 'terminal.json'))).toBe(true);
+            expect(existsSync(join(probeDirectory, 'terminal.json')), result.error).toBe(true);
             const handle = JSON.parse(readFileSync(join(probeDirectory, 'created.json'), 'utf8'));
             const inspected = JSON.parse(execFileSync('docker', ['--host', handle.endpoint, 'inspect', handle.container_id], { encoding: 'utf8', timeout: 5000 }))[0];
             expect(inspected.State.Running).toBe(false); expect(inspected.State.Pid).toBe(0);
@@ -204,7 +221,11 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
             expect(terminal.inactive).toBe(true);
             if (mode === 'missing' || mode === 'invalid') expect(result.error).toContain('not an exact CLI version');
             if (mode === 'descendant') expect(terminal.stdout_sha256).toBe(canonicalMessageDigest({ bytes: 'descendant-started\n' }));
-            if (mode === 'exhaust') expect(terminal.stdout_sha256).toBe(canonicalMessageDigest({ bytes: 'codex-cli 0.153.4\n' }));
+            if (mode === 'exhaust') {
+              expect(terminal.stdout_sha256).toBe(canonicalMessageDigest({ bytes: 'codex-cli 0.153.4\n' }));
+              expect(terminal.exit_code).toBe(0); expect(terminal.output_complete).toBe(true);
+              expect(terminal.termination_cause).toBe('completed');
+            }
             if (mode === 'flood') expect(terminal.output_complete).toBe(false);
             if (mode === 'cancel') expect(terminal.termination_cause).toBe('cancelled');
           }
