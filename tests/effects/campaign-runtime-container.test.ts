@@ -1,5 +1,5 @@
 import { canonicalMessageDigest } from '../../src/core/messages/mechanics';
-import { campaignContainerJournalRoot } from '../../src/effects/automation/campaign-container';
+import { campaignContainerJournalRoot, cleanupCampaignContainer } from '../../src/effects/automation/campaign-container';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, realpathSync } from 'fs';
 import { tmpdir } from 'os';
@@ -23,8 +23,12 @@ afterEach(() => {
     try { for (const entry of readdirSync(journals)) {
       const request = JSON.parse(readFileSync(join(journals, entry, 'request.json'), 'utf8'));
       if (request.expected.fields['Config.WorkingDir'] !== root) continue;
-      const result = Bun.spawnSync(['docker', '--host', request.endpoint, 'rm', '-f', request.name], { timeout: 5000 });
-      if (result.exitCode !== 0) throw new Error('runtime fixture container cleanup failed');
+      const present = Bun.spawnSync(['docker', '--host', request.endpoint, 'container', 'ls', '--all', '--filter', `name=^/${request.name}$`, '--format', '{{.ID}}'], { timeout: 5000 });
+      if (present.exitCode !== 0) throw new Error('runtime fixture container inventory failed');
+      if (new TextDecoder().decode(present.stdout).trim()) {
+        const result = Bun.spawnSync(['docker', '--host', request.endpoint, 'rm', '-f', request.name], { timeout: 5000 });
+        if (result.exitCode !== 0) throw new Error('runtime fixture container cleanup failed');
+      }
       rmSync(join(journals, entry), { recursive: true, force: true });
     } } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     rmSync(root, { recursive: true, force: true });
@@ -88,6 +92,17 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
     expect(observeCampaignCodexTerminal({ ...input, termination_cause: 'cancelled' }).runtime_effect_inactive).toBeNull();
     await expect(executeCampaignCodexInvocation(invocation, f.root)).rejects.toThrow('already been admitted');
   }, 30000);
+  test('actual terminal consumer retains identical authority after both containers are removed', async () => {
+    const f = fixture('worker'); f.input.deadline_ms = Date.now() + 10000;
+    const invocation = await prepareCampaignCodexInvocation(f.input);
+    const child = await runChild('worker','codex-exec:worker',f.root,f.root,{REPO_HARNESS_PACKAGE_ROOT:join(import.meta.dir,'../..')},f.input.deadline_ms,undefined,invocation);
+    const input = { invocation,worktree:f.root,...child };
+    const before = observeCampaignCodexTerminal(input);
+    expect(before.state).toBe('terminal');
+    while (Date.now()<invocation.deadline_ms) await Bun.sleep(20);
+    for (const handle of [invocation.container,invocation.probe.container]) await cleanupCampaignContainer(handle.directory);
+    expect(observeCampaignCodexTerminal(input)).toEqual(before);
+  },20000);
   test('post-exit replacement of both logs and local summaries cannot forge terminal authority', async () => {
     const f = fixture('worker'); const invocation = await prepareCampaignCodexInvocation(f.input);
     const child = await runChild('worker', 'codex-exec:worker', f.root, f.root,
