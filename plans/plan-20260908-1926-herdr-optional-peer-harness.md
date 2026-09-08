@@ -8,7 +8,7 @@
 > **Source Ref**: (none)
 > **Artifact Level**: work-package
 > **Promotion Reason**: verification_boundary
-> **Substantive Change SHA256**: `sha256:33bec1d5a4b3c5ebc08a2dfbf93d9a56e0227da46f6bfe943cff9fdb9bec73c8`
+> **Substantive Change SHA256**: `sha256:63a42898a257df2153de1d51ea4f2b3d3795b799b5935e8c17de7113b538dda6`
 > **Verification Boundary**: init managed-block rendering with and without herdr, tooling optional capability, assembly of both root partials
 > **Rollback Surface**: single commit; user-level files change only on next repo-harness init
 > **Spec**: `docs/spec.md`
