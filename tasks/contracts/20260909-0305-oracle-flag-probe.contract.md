@@ -148,7 +148,7 @@ exit_criteria:
     {
       "id": "focused-regression",
       "kind": "package_test",
-      "path": "tests/unit/oracle-flag-probe.test.ts",
+      "path": "tests/cli/chatgpt-browser.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",

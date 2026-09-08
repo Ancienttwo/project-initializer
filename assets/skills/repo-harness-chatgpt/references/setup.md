@@ -124,9 +124,9 @@ as verification-only and re-project from the durable checkout afterward.
    `ORACLE_INCOMPATIBLE`/`nodeCompatible:false`, fix the Oracle install/runtime
    and rerun doctor; do not lower repo-harness' own runtime constraints instead.
 4. Treat `agent_actions` such as `chatgpt-oracle-install-pinned`,
-   `chatgpt-oracle-upgrade-pinned`, or `chatgpt-oracle-fix-configured-source` as
-   opt-in GPT Pro setup/repair actions only; never run them from a default
-   install or an unrelated setup check.
+   `chatgpt-oracle-upgrade-pinned`, `chatgpt-oracle-fix-configured-source`, or
+   `chatgpt-oracle-select-fork-build` as opt-in GPT Pro setup/repair actions
+   only; never run them from a default install or an unrelated setup check.
 5. Do not `npx` or auto-download Oracle during setup; prefer an auditable
    pinned binary path.
 

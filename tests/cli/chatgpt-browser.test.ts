@@ -5,6 +5,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { homedir, tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { runBrowserConsult, runBrowserFollowup } from '../../src/cli/chatgpt-browser/engine';
+import { buildRuntimeAcceptanceProbeArgs } from '../../src/cli/chatgpt-browser/oracle-provider';
 import { createCdpClient, waitForVerifiedAssistantText } from '../../src/cli/chatgpt-browser/native-provider';
 import { DEFAULT_SESSION_ROOT, listBrowserSessions, writeBrowserSession } from '../../src/cli/chatgpt-browser/session-store';
 import { assertChatGptMcpContract } from '../helpers/chatgpt-mcp-contract';
@@ -2110,8 +2111,16 @@ describe('chatgpt browser command', () => {
         expect(readiness.oracle.error.recovery).toContain('REPO_HARNESS_ORACLE_BIN');
         expect(readiness.oracle.error.recovery).toContain('--oracle-bin');
         expect(readiness.agent_actions).toHaveLength(1);
-        expect(readiness.agent_actions[0]).toMatchObject({ id: 'chatgpt-oracle-fix-configured-source', requires_agent: true });
-        expect(readiness.agent_actions[0].reason).toContain('writeSession');
+        expect(readiness.agent_actions[0]).toMatchObject({ id: 'chatgpt-oracle-select-fork-build', requires_agent: true, automatic: false });
+        expect(readiness.agent_actions[0].reason).toContain('--write-session');
+        expect(readiness.agent_actions[0].command).toContain('REPO_HARNESS_ORACLE_BIN=<path-to-fork-oracle>');
+        expect(readiness.agent_actions[0].command).not.toContain('bun add -g @steipete/oracle');
+        expect(readiness.agent_actions[0].alternatives.join('\n')).toContain('--oracle-bin <path-to-fork-oracle>');
+        const forkNext = readiness.next.join('\n');
+        expect(forkNext).toContain('the fork build is required');
+        expect(forkNext).toContain('REPO_HARNESS_ORACLE_BIN=<path-to-fork-oracle>');
+        expect(forkNext).toContain('--oracle-bin <path-to-fork-oracle>');
+        expect(forkNext).not.toContain('upgrade oracle or check `oracle --help`');
       } finally {
         rmSync(binDir, { recursive: true, force: true });
       }
@@ -2143,6 +2152,18 @@ describe('chatgpt browser command', () => {
     });
   }, 30_000);
 
+  test('runtime flag probe fails closed when buildOracleCommand stops emitting a mapped flag', () => {
+    const probeDir = mkdtempSync(join(tmpdir(), 'repo-harness-oracle-probe-sync-'));
+    try {
+      expect(buildRuntimeAcceptanceProbeArgs(probeDir)).toContain('--write-session');
+      expect(() => buildRuntimeAcceptanceProbeArgs(probeDir, [
+        { flag: '--write-session', capability: 'writeSession' },
+        { flag: '--retired-evidence-flag', capability: 'networkEvidence' },
+      ])).toThrow('oracle runtime probe is out of sync with buildOracleCommand: --retired-evidence-flag is no longer emitted');
+    } finally {
+      rmSync(probeDir, { recursive: true, force: true });
+    }
+  });
 
   test('oracle doctor is not ready without the copy-profile transport flags', () => {
     withRepo((repoRoot) => {

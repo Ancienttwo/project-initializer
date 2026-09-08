@@ -231,7 +231,10 @@ export const ORACLE_FORK_FLAG_RECOVERY = 'The resolved oracle lacks the repo-har
  * surface cannot drift from the surface the real consult sends. A mapped flag that
  * the builder stopped emitting is a source-of-truth break, not a probe result.
  */
-function buildRuntimeAcceptanceProbeArgs(probeDir: string): string[] {
+export function buildRuntimeAcceptanceProbeArgs(
+  probeDir: string,
+  probeCapabilities: typeof ORACLE_RUNTIME_PROBE_CAPABILITIES = ORACLE_RUNTIME_PROBE_CAPABILITIES,
+): string[] {
   const args = buildOracleCommand(
     { repoRoot: probeDir, prompt: 'repo-harness parser probe', thinking: 'heavy' },
     undefined,
@@ -239,7 +242,7 @@ function buildRuntimeAcceptanceProbeArgs(probeDir: string): string[] {
     join(probeDir, 'network.jsonl'),
     join(probeDir, 'conversation.json'),
   );
-  const unmapped = ORACLE_RUNTIME_PROBE_CAPABILITIES.filter(({ flag }) => !args.includes(flag)).map(({ flag }) => flag);
+  const unmapped = probeCapabilities.filter(({ flag }) => !args.includes(flag)).map(({ flag }) => flag);
   if (unmapped.length > 0) {
     throw new Error(`oracle runtime probe is out of sync with buildOracleCommand: ${unmapped.join(', ')} is no longer emitted`);
   }

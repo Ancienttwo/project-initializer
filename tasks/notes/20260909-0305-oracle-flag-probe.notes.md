@@ -9,7 +9,18 @@
 
 ## Design Decisions
 
-- ...
+- The four fork runtime flags (`--write-session`, `--write-network-evidence`,
+  `--write-conversation-evidence`, `--browser-thinking-time`) collapse onto a
+  single probe boolean instead of four independent capability probes. They ship
+  only in the repo-harness Oracle fork and always land together, so a partial
+  set is not a reachable build; probing each flag separately would multiply
+  spawn cost while adding no state the recovery path can act on differently.
+  The per-flag names are still kept in `ORACLE_RUNTIME_PROBE_CAPABILITIES` so
+  the reported gap and the drift guard name the exact flags.
+- The fork-build agent action fires only when *every* missing capability is a
+  fork capability. A binary that also lacks upstream `--help` capabilities is an
+  ordinary version/source problem, and pointing it at the fork build would hide
+  the real defect.
 
 ## Deviations From Plan Or Spec
 
@@ -19,7 +30,9 @@
 
 | Option | Decision | Reason |
 |--------|----------|--------|
-| ... | ... | ... |
+| Emit `chatgpt-oracle-upgrade-pinned` for a fork-flag gap | Rejected | `bun add -g @steipete/oracle@0.20.0` can never add fork-only flags, so the agent loops forever on the same action. |
+| Emit `chatgpt-oracle-select-fork-build` pointing at `REPO_HARNESS_ORACLE_BIN` / `--oracle-bin` | Chosen | The only real recovery is selecting the fork binary; it needs a human/agent-supplied path, so `automatic: false` and `requires_agent: true` stay. |
+| Probe each fork flag independently | Rejected | The flags are all-or-nothing per build; extra probes cost spawns and change no recovery. |
 
 ## Open Questions
 
