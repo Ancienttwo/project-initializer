@@ -1,3 +1,4 @@
+import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { buildCampaignRevisionReadInstruction, encodeCampaignRevisionPrompt } from '../../core/automation/campaign-revision-evidence';
 import { validateCampaignRevisionRequest, validateCampaignRevisionResult, revisionEvidenceForObservation, type CampaignRevisionResultV2 } from '../../core/automation/campaign-revision-observation';
 import { execFileSync } from 'child_process';
@@ -60,7 +61,9 @@ export async function runCampaignRevisionObservation(input: {
     return target;
   };
   const target = assertCurrentTarget();
-  if (readDevelopmentCampaignPolicyAtRevision(root, target).mode === 'off') refuse('revision observation requires enabled campaign policy');
+  const campaignPolicy = readDevelopmentCampaignPolicyAtRevision(root, target);
+  if (campaignPolicy.mode === 'off') refuse('revision observation requires enabled campaign policy');
+  if (campaignPolicy.mode === 'active') readCampaignProtectionAtRevision(root, target);
   const policy = requireManualGithubPolicy(readCampaignExternalSourcesPolicyAtRevision(root, target));
   withCampaignRevisionAdmission(root, campaignId, authority.authorization_sha256, () => undefined);
   const binding = deps.readBinding(root);

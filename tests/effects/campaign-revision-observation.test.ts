@@ -24,11 +24,12 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const SPRINT = 'plans/sprints/repair.sprint.md';
-function fixture(maxCalls = 4, create = true, finiteSelection = false, mode: 'shadow' | 'active' = 'shadow') {
+function fixture(maxCalls = 4, create = true, finiteSelection = false, mode: 'shadow' | 'active' = 'shadow', protection = true) {
   const capability = CAP, rounds = 1;
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-adoption-'))); const home = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-home-')));
   git(root, ['init', '-q', '-b', 'main']); git(root, ['config', 'user.name', 'Test']); git(root, ['config', 'user.email', 'test@example.invalid']);
   for (const path of ['.ai/harness', '.archcontext/model/nodes', 'src', 'plans/sprints', 'plans/policies']) mkdirSync(join(root, path), { recursive: true });
+  if (protection) writeFileSync(join(root, '.ai/harness/campaign-protection.json'), JSON.stringify({protocol:1,capabilities:[],unmapped_surfaces:[],unmapped_closure:{roots:[],exempt_paths:[]}}));
   writeFileSync(join(root, 'src/index.ts'), 'export {};\n');
   writeFileSync(join(root, '.archcontext/model/nodes/capability.yaml'), JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: capability, kind: 'capability', name: 'Campaign', status: 'active', summary: 'Fixture capability', responsibilities: ['Own fixture'], source: { include: ['src/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } }));
   writeFileSync(join(root, '.ai/harness/policy.json'), JSON.stringify({ context: { capability_source: 'archcontext' }, development_campaign: { version: 1, mode, limits: { maximum_group_count: 1, maximum_issues_per_group: 2, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: finiteSelection ? { kind: 'issue_numbers', issue_numbers: [1] } : { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: 20, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } } }));
@@ -329,4 +330,20 @@ test('complete active intent rejects unavailable revision before the supervision
   await runCampaignRevisionObservation(f.input, { readBinding: f.readBinding, consult: async () => f.browser() });
   const intent = await authoringIntent(f);
   expect(() => requireCampaignActiveAdmission(f.root, intent, f.env)).toThrow('revision evidence is unavailable');
+});
+
+test('active target missing protection refuses before request, budget or provider I/O', async () => {
+  const f=fixture(40,false,false,'active',false); let calls=0;
+  await expect(runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async()=>{calls++;return f.browser();}})).rejects.toMatchObject({code:'campaign_policy_invalid'});
+  expect(calls).toBe(0);
+  expect(readCampaignRevisionRecord(f.root,f.campaign.campaign_id,'request')).toBeNull();
+  expect(budgetStore.listAutomationBudgetRuns(f.root)).toHaveLength(0);
+});
+
+test('active authoring cannot skip protection validation by omitting revision observation', async () => {
+  const f=fixture(40,true,false,'active',false); let calls=0;
+  const status=readDevelopmentCampaignStatus(f.root,f.campaign.campaign_id,f.env);
+  campaignStore.appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:status.current.current_sha256,idempotency_key:'prepare-protection',operation:'prepare_group',observed_at:AT,env:f.env});
+  await expect(startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.campaign.campaign_id,group_number:1,env:f.env},{readBinding:f.readBinding,consult:async()=>{calls++;return f.browser();}})).rejects.toMatchObject({code:'campaign_policy_invalid'});
+  expect(calls).toBe(0);expect(budgetStore.listAutomationBudgetRuns(f.root)).toHaveLength(0);
 });
