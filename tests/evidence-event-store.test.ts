@@ -496,3 +496,16 @@ test("declared path arrays do not exempt known secrets, traversal or free text",
   }
   expect(redactPayloadStrings({ note: path }, [])).not.toEqual({ note: path });
 });
+
+test("declared extensionless path arrays still redact unknown token segments in the ledger", () => {
+  const token = "ghp_abcdefghijklmnopqrstuvwxyz0123456789AB";
+  for (const collection of ["paths", "subject_paths", "selected_paths", "allowed_paths", "files_changed", "reviewed_paths"]) {
+    const payload = { [collection]: ["deploy/" + token] };
+    expect(JSON.stringify(redactPayloadStrings(payload, []))).not.toContain(token);
+    withTempRepo("evidence-path-token", root => {
+      freshGenesisRepo(root);
+      const record = appendEvidenceEvent(root, baseInput({ payload: { kind: "json", value: payload } }));
+      expect(JSON.stringify(record.payload)).not.toContain(token);
+    });
+  }
+});

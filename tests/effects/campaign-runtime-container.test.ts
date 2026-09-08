@@ -52,7 +52,7 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
     modelFreeImage = execFileSync('docker', ['build', '-q', buildRoot], { encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024 }).trim();
   }, 65000);
   function fixture(role: 'worker' | 'verifier', image = modelFreeImage) {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), 'brc-runtime-'))); roots.push(root);
+    const root = realpathSync(mkdtempSync(join(process.platform === 'linux' ? '/var/tmp' : tmpdir(), 'brc-runtime-'))); roots.push(root);
     git(root, 'init', '-q'); mkdirSync(join(root, '.codex/agents'), { recursive: true });
     const profile = `.codex/agents/${role === 'worker' ? 'fast-worker' : 'gatekeeper'}.toml`;
     writeFileSync(join(root, profile), `model="fixture"\nsandbox_mode="${role === 'worker' ? 'workspace-write' : 'read-only'}"\nmodel_reasoning_effort="high"\ndeveloper_instructions="Fixture role"\n`);

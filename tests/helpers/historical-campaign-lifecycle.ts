@@ -1,3 +1,4 @@
+import { tmpdir } from 'os';
 import { campaignContainerJournalRoot } from '../../src/effects/automation/campaign-container';
 import { campaignSessionEvidence } from './campaign-browser-session';
 import { buildContainmentSpec, type CampaignContainer } from '../../src/core/automation/campaign-containment';
@@ -66,7 +67,7 @@ export async function historicalPlanningFixture(twoEngineers = false, requiredRe
     files['.archcontext/model/nodes/second.yaml'] = JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: otherCapability, kind: 'capability', name: 'Second', status: 'active', summary: 'Second fixture capability', responsibilities: ['Own second fixture'], source: { include: ['src/second/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } });
   }
   const f = await createAdoptionRepository('active', 1, capability, {}, files, { ...budgetLimits, max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
-    ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) });
+    ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) }, process.platform === 'linux' ? '/var/tmp' : tmpdir());
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {
     const observations = snapshot.observations.map((o, index) => {

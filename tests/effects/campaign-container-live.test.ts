@@ -17,7 +17,7 @@ afterEach(() => {
   }
 });
 async function prepare(argv: string[], writable = false, duration = 10000) {
-  const root = mkdtempSync(join(tmpdir(), 'brc-contained-test-'));
+  const root = mkdtempSync(join(process.platform === 'linux' ? '/var/tmp' : tmpdir(), 'brc-contained-test-'));
   mkdirSync(join(root, 'work')); mkdirSync(join(root, 'common'));
   const item: { root: string; handle?: CampaignContainer } = { root }; owned.push(item);
   const deadline = Date.now() + duration;
