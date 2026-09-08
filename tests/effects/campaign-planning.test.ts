@@ -80,7 +80,7 @@ test('historical protection rejects directory scope, authority inputs and remove
   }
   expect(() => reject('capability.runtime-harness.removed', ['src/index.ts'])).toThrow('no longer registered');
   const path = '.ai/harness/campaign-protection.json';
-  const inventory = JSON.parse(readFileSync(join(f.root, path), 'utf8')); inventory.capabilities = [];
+  const inventory = JSON.parse(readFileSync(join(f.root, path), 'utf8')); inventory.capabilities = [{ capability_id: 'capability.runtime-harness.fixture' }];
   writeFileSync(join(f.root, path), JSON.stringify(inventory));
   execFileSync('git', ['add', path], { cwd: f.root }); execFileSync('git', ['commit', '-qm', 'changed protection'], { cwd: f.root });
   const proof = readCanonicalTaskPlanProof(f.root, { sprintPath: f.job.sprint_path, taskCell: f.job.source_ref.slice(`sprint:${f.job.sprint_path}#`.length) });

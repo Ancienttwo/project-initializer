@@ -198,3 +198,7 @@ Review corrections: shared protection failures use existing campaign_policy_inva
 Baseline run-20260909T031328-26791: all14 contract criteria passed at71792662; overall preparation was blocked solely because Change Assessment did not declare its existing executable oracle for the new helper. Declare that mapping and use the three affected protection/planning/observation files for final delta verification; do not rerun the eight-file baseline.
 
 > **Substantive Change SHA256**: `sha256:2d8ef123e3ff48743d047e9cacf50e9251c4753ad331a7850c727e2283a5a62c`
+
+Final fixture correction makes the protection mutation non-empty against the minimal fixture registry; the targeted invalidation test passes. Security and architecture delta reviews pass for production source at 9f4e4a8f. No production source changed after that review.
+
+> **Substantive Change SHA256**: `sha256:fff167bce8ae5e57e709f7dd56cd962e6183e96534c97dc0392e462674f622ae`
