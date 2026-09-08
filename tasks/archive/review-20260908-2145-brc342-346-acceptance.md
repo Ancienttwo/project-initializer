@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 21:45
+> **Related Plan**: plans/archive/plan-20260908-2102-brc342-346-acceptance.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-2145
+> **Archive Projection V1**: `plans/plan-20260908-2102-brc342-346-acceptance.md` => `plans/archive/plan-20260908-2102-brc342-346-acceptance.md`
+> **Archive Projection V1**: `tasks/notes/20260908-2102-brc342-346-acceptance.notes.md` => `tasks/archive/notes-20260908-2145-brc342-346-acceptance.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-2102-brc342-346-acceptance.contract.md` => `tasks/archive/contract-20260908-2145-brc342-346-acceptance.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-2102-brc342-346-acceptance.review.md` => `tasks/archive/review-20260908-2145-brc342-346-acceptance.md`
+
 # Task Review: brc342-346-acceptance
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-2102-brc342-346-acceptance.md
-> **Contract**: tasks/contracts/20260908-2102-brc342-346-acceptance.contract.md
-> **Notes File**: tasks/notes/20260908-2102-brc342-346-acceptance.notes.md
+> **Plan**: plans/archive/plan-20260908-2102-brc342-346-acceptance.md
+> **Contract**: tasks/archive/contract-20260908-2145-brc342-346-acceptance.md
+> **Notes File**: tasks/archive/notes-20260908-2145-brc342-346-acceptance.md
 > **Recommendation**: pass
 > **Review Rubric Version**: 2
 > **Reviewed Subject SHA256**: sha256:b2a7bb100b6f51846c78041b2d437c9594d44202956ec65a7cecff874f57dd8b
