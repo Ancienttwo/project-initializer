@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-08 10:24
+> **Related Plan**: plans/archive/plan-20260908-1006-brc14-response-capture.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1024
+> **Archive Projection V1**: `plans/plan-20260908-1006-brc14-response-capture.md` => `plans/archive/plan-20260908-1006-brc14-response-capture.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1006-brc14-response-capture.notes.md` => `tasks/archive/notes-20260908-1024-brc14-response-capture.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1006-brc14-response-capture.contract.md` => `tasks/archive/contract-20260908-1024-brc14-response-capture.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1006-brc14-response-capture.review.md` => `tasks/archive/review-20260908-1024-brc14-response-capture.md`
+
 # BRC14 response capture decisions
 
 The existing Oracle exporter owns the page-stream format. The wrapper retains private original bytes and a descriptor-bound transport observation only. No resolved-commit DTO or ChatGPT tool parser is invented. Current historical conversation results do not contain a matching original tool request or bind an Oracle fresh-audit invocation.
