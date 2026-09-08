@@ -35,3 +35,11 @@ Final remote diff against c17b004a, following conflict resolution:
 > **Substantive Change SHA256**: `sha256:9904fa74e48c54924f945d8521694fad686fe90656fb6bcb09c9a500f305140b`
 
 TypeScript, helper parity, six integrity checks and exact cleanup source/test equality passed on the combined candidate. Final PR CI remains its own required evidence.
+
+## Single directly blocking out-of-scope correction
+
+CI 34221837558 failed before tests: c17b004a changed the generated agentic-development-flow document without updating assets/reference-configs/agentic-development-flow.md. The exact accepted paragraph was added to that canonical template, then the standard projection/check was run. No wording or runtime behavior changed. This is the task's one directly blocking out-of-scope fix; another independent fault requires stopping.
+
+Remote diff including the source-template correction:
+
+> **Substantive Change SHA256**: `sha256:4166997a8fadcde4fa65f5c83406ff47a556f76ecf0e5b26620d29695c029127`
