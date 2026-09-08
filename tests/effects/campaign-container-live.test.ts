@@ -114,3 +114,26 @@ test.skipIf(!image)('interruption publication crash never leaves a partial autho
   const result = await reconcileCampaignContainer(f.handle);
   expect(result.inactive).toBe(true); expect(result.output_complete).toBe(false);
 }, 15000);
+
+// Replay a stale running snapshot at the cleanup boundary, after actual namespace exit.
+test.skipIf(!image)('cleanup consumes fresh inactivity when kill loses the namespace-exit race', async () => {
+  const f = await prepare(['/usr/local/bin/codex', '--version']);
+  const code = `import * as cp from 'child_process'; import { mock } from 'bun:test';
+    const original=cp.spawn; let inspections=0, kills=0;
+    mock.module('child_process',()=>({...cp,spawn(executable,args,options){
+      if(args.includes('kill')) kills++;
+      if(args.includes('inspect') && args.includes('--type') && ++inspections===2){
+        const transform = 'const cp=require("child_process"); const result=cp.spawnSync("docker",'+JSON.stringify(args)+', {encoding:"utf8"}); if(result.status!==0)process.exit(1); const value=JSON.parse(result.stdout); value[0].State.Running=true; value[0].State.Status="running"; value[0].State.Pid=123; process.stdout.write(JSON.stringify(value));';
+        return original(process.execPath,['-e',transform],options);
+      }
+      return original(executable,args,options);
+    }}));
+    const {runCampaignContainer}=await import(${JSON.stringify(join(import.meta.dir, '../../src/effects/automation/campaign-container.ts'))});
+    const result=await runCampaignContainer(${JSON.stringify(f.handle)},${f.deadline});
+    console.log(JSON.stringify({inactive:result.inactive,exit:result.exit_code,kills}));`;
+  const child = Bun.spawn([process.execPath, '-e', code], { env: {...process.env}, stdout: 'pipe', stderr: 'pipe' });
+  const streams=Promise.all([new Response(child.stdout).text(),new Response(child.stderr).text()]);
+  const exit=await child.exited; const [stdout,stderr]=await streams;
+  expect(exit,stderr).toBe(0);
+  expect(JSON.parse(stdout)).toEqual({inactive:true,exit:0,kills:1});
+}, 20000);

@@ -183,7 +183,8 @@ export async function runCampaignContainer(handle: CampaignContainer, deadline: 
   const cleanupDeadline = Date.now() + CLEANUP_MS;
   let value = await inspect(handle, cleanupDeadline);
   if (value.State.Running) {
-    await api(['kill', '--signal', 'KILL', handle.container_id], cleanupDeadline, handle.endpoint);
+    // PID1 may exit between inspect and kill. Only fresh daemon readback proves inactivity.
+    await command(['kill', '--signal', 'KILL', handle.container_id], cleanupDeadline, handle.endpoint);
     value = await inspect(handle, cleanupDeadline);
   }
   const inactive = stopped(value) || (!started && value.State.Status === 'created' && value.State.Pid === 0);

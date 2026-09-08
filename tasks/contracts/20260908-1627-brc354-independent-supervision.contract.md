@@ -172,13 +172,21 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "expensive",
-      "evidence_policy": "current_exact",
-      "necessity": "Covers protocol cutover and preserved failure settlement, recovery, cleanup, FIFO and cancellation paths. No full suite.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Retain passing lifecycle/closeout/settlement baseline at db261e16. The only production delta changes cleanup kill exit handling to consume fresh inactivity; current real Docker tests cover this race and recovery. No lifecycle consumer changes.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
         ]
-      }
+      },
+      "baseline": {
+        "run_file": ".ai/harness/runs/verification-vx-a9feb18d252440e5a024.json",
+        "execution_id": "vx-a9feb18d252440e5a024"
+      },
+      "delta_checks": [
+        "runtime-docker",
+        "typecheck"
+      ]
     },
     {
       "id": "typecheck",
