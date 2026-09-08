@@ -47,10 +47,10 @@
 > **Reviewed Subject SHA256**: sha256:d178f5531656ef388e593b043ec039e3f6aa51d5cf4b9c65340b27defbc8ef0b
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: 38c26b2ada6a3071df40745b8eed6e06315695b6
-> **Verification Evidence SHA256**: sha256:24d31946e23b45cd9f9bb094fed72172a66d845b803e8957aeff44ca9fb8468a
-> **Issued At**: 2026-09-08T06:20:27.437Z
+> **Verification Evidence SHA256**: sha256:b99a8ccdc8ff849e5e200cacff44215fb1740315ae3aa495e9f8116879dac28b
+> **Issued At**: 2026-09-08T06:24:38.218Z
 
-- Summary: Independent architecture/composition, security/assumption and cascade/abuse review passed. Working-turn identity finding fixed in 037abfb4 and independently rechecked. Canonical verification passes 14/14; Oracle producer passes 74 focused tests, typecheck, lint and build. This accepts the bounded history-evidence implementation only; complete-group live audit and active/manual canary remain pending.
+- Summary: Bounded provider history evidence implementation passed independent architecture, security and cascade reviews; working-turn correction rechecked. 14 canonical criteria passed, Oracle 74 focused tests and build passed. Source reference corrected to prevent closing whole BRC14; no semantic code change. Full live BRC14 and BRC15 remain pending.
 - Findings: none
 
 ## Behavior Diff Notes
