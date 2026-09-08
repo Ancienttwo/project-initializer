@@ -21,7 +21,7 @@ Prepare a reviewable strict-admission restoration with positive and negative rea
 
 ## Scope
 
-- In scope: obsolete unconditional refusal, real-store regression expectations, durable evidence boundary, and the single directly blocking frozen capability-source selection defect observed on AiphaBee.
+- In scope: obsolete unconditional refusal, real-store regression expectations, durable evidence boundary, the frozen capability-source selection defect, and the observed BRC14 prompt/resource mismatch affecting both revision observation and final audit.
 - Out of scope: activation policy changes, live provider operations, grants, stopped campaigns, package release.
 - Taste constraints: <!-- advisory only, no run gate; default style/taste lives in AGENTS.md and the minimal-change policy, use this to record a per-task override -->
 
@@ -71,6 +71,9 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - src/core/automation/campaign-revision-evidence.ts
+  - src/effects/automation/campaign-revision-observation.ts
+  - src/effects/automation/campaign-fresh-audit.ts
   - src/effects/automation/campaign-revision-admission.ts
   - src/effects/automation/campaign-capability-registry.ts
   - tests/effects/
@@ -149,7 +152,7 @@ exit_criteria:
     {
       "id": "revision-admission",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-step.test.ts tests/effects/campaign-planning.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/effects/campaign-fresh-audit.test.ts tests/unit/campaign-revision-evidence.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
@@ -273,6 +276,7 @@ the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
 
+- Baseline: run-20260908T230034-3349 retains its original 86-case source subject. The subsequent delta changes only revision-resource prompt construction and its two callers. Final coverage names observation, fresh audit and evidence decoder suites; no full-suite trigger.
 - Functional behavior:
 - Edge cases:
 - Regression risks:
