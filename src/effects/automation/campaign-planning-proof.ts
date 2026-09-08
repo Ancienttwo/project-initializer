@@ -12,7 +12,7 @@ import type { IssueBatchIntentV1 } from '../../core/automation/issue-batch';
 import { markdownHeader, parseAllowedPaths } from '../../core/state/artifact-parsers';
 import { readIssueBatchAdoptionArtifact, readIssueBatchIntent } from './issue-batch-store';
 import type { CampaignPublicationV1 } from './issue-batch-publication';
-import { readDevelopmentCampaignPolicyAtRevision, readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
+import { DevelopmentCampaignPolicyError, readDevelopmentCampaignPolicyAtRevision, readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
 import { readStoredProgramAuthorization } from './grant-store';
 import { readDevelopmentCampaignStatus } from './development-campaign-store';
 import { readPlanningRecord, storedPlanningIntents } from './campaign-planning-store';
@@ -60,11 +60,18 @@ export function requireCampaignPlanningAuthority(root: string, intent: IssueBatc
   if (intent.group_number > policy.limits.maximum_group_count || manifest.slots.length > policy.limits.maximum_issues_per_group) throw new CampaignPlanningError('human_attention_required', 'campaign exceeds current policy');
   return { grant, publication: p, manifest, target, policy };
 }
+function planningProtection(root: string, target: string) {
+  try { return readCampaignProtectionAtRevision(root, planningGit(root, ['rev-parse', '--verify', `${target}^{commit}`])); }
+  catch (error) {
+    if (error instanceof DevelopmentCampaignPolicyError) throw new CampaignPlanningError('planning_failed', error.message);
+    throw error;
+  }
+}
 export function planningProtectionDigest(root: string, target: string): string {
-  return readCampaignProtectionAtRevision(root, planningGit(root, ['rev-parse', '--verify', `${target}^{commit}`])).digest;
+  return planningProtection(root, target).digest;
 }
 export function rejectProtectedPlanning(root: string, target: string, capability: string, paths: readonly string[]): void {
-  const { inventory, registry, authorityInputs } = readCampaignProtectionAtRevision(root, planningGit(root, ['rev-parse', '--verify', `${target}^{commit}`]));
+  const { inventory, registry, authorityInputs } = planningProtection(root, target);
   const protectedIds = inventory.capabilities.map(c => c.capability_id);
   if (protectedIds.includes(capability)) throw new CampaignPlanningError('protected_surface_detected', `protected capability: ${capability}`);
   if (!registry.capabilities.some(c => `capability.${c.domain}.${c.name}` === capability)) throw new CampaignPlanningError('source_stale', 'primary capability is no longer registered');

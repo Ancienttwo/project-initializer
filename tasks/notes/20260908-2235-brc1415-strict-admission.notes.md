@@ -193,3 +193,8 @@ P3: use one target-owned `.ai/harness/campaign-protection.json`; share the froze
 Regression evidence: /tmp/brc-target-protection-red.log fails against the original planner with the exact missing fixture error. Updated five-file focused run:98 pass,0 fail,892 assertions. The new target-owned guard was tested without ArchContext or repo-harness test directories.
 
 > **Substantive Change SHA256**: `sha256:3bd97974262cf98b408fbbea321f73b3146315172b7d838872d0a6a61af7034a`
+
+Review corrections: shared protection failures use existing campaign_policy_invalid; only the planning adapter maps to planning_failed. Protected capability IDs must resolve in the selected registry, so typos fail before provider I/O. Historical fixtures now explicitly declare only their own capability protection set while retaining the existing unmapped-path rules.
+Baseline run-20260909T031328-26791: all14 contract criteria passed at71792662; overall preparation was blocked solely because Change Assessment did not declare its existing executable oracle for the new helper. Declare that mapping and use the three affected protection/planning/observation files for final delta verification; do not rerun the eight-file baseline.
+
+> **Substantive Change SHA256**: `sha256:2d8ef123e3ff48743d047e9cacf50e9251c4753ad331a7850c727e2283a5a62c`

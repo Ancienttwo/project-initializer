@@ -58,7 +58,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"target-protection-regression","kind":"deterministic_test","paths":["src/effects/automation/campaign-protection.ts"]}]}
 ```
 
 ## Acceptance Policy
@@ -164,12 +164,12 @@ exit_criteria:
     {
       "id": "target-protection-regression",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-planning.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/campaign-acquisition.test.ts tests/effects/campaign-fresh-audit.test.ts tests/characterization/repair-campaign-authority-freeze.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-planning.test.ts tests/effects/campaign-revision-observation.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Covers selected registry portability, protection authority and fingerprint refusal, pre-provider active validation, moved fixture composition through adoption/acquisition and fresh audits, and unchanged self-host protected surfaces. Prior PR369 CI is baseline; no local full-suite trigger.",
+      "necessity": "The eight-file adoption/acquisition/fresh-audit and characterization baseline passed at71792662 in run-20260909T031328-26791; only assessment declaration lacked the oracle binding. Final delta validates selected inventory membership, typed policy/planning errors and active pre-provider refusals. Unchanged source protection bytes and other runtime behavior retain baseline evidence.",
       "inputs": {
         "env": []
       }

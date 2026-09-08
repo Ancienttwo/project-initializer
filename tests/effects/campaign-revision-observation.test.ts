@@ -334,7 +334,7 @@ test('complete active intent rejects unavailable revision before the supervision
 
 test('active target missing protection refuses before request, budget or provider I/O', async () => {
   const f=fixture(40,false,false,'active',false); let calls=0;
-  await expect(runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async()=>{calls++;return f.browser();}})).rejects.toThrow('protection inventory');
+  await expect(runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async()=>{calls++;return f.browser();}})).rejects.toMatchObject({code:'campaign_policy_invalid'});
   expect(calls).toBe(0);
   expect(readCampaignRevisionRecord(f.root,f.campaign.campaign_id,'request')).toBeNull();
   expect(budgetStore.listAutomationBudgetRuns(f.root)).toHaveLength(0);
@@ -344,6 +344,6 @@ test('active authoring cannot skip protection validation by omitting revision ob
   const f=fixture(40,true,false,'active',false); let calls=0;
   const status=readDevelopmentCampaignStatus(f.root,f.campaign.campaign_id,f.env);
   campaignStore.appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:status.current.current_sha256,idempotency_key:'prepare-protection',operation:'prepare_group',observed_at:AT,env:f.env});
-  await expect(startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.campaign.campaign_id,group_number:1,env:f.env},{readBinding:f.readBinding,consult:async()=>{calls++;return f.browser();}})).rejects.toThrow('protection inventory');
+  await expect(startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.campaign.campaign_id,group_number:1,env:f.env},{readBinding:f.readBinding,consult:async()=>{calls++;return f.browser();}})).rejects.toMatchObject({code:'campaign_policy_invalid'});
   expect(calls).toBe(0);expect(budgetStore.listAutomationBudgetRuns(f.root)).toHaveLength(0);
 });

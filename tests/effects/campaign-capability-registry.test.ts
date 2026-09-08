@@ -62,3 +62,11 @@ test.each([undefined,{protocol:1},{...protection,unmapped_surfaces:[{paths:['../
   const f=fixture('registry'); if(value!==undefined)f.write('.ai/harness/campaign-protection.json',value);
   expect(()=>planningProtectionDigest(f.root,f.commit())).toThrow();
 });
+
+test('target protection IDs must resolve in the same selected registry', () => {
+  const f=fixture('registry');
+  f.write('.ai/harness/campaign-protection.json',{...protection,capabilities:[{capability_id:'capability.product.registrx'}]});
+  expect(()=>planningProtectionDigest(f.root,f.commit())).toThrow('protection inventory');
+  f.write('.ai/harness/campaign-protection.json',{...protection,capabilities:[{capability_id:'capability.product.registry'}]});
+  expect(()=>rejectProtectedPlanning(f.root,f.commit(),'capability.product.registry',['src/new.ts'])).toThrow('protected capability');
+});

@@ -58,7 +58,7 @@ const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 export async function historicalPlanningFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number; max_provider_failures?: number } = {}, nonReproducible = false, planningOnly = false, verifiedRevision = false) {
   const capability = 'capability.runtime-harness.fixture';
-  const inventory = readFileSync(join(import.meta.dir, '../../.ai/harness/campaign-protection.json'), 'utf8');
+  const inventory = JSON.stringify({ ...JSON.parse(readFileSync(join(import.meta.dir, '../../.ai/harness/campaign-protection.json'), 'utf8')), capabilities: [] });
   const otherCapability = 'capability.runtime-harness.second';
   const files: Record<string, string> = { '.ai/harness/campaign-protection.json': inventory };
   if (retryPolicy) files['plans/policies/publication.json'] = JSON.stringify({ ...publicationPolicy, retry_policy: retryPolicy });
