@@ -19,7 +19,7 @@ export function requireCampaignActiveAdmission(repoRoot: string, candidate: Issu
     const status = readDevelopmentCampaignStatus(root, intent.campaign_id, env);
     const grant = readExactAuthorityBinding(root, status.campaign, env);
     const requireThat = (ok: unknown) => { if (!ok) throw new Error('campaign revision admission binding differs'); };
-    requireThat(Date.parse(grant.expires_at) > Date.now() && ['group_preparing','group_running'].includes(status.current.state));
+    requireThat(['group_preparing','group_running'].includes(status.current.state));
     requireThat(intent.repository_id === grant.repository_id && intent.target_ref === grant.target_ref
       && intent.chrome_profile_directory === grant.campaign!.chrome_profile_directory
       && intent.base_main_sha === resolveCampaignGroupBaseline(root,status.campaign,status.events,intent.group_number,env));
@@ -40,6 +40,8 @@ export function requireCampaignActiveAdmission(repoRoot: string, candidate: Issu
       evidence_refs:[{ref:`revision-observation:${result.request_sha256}`,sha256:automationDigest(result)}],env});
     requireThat(usage?.outcome === 'progress');
     const current = readAutomationBudgetStatus(root,reservation.automation_run_id,env);
+    const now = Date.now();
+    requireThat(now < Date.parse(grant.expires_at) && now < Date.parse(current.budget.deadline_at));
     requireThat(current.budget.authorization.authorization_sha256 === grant.authorization_sha256
       && current.current.state === 'active' && current.stop_receipt === null
       && !current.current.open_reservation_sha256s.includes(reservation.reservation_sha256));

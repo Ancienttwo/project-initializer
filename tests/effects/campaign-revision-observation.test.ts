@@ -290,3 +290,14 @@ test('self-consistent changed history cannot borrow the original ledger settleme
   const spy=spyOn(campaignStore,'readCampaignRevisionRecord').mockImplementation((root,id,name)=>name==='result'?changed:original(root,id,name));
   try {expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('stored usage does not bind');} finally {spy.mockRestore();}
 });
+
+test('active revision admission rejects elapsed budget deadline before a stop receipt exists', async () => {
+  const f=fixture(4,true,false,'active');
+  await runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async(input:any)=>historyBrowser(f,input.prompt)});
+  const intent=await authoringIntent(f), budget=f.budget();
+  expect(budget.current.state).toBe('active');expect(budget.stop_receipt).toBeNull();
+  const now=Date.parse(budget.budget.deadline_at)+1;
+  expect(now).toBeLessThan(Date.parse(f.authorization.expires_at));
+  const clock=spyOn(Date,'now').mockReturnValue(now);
+  try {expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');} finally {clock.mockRestore();}
+});

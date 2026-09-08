@@ -7,7 +7,7 @@
 > **Last Updated**: 2026-09-08 14:46
 > **Lifecycle**: notes
 
-> **Substantive Change SHA256**: `sha256:a9479b7f38653a72b65deef2f0719bed980b3f58d7b6a83c4c479b8f483d66aa`
+> **Substantive Change SHA256**: `sha256:142356b4635011ebdd4f736d7cf9161efbe77d463a89cef053945de3b13a8f22`
 
 ## Design Decisions
 
@@ -50,3 +50,7 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 - Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
 - Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
 - Promote to harness asset files only after verification across more than one task or fixture.
+
+## Review correction
+
+Architecture review identified budget deadline expiry without a stop receipt. The original guard relied on the active projection, which does not materialize elapsed deadlines. /tmp/brc14-deadline-red.log proves the prior implementation accepted that state. The guard now checks grant expiry and budget deadline with one current timestamp. The regression runs without a live provider. The previous untracked recovery-only handoff was moved to ignored .ai/harness/runs/ so it remains available without entering the commit surface.
