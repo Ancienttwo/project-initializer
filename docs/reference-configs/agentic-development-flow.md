@@ -98,7 +98,6 @@ work, or shared contracts, report the P1/P2/P3 evidence explicitly.
 
 Local merge closeout runs verification → publication readback → cleanup of that task’s worktree and local branch → completion. If cleanup is refused, `contract-worktree finish --merge` returns nonzero and reports **merged; cleanup incomplete** with the publication SHA and a targeted cleanup command. The publication remains committed; resolve the retained worktree and retry only cleanup, not merge. Draft PR / `finish --no-merge` keeps its worktree. Operator-invoked `ship-worktrees --cleanup-merged` processes entries independently, preserves blocked entries, continues safe entries, and returns nonzero after the summary if any cleanup was blocked. Its dry-run previews the full batch without deleting anything.
 
-
 ## Passive Plan Capture
 
 - Codex Plan mode and Waza `/think` do not need the user to remember `new-sprint` or `plan-to-todo`.
