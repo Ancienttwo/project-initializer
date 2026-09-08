@@ -10,7 +10,7 @@ import {
 } from './binding';
 import { resolveBrowserOutputPath } from './file-policy';
 import { checkNativeChatgptSession, nativeDebuggingBlockedByDefaultProfile, nativeProviderAvailable, runNativeProvider } from './native-provider';
-import { buildOracleCommand, probeOracle, REQUIRED_ORACLE_VERSION, resolveOracleBin, runOracleProvider, supportsBrowserAppPreselect, validateOracleProfileBinding, validateOracleVersion } from './oracle-provider';
+import { buildOracleCommand, ORACLE_FORK_FLAG_RECOVERY, ORACLE_RUNTIME_PROBE_CAPABILITIES, probeOracle, REQUIRED_ORACLE_VERSION, resolveOracleBin, runOracleProvider, supportsBrowserAppPreselect, validateOracleProfileBinding, validateOracleVersion } from './oracle-provider';
 import { assemblePromptBundle } from './prompt-assembler';
 import { scanPromptBundle } from './secret-scan';
 import {
@@ -62,6 +62,9 @@ const EMPTY_ORACLE_CAPABILITIES = {
   copyProfile: false,
   browserChromeProfile: false,
   browserThinkingTime: false,
+  writeSession: false,
+  networkEvidence: false,
+  conversationEvidence: false,
   chatgptUrl: false,
   heartbeat: false,
 };
@@ -266,6 +269,9 @@ export async function browserDoctor(
     .map(([capability]) => capability);
   const oracleVersionCompatible = oracleProbe?.versionCompatible === true;
   const oracleVersionError = oracleProbe ? validateOracleVersion(oracleProbe.version).error : undefined;
+  const missingForkCapabilities = ORACLE_RUNTIME_PROBE_CAPABILITIES
+    .filter(({ capability }) => oracleCapabilities[capability] !== true)
+    .map(({ flag }) => flag);
   const oracleCapabilitiesReady = Boolean(oracleProbe?.nodeCompatible && oracleVersionCompatible && missingOracleCapabilities.length === 0);
   const nativePresent = await nativeProviderAvailable();
   const bindingResult = readBrowserBinding(repoRoot);
@@ -338,7 +344,9 @@ export async function browserDoctor(
     ? oracleResolution.error ?? (!oracleCapabilitiesReady && oraclePresent ? oracleVersionError ?? {
       code: 'ORACLE_INCOMPATIBLE',
       message: `oracle binary did not report required browser-mode capabilities: ${missingOracleCapabilities.join(', ')}`,
-      recovery: 'Upgrade oracle or check `oracle --help`; repo-harness requires every flag it may send at runtime.',
+      recovery: missingForkCapabilities.length > 0
+        ? ORACLE_FORK_FLAG_RECOVERY
+        : 'Upgrade oracle or check `oracle --help`; repo-harness requires every flag it may send at runtime.',
     } : undefined)
     : undefined;
   const agentActions = buildOracleAgentActions({

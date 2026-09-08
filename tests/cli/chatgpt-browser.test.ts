@@ -126,13 +126,28 @@ function sessionDescriptorFixture(id: string, parent: string | null = null): str
   ];
 }
 
-function writeFakeOracle(path: string, opts: { help?: string; sessionLine?: string; body?: string[] } = {}): string {
+// The real consult path probes runtime-flag acceptance with a `--dry-run json`
+// preview before it spawns anything, so a fake oracle must answer that probe:
+// accepting it (exit 0) or rejecting the fork-only `--write-session` flag the way
+// upstream Oracle's argument parser does.
+function writeFakeOracle(path: string, opts: { help?: string; sessionLine?: string; body?: string[]; rejectWriteSession?: boolean } = {}): string {
   writeFileSync(path, [
     '#!/bin/sh',
     'case "$1" in',
     '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
     `  --help|--debug-help) printf "%s\\n" "${opts.help ?? FAKE_ORACLE_HELP}"; exit 0;;`,
     'esac',
+    ...(opts.rejectWriteSession
+      ? [
+        'for a in "$@"; do',
+        '  if [ "$a" = "--write-session" ]; then printf "%s\\n" "error: unknown option \'--write-session\'" >&2; exit 1; fi',
+        'done',
+      ]
+      : [
+        'for a in "$@"; do',
+        '  if [ "$a" = "--dry-run" ]; then exit 0; fi',
+        'done',
+      ]),
     ...(opts.body ?? [
       'ARGS="$*"',
       'OUT=""',
@@ -388,6 +403,9 @@ describe('chatgpt browser command', () => {
           'case "$1" in',
           '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
           'esac',
+          'for a in "$@"; do',
+          '  if [ "$a" = "--dry-run" ]; then exit 0; fi',
+          'done',
           'OUT=""',
           'FILE=""',
           'PREV=""',
@@ -1152,7 +1170,11 @@ describe('chatgpt browser command', () => {
           '#!/bin/sh',
           'case "$1" in',
           '  --version) printf "%s\\n" "0.20.0"; exit 0;;',
+          `  --help|--debug-help) printf "%s\\n" "${FAKE_ORACLE_HELP}"; exit 0;;`,
           'esac',
+          'for a in "$@"; do',
+          '  if [ "$a" = "--dry-run" ]; then exit 0; fi',
+          'done',
           'printf "%s\\n" "$@" > "$FAKE_ORACLE_ARGS_PATH"',
           '(',
           '  trap "" TERM',
@@ -1945,6 +1967,9 @@ describe('chatgpt browser command', () => {
           browserModelStrategy: true,
           copyProfile: true,
           browserChromeProfile: true,
+          writeSession: true,
+          networkEvidence: true,
+          conversationEvidence: true,
           browserThinkingTime: true,
           chatgptUrl: true,
           heartbeat: true,
@@ -2016,10 +2041,13 @@ describe('chatgpt browser command', () => {
           copyProfile: false,
           browserChromeProfile: false,
           browserThinkingTime: false,
+          writeSession: false,
+          networkEvidence: false,
+          conversationEvidence: false,
           chatgptUrl: false,
           heartbeat: false,
         });
-        expect(readiness.oracle.missingCapabilities).toEqual(['browserFollowup', 'sessionFollowup', 'browserArchive', 'browserModelStrategy', 'copyProfile', 'browserChromeProfile', 'browserThinkingTime', 'chatgptUrl', 'heartbeat']);
+        expect(readiness.oracle.missingCapabilities).toEqual(['browserFollowup', 'sessionFollowup', 'browserArchive', 'browserModelStrategy', 'copyProfile', 'browserChromeProfile', 'browserThinkingTime', 'writeSession', 'networkEvidence', 'conversationEvidence', 'chatgptUrl', 'heartbeat']);
         expect(readiness.oracle.error.message).toContain('browserFollowup');
         expect(readiness.agent_actions).toHaveLength(1);
         expect(readiness.agent_actions[0]).toMatchObject({
@@ -2035,6 +2063,86 @@ describe('chatgpt browser command', () => {
       }
     });
   }, 30_000);
+
+  // The session-descriptor and evidence flags live only in the repo-harness Oracle
+  // fork. `--help` does not list them, so acceptance is proved by a dry-run probe.
+  test('oracle doctor reports ready when the binary accepts the runtime flag probe', () => {
+    withRepo((repoRoot) => {
+      const binDir = mkdtempSync(join(tmpdir(), 'repo-harness-fake-oracle-fork-flags-'));
+      try {
+        const oraclePath = writeFakeOracle(join(binDir, 'oracle'));
+        const doctor = runChatgpt(['browser-doctor', '--repo', repoRoot, '--provider', 'oracle', '--oracle-bin', oraclePath, '--json']);
+        expect(doctor.status).toBe(0);
+        const readiness = JSON.parse(doctor.stdout);
+        expect(readiness.status).toBe('ready');
+        expect(readiness.oracle.missingCapabilities).toEqual([]);
+        expect(readiness.oracle.capabilities).toMatchObject({
+          writeSession: true,
+          networkEvidence: true,
+          conversationEvidence: true,
+          browserThinkingTime: true,
+        });
+        expect(readiness.agent_actions).toEqual([]);
+      } finally {
+        rmSync(binDir, { recursive: true, force: true });
+      }
+    });
+  }, 30_000);
+
+  test('oracle doctor fails closed when the binary rejects the fork session flags', () => {
+    withRepo((repoRoot) => {
+      const binDir = mkdtempSync(join(tmpdir(), 'repo-harness-fake-oracle-upstream-flags-'));
+      try {
+        const oraclePath = writeFakeOracle(join(binDir, 'oracle'), { rejectWriteSession: true });
+        const doctor = runChatgpt(['browser-doctor', '--repo', repoRoot, '--provider', 'oracle', '--oracle-bin', oraclePath, '--json']);
+        expect(doctor.status).toBe(0);
+        const readiness = JSON.parse(doctor.stdout);
+        expect(readiness.status).toBe('action_required');
+        expect(readiness.code).toBe('ORACLE_INCOMPATIBLE');
+        expect(readiness.oracle.capabilities).toMatchObject({
+          writeSession: false,
+          networkEvidence: false,
+          conversationEvidence: false,
+          browserThinkingTime: false,
+        });
+        expect(readiness.oracle.missingCapabilities).toEqual(['browserThinkingTime', 'writeSession', 'networkEvidence', 'conversationEvidence']);
+        expect(readiness.oracle.error.recovery).toContain('repo-harness fork flags');
+        expect(readiness.oracle.error.recovery).toContain('REPO_HARNESS_ORACLE_BIN');
+        expect(readiness.oracle.error.recovery).toContain('--oracle-bin');
+        expect(readiness.agent_actions).toHaveLength(1);
+        expect(readiness.agent_actions[0]).toMatchObject({ id: 'chatgpt-oracle-fix-configured-source', requires_agent: true });
+        expect(readiness.agent_actions[0].reason).toContain('writeSession');
+      } finally {
+        rmSync(binDir, { recursive: true, force: true });
+      }
+    });
+  }, 30_000);
+
+  test('oracle consult refuses before spawning when the binary rejects the fork session flags', () => {
+    withRepo((repoRoot) => {
+      const binDir = mkdtempSync(join(tmpdir(), 'repo-harness-fake-oracle-upstream-consult-'));
+      try {
+        const oraclePath = writeFakeOracle(join(binDir, 'oracle'), {
+          rejectWriteSession: true,
+          body: ['printf "%s\\n" "unexpected oracle execution" >&2', 'exit 99'],
+        });
+        const result = runChatgpt(['browser-consult', '--repo', repoRoot, '--prompt', 'Review this.', '--oracle-bin', oraclePath]);
+        expect(result.status).toBe(0);
+        const payload = JSON.parse(result.stdout);
+        expect(payload.status).toBe('failed');
+        expect(payload.error.code).toBe('ORACLE_RUNTIME_FLAGS_UNSUPPORTED');
+        expect(payload.error.message).toContain('--write-session');
+        expect(payload.error.recovery).toContain('repo-harness fork flags');
+        const output = readFileSync(payload.paths.output, 'utf-8');
+        expect(output).toContain('The resolved oracle lacks the repo-harness fork flags.');
+        expect(output).not.toContain('unknown option');
+        expect(output).not.toContain('unexpected oracle execution');
+      } finally {
+        rmSync(binDir, { recursive: true, force: true });
+      }
+    });
+  }, 30_000);
+
 
   test('oracle doctor is not ready without the copy-profile transport flags', () => {
     withRepo((repoRoot) => {

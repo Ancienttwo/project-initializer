@@ -44,6 +44,9 @@ export interface OracleCapabilities {
   copyProfile: boolean;
   browserChromeProfile: boolean;
   browserThinkingTime: boolean;
+  writeSession: boolean;
+  networkEvidence: boolean;
+  conversationEvidence: boolean;
   chatgptUrl: boolean;
   heartbeat: boolean;
 }
@@ -130,7 +133,7 @@ export function resolveOracleBin(input: Pick<BrowserConsultInput, 'repoRoot' | '
   };
 }
 
-function detectCapabilities(helpText: string, browserThinkingTime: boolean): OracleCapabilities {
+function detectCapabilities(helpText: string, runtimeFlagsAccepted: boolean): OracleCapabilities {
   const has = (flag: string) => helpText.includes(flag);
   return {
     browserEngine: has('--engine'),
@@ -143,7 +146,13 @@ function detectCapabilities(helpText: string, browserThinkingTime: boolean): Ora
     // `--debug-help` into the same text so both transport flags are visible.
     copyProfile: has('--copy-profile'),
     browserChromeProfile: has('--browser-chrome-profile'),
-    browserThinkingTime,
+    // Session-descriptor, evidence and thinking-time flags are only observable
+    // through an argument-parse probe: the repo-harness Oracle fork accepts them,
+    // upstream rejects them, and neither reliably lists them in `--help`.
+    browserThinkingTime: runtimeFlagsAccepted,
+    writeSession: runtimeFlagsAccepted,
+    networkEvidence: runtimeFlagsAccepted,
+    conversationEvidence: runtimeFlagsAccepted,
     chatgptUrl: has('--chatgpt-url'),
     heartbeat: has('--heartbeat'),
   };
@@ -187,30 +196,65 @@ export function probeOracle(binary: string): OracleProbe {
   // substitute: it can omit or embed unrelated version-like strings.
   const version = probeOracleVersion(binary);
   const ranOk = !help.error && (help.status === 0 || helpText.trim().length > 0);
-  const browserThinkingTime = probeBrowserThinkingTime(binary);
+  const runtimeFlagsAccepted = probeRuntimeFlagAcceptance(binary);
   return {
     binary,
     version,
     versionCompatible: validateOracleVersion(version).compatible,
     nodeCompatible: ranOk,
-    capabilities: detectCapabilities(helpText, browserThinkingTime),
+    capabilities: detectCapabilities(helpText, runtimeFlagsAccepted),
     helpText,
   };
 }
 
-function probeBrowserThinkingTime(binary: string): boolean {
+/**
+ * Runtime flags whose acceptance cannot be read from `--help`. The probe below
+ * sends the exact argument vector `buildOracleCommand` emits, so this list only
+ * maps a flag to the capability it reports; the flags themselves are never
+ * hand-authored a second time.
+ */
+export const ORACLE_RUNTIME_PROBE_CAPABILITIES: ReadonlyArray<{
+  flag: string;
+  capability: 'writeSession' | 'networkEvidence' | 'conversationEvidence' | 'browserThinkingTime';
+}> = [
+  { flag: '--write-session', capability: 'writeSession' },
+  { flag: '--write-network-evidence', capability: 'networkEvidence' },
+  { flag: '--write-conversation-evidence', capability: 'conversationEvidence' },
+  { flag: '--browser-thinking-time', capability: 'browserThinkingTime' },
+];
+
+/** Shared recovery for a resolved oracle that lacks the repo-harness fork flags. */
+export const ORACLE_FORK_FLAG_RECOVERY = 'The resolved oracle lacks the repo-harness fork flags (session descriptor and evidence capture). Point repo-harness at the fork build with --oracle-bin <path-to-fork-oracle> or REPO_HARNESS_ORACLE_BIN=<path-to-fork-oracle>, then rerun repo-harness chatgpt browser-doctor --provider oracle --json.';
+
+/**
+ * Build the probe argument vector from `buildOracleCommand` itself so the probed
+ * surface cannot drift from the surface the real consult sends. A mapped flag that
+ * the builder stopped emitting is a source-of-truth break, not a probe result.
+ */
+function buildRuntimeAcceptanceProbeArgs(probeDir: string): string[] {
+  const args = buildOracleCommand(
+    { repoRoot: probeDir, prompt: 'repo-harness parser probe', thinking: 'heavy' },
+    undefined,
+    join(probeDir, 'session.json'),
+    join(probeDir, 'network.jsonl'),
+    join(probeDir, 'conversation.json'),
+  );
+  const unmapped = ORACLE_RUNTIME_PROBE_CAPABILITIES.filter(({ flag }) => !args.includes(flag)).map(({ flag }) => flag);
+  if (unmapped.length > 0) {
+    throw new Error(`oracle runtime probe is out of sync with buildOracleCommand: ${unmapped.join(', ')} is no longer emitted`);
+  }
+  return [...args, '--dry-run', 'json'];
+}
+
+/**
+ * Probe whether the resolved binary accepts every runtime flag the real consult
+ * sends. Oracle's `--dry-run json` preview is side-effect free, so a rejected flag
+ * surfaces at argument parsing instead of mid-consult.
+ */
+function probeRuntimeFlagAcceptance(binary: string): boolean {
   const probeDir = mkdtempSync(join(tmpdir(), 'repo-harness-oracle-probe-'));
   try {
-    const result = spawnSync(binary, [
-      '--engine',
-      'browser',
-      '--browser-thinking-time',
-      'heavy',
-      '--dry-run',
-      'json',
-      '--prompt',
-      'repo-harness parser probe',
-    ], {
+    const result = spawnSync(binary, buildRuntimeAcceptanceProbeArgs(probeDir), {
       cwd: probeDir,
       env: buildOracleEnv(probeDir),
       encoding: 'utf-8',
@@ -219,7 +263,8 @@ function probeBrowserThinkingTime(binary: string): boolean {
     });
     const text = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     return !result.error && result.status === 0 && !/unknown option|error: option/i.test(text);
-  } catch (_error) {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('oracle runtime probe is out of sync')) throw error;
     return false;
   } finally {
     rmSync(probeDir, { recursive: true, force: true });
@@ -527,6 +572,27 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
   const oracleBinary = resolution.binary;
   let cachedProbe: OracleProbe | undefined;
   const probeResolvedOracle = (): OracleProbe => (cachedProbe ??= probeOracle(oracleBinary));
+  // The session descriptor and evidence flags exist only in the repo-harness
+  // Oracle fork. Without them the real command dies at argument parsing, so it is
+  // refused before the browser is ever launched.
+  const unsupportedRuntimeFlags = ORACLE_RUNTIME_PROBE_CAPABILITIES
+    .filter(({ capability }) => probeResolvedOracle().capabilities[capability] !== true)
+    .map(({ flag }) => flag);
+  if (unsupportedRuntimeFlags.length > 0) {
+    const message = `oracle binary did not accept ${unsupportedRuntimeFlags.join(', ')}, which every browser consult sends`;
+    return {
+      status: 'failed',
+      output: `${message}. The resolved oracle lacks the repo-harness fork flags.`,
+      command: [oracleBinary, ...buildOracleCommand(input)],
+      oracleBinary,
+      oracleVersion: resolvedOracleVersion,
+      error: {
+        code: 'ORACLE_RUNTIME_FLAGS_UNSUPPORTED',
+        message,
+        recovery: ORACLE_FORK_FLAG_RECOVERY,
+      },
+    };
+  }
   if (input.chatgptApp) {
     if (!supportsBrowserAppPreselect(probeResolvedOracle().helpText)) {
       return {
