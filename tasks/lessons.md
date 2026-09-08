@@ -12,6 +12,12 @@
 
 ## Active Lessons
 
+- Date: 2026-09-08
+- Triggered by correction: a bounded Stop repeatedly replayed the first legacy architecture drift paths and never reached source files later in the backlog.
+- Mistake pattern: acknowledging only the whole range while doing unbounded per-path work inside a fixed deadline.
+- Prevention rule: persist the frozen delivery range and acknowledge each complete path cascade before starting the next; advance the Git cursor only after the entire frozen batch completes. Keep later commits observable and retain failed items for retry.
+- Where to apply next time: Stop and manual architecture drain; see `docs/architecture/modules/runtime-harness/hook-adapters.md` for the at-least-once delivery contract.
+
 - Date: 2026-09-07
 - Triggered by correction: BRC audit reproduced old-revision challenge answers passing with a new SHA, and cross-session discussion separated shadow observation from active execution requirements.
 - Mistake pattern: promoting sampled content equality and an echoed revision into proof of exact revision access; treating a parallel capacity limit as a throughput promise; placing a provider feasibility probe behind unrelated active-path work.

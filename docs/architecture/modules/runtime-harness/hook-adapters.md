@@ -259,7 +259,18 @@ does not inspect legacy command shapes, so there is no dual-read path.
   request-triggered `context-contract-sync` / `capability-context` follow-up
   must succeed. Stop remains advisory and reports a bounded diagnostic, while
   the manual drain exits non-zero; neither path advances the cursor after a
-  partial cascade. A missing or unresolvable cursor re-anchors at HEAD,
+  partial cascade. Both callers persist a frozen legacy batch in
+  `.ai/harness/state/architecture-drift-cascade.json` under the shared exclusive
+  directory lock. Each complete path cascade advances its `completed` offset;
+  timeout or failure retries the interrupted path, not the acknowledged prefix.
+  The Git cursor advances only to the frozen batch HEAD once all paths finish;
+  commits arriving during delivery remain in the next range. Pending working-tree
+  edits are observed again by the next Stop. Malformed batch state fails closed,
+  and a separately acknowledged cursor supersedes a stale batch rather than being
+  rewound. A crash between an effect and its offset write may repeat that path:
+  delivery is at least once. Subprocess cost still limits throughput, but a finite
+  backlog whose individual cascades fit the budget makes progress across Stops.
+  A missing or unresolvable cursor re-anchors at HEAD,
   processes working-tree entries only, and emits one stderr note instead of
   replaying history. Deletions stay in the feed:
   `architecture-queue record --file` classifies lexically and records a card for

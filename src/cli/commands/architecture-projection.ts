@@ -20,6 +20,7 @@ import {
   advanceArchitectureDriftCursor,
   architectureDriftSourceEvent,
   computeArchitectureDriftChangedSet,
+  drainArchitectureDriftCascade,
 } from '../hook/architecture-drift';
 
 export interface ProjectionCommandOptions {
@@ -54,12 +55,11 @@ export function buildArchitectureProjectionCommand(): Command {
       const deadlineMs = Date.now() + loadArchitectureProjectionPolicy(root).timeoutMs;
       const result = drainArchitectureProjectionJobs(root, { sourceEvents: driftEvent ? [driftEvent] : [] });
       if (result.status === 'disabled') {
-        for (const changedPath of changedSet.paths) {
+        drainArchitectureDriftCascade(root, changedSet, (changedPath) => {
           const cascade = processArchitectureCascade(root, process.env, changedPath, { deadlineMs, nowMs: Date.now });
           if (!cascade.ok) throw new Error(cascade.error);
-        }
-      }
-      if (result.acknowledgeSourceEvents && changedSet.headSha !== null) {
+        }, { deadlineMs, nowMs: Date.now });
+      } else if (result.acknowledgeSourceEvents && changedSet.headSha !== null) {
         advanceArchitectureDriftCursor(root, changedSet.headSha);
       }
       write({ ...result, sourceJournalPending: readPendingPostEditEvents(root).length });

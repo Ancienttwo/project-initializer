@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
@@ -9,6 +9,7 @@ import {
   advanceArchitectureDriftCursor,
   architectureDriftSourceEvent,
   computeArchitectureDriftChangedSet,
+  drainArchitectureDriftCascade,
   readArchitectureDriftCursor,
 } from '../src/cli/hook/architecture-drift';
 
@@ -262,5 +263,100 @@ describe('architecture drift source event', () => {
 
   test('has no delivery to make for an empty changed set', () => {
     expect(architectureDriftSourceEvent({ headSha: 'a'.repeat(40), cursorSha: null, paths: [], warnings: [] })).toBeNull();
+  });
+});
+
+describe('resumable legacy cascade', () => {
+  test('drains a 1592-path backlog across bounded retries without replaying the prefix', () => {
+    const cwd = fixture();
+    const anchor = git(cwd, ['rev-parse', 'HEAD']);
+    advanceArchitectureDriftCursor(cwd, anchor);
+    const paths = Array.from({ length: 1592 }, (_, i) => `src/${String(i).padStart(4, '0')}.ts`);
+    const changed = { cursorSha: anchor, headSha: anchor, paths, warnings: [] };
+    const delivered: string[] = [];
+    let runs = 0;
+    while (delivered.length < paths.length) {
+      let clock = 0;
+      runs += 1;
+      try {
+        drainArchitectureDriftCascade(cwd, changed, (path) => { delivered.push(path); clock += 1000; },
+          { deadlineMs: 20_000, nowMs: () => clock });
+      } catch (error) {
+        expect(String(error)).toContain('deadline exhausted');
+      }
+      if (runs > 80) throw new Error('backlog did not converge');
+    }
+    expect(runs).toBe(80);
+    expect(delivered).toEqual(paths);
+  });
+
+  test('retries the failed path but not its completed predecessor', () => {
+    const cwd = fixture();
+    const changed = { ...computeArchitectureDriftChangedSet(cwd), paths: ['a.ts', 'b.ts', 'c.ts'] };
+    const calls: string[] = [];
+    const budget = { deadlineMs: 20_000, nowMs: () => 0 };
+    expect(() => drainArchitectureDriftCascade(cwd, changed, (path) => {
+      calls.push(path);
+      if (path === 'b.ts') throw new Error('follow-up failed');
+    }, budget)).toThrow('follow-up failed');
+    expect(readArchitectureDriftCursor(cwd)).toBeNull();
+    drainArchitectureDriftCascade(cwd, changed, (path) => { calls.push(path); }, budget);
+    expect(calls).toEqual(['a.ts', 'b.ts', 'b.ts', 'c.ts']);
+    expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(changed.headSha!);
+  });
+
+  test('rejects malformed progress without acknowledging or delivering paths', () => {
+    const cwd = fixture();
+    write(cwd, '.ai/harness/state/architecture-drift-cascade.json', '{"version":1,"completed":999}');
+    let called = false;
+    expect(() => drainArchitectureDriftCascade(cwd, computeArchitectureDriftChangedSet(cwd),
+      () => { called = true; }, { deadlineMs: 20_000, nowMs: () => 0 })).toThrow('invalid architecture drift cascade batch');
+    expect(called).toBe(false);
+    expect(readArchitectureDriftCursor(cwd)).toBeNull();
+  });
+
+  test('manual CLI drain resumes a failed batch and preserves its JSON contract', () => {
+    const cwd = fixture();
+    advanceArchitectureDriftCursor(cwd, git(cwd, ['rev-parse', 'HEAD']));
+    write(cwd, 'a.ts', 'export const a = 1;');
+    write(cwd, 'b.ts', 'export const b = 1;');
+    const head = commitAll(cwd, 'backlog');
+    const stubRoot = realpathSync(mkdtempSync(join(tmpdir(), 'drift-cli-helper-')));
+    workspaces.push(stubRoot);
+    const calls = join(stubRoot, 'calls.txt');
+    const failed = join(stubRoot, 'failed');
+    const stub = join(stubRoot, 'stub.ts');
+    writeFileSync(stub, [
+      "import { appendFileSync, existsSync, writeFileSync } from 'fs';",
+      "if (process.argv[3] === 'architecture-queue') {",
+      " const path = process.argv.at(-1); appendFileSync(process.env.DRIFT_CALLS!, path + '\\n');",
+      " if (path === 'b.ts' && !existsSync(process.env.DRIFT_FAILED!)) { writeFileSync(process.env.DRIFT_FAILED!, 'yes'); process.exit(9); }",
+      "}",
+    ].join('\n'));
+    const run = () => spawnSync(process.execPath, [join(import.meta.dir, '../src/cli/index.ts'), 'architecture-projection', 'drain', '--json'],
+      { cwd, encoding: 'utf8', env: { ...process.env, REPO_HARNESS_CLI: stub, DRIFT_CALLS: calls, DRIFT_FAILED: failed } });
+    const first = run();
+    expect(first.status).toBe(1);
+    expect(first.stderr).toContain('architecture-queue exited 9');
+    const second = run();
+    expect(second.status).toBe(0);
+    expect(JSON.parse(second.stdout).status).toBe('disabled');
+    expect(readFileSync(calls, 'utf8').trim().split('\n')).toEqual(['a.ts', 'b.ts', 'b.ts']);
+    expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(head);
+  });
+
+  test('does not rewind a cursor acknowledged by another projection', () => {
+    const cwd = fixture();
+    const changed = { ...computeArchitectureDriftChangedSet(cwd), paths: ['a.ts', 'b.ts'] };
+    const budget = { deadlineMs: 20_000, nowMs: () => 0 };
+    expect(() => drainArchitectureDriftCascade(cwd, changed, () => { throw new Error('interrupted'); }, budget)).toThrow();
+    write(cwd, 'new.ts', 'export const value = 1;');
+    const newHead = commitAll(cwd, 'new head');
+    advanceArchitectureDriftCursor(cwd, newHead);
+    expect(() => drainArchitectureDriftCascade(cwd, changed, () => {}, budget)).toThrow('cursor changed before cascade');
+    const calls: string[] = [];
+    drainArchitectureDriftCascade(cwd, computeArchitectureDriftChangedSet(cwd), (path) => { calls.push(path); }, budget);
+    expect(calls).toEqual([]);
+    expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(newHead);
   });
 });

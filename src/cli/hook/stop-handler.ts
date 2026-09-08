@@ -30,6 +30,7 @@ import {
   advanceArchitectureDriftCursor,
   architectureDriftSourceEvent,
   computeArchitectureDriftChangedSet,
+  drainArchitectureDriftCascade,
 } from './architecture-drift';
 import { isImplementationSurfacePath } from '../../effects/review/diff-fingerprint';
 import { drainArchitectureProjectionJobs, type ArchitectureProjectionDrainResultV1 } from '../../effects/architecture/projection-orchestrator';
@@ -715,15 +716,15 @@ export function runStopHandler(opts: StopHandlerInput): StopHandlerResult {
     architectureDrain = dependencies.drainArchitectureProjection?.(repoRoot, env)
       ?? drainArchitectureProjectionJobs(repoRoot, { env, sourceEvents: driftEvent ? [driftEvent] : [], deadlineMs: deferredDeadlineMs, nowMs: wallClockMs });
     if (architectureDrain.status === 'disabled') {
-      for (const changedPath of changedSet.paths) {
+      drainArchitectureDriftCascade(repoRoot, changedSet, (changedPath) => {
         const cascade = processArchitectureCascade(repoRoot, env, changedPath, { deadlineMs: deferredDeadlineMs, nowMs: wallClockMs });
         if (!cascade.ok) throw new Error(cascade.error);
-      }
+      }, { deadlineMs: deferredDeadlineMs, nowMs: wallClockMs }, now);
     }
     // The cursor is the retry boundary: it only moves past a range the
     // consumer acknowledged, so a retry-pending, dead-lettered, or throwing
     // drain replays the same range on the next Stop.
-    if (architectureDrain.acknowledgeSourceEvents && changedSet.headSha !== null) {
+    if (architectureDrain.status !== 'disabled' && architectureDrain.acknowledgeSourceEvents && changedSet.headSha !== null) {
       advanceArchitectureDriftCursor(repoRoot, changedSet.headSha, now);
     }
   } catch (error) {

@@ -518,6 +518,43 @@ describe('runStopHandler', () => {
     expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(head);
   }, 30_000);
 
+  test('resumes completed cascade paths across Stop deadlines and preserves newer commits', () => {
+    const { cwd, head: anchor } = gitFixture();
+    advanceArchitectureDriftCursor(cwd, anchor);
+    const paths = ['a.test.ts', 'b.test.ts', 'z-source.ts'];
+    for (const path of paths) writeFileSync(join(cwd, path), 'export const value = 1;\n');
+    git(cwd, ['add', '-A']);
+    git(cwd, ['commit', '-m', 'backlog']);
+    const batchHead = git(cwd, ['rev-parse', 'HEAD']);
+    const stubRoot = mkdtempSync(join(tmpdir(), 'repo-harness-resume-cascade-'));
+    fixtures.push(stubRoot);
+    const calls = join(stubRoot, 'calls.txt');
+    const stubCli = join(stubRoot, 'stub.ts');
+    writeFileSync(calls, '');
+    writeFileSync(stubCli, "import { appendFileSync } from 'fs';\nif (process.argv[3] === 'architecture-queue') appendFileSync(process.env.STOP_CASCADE_CALLS!, process.argv.at(-1) + '\\n');\n");
+    const env = { ...process.env, REPO_HARNESS_CLI: stubCli, STOP_CASCADE_CALLS: calls };
+    const recorded = () => readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
+    const stop = () => {
+      const before = recorded().length;
+      return runStopHandler({ collector: collector(cwd, () => canonicalState()), env,
+        dependencies: { wallClockMs: () => recorded().length > before ? 20_001 : 0 } });
+    };
+    expect(stop().stderr).toContain('deadline exhausted');
+    expect(recorded()).toEqual([paths[0]]);
+    expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(anchor);
+    writeFileSync(join(cwd, 'newer.ts'), 'export const newer = true;\n');
+    git(cwd, ['add', 'newer.ts']);
+    git(cwd, ['commit', '-m', 'newer change']);
+    stop();
+    stop();
+    expect(recorded()).toEqual(paths);
+    expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(batchHead);
+    expect(computeArchitectureDriftChangedSet(cwd).paths).toEqual(['newer.ts']);
+    stop();
+    expect(recorded()).toEqual([...paths, 'newer.ts']);
+    expect(readArchitectureDriftCursor(cwd)?.head_sha).toBe(git(cwd, ['rev-parse', 'HEAD']));
+  }, 30_000);
+
   test('bounds a slow cascade child and retains the unacknowledged drift range', () => {
     const { cwd, head } = gitFixture();
     advanceArchitectureDriftCursor(cwd, head);
