@@ -157,13 +157,20 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "expensive",
-      "evidence_policy": "current_exact",
-      "necessity": "Actual producer, caller and consumer; post-exit tamper, identity, isolated mounts, cancellation, controller loss and atomic recovery. Synthetic executable and version only.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Sixteen actual Docker checks passed on d2e311f4. Subsequent changes only bind workflow metadata; compare all implementation and test inputs byte-for-byte instead of repeating Docker.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
         ]
-      }
+      },
+      "baseline": {
+        "run_file": ".ai/harness/runs/verification-vx-c16e467c5e8849cd8928.json",
+        "execution_id": "vx-c16e467c5e8849cd8928"
+      },
+      "delta_checks": [
+        "source-unchanged"
+      ]
     },
     {
       "id": "lifecycle-regression",
@@ -184,7 +191,7 @@ exit_criteria:
         "execution_id": "vx-a9feb18d252440e5a024"
       },
       "delta_checks": [
-        "runtime-docker",
+        "cleanup-race",
         "typecheck"
       ]
     },
@@ -288,6 +295,32 @@ exit_criteria:
       "cost": "normal",
       "evidence_policy": "current_exact",
       "necessity": "Required repository integrity check.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "source-unchanged",
+      "kind": "command",
+      "command": "git diff --exit-code d2e311f4 -- src/ scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ tests/",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Proves Docker acceptance inputs unchanged since its passing fixed-revision run.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "cleanup-race",
+      "kind": "command",
+      "command": "BRC_TEST_CONTAINER_IMAGE=sha256:72270cb098680b4e5e9e34f3ed7da6d861551bf946813a485069554055e08523 bun test tests/effects/campaign-container-live.test.ts -t \"cleanup consumes\"",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Covers the only production delta since lifecycle baseline; fresh exact-container inactivity after kill races namespace exit.",
       "inputs": {
         "env": []
       }
