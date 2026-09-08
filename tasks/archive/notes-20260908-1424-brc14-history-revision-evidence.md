@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 14:24
+> **Related Plan**: plans/archive/plan-20260908-1350-brc14-history-revision-evidence.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1424
+> **Archive Projection V1**: `plans/plan-20260908-1350-brc14-history-revision-evidence.md` => `plans/archive/plan-20260908-1350-brc14-history-revision-evidence.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1350-brc14-history-revision-evidence.notes.md` => `tasks/archive/notes-20260908-1424-brc14-history-revision-evidence.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1350-brc14-history-revision-evidence.contract.md` => `tasks/archive/contract-20260908-1424-brc14-history-revision-evidence.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1350-brc14-history-revision-evidence.review.md` => `tasks/archive/review-20260908-1424-brc14-history-revision-evidence.md`
+
 # Implementation Notes: brc14-history-revision-evidence
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-1350-brc14-history-revision-evidence.md
-> **Contract**: tasks/contracts/20260908-1350-brc14-history-revision-evidence.contract.md
-> **Review**: tasks/reviews/20260908-1350-brc14-history-revision-evidence.review.md
+> **Plan**: plans/archive/plan-20260908-1350-brc14-history-revision-evidence.md
+> **Contract**: tasks/archive/contract-20260908-1424-brc14-history-revision-evidence.md
+> **Review**: tasks/archive/review-20260908-1424-brc14-history-revision-evidence.md
 > **Last Updated**: 2026-09-08 13:50
 > **Lifecycle**: notes
 

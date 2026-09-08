@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 14:24
+> **Related Plan**: plans/archive/plan-20260908-1350-brc14-history-revision-evidence.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-1424
+> **Archive Projection V1**: `plans/plan-20260908-1350-brc14-history-revision-evidence.md` => `plans/archive/plan-20260908-1350-brc14-history-revision-evidence.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1350-brc14-history-revision-evidence.notes.md` => `tasks/archive/notes-20260908-1424-brc14-history-revision-evidence.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1350-brc14-history-revision-evidence.contract.md` => `tasks/archive/contract-20260908-1424-brc14-history-revision-evidence.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1350-brc14-history-revision-evidence.review.md` => `tasks/archive/review-20260908-1424-brc14-history-revision-evidence.md`
+
 # Task Review: brc14-history-revision-evidence
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-1350-brc14-history-revision-evidence.md
-> **Contract**: tasks/contracts/20260908-1350-brc14-history-revision-evidence.contract.md
-> **Notes File**: tasks/notes/20260908-1350-brc14-history-revision-evidence.notes.md
+> **Plan**: plans/archive/plan-20260908-1350-brc14-history-revision-evidence.md
+> **Contract**: tasks/archive/contract-20260908-1424-brc14-history-revision-evidence.md
+> **Notes File**: tasks/archive/notes-20260908-1424-brc14-history-revision-evidence.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 13:50
 > **Recommendation**: pass
