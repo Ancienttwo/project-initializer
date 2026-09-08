@@ -119,16 +119,30 @@ src/effects/automation/campaign-revision-admission.ts; tests/effects/campaign-re
 Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, covering fresh audit, revision observation and slot reconciliation. Focused final check: bun test tests/effects/campaign-revision-observation.test.ts. TypeScript and six required integrity checks. Compare runtime source/profile/container inputs against cc2fbc48 to retain its Docker evidence; no local full suite. Required CI applies before merge.
 
 ## Task Breakdown
-- [x] Prepare strict admission restoration and focused positive/negative real-store regression coverage.
-- [x] Freeze and verify focused checks, TypeScript and required repository integrity gates, retaining unchanged Docker baseline scope.
-- [x] Verify the AiphaBee capability-source fix: 86 affected tests and 14 scoped criteria pass.
-- [ ] Complete AiphaBee shadow/active canary: first observation failed before submission; reservation reconciled, Oracle preselection blocker retained for scope decision.
+- [x] Restore the strict positive revision-admission path with real-store positive/negative regression evidence.
+- [x] Correct selected capability authority, raw-resource request binding and label-scoped Issue reads; preserve old observations.
+- [x] Add explicit stopped-authoring continuation; verify existing BYOK #177/#178 updated in place under a fresh run.
+- [ ] A: prove the real admission -> existing Docker carrier composition and required negative/read-only boundaries with model-free evidence; reuse unchanged #363/#366 inputs.
+- [ ] A: add the complete Group 1 -> Group 2 -> Group 3 -> terminal effect regression, binding each next group to the previous final SHA and refusing Group 4.
+- [ ] A: freeze the final candidate against the live target main, bind delta acceptance and pass required CI for that head.
+- [ ] B preflight: resolve the observed Oracle followup editor-focus failure and canonical recovery of its failed challenge before another live call.
+- [ ] B: complete one two-slot active/manual delivery using the existing real BYOK Issues, including at least one worker/verifier repair, automatic PR, Owner merge, Issue closure and exact cleanup.
+- [ ] B: perform one fresh final audit for the complete two-slot snapshot; use that same observation for BRC14 and BRC15 closeout.
 
-## Annotations
-<!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
+## Fixed Phase A Closeout Matrix
 
-## Task Breakdown
-- [x] Prepare strict admission restoration and focused positive/negative real-store regression coverage.
-- [x] Freeze and verify focused checks, TypeScript and required repository integrity gates, retaining unchanged Docker baseline scope.
-- [x] Verify the AiphaBee capability-source fix: 86 affected tests and 14 scoped criteria pass.
-- [ ] Complete AiphaBee shadow/active canary: first observation failed before submission; reservation reconciled, Oracle preselection blocker retained for scope decision.
+This matrix incorporates the Owner-supplied GPT review. The review inspected aa3cb452; the current candidate already removed the unconditional active-disabled fence. It is not a reason to redo completed Docker containment, role, probe or cleanup work. Remote main was observed at 1f1dad978a5583928956e844f66cb14c965b4766 on 2026-09-09; inspect its actual delta before final candidate integration. PR #367 is still Draft and has no required-CI result for its current head.
+
+| Boundary | Evidence and remaining action | Completion claim |
+|---|---|---|
+| Positive admission | Existing strict guard and real-store tests; map the composition through actual adoption/acquisition to the already accepted Docker carrier, retaining missing-evidence/identity/budget/environment rejection before effects | Program reachability only; fake provider/synthetic executable is not a live model run |
+| Group sequencing | Existing parameterization stops at Group 2 authoring; add Group 2 accepted -> Group 3 on Group 2 final SHA -> terminal, with Group 4 refused | Model-free three-group semantics, never three real GPT groups |
+| Candidate gate | Compare unchanged runtime/profile/image inputs against #363/#366 evidence; verify only changed or uncovered inputs; required CI belongs to final candidate | No Docker re-audit or automatic full-suite rerun |
+| Real delivery | One group, two slots, max_parallel_tasks=2 as capacity, active/manual, default product off; preserve #177/#178 and history, no bulk Issue recreation | At least one actual repair/test-gap PR merged and automatically closed/cleaned; an empty run cannot pass |
+| BRC14 | One new final audit session bound to final_main_sha and every slot, plus complete model-free sequencing/rejection evidence | Only verified accepted/accepted_with_followups completes the existing state machine |
+| BRC15 | Existing Canary 1 and BRC15a negative record/Owner decision plus this same Canary 3 delivery and activation ladder | No new shadow-quality threshold or ten-Issue experiment |
+| Release | Existing release gate on the actual release candidate after BRC acceptance | Canary success does not imply package release |
+
+Before B, freeze source candidate, target SHA, Oracle binary, profile, image and finite budgets. Derive counts from observe-revision, initial authoring/at-most-one allowed repair, challenge, all observation/adoption reads, acquisition, worker/verifier, closeout and final audit. `adopt --dry-run` is not a free preflight. Unknown requests reconcile before any retry; stopped grants and failed evidence stay immutable. No mid-run version/profile/budget changes or automatic fresh batch. Read only the selected campaign label scope, never the repository-wide Issue collection.
+
+Excluded: auto-merge, auto-low-risk, Canary 4/5, refactor expansion, TTL/GC, new Docker foundations and repository-wide quality audits. The existing #354/#342/#346/BRC6a/BRC15a closure boundaries are retained. No new closing requirements may be added after the final acceptance matrix is frozen; newly observed failures are reported against their existing boundary.
