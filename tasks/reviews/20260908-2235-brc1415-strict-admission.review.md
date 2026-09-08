@@ -8,7 +8,7 @@
 > **Last Updated**: 2026-09-08 22:35
 > **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: sha256:6b807c6b42cfb4d8208ca03a15aa9e282bbe6cc5b24a543e8bb965b430466516
+> **Reviewed Subject SHA256**: sha256:f9c77692972f1bbddd5e6644b6027ba22b339f3d304512dcdca7b22fe507e568
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: 1f1dad978a5583928956e844f66cb14c965b4766
 
@@ -44,13 +44,13 @@
 > **Reviewer**: Codex
 > **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: sha256:6b807c6b42cfb4d8208ca03a15aa9e282bbe6cc5b24a543e8bb965b430466516
+> **Reviewed Subject SHA256**: sha256:f9c77692972f1bbddd5e6644b6027ba22b339f3d304512dcdca7b22fe507e568
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: 1f1dad978a5583928956e844f66cb14c965b4766
-> **Verification Evidence SHA256**: sha256:3f4f1a95050855f66ef1846562d121c8522a0bbf5c1cd156b58a8cd8ee578f7d
-> **Issued At**: 2026-09-08T16:55:57.921Z
+> **Verification Evidence SHA256**: sha256:c7913af720575c5b8a82fba58773159e2f633328eb1f4a4bfd6f997dc0270ddd
+> **Issued At**: 2026-09-08T17:20:28.542Z
 
-- Summary: Model-free positive admission, carrier-only new launches, historical recovery and complete three-group sequencing pass. Fourteen contract criteria pass; real Canary delivery and final fresh audit remain outstanding.
+- Summary: Three-line inherited-main Stop snapshot correction passes targeted regression and integrity checks. BRC production code is unchanged from accepted c2ef4c62 and all BRC suites passed CI 34254078294. Live canary remains outstanding.
 - Findings: none
 
 ## Behavior Diff Notes
