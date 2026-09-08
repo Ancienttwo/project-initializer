@@ -23,6 +23,12 @@ export function campaignContainerJournalRoot(): string {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   return realpathSync(directory);
 }
+/** A deterministic address makes the pre-create request discoverable from the original identity. */
+export function campaignContainerDirectory(common: string, identity: unknown): string {
+  const key = canonicalMessageDigest({ common: realpathSync(common), identity }).slice(7, 39);
+  const name = [key.slice(0, 8), key.slice(8, 12), key.slice(12, 16), key.slice(16, 20), key.slice(20)].join('-');
+  return join(campaignContainerJournalRoot(), name);
+}
 function assertUnMounted(directory: string, sources: string[]): void {
   for (const source of sources) {
     const canonical = realpathSync(source);
@@ -121,9 +127,9 @@ export async function prepareCampaignContainer(input: {
   if (daemon.OSType !== 'linux' || daemon.ServerVersion !== '28.3.2' || !Array.isArray(daemon.SecurityOptions) || !daemon.SecurityOptions.includes('name=seccomp,profile=builtin') || typeof daemon.ID !== 'string' || !daemon.ID) throw new Error('campaign requires a Linux Docker daemon');
   const image = JSON.parse(await api(['image', 'inspect', input.image], input.deadline_ms, endpoint))[0];
   if (image.Id !== input.image || image.Os !== 'linux') throw new Error('campaign image is unavailable or changed');
-  const directory = join(campaignContainerJournalRoot(), randomUUID());
+  const directory = campaignContainerDirectory(common, input.identity);
   assertUnMounted(directory, [worktree, common, ...(input.auth_file ? [input.auth_file] : [])]);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  mkdirSync(directory, { mode: 0o700 });
   assertJournal(directory);
   assertUnMounted(realpathSync(directory), [worktree, common, ...(input.auth_file ? [input.auth_file] : [])]);
   const name = `repo-harness-campaign-${randomUUID()}`;
@@ -269,4 +275,53 @@ export function readCampaignContainerInterruption(handle: CampaignContainer) {
         && body.daemon_state.Dead === false && body.daemon_state.Restarting === false && body.restart_count === 0)) throw new Error('container interruption proof differs');
   return { receipt_sha256: receipt_sha256 as string, container_id: handle.container_id, deadline_ms: body.deadline_ms as number,
     inactive: true as const, output_complete: false as const };
+}
+
+/** Recover only the pre-create request for this identity; never issue create or start. */
+export async function reconcileCampaignContainerPreparation(input: {
+  common: string; worktree: string; identity: unknown; deadline_ms: number;
+}) {
+  if (!Number.isSafeInteger(input.deadline_ms) || Date.now() < input.deadline_ms) throw new Error('container preparation reconciliation requires the original expired deadline');
+  const directory = campaignContainerDirectory(input.common, input.identity);
+  if (realpathSync(directory) !== directory) throw new Error('container preparation journal has an alias');
+  const { request_sha256, ...request } = read(directory, 'request');
+  if (canonicalMessageDigest(request) !== request_sha256 || request.deadline_ms !== input.deadline_ms
+    || canonicalMessageDigest({ identity: request.identity }) !== canonicalMessageDigest({ identity: input.identity })
+    || request.expected.fields['Config.WorkingDir'] !== realpathSync(input.worktree)
+    || !/^repo-harness-campaign-[a-f0-9-]{36}$/.test(request.name)) throw new Error('container preparation identity differs');
+  assertUnMounted(directory, request.expected.mounts.map((m: any) => m.Source));
+  if (!existsSync(join(directory, 'created.json'))) {
+    // The pre-create name is durable even if the create response was lost. A missing
+    // daemon object is unknown; it is never interpreted as proof of inactivity.
+    const deadline = Date.now() + CLEANUP_MS;
+    const daemon = JSON.parse(await api(['info', '--format', '{{json .}}'], deadline, request.endpoint));
+    if (daemon.ID !== request.daemon_id || daemon.ServerVersion !== '28.3.2' || daemon.OSType !== 'linux') throw new Error('container preparation daemon differs');
+    const values = JSON.parse(await api(['inspect', '--type', 'container', request.name], deadline, request.endpoint));
+    const value = values[0];
+    if (values.length !== 1 || value.Name !== '/' + request.name || !/^[a-f0-9]{64}$/.test(value.Id)) throw new Error('container preparation readback identity differs');
+    assertContainment({ ...request.expected, phase: {} }, value);
+    const config = configuration(value);
+    const handle: CampaignContainer = { protocol: 1, directory, endpoint: request.endpoint, daemon_id: request.daemon_id,
+      image: request.expected.fields.Image, container_id: value.Id, request_sha256, configuration_sha256: canonicalMessageDigest(config) };
+    for (const [phase, record] of [['configuration', config], ['created', handle]] as const) {
+      try { save(directory, phase, record); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || canonicalMessageDigest(read(directory, phase)) !== canonicalMessageDigest({ ...record })) throw error; }
+    }
+  }
+  const handle = read(directory, 'created') as CampaignContainer;
+  if (handle.directory !== directory || handle.request_sha256 !== request_sha256) throw new Error('container preparation handle differs');
+  const proof = await reconcileCampaignContainer(handle);
+  return { handle, ...proof };
+}
+
+export function readCampaignContainerPreparation(input: { common: string; worktree: string; identity: unknown; deadline_ms: number }) {
+  const directory = campaignContainerDirectory(input.common, input.identity);
+  const handle = read(directory, 'created') as CampaignContainer;
+  const { request_sha256, ...request } = read(directory, 'request');
+  if (handle.directory !== directory || request_sha256 !== handle.request_sha256
+    || canonicalMessageDigest(request) !== request_sha256 || request.deadline_ms !== input.deadline_ms
+    || canonicalMessageDigest({ identity: request.identity }) !== canonicalMessageDigest({ identity: input.identity })
+    || request.expected.fields['Config.WorkingDir'] !== realpathSync(input.worktree)) throw new Error('container preparation binding differs');
+  assertUnMounted(directory, request.expected.mounts.map((mount: { Source: string }) => mount.Source));
+  return readCampaignContainerInterruption(handle);
 }

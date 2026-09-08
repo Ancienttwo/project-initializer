@@ -1,11 +1,11 @@
-import { lstatSync, readFileSync, realpathSync } from 'fs';
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'fs';
 import { isAbsolute, relative, resolve } from 'path';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
 import { canonicalMessageDigest } from '../../core/messages/mechanics';
 import { validateCampaignCodexInvocation, type CampaignCodexInvocation, type CampaignRuntimeIdentity } from '../../core/automation/campaign-runtime';
 import { parseCodexExecStructuredOutput } from '../collaboration/provider-output-adapter';
-import { prepareCampaignContainer, runCampaignContainer, assertCampaignContainerBinding, readCampaignContainerReceipt, reconcileCampaignContainer, readCampaignContainerInterruption } from './campaign-container';
+import { prepareCampaignContainer, runCampaignContainer, assertCampaignContainerBinding, readCampaignContainerReceipt, reconcileCampaignContainer, readCampaignContainerInterruption, reconcileCampaignContainerPreparation, campaignContainerDirectory, readCampaignContainerPreparation } from './campaign-container';
 
 function bytesSha(bytes: string | Buffer): string { return `sha256:${createHash('sha256').update(bytes).digest('hex')}`; }
 function regular(root: string, path: string): Buffer {
@@ -151,4 +151,33 @@ export function observeCampaignCodexInterruption(invocation: CampaignCodexInvoca
   assertCampaignInvocationExecutable(invocation, worktree);
   const proof = readCampaignContainerInterruption(invocation.container);
   return { invocation_sha256: invocation.invocation_sha256, identity: invocation.identity, ...proof };
+}
+
+export interface CampaignCodexPreparation {
+  identity: CampaignRuntimeIdentity;
+  deadline_ms: number;
+}
+/** Preparation may have a probe alone or probe plus an unstarted workload. */
+export async function reconcileCampaignCodexPreparation(preparation: CampaignCodexPreparation, worktree: string) {
+  const common = commonDirectory(worktree, Date.now() + 5000);
+  const identities = [{ ...preparation.identity, phase: 'version' }, preparation.identity];
+  const proofs = [];
+  for (const identity of identities) {
+    const directory = campaignContainerDirectory(common, identity);
+    if (!existsSync(directory)) continue;
+    proofs.push(await reconcileCampaignContainerPreparation({ common, worktree, identity, deadline_ms: preparation.deadline_ms }));
+  }
+  if (!proofs.length) throw new Error('container preparation has no durable request; inactivity remains unknown');
+  return { identity: preparation.identity, deadline_ms: preparation.deadline_ms, proofs };
+}
+export function observeCampaignCodexPreparationInterruption(preparation: CampaignCodexPreparation, worktree: string) {
+  const common = commonDirectory(worktree, Date.now() + 5000);
+  const proofs = [];
+  for (const identity of [{ ...preparation.identity, phase: 'version' }, preparation.identity]) {
+    const directory = campaignContainerDirectory(common, identity);
+    if (!existsSync(directory)) continue;
+    proofs.push(readCampaignContainerPreparation({ common, worktree, identity, deadline_ms: preparation.deadline_ms }));
+  }
+  if (!proofs.length) throw new Error('container preparation inactivity remains unknown');
+  return { identity: preparation.identity, deadline_ms: preparation.deadline_ms, proofs };
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { prepareCampaignContainer, runCampaignContainer, reconcileCampaignContainer, type CampaignContainer } from '../../src/effects/automation/campaign-container';
+import { prepareCampaignContainer, runCampaignContainer, reconcileCampaignContainer, campaignContainerDirectory, reconcileCampaignContainerPreparation, type CampaignContainer } from '../../src/effects/automation/campaign-container';
 
 const image = process.env.BRC_TEST_CONTAINER_IMAGE;
 const owned: { root: string; handle?: CampaignContainer }[] = [];
@@ -136,4 +136,56 @@ test.skipIf(!image)('cleanup consumes fresh inactivity when kill loses the names
   const exit=await child.exited; const [stdout,stderr]=await streams;
   expect(exit,stderr).toBe(0);
   expect(JSON.parse(stdout)).toEqual({inactive:true,exit:0,kills:1});
+}, 20000);
+
+for (const phase of ['request', 'configuration', 'start', 'terminal']) test.skipIf(!image)(`Docker controller death at ${phase} publication reconciles known identity without another start`, async () => {
+  const root = mkdtempSync(join(process.platform === 'linux' ? '/var/tmp' : tmpdir(), 'brc-preparation-crash-'));
+  mkdirSync(join(root, 'work')); mkdirSync(join(root, 'common'));
+  const identity = { test: 'preparation-crash', phase };
+  const deadline = Date.now() + 6000;
+  const directory = campaignContainerDirectory(join(root, 'common'), identity);
+  const code = `import * as fs from 'fs'; import { mock } from 'bun:test';
+    const link=fs.linkSync;
+    mock.module('fs',()=>({...fs,linkSync(from,to){link(from,to);if(String(to).endsWith('/${phase}.json'))process.kill(process.pid,'SIGKILL')}}));
+    const {prepareCampaignContainer,runCampaignContainer}=await import(${JSON.stringify(join(import.meta.dir, '../../src/effects/automation/campaign-container.ts'))});
+    const handle=await prepareCampaignContainer(${JSON.stringify({root,worktree:join(root,'work'),common_git_dir:join(root,'common'),argv:['/usr/local/bin/codex','--version'],deadline_ms:deadline,writable:false,image,identity})});
+    await runCampaignContainer(handle,${deadline});`;
+  const child = Bun.spawn([process.execPath, '-e', code], { env: { ...process.env }, stdout: 'ignore', stderr: 'pipe' });
+  let request: any;
+  try {
+    const timer = setTimeout(() => child.kill('SIGKILL'), 12000);
+    try { expect(await child.exited, await new Response(child.stderr).text()).toBe(137); }
+    finally { clearTimeout(timer); }
+    request = JSON.parse(readFileSync(join(directory, 'request.json'), 'utf8'));
+    if (phase === 'configuration') expect(existsSync(join(directory, 'created.json'))).toBe(false);
+    const startBefore = existsSync(join(directory, 'start.json')) ? readFileSync(join(directory, 'start.json'), 'utf8') : null;
+    while (Date.now() <= deadline) await Bun.sleep(20);
+    if (phase === 'request') {
+      await expect(reconcileCampaignContainerPreparation({ common: join(root, 'common'), worktree: join(root, 'work'), identity, deadline_ms: deadline })).rejects.toThrow();
+      expect(existsSync(join(directory, 'interrupted.json'))).toBe(false);
+      expect(Bun.spawnSync(['docker', '--host', request.endpoint, 'inspect', request.name]).exitCode).not.toBe(0);
+      return;
+    }
+    const result = await reconcileCampaignContainerPreparation({ common: join(root, 'common'), worktree: join(root, 'work'), identity, deadline_ms: deadline });
+    expect(result.inactive).toBe(true); expect(result.output_complete).toBe(false);
+    expect(await reconcileCampaignContainerPreparation({ common: join(root, 'common'), worktree: join(root, 'work'), identity, deadline_ms: deadline })).toEqual(result);
+    expect(existsSync(join(directory, 'start.json')) ? readFileSync(join(directory, 'start.json'), 'utf8') : null).toBe(startBefore);
+    expect(existsSync(join(directory, 'terminal.json'))).toBe(phase === 'terminal');
+    await expect(reconcileCampaignContainerPreparation({ common: join(root, 'common'), worktree: join(root, 'work'), identity, deadline_ms: deadline + 1 })).rejects.toThrow('identity differs');
+  } finally {
+    child.kill('SIGKILL'); await child.exited;
+    if (!request && existsSync(join(directory, 'request.json'))) request = JSON.parse(readFileSync(join(directory, 'request.json'), 'utf8'));
+    if (request && phase !== 'request') expect(Bun.spawnSync(['docker', '--host', request.endpoint, 'rm', '-f', request.name], { timeout: 5000 }).exitCode).toBe(0);
+    rmSync(directory, { recursive: true, force: true }); rmSync(root, { recursive: true, force: true });
+  }
+}, 20000);
+
+test.skipIf(!image)('an existing preparation cannot create a second container for the same identity', async () => {
+  const f = await prepare(['/usr/local/bin/codex', '--version']);
+  const before = readFileSync(join(f.handle.directory, 'request.json'), 'utf8');
+  await expect(prepareCampaignContainer({ root: f.root, worktree: join(f.root, 'work'), common_git_dir: join(f.root, 'common'),
+    argv: ['/usr/local/bin/codex', '--version'], deadline_ms: f.deadline, writable: false, image: image!,
+    identity: { test: 'no-provider' } })).rejects.toThrow('EEXIST');
+  expect(readFileSync(join(f.handle.directory, 'request.json'), 'utf8')).toBe(before);
+  expect(existsSync(join(f.handle.directory, 'start.json'))).toBe(false);
 }, 20000);

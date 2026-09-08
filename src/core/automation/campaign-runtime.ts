@@ -31,7 +31,7 @@ export interface CampaignCodexInvocation {
   readonly invocation_sha256: string;
 }
 
-export function campaignRuntimeRecordKey(dispatchId: string, role: CampaignRuntimeIdentity['role'], phase: 'intent' | 'started' | 'terminal'): string {
+export function campaignRuntimeRecordKey(dispatchId: string, role: CampaignRuntimeIdentity['role'], phase: 'preparation' | 'intent' | 'started' | 'terminal'): string {
   return canonicalMessageDigest({ dispatch: dispatchId, role, phase, protocol: 'campaign-codex-invocation-v1' }).slice(7);
 }
 

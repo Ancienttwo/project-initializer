@@ -20,7 +20,7 @@ import { LeaseLivenessStoreError, readLeaseLiveness, renewLeaseLiveness } from '
 
 import { campaignRuntimeRecordKey, type CampaignCodexInvocation } from '../../core/automation/campaign-runtime';
 import { campaignAttemptOutcome } from '../../core/automation/campaign-runtime';
-import { prepareCampaignCodexInvocation, assertCampaignInvocationExecutable, observeCampaignCodexTerminal, observeCampaignCodexInterruption, parseCampaignVerifierResponse } from './campaign-runtime';
+import { prepareCampaignCodexInvocation, assertCampaignInvocationExecutable, observeCampaignCodexTerminal, observeCampaignCodexInterruption, parseCampaignVerifierResponse, observeCampaignCodexPreparationInterruption, type CampaignCodexPreparation } from './campaign-runtime';
 
 type Acquisition = Extract<ScheduledEngineerAcquireResult, { ok: true }>;
 export interface CampaignWorkerSelector {
@@ -152,7 +152,7 @@ export function bindCampaignWorker(input: {
   const observations: CampaignWorkerChildObservation[] = [];
   const invocations = new Map<'worker' | 'verifier', CampaignCodexInvocation>();
   const assertNotRetired = () => { if (read('retired')) throw new Error('campaign dispatch controller has been retired'); };
-  const runtimeKey = (role: 'worker' | 'verifier', phase: 'intent' | 'started' | 'terminal') => campaignRuntimeRecordKey(selector.dispatch_id, role, phase);
+  const runtimeKey = (role: 'worker' | 'verifier', phase: 'preparation' | 'intent' | 'started' | 'terminal') => campaignRuntimeRecordKey(selector.dispatch_id, role, phase);
   let activeRole: 'worker' | 'verifier' | null = null;
   let verifierVerdict: 'pass' | 'fail' | null = null;
   const renewUnderLock = () => {
@@ -174,8 +174,14 @@ export function bindCampaignWorker(input: {
     async prepareChild(role: 'worker' | 'verifier', prompt: string, deadline: number): Promise<CampaignCodexInvocation> {
       if (input.provider !== 'codex-exec') throw new Error('campaign provider mode is not selected');
       validate();
-      const invocation = await prepareCampaignCodexInvocation({ deadline_ms: Math.min(deadline, Date.parse(budget.deadline_at)), repo_root: root, worktree: work.worktree_path, prompt_path: prompt, env: input.env,
-        identity: { dispatch_id: selector.dispatch_id, role, task_id: work.task_id, task_revision: work.task_revision, claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation } });
+      const preparation = { deadline_ms: Math.min(deadline, Date.parse(budget.deadline_at)),
+        identity: { dispatch_id: selector.dispatch_id, role, task_id: work.task_id, task_revision: work.task_revision, claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation } };
+      withCampaignPlanningLock(root, intent, () => {
+        assertNotRetired();
+        if (readPlanningRecord(root, intent, runtimeKey(role, 'preparation'))) throw new Error('campaign preparation already admitted; reconciliation required');
+        persistPlanningRecord(root, intent, runtimeKey(role, 'preparation'), preparation);
+      });
+      const invocation = await prepareCampaignCodexInvocation({ ...preparation, repo_root: root, worktree: work.worktree_path, prompt_path: prompt, env: input.env });
       withCampaignPlanningLock(root, intent, () => {
         assertNotRetired();
         persistPlanningRecord(root, intent, runtimeKey(role, 'intent'), invocation);
@@ -414,15 +420,19 @@ export function settleInterruptedCampaignWorker(selectorValue: unknown, env?: No
       || !readPlanningRecord(root, intent, key(selector.dispatch_id, 'retired'))) throw new Error('interruption settlement requires the retired original owner');
     const launch = readPlanningRecord<{ request: { provider?: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
     if (launch?.request.provider !== 'codex-exec') throw new Error('interruption settlement requires a managed launch');
-    const proofs = (['worker', 'verifier'] as const).flatMap(role => {
+    const proofs: { receipt_sha256: string }[] = [];
+    for (const role of ['worker', 'verifier'] as const) {
       const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
-      if (!invocation) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); return []; }
-      if (invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
-        || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
-        || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
-        || invocation.identity.binding_generation !== offer.binding_generation) throw new Error('interrupted invocation identity differs');
-      return [observeCampaignCodexInterruption(invocation, work.worktree_path)];
-    });
+      const preparation = readPlanningRecord<CampaignCodexPreparation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparation'));
+      const record = invocation ?? preparation;
+      if (!record) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); continue; }
+      if (record.identity.dispatch_id !== selector.dispatch_id || record.identity.role !== role
+        || record.identity.claim_id !== work.claim_id || record.identity.lease_generation !== work.generation
+        || record.identity.task_id !== work.task_id || record.identity.task_revision !== work.task_revision
+        || record.identity.binding_generation !== offer.binding_generation) throw new Error('interrupted invocation identity differs');
+      if (invocation) proofs.push(observeCampaignCodexInterruption(invocation, work.worktree_path));
+      else proofs.push(...observeCampaignCodexPreparationInterruption(preparation!, work.worktree_path).proofs);
+    }
     const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
     const reservation = readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), env);
     if (!reservation || reservation.kind !== 'repo-harness-automation-reservation' || reservation.provider !== 'codex'
