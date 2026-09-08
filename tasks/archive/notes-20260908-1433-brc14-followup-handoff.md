@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 14:33
+> **Related Plan**: plans/archive/plan-20260908-1425-brc14-followup-handoff.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1433
+> **Archive Projection V1**: `plans/plan-20260908-1425-brc14-followup-handoff.md` => `plans/archive/plan-20260908-1425-brc14-followup-handoff.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1425-brc14-followup-handoff.notes.md` => `tasks/archive/notes-20260908-1433-brc14-followup-handoff.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1425-brc14-followup-handoff.contract.md` => `tasks/archive/contract-20260908-1433-brc14-followup-handoff.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1425-brc14-followup-handoff.review.md` => `tasks/archive/review-20260908-1433-brc14-followup-handoff.md`
+
 # Implementation Notes: brc14-followup-handoff
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-1425-brc14-followup-handoff.md
-> **Contract**: tasks/contracts/20260908-1425-brc14-followup-handoff.contract.md
-> **Review**: tasks/reviews/20260908-1425-brc14-followup-handoff.review.md
+> **Plan**: plans/archive/plan-20260908-1425-brc14-followup-handoff.md
+> **Contract**: tasks/archive/contract-20260908-1433-brc14-followup-handoff.md
+> **Review**: tasks/archive/review-20260908-1433-brc14-followup-handoff.md
 > **Last Updated**: 2026-09-08 14:25
 > **Lifecycle**: notes
 

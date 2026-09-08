@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 14:33
+> **Related Plan**: plans/archive/plan-20260908-1425-brc14-followup-handoff.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-1433
+> **Archive Projection V1**: `plans/plan-20260908-1425-brc14-followup-handoff.md` => `plans/archive/plan-20260908-1425-brc14-followup-handoff.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1425-brc14-followup-handoff.notes.md` => `tasks/archive/notes-20260908-1433-brc14-followup-handoff.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1425-brc14-followup-handoff.contract.md` => `tasks/archive/contract-20260908-1433-brc14-followup-handoff.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1425-brc14-followup-handoff.review.md` => `tasks/archive/review-20260908-1433-brc14-followup-handoff.md`
+
 # Task Contract: brc14-followup-handoff
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-1425-brc14-followup-handoff.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-1425-brc14-followup-handoff.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 14:25
-> **Review File**: `tasks/reviews/20260908-1425-brc14-followup-handoff.review.md`
-> **Notes File**: `tasks/notes/20260908-1425-brc14-followup-handoff.notes.md`
+> **Review File**: `tasks/archive/review-20260908-1433-brc14-followup-handoff.md`
+> **Notes File**: `tasks/archive/notes-20260908-1433-brc14-followup-handoff.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-1425-brc14-followup-handoff.md`
+- Source plan: `plans/archive/plan-20260908-1425-brc14-followup-handoff.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-1425-brc14-followup-handoff.review.md`
-- Notes file: `tasks/notes/20260908-1425-brc14-followup-handoff.notes.md`
+- Review file: `tasks/archive/review-20260908-1433-brc14-followup-handoff.md`
+- Notes file: `tasks/archive/notes-20260908-1433-brc14-followup-handoff.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -134,7 +144,7 @@ exit_criteria:
     - docs/spec.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-1425-brc14-followup-handoff.notes.md
+    - tasks/archive/notes-20260908-1433-brc14-followup-handoff.md
 ```
 
 ## Verification Plan
