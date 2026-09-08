@@ -111,10 +111,10 @@ Gate accepts repo root and existing intent, loads current campaign and anchored 
 Scope exceeds eight files due one cross-module invariant: core observation protocol, observation effect, active gate, adoption/planning/capacity/acquisition/worker callers and fleet offer projection and named tests. No new dependency, CLI command, service, flag or credential. Private local evidence remains host-trusted; content hashes are integrity, not outside-machine attestations. At 10x history volume the existing byte/page bound fails closed. Rollback reverts implementation and rejects new records on old code; old records remain unchanged.
 
 ## Task Breakdown
-- [ ] Add strict protocol-2 observation request/result validation, same-session capture and persist-before-settle producer.
-- [ ] Bind active entrypoints to exact campaign/intent/grant/history and real observed ledger settlement, preserving recovery paths.
-- [ ] Test positive formal observation, unavailable/legacy/cross-identity/corrupted/unsettled evidence, budget stop, later group binding and protected callers without real providers.
-- [ ] Freeze and run focused verification, TypeScript and six repository integrity checks; independent semantic review and archive with no main merge or whole-sprint completion.
+- [x] Add strict protocol-2 observation request/result validation, same-session capture and persist-before-settle producer.
+- [x] Bind active entrypoints to exact campaign/intent/grant/history and real observed ledger settlement, preserving recovery paths.
+- [x] Test positive formal observation, unavailable/legacy/cross-identity/corrupted/unsettled evidence, budget stop, later group binding and protected callers without real providers.
+- [x] Freeze and run focused verification, TypeScript and six repository integrity checks; independent semantic review and archive with no main merge or whole-sprint completion.
 
 ## Verification
 Named tests: campaign-revision-observation, campaign-revision-admission, campaign-fresh-audit, issue-batch-adoption, campaign-planning, campaign-capacity, campaign-acquisition, campaign-worker, development-campaign-store; CLI development-campaign; TypeScript. Six required integrity checks include init dry-run; adoption fixture apply is covered by issue-batch-adoption effect tests. No full suite: named authority, ledger, replay, provider and transaction boundaries cover the changed behavior. Preserve previous package evidence as original-subject baseline only.
@@ -126,7 +126,7 @@ No real GPT call, new grant/budget, GitHub write, active campaign launch, releas
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Add strict protocol-2 observation request/result validation, same-session capture and persist-before-settle producer.
-- [ ] Bind active entrypoints to exact campaign/intent/grant/history and real observed ledger settlement, preserving recovery paths.
-- [ ] Test positive formal observation, unavailable/legacy/cross-identity/corrupted/unsettled evidence, budget stop, later group binding and protected callers without real providers.
-- [ ] Freeze and run focused verification, TypeScript and six repository integrity checks; independent semantic review and archive with no main merge or whole-sprint completion.
+- [x] Add strict protocol-2 observation request/result validation, same-session capture and persist-before-settle producer.
+- [x] Bind active entrypoints to exact campaign/intent/grant/history and real observed ledger settlement, preserving recovery paths.
+- [x] Test positive formal observation, unavailable/legacy/cross-identity/corrupted/unsettled evidence, budget stop, later group binding and protected callers without real providers.
+- [x] Freeze and run focused verification, TypeScript and six repository integrity checks; independent semantic review and archive with no main merge or whole-sprint completion.

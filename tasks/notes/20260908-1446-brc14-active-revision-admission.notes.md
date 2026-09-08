@@ -54,3 +54,7 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 ## Review correction
 
 Architecture review identified budget deadline expiry without a stop receipt. The original guard relied on the active projection, which does not materialize elapsed deadlines. /tmp/brc14-deadline-red.log proves the prior implementation accepted that state. The guard now checks grant expiry and budget deadline with one current timestamp. The regression runs without a live provider. The previous untracked recovery-only handoff was moved to ignored .ai/harness/runs/ so it remains available without entering the commit surface.
+
+## Final acceptance
+
+Canonical run run-20260908T145745-40710 passed 13/13 criteria on source 744f49c3, including the focused caller/observation/transaction tests (202408 ms), typecheck and six integrity checks. Architecture/composition, security/assumption and cascade/abuse native reviews passed; deadline finding independently closed after its red/green guard. No live provider ran. Main independently advanced to cfb26baa and preserved its previous WIP; this isolated package does not merge or overwrite it.
