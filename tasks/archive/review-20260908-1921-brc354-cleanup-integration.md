@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 19:21
+> **Related Plan**: plans/archive/plan-20260908-1905-brc354-cleanup-integration.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-1921
+> **Archive Projection V1**: `plans/plan-20260908-1905-brc354-cleanup-integration.md` => `plans/archive/plan-20260908-1905-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md` => `tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1905-brc354-cleanup-integration.contract.md` => `tasks/archive/contract-20260908-1921-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1905-brc354-cleanup-integration.review.md` => `tasks/archive/review-20260908-1921-brc354-cleanup-integration.md`
+
 # Task Review: brc354-cleanup-integration
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-1905-brc354-cleanup-integration.md
-> **Contract**: tasks/contracts/20260908-1905-brc354-cleanup-integration.contract.md
-> **Notes File**: tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md
+> **Plan**: plans/archive/plan-20260908-1905-brc354-cleanup-integration.md
+> **Contract**: tasks/archive/contract-20260908-1921-brc354-cleanup-integration.md
+> **Notes File**: tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 19:05
 > **Recommendation**: pass
@@ -31,7 +41,7 @@
 
 - Final Docker execution: vx-432e91991b434382b082, 142158 ms, pass. Initial failure vx-9f7ed717614f4b8f9140 is retained; new fixture budgets were corrected, unchanged watchdog tests passed serial re-verification.
 - Run snapshot: .ai/harness/runs/run-20260908T191436-43077-20260908-1905-brc354-cleanup-integration.json.
-- Implementation notes reviewed: tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md.
+- Implementation notes reviewed: tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md.
 - Baseline #361 491ff094 merged as ba09b548 with identical tree and five passing CI checks. Prior #362 is closed as superseded; no preparing marker was ported.
 
 ## Acceptance Receipt Projection

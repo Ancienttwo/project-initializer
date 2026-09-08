@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 19:21
+> **Related Plan**: plans/archive/plan-20260908-1905-brc354-cleanup-integration.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-1921
+> **Archive Projection V1**: `plans/plan-20260908-1905-brc354-cleanup-integration.md` => `plans/archive/plan-20260908-1905-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md` => `tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1905-brc354-cleanup-integration.contract.md` => `tasks/archive/contract-20260908-1921-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1905-brc354-cleanup-integration.review.md` => `tasks/archive/review-20260908-1921-brc354-cleanup-integration.md`
+
 # Task Contract: brc354-cleanup-integration
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-1905-brc354-cleanup-integration.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-1905-brc354-cleanup-integration.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 19:05
-> **Review File**: `tasks/reviews/20260908-1905-brc354-cleanup-integration.review.md`
-> **Notes File**: `tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md`
+> **Review File**: `tasks/archive/review-20260908-1921-brc354-cleanup-integration.md`
+> **Notes File**: `tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -41,10 +51,10 @@ Not applicable: this slice adds the explicit cleanup contract atop accepted prep
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-1905-brc354-cleanup-integration.md`
+- Source plan: `plans/archive/plan-20260908-1905-brc354-cleanup-integration.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-1905-brc354-cleanup-integration.review.md`
-- Notes file: `tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md`
+- Review file: `tasks/archive/review-20260908-1921-brc354-cleanup-integration.md`
+- Notes file: `tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -71,9 +81,9 @@ allowed_paths:
   - scripts/cleanup-campaign-container.ts
   - plans/
   - tasks/todos.md
-  - tasks/contracts/20260908-1905-brc354-cleanup-integration.contract.md
-  - tasks/reviews/20260908-1905-brc354-cleanup-integration.review.md
-  - tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md
+  - tasks/archive/contract-20260908-1921-brc354-cleanup-integration.md
+  - tasks/archive/review-20260908-1921-brc354-cleanup-integration.md
+  - tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md
   - .ai/context/capabilities.json
   - .claude/templates/
   - src/
@@ -133,7 +143,7 @@ exit_criteria:
     - scripts/cleanup-campaign-container.ts
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md
+    - tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md
 ```
 
 ## Verification Plan

@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-08 19:21
+> **Related Plan**: plans/archive/plan-20260908-1905-brc354-cleanup-integration.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1921
+> **Archive Projection V1**: `plans/plan-20260908-1905-brc354-cleanup-integration.md` => `plans/archive/plan-20260908-1905-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1905-brc354-cleanup-integration.notes.md` => `tasks/archive/notes-20260908-1921-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1905-brc354-cleanup-integration.contract.md` => `tasks/archive/contract-20260908-1921-brc354-cleanup-integration.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1905-brc354-cleanup-integration.review.md` => `tasks/archive/review-20260908-1921-brc354-cleanup-integration.md`
+
 # Cleanup integration decisions
 
 Keep #361 preparation authority and deterministic journals intact. The superseded #362 preparing marker is intentionally excluded. Cleanup is the sole production delta. Docker SIGKILL cases now reconcile and clean the reconstructed handle, then consume identical proof after deletion; missing request-only objects remain refused.
