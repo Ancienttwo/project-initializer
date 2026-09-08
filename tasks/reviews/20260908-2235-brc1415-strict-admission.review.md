@@ -8,9 +8,9 @@
 > **Last Updated**: 2026-09-08 22:35
 > **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: sha256:70cf8fda24ddaada2ad9e693b84743a9b09342c31f14aeac955431651dc3948a
+> **Reviewed Subject SHA256**: sha256:6b807c6b42cfb4d8208ca03a15aa9e282bbe6cc5b24a543e8bb965b430466516
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: aa3cb4522e842e04e5f7188f62b2a80b6049b28f
+> **Reviewed Target Revision**: 1f1dad978a5583928956e844f66cb14c965b4766
 
 ## Human Review Card
 
@@ -44,13 +44,13 @@
 > **Reviewer**: Codex
 > **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: sha256:70cf8fda24ddaada2ad9e693b84743a9b09342c31f14aeac955431651dc3948a
+> **Reviewed Subject SHA256**: sha256:6b807c6b42cfb4d8208ca03a15aa9e282bbe6cc5b24a543e8bb965b430466516
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: aa3cb4522e842e04e5f7188f62b2a80b6049b28f
-> **Verification Evidence SHA256**: sha256:b47b490fbadc1e0499fe3931f76bc5db305dcaae315365363c6621e8c91a7a86
-> **Issued At**: 2026-09-08T15:47:22.947Z
+> **Reviewed Target Revision**: 1f1dad978a5583928956e844f66cb14c965b4766
+> **Verification Evidence SHA256**: sha256:3f4f1a95050855f66ef1846562d121c8522a0bbf5c1cd156b58a8cd8ee578f7d
+> **Issued At**: 2026-09-08T16:55:57.921Z
 
-- Summary: Local candidate acceptance: 14/14 canonical criteria passed, including 60 focused raw-resource request and decoder cases. Prior 86-case evidence remains baseline for its original subject. Live BYOK shadow and active revision observations are verified separately; worker and merge acceptance remain pending.
+- Summary: Model-free positive admission, carrier-only new launches, historical recovery and complete three-group sequencing pass. Fourteen contract criteria pass; real Canary delivery and final fresh audit remain outstanding.
 - Findings: none
 
 ## Behavior Diff Notes

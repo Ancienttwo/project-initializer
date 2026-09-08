@@ -153,3 +153,7 @@ P1/P2: contract-run accepts an optional campaign provider; bindCampaignWorker pr
 > **Substantive Change SHA256**: `sha256:6f702316a4f5de3159ed0eb6d4a5de7456576b9bded144aa4cac1a42e6ce323a`
 
 > **Substantive Change SHA256**: `sha256:91930f7fef3b66d87ca2673e2fa0f1a71ca6b45a22b717dff1dc3662d3e9f4c7`
+
+The retained initial-base task-sync criterion includes the merged main changes. Bind that exact integrated diff without changing ownership or claiming those changes as this slice. All behavior criteria passed in run-20260909T004725-61115; only the missing workflow fingerprint failed.
+
+> **Substantive Change SHA256**: `sha256:bb9f6bd7f4648697bd80356d1b929f05fd479464d019c47f097aa12b17332e75`
