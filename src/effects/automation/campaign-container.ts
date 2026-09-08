@@ -270,3 +270,38 @@ export function readCampaignContainerInterruption(handle: CampaignContainer) {
   return { receipt_sha256: receipt_sha256 as string, container_id: handle.container_id, deadline_ms: body.deadline_ms as number,
     inactive: true as const, output_complete: false as const };
 }
+
+/** Operator-invoked retention boundary. Never removes a journal, worktree, or a running container. */
+export async function cleanupCampaignContainer(directory: string) {
+  assertJournal(directory);
+  const handle = read(directory, 'created') as CampaignContainer;
+  if (handle.directory !== directory) throw new Error('cleanup journal identity differs');
+  // Publish the recovery proof before deletion; later reconciliation consumes these same bytes.
+  const interruption = await reconcileCampaignContainer(handle);
+  const proof = { protocol: 1, kind: 'repo-harness-campaign-container-cleanup', handle,
+    interruption_receipt_sha256: interruption.receipt_sha256 };
+  const expected = { ...proof, receipt_sha256: canonicalMessageDigest(proof) };
+  const cleanupDeadline = Date.now() + CLEANUP_MS;
+  const daemon = JSON.parse(await api(['info', '--format', '{{json .}}'], cleanupDeadline, handle.endpoint));
+  if (daemon.ID !== handle.daemon_id || daemon.OSType !== 'linux' || daemon.ServerVersion !== '28.3.2') throw new Error('cleanup daemon identity changed');
+  const present = async () => {
+    const id = await api(['container', 'ls', '--all', '--no-trunc', '--filter', `id=${handle.container_id}`, '--format', '{{.ID}}'], cleanupDeadline, handle.endpoint);
+    if (id !== '' && id !== handle.container_id) throw new Error('cleanup container identity differs');
+    return id !== '';
+  };
+  if (existsSync(join(directory, 'cleanup.json')) && canonicalMessageDigest(read(directory, 'cleanup')) !== canonicalMessageDigest(expected)) throw new Error('cleanup receipt differs');
+  if (await present()) {
+    const value = await inspect(handle, cleanupDeadline);
+    if (!stopped(value) && !(value.State.Status === 'created' && value.State.Running === false && value.State.Pid === 0
+      && value.State.Dead === false && value.State.Restarting === false && value.RestartCount === 0)) throw new Error('cleanup requires an inactive container');
+    // No --force: a concurrent start cannot turn cleanup into workload termination.
+    await api(['rm', handle.container_id], cleanupDeadline, handle.endpoint);
+  }
+  if (await present()) throw new Error('container removal is not proven');
+  if (!existsSync(join(directory, 'cleanup.json'))) {
+    try { save(directory, 'cleanup', expected); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+  }
+  if (canonicalMessageDigest(read(directory, 'cleanup')) !== canonicalMessageDigest(expected)) throw new Error('cleanup receipt differs');
+  return expected;
+}

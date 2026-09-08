@@ -56,15 +56,16 @@ function observe(context: Context, owner: LeaseOwnerRecord): LeaseReclaimEvidenc
     const started = readPlanningRecord<{ invocation_sha256: string; identity: unknown }>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'started'));
     const terminal = readPlanningRecord<ReturnType<typeof observeCampaignCodexTerminal>>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'terminal'));
     const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation }>(root, intent, key(selector.dispatch_id, `child-${role}`));
-    if (!started) return { role, inactive: retired && (!launch || launch.request.provider === 'codex-exec') ? true : null, invocation, started, terminal };
-    if (!invocation || started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)
+    const preparing = readPlanningRecord(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparing'));
+    if (!started && !preparing && !invocation) return { role, inactive: retired && (!launch || launch.request.provider === 'codex-exec') ? true : null, invocation, started, terminal };
+    if (!invocation || (started && (started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)))
       || invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
       || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
       || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
       || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation) {
       return { role, inactive: null, invocation, started, terminal };
     }
-    if (!terminal || !child) {
+    if (!started || !terminal || !child) {
       try { const interruption = observeCampaignCodexInterruption(invocation, work.worktree_path);
         return { role, inactive: true, invocation, started, terminal, interruption };
       } catch { return { role, inactive: null, invocation, started, terminal }; }
@@ -181,6 +182,12 @@ export async function reconcileAndRecoverCampaignDispatch(input: Parameters<type
   const context = readCampaignWorkerHandoff(input.selector);
   assertRecoveryParent(context, input);
   const { root, intent, selector, handoff } = context;
+  for (const role of ['worker', 'verifier'] as const) {
+    if (readPlanningRecord(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparing'))
+      && !readPlanningRecord(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'))) {
+      throw new Error('campaign preparation lacks a published invocation; supervision unresolved');
+    }
+  }
   if (readPlanningRecord(root, intent, key(selector.dispatch_id, 'final'))) return recoverCampaignDispatch(input);
   const launch = readPlanningRecord<{ request: { provider?: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
   if (launch?.request.provider !== 'codex-exec') return recoverCampaignDispatch(input);

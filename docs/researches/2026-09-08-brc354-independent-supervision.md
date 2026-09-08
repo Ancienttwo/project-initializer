@@ -18,4 +18,23 @@ The post-archive delta at 22b9032c keeps containment fixtures outside Linux /tmp
 
 The three affected lifecycle/closeout files passed in a no-network Linux test container: 37 passed, one nested-Docker case skipped, zero failed. The evidence/projection regression set passed 43 tests. The skipped case and sixteen Docker supervision checks retain their original image-enabled baseline identities; neither the baseline AcceptanceReceipt nor these offline results prove current live campaign readiness. See tasks/reviews/20260908-brc354-ci-delta.review.md for exact evidence references.
 
-Recovery acceptance currently covers an already persisted invocation, exact-container inactivity, original deadline and no-restart settlement. Controller loss before durable invocation publication is not established by that evidence. Successful container/journal retention also needs an explicit cleanup contract compatible with later exact-container readback; unconditional removal would invalidate that recovery dependency. Both remain pre-active review boundaries. PR #360 does not itself close #354; active remains disabled and BRC14/BRC15 live acceptance remains outstanding.
+Recovery acceptance currently covers an already persisted invocation, exact-container inactivity, original deadline and no-restart settlement. Controller loss before durable invocation publication is not established by that evidence. Successful container/journal retention also needs an explicit cleanup contract compatible with later exact-container readback; unconditional removal would invalidate that recovery dependency. These were the outstanding boundaries at PR #360; the following closeout defines their fail-closed and retention contracts. Active remains disabled and BRC14/BRC15 live acceptance remains outstanding.
+
+
+## Preparation loss and retention contract
+
+Before the first asynchronous preparation step, the campaign controller publishes an immutable `preparing` record bound to dispatch, role, task/revision, claim, lease/binding generations and the original bounded deadline. Retirement and preparation share the planning lock. A duplicate preparation cannot restart a probe; retirement prevents new preparation. The invocation remains the executable authority and is published only after the protected probe and workload handles exist.
+
+A preparation record without its complete invocation is unresolved supervision. Reclaim never treats a missing `started` record as inactivity in this state, and reconciliation refuses before settlement or ownership change. A complete invocation without `started` also needs the existing expired-deadline interruption proof. This is fail-closed crash handling, not reconstruction of missing provider output or a promise of automatic recovery from partial preparation. The active gate remains closed.
+
+Container retention is deliberate until the original deadline has expired. The explicit operator command is:
+
+```sh
+bun scripts/cleanup-campaign-container.ts <absolute-protected-journal-directory>
+```
+
+The operator selects one existing journal under the configured account-level harness home; the command reads its immutable `created` handle rather than accepting a supplied Docker name or digest. It verifies request/daemon/container identity, original expiry and inactivity, then atomically publishes the interruption proof before removing that exact container without force. It reads absence back from the same daemon and publishes a cleanup receipt. Configuration drift, live state, missing created authority and unavailable Docker all refuse deletion. A crash after removal is retryable from the retained interruption record without re-running the workload or creating terminal output.
+
+Protected request, configuration, created, start, terminal, interruption and cleanup records are retained; there is no TTL deletion or broad prune. Later terminal/recovery consumers keep reading those same immutable proofs even after container removal. Container cleanup grants no dispatch settlement, Lease reclaim, worktree deletion or release authority. Partial preparation lacking a complete handle stays operator-attention-required; filesystem/name scanning cannot manufacture its missing invocation authority. Journal storage grows with invocations and remains the explicit storage tradeoff until a separately authorized evidence archival policy exists.
+
+The closeout regressions include real controller SIGKILL at protected probe/workload request and created publication, and immediately before/after planning invocation publication. They exercise actual reclaim/reconciliation consumers and retain the original simultaneous log/summary substitution tests. Cleanup tests cover original deadline refusal, CLI removal, terminal-consumer equality after both containers are removed, interruption replay after removal/publication loss and configuration-drift refusal.

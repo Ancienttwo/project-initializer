@@ -152,7 +152,7 @@ export function bindCampaignWorker(input: {
   const observations: CampaignWorkerChildObservation[] = [];
   const invocations = new Map<'worker' | 'verifier', CampaignCodexInvocation>();
   const assertNotRetired = () => { if (read('retired')) throw new Error('campaign dispatch controller has been retired'); };
-  const runtimeKey = (role: 'worker' | 'verifier', phase: 'intent' | 'started' | 'terminal') => campaignRuntimeRecordKey(selector.dispatch_id, role, phase);
+  const runtimeKey = (role: 'worker' | 'verifier', phase: 'preparing' | 'intent' | 'started' | 'terminal') => campaignRuntimeRecordKey(selector.dispatch_id, role, phase);
   let activeRole: 'worker' | 'verifier' | null = null;
   let verifierVerdict: 'pass' | 'fail' | null = null;
   const renewUnderLock = () => {
@@ -173,9 +173,17 @@ export function bindCampaignWorker(input: {
     replay: null, selector, deadline_at: budget.deadline_at, renewal_interval_ms: livenessPolicy.renewal_interval_ms, renew,
     async prepareChild(role: 'worker' | 'verifier', prompt: string, deadline: number): Promise<CampaignCodexInvocation> {
       if (input.provider !== 'codex-exec') throw new Error('campaign provider mode is not selected');
-      validate();
-      const invocation = await prepareCampaignCodexInvocation({ deadline_ms: Math.min(deadline, Date.parse(budget.deadline_at)), repo_root: root, worktree: work.worktree_path, prompt_path: prompt, env: input.env,
-        identity: { dispatch_id: selector.dispatch_id, role, task_id: work.task_id, task_revision: work.task_revision, claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation } });
+      const preparation = { identity: { dispatch_id: selector.dispatch_id, role, task_id: work.task_id, task_revision: work.task_revision,
+        claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation },
+        deadline_ms: Math.min(deadline, Date.parse(budget.deadline_at)) };
+      withCampaignPlanningLock(root, intent, () => {
+        assertNotRetired();
+        validate();
+        if (readPlanningRecord(root, intent, runtimeKey(role, 'preparing'))) throw new Error('campaign preparation already claimed; reconciliation required');
+        // Even the version probe is a runtime effect. Fence it before any asynchronous preparation.
+        persistPlanningRecord(root, intent, runtimeKey(role, 'preparing'), preparation);
+      });
+      const invocation = await prepareCampaignCodexInvocation({ ...preparation, repo_root: root, worktree: work.worktree_path, prompt_path: prompt, env: input.env });
       withCampaignPlanningLock(root, intent, () => {
         assertNotRetired();
         persistPlanningRecord(root, intent, runtimeKey(role, 'intent'), invocation);
@@ -416,7 +424,10 @@ export function settleInterruptedCampaignWorker(selectorValue: unknown, env?: No
     if (launch?.request.provider !== 'codex-exec') throw new Error('interruption settlement requires a managed launch');
     const proofs = (['worker', 'verifier'] as const).flatMap(role => {
       const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
-      if (!invocation) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); return []; }
+      if (!invocation) {
+        if (readPlanningRecord(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparing'))) throw new Error('campaign preparation lacks a published invocation; supervision unresolved');
+        if (role === 'worker') throw new Error('interrupted worker intent is missing'); return [];
+      }
       if (invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
         || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
         || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision

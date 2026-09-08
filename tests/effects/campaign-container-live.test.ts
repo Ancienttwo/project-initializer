@@ -2,15 +2,19 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { prepareCampaignContainer, runCampaignContainer, reconcileCampaignContainer, type CampaignContainer } from '../../src/effects/automation/campaign-container';
+import { prepareCampaignContainer, runCampaignContainer, reconcileCampaignContainer, cleanupCampaignContainer, readCampaignContainerReceipt, type CampaignContainer } from '../../src/effects/automation/campaign-container';
 
 const image = process.env.BRC_TEST_CONTAINER_IMAGE;
 const owned: { root: string; handle?: CampaignContainer }[] = [];
 afterEach(() => {
   for (const item of owned.splice(0)) {
     if (item.handle) {
-      const result = Bun.spawnSync(['docker', '--host', item.handle.endpoint, 'rm', '-f', item.handle.container_id], { timeout: 5000 });
-      if (result.exitCode !== 0) throw new Error('owned fixture container cleanup failed');
+      const present = Bun.spawnSync(['docker', '--host', item.handle.endpoint, 'container', 'ls', '--all', '--no-trunc', '--filter', `id=${item.handle.container_id}`, '--format', '{{.ID}}'], { timeout: 5000 });
+      if (present.exitCode !== 0) throw new Error('owned fixture container inventory failed');
+      if (new TextDecoder().decode(present.stdout).trim()) {
+        const result = Bun.spawnSync(['docker', '--host', item.handle.endpoint, 'rm', '-f', item.handle.container_id], { timeout: 5000 });
+        if (result.exitCode !== 0) throw new Error('owned fixture container cleanup failed');
+      }
       rmSync(item.handle.directory, { recursive: true, force: true });
     }
     rmSync(item.root, { recursive: true, force: true });
@@ -137,3 +141,53 @@ test.skipIf(!image)('cleanup consumes fresh inactivity when kill loses the names
   expect(exit,stderr).toBe(0);
   expect(JSON.parse(stdout)).toEqual({inactive:true,exit:0,kills:1});
 }, 20000);
+
+test.skipIf(!image)('cleanup waits for expiry and preserves exact terminal and interruption readback', async () => {
+  const f = await prepare(['/usr/local/bin/codex','--version'],false,6000);
+  const terminal = await runCampaignContainer(f.handle,f.deadline);
+  await expect(cleanupCampaignContainer(f.handle.directory)).rejects.toThrow('expired deadline');
+  while (Date.now() < f.deadline) await Bun.sleep(20);
+  const cli = Bun.spawn([process.execPath,join(import.meta.dir,'../../scripts/cleanup-campaign-container.ts'),f.handle.directory],{env:{...process.env},stdout:'pipe',stderr:'pipe'});
+  const streams=Promise.all([new Response(cli.stdout).text(),new Response(cli.stderr).text()]);
+  const exit=await cli.exited; const [stdout,stderr]=await streams;
+  expect(exit,stderr).toBe(0);
+  const cleaned=JSON.parse(stdout);
+  expect(cleaned.handle).toEqual(f.handle);
+  expect(Bun.spawnSync(['docker','--host',f.handle.endpoint,'inspect',f.handle.container_id],{timeout:5000}).exitCode).not.toBe(0);
+  expect(readCampaignContainerReceipt(f.handle,terminal.receipt_sha256,terminal.stdout,terminal.stderr).inactive).toBe(true);
+  const interruption=await reconcileCampaignContainer(f.handle);
+  expect(interruption.receipt_sha256).toBe(cleaned.interruption_receipt_sha256);
+  expect(await cleanupCampaignContainer(f.handle.directory)).toEqual(cleaned);
+  expect(existsSync(join(f.handle.directory,'request.json'))).toBe(true);
+  expect(existsSync(join(f.handle.directory,'terminal.json'))).toBe(true);
+  expect(existsSync(join(f.handle.directory,'interrupted.json'))).toBe(true);
+},15000);
+
+test.skipIf(!image)('cleanup crash after removal replays from durable interruption without creating output', async () => {
+  const f = await prepare(['/usr/local/bin/codex','--version'],false,3000);
+  while(Date.now()<f.deadline) await Bun.sleep(20);
+  const code=`import * as fs from 'fs'; import {mock} from 'bun:test'; const link=fs.linkSync;
+    mock.module('fs',()=>({...fs,linkSync(from,to){if(String(to).endsWith('/cleanup.json'))process.kill(process.pid,'SIGKILL');link(from,to)}}));
+    const {cleanupCampaignContainer}=await import(${JSON.stringify(join(import.meta.dir,'../../src/effects/automation/campaign-container.ts'))});
+    await cleanupCampaignContainer(${JSON.stringify(f.handle.directory)});`;
+  const child=Bun.spawn([process.execPath,'-e',code],{env:{...process.env},stdout:'ignore',stderr:'pipe'});
+  const error=new Response(child.stderr).text();
+  expect(await child.exited,await error).toBe(137);
+  expect(existsSync(join(f.handle.directory,'cleanup.json'))).toBe(false);
+  expect(existsSync(join(f.handle.directory,'interrupted.json'))).toBe(true);
+  expect(Bun.spawnSync(['docker','--host',f.handle.endpoint,'inspect',f.handle.container_id],{timeout:5000}).exitCode).not.toBe(0);
+  const result=await cleanupCampaignContainer(f.handle.directory);
+  expect((await reconcileCampaignContainer(f.handle)).receipt_sha256).toBe(result.interruption_receipt_sha256);
+  expect(existsSync(join(f.handle.directory,'terminal.json'))).toBe(false);
+  expect(existsSync(join(f.handle.directory,'start.json'))).toBe(false);
+},15000);
+
+test.skipIf(!image)('cleanup refuses configuration drift even after an interruption was cached', async () => {
+  const f = await prepare(['/usr/local/bin/codex','--version'],false,3000);
+  while(Date.now()<f.deadline) await Bun.sleep(20);
+  await reconcileCampaignContainer(f.handle);
+  expect(Bun.spawnSync(['docker','--host',f.handle.endpoint,'update','--memory','536870912',f.handle.container_id],{timeout:5000}).exitCode).toBe(0);
+  await expect(cleanupCampaignContainer(f.handle.directory)).rejects.toThrow('HostConfig.Memory');
+  expect(existsSync(join(f.handle.directory,'cleanup.json'))).toBe(false);
+  expect(Bun.spawnSync(['docker','--host',f.handle.endpoint,'inspect',f.handle.container_id],{timeout:5000}).exitCode).toBe(0);
+},15000);

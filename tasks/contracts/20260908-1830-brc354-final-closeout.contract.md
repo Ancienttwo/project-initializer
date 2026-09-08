@@ -1,0 +1,314 @@
+# Task Contract: brc354-final-closeout
+
+> **Status**: Active
+> **Plan**: plans/plan-20260908-1830-brc354-final-closeout.md
+> **Task Profile**: bugfix
+> <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
+> **Owner**: ancienttwo
+> **Capability ID**: root
+> **Last Updated**: 2026-09-08 18:30
+> **Review File**: `tasks/reviews/20260908-1830-brc354-final-closeout.review.md`
+> **Notes File**: `tasks/notes/20260908-1830-brc354-final-closeout.notes.md`
+> **Exemplar**: `docs/reference-configs/contract-brief-example.md`
+
+## Why
+
+Issue #354 requires independently protected supervision across controller loss and subsequent recovery; missing invocation records must not become positive inactivity.
+
+## Goal
+
+Fence Docker preparation before side effects, reject incomplete authority in real recovery consumers, and provide bounded exact-container cleanup preserving protected recovery evidence.
+
+## Scope
+
+- In scope: preparation markers, recovery refusals, exact-container cleanup, protected journal retention, model-free tests and documentation.
+- Out of scope: model calls, active enablement, package release and unrelated worktree cleanup.
+- Taste constraints: <!-- advisory only, no run gate; default style/taste lives in AGENTS.md and the minimal-change policy, use this to record a per-task override -->
+
+## Stop Conditions
+
+- Stop and hand back to the parent if the change would require editing a path outside Allowed Paths.
+- Stop if an Exit Criteria command cannot be run in this environment.
+- Stop if Goal, Scope, or Exit Criteria are internally contradictory.
+
+## Falsifier
+
+A controller killed during preparation yields positive inactivity; cleanup admits a live or unbound container; or later recovery requires an already deleted container. The focused regressions exercise these actual consumers.
+
+## Root Cause Evidence
+
+- root_cause: campaign-worker prepareChild performs Docker effects before publishing invocation; campaign-recovery observe treated missing started as inactivity after retirement even when preparation was unresolved.
+- repro: bun test tests/effects/brc10-lifecycle.test.ts --test-name-pattern 'unpublished.*preparation' on main a1393e44 with only the regression guard added.
+- regression_guard: tests/effects/brc10-lifecycle.test.ts
+- pre_fix_failure_artifact: .ai/harness/runs/brc354-pre-fix.log
+
+## Workflow Inventory
+
+- Source plan: `plans/plan-20260908-1830-brc354-final-closeout.md`
+- Deferred-goal ledger: `tasks/todos.md`
+- Review file: `tasks/reviews/20260908-1830-brc354-final-closeout.review.md`
+- Notes file: `tasks/notes/20260908-1830-brc354-final-closeout.notes.md`
+- Checks file: `.ai/harness/checks/latest.json`
+- Run snapshots: `.ai/harness/runs/`
+- Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
+- Completion gate: run `verify-sprint --prepare-acceptance`, record one typed AcceptanceReceipt under the frozen policy below, then run `verify-sprint`; review Markdown is projection only.
+
+## Change Assessment
+
+```json
+{"protocol": 1, "oracles": [{"id": "runtime-docker", "kind": "runtime_readback", "paths": ["*"]}, {"id": "lifecycle-regression", "kind": "deterministic_test", "paths": ["*"]}]}
+```
+
+## Acceptance Policy
+
+```json
+{"protocol":2,"reviewer":"Codex","source":"codex-plugin","user_waiver":"allowed"}
+```
+
+## Allowed Paths
+
+```yaml
+allowed_paths:
+  - docs/researches/2026-09-08-brc354-independent-supervision.md
+  - docs/architecture/
+  - scripts/cleanup-campaign-container.ts
+  - plans/
+  - tasks/todos.md
+  - tasks/contracts/20260908-1830-brc354-final-closeout.contract.md
+  - tasks/reviews/20260908-1830-brc354-final-closeout.review.md
+  - tasks/notes/20260908-1830-brc354-final-closeout.notes.md
+  - .ai/context/capabilities.json
+  - .claude/templates/
+  - src/
+  - tests/
+```
+
+## Evidence Requirements
+
+```yaml
+evidence_requirements:
+  # Set benchmark to required when this contract consumes the harness profile benchmark matrix.
+  benchmark: not_applicable
+```
+
+## Delegation Contract
+
+```yaml
+delegation:
+  budget:
+    tokens: null
+    runner_invocations: null
+    wall_time_minutes: null
+  permission_scope:
+    mode: inherit_allowed_paths
+    writable_paths: []
+    network: inherited
+  roles:
+    parent:
+      mode: narrate_and_gatekeep
+      purpose: approval_checkpoint_owner
+    explorer:
+      mode: read_only
+      purpose: codebase_research
+    worker:
+      mode: edit_within_allowed_paths
+      purpose: implementation
+    verifier:
+      mode: read_only
+      purpose: exit_criteria_review
+  runner:
+    preferred:
+      - subagent
+    fallback: null
+    brief_is_authoritative: true
+```
+
+## Exit Criteria (Machine Verifiable)
+
+This block contains only non-executable artifact requirements. Define every
+executable check once in the canonical Verification Plan below. Each check must
+state its phase, cost, evidence policy, necessity, and input environment; a
+missing or malformed plan fails closed.
+
+```yaml
+exit_criteria:
+  files_exist:
+    - src/effects/automation/campaign-container.ts
+  artifacts_exist:
+    - .ai/harness/checks/latest.json
+    - tasks/notes/20260908-1830-brc354-final-closeout.notes.md
+```
+
+## Verification Plan
+
+```json
+{
+  "protocol": 1,
+  "checks": [
+    {
+      "id": "runtime-docker",
+      "kind": "command",
+      "command": "BRC_TEST_CONTAINER_IMAGE=sha256:72270cb098680b4e5e9e34f3ed7da6d861551bf946813a485069554055e08523 bun test tests/effects/campaign-runtime-container.test.ts tests/effects/campaign-container-live.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "expensive",
+      "evidence_policy": "current_exact",
+      "necessity": "Real Docker exact identity, protected receipts, cleanup, controller loss and actual terminal consumer; no provider inference.",
+      "inputs": {
+        "env": [
+          "BRC_TEST_CONTAINER_IMAGE"
+        ]
+      }
+    },
+    {
+      "id": "lifecycle-regression",
+      "kind": "package_test",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "expensive",
+      "evidence_policy": "current_exact",
+      "necessity": "Real recovery/settlement consumers and retained source/helper rejection invariants.",
+      "inputs": {
+        "env": [
+          "BRC_TEST_CONTAINER_IMAGE"
+        ]
+      },
+      "path": "tests/effects/brc10-lifecycle.test.ts"
+    },
+    {
+      "id": "lifecycle-guards",
+      "kind": "command",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "expensive",
+      "evidence_policy": "current_exact",
+      "necessity": "Retains closeout, raw supervision and containment regression checks.",
+      "inputs": {
+        "env": [
+          "BRC_TEST_CONTAINER_IMAGE"
+        ]
+      },
+      "command": "BRC_TEST_CONTAINER_IMAGE=sha256:72270cb098680b4e5e9e34f3ed7da6d861551bf946813a485069554055e08523 bun test tests/effects/campaign-closeout.test.ts tests/unit/brc10-lifecycle.test.ts tests/campaign-finish-failure-audit.test.ts tests/bounded-supervisor-audit.test.ts tests/effects/campaign-containment.test.ts"
+    },
+    {
+      "id": "typecheck",
+      "kind": "command",
+      "command": "bun run check:type",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "TypeScript contract consistency.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "helper-parity",
+      "kind": "command",
+      "command": "bun run check:helpers",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Source and packaged consumers remain identical.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "deploy-sql",
+      "kind": "command",
+      "command": "bash scripts/check-deploy-sql-order.sh",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Required repository integrity.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "command",
+      "command": "bash scripts/check-architecture-sync.sh",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Required architecture alignment.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "task-sync",
+      "kind": "command",
+      "command": "bash scripts/check-task-sync.sh",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Required diff-bound workflow evidence.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "task-workflow",
+      "kind": "command",
+      "command": "bash scripts/check-task-workflow.sh --strict",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Required strict workflow integrity.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "inspect",
+      "kind": "command",
+      "command": "bun scripts/inspect-project-state.ts --repo . --format text",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Required installed state consistency.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "init-dry-run",
+      "kind": "command",
+      "command": "bun src/cli/index.ts init --repo . --dry-run",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Required adoption dry-run.",
+      "inputs": {
+        "env": []
+      }
+    }
+  ]
+}
+```
+
+This is the sole executable verification authority. Use `baseline_with_delta`
+only when a referenced immutable baseline plus named current delta checks prove
+the intended coverage; do not infer that choice from paths or command text.
+
+## Acceptance Notes (Human Review)
+
+- Functional behavior: preparation effects are fenced before await; unresolved authority refuses inactivity/reclaim/settlement. Exact-container cleanup preserves immutable recovery proofs.
+- Edge cases: pre/post-publication SIGKILL, missing invocation, repeated preparation, expiry and deletion/publication loss.
+- Regression risks: existing persisted-invocation recovery and helper isolation; covered by named model-free Docker and lifecycle checks.
+
+## Rollback Point
+
+- Commit / checkpoint: main a1393e44.
+- Revert strategy: revert only the resulting closeout commit; retained runtime journals are not deleted.

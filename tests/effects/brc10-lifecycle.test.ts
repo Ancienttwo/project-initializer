@@ -312,3 +312,113 @@ test.skipIf(!process.env.BRC_TEST_CONTAINER_IMAGE)('expired Docker handoff recon
     }
   }
 }, 40000);
+
+for (const role of ['worker', 'verifier'] as const) {
+  test(`unpublished ${role} preparation cannot become inactivity after retirement`, async () => {
+    const f = await acquired();
+    const owner = readLease(f.root, f.envelope.task_id);
+    // The immutable preparation fence precedes Docker create and invocation publication.
+    const preparation = { identity: { dispatch_id: f.input.selector.dispatch_id, role, task_id: f.envelope.task_id,
+      task_revision: f.envelope.task_revision, claim_id: f.envelope.claim_id, lease_generation: f.envelope.generation,
+      binding_generation: f.historical.acquired.offer.binding_generation }, deadline_ms: Date.now() - 1 };
+    persistPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, role, 'preparing'), preparation);
+    retireCampaignDispatch(f.input);
+    const result = observeCampaignReclaimEligibility({ ...f.input, now: () => new Date(Date.now() + 60000) });
+    expect(result.evidence.runtime_effect_inactive).toBeNull();
+    expect(result.classification).not.toBe('reclaimable');
+    const { reconcileAndRecoverCampaignDispatch } = await import('../../src/effects/automation/campaign-recovery');
+    await expect(reconcileAndRecoverCampaignDispatch(f.input)).rejects.toThrow('preparation lacks a published invocation');
+    expect(readLease(f.root, f.envelope.task_id)).toEqual(owner);
+  }, 60000);
+}
+
+for (const [role, barrier] of [
+  ['worker', 'probe-request'], ['worker', 'probe-created'], ['worker', 'workload-request'],
+  ['verifier', 'workload-created'], ['verifier', 'before-invocation'], ['worker', 'after-invocation'],
+] as const) {
+  test.skipIf(!process.env.BRC_TEST_CONTAINER_IMAGE)(`controller SIGKILL at ${role}/${barrier} preserves preparation refusal`, async () => {
+    const f = await acquired();
+    const env = { ...installProviderFixture(f), BRC_CAMPAIGN_IMAGE: process.env.BRC_TEST_CONTAINER_IMAGE!, REPO_HARNESS_HOME: f.home };
+    const worktree = f.envelope.worktree_path;
+    writeFileSync(join(worktree, 'prepare.prompt'), 'never execute inference');
+    const deadline = Date.now() + 30000;
+    const invocationKey = campaignRuntimeRecordKey(f.input.selector.dispatch_id, role, 'intent');
+    const moduleRoot = join(import.meta.dir, '../../src/effects/automation');
+    const code = `import * as fs from 'fs'; import {mock} from 'bun:test';
+      const link=fs.linkSync, rename=fs.renameSync; let requests=0,created=0;
+      const barrier=${JSON.stringify(barrier)}; const die=()=>{fs.writeFileSync(${JSON.stringify(join(f.home,'barrier-reached'))},barrier);process.kill(process.pid,'SIGKILL')};
+      mock.module('fs',()=>({...fs,
+        linkSync(source,target){link(source,target);
+          if(String(target).endsWith('/request.json') && ++requests===(barrier==='probe-request'?1:2) && barrier.endsWith('request'))die();
+          if(String(target).endsWith('/created.json') && ++created===(barrier==='probe-created'?1:2) && barrier.endsWith('created'))die();},
+        renameSync(source,target){
+          const invocation=String(target).endsWith('/${invocationKey}.json');
+          if(invocation&&barrier==='before-invocation')die();
+          rename(source,target);
+          if(invocation&&barrier==='after-invocation')die();}
+      }));
+      // Only this disposable process bypasses active admission to reach model-free preparation.
+      mock.module(${JSON.stringify(join(moduleRoot, 'campaign-revision-admission.ts'))},()=>({requireCampaignActiveAdmission(){}}));
+      const {bindCampaignWorker}=await import(${JSON.stringify(join(moduleRoot, 'campaign-worker.ts'))});
+      const worker=bindCampaignWorker(${JSON.stringify({ selector:f.input.selector, worktree, contract:f.envelope.plan.contract_path,
+        worker_command:'codex-exec:worker', verifier_command:'codex-exec:verifier', provider:'codex-exec', env })});
+      await worker.prepareChild(${JSON.stringify(role)},'prepare.prompt',${deadline});
+      throw new Error('barrier not reached');`;
+    try {
+      const child = Bun.spawn([process.execPath, '-e', code], { env: {...process.env,...env}, stdout:'ignore', stderr:'pipe' });
+      const timer = setTimeout(() => child.kill('SIGKILL'), 35000);
+      let exit: number; let stderr: string;
+      try { const output = new Response(child.stderr).text(); exit = await child.exited; stderr = await output; }
+      finally { clearTimeout(timer); }
+      expect(exit!, stderr!).toBe(137);
+      expect(readFileSync(join(f.home,'barrier-reached'),'utf8')).toBe(barrier);
+      const preparation = readPlanningRecord<{identity: {role:string};deadline_ms:number}>(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id,role,'preparing'));
+      expect(preparation?.identity.role).toBe(role); expect(preparation?.deadline_ms).toBe(deadline);
+      const invocation = readPlanningRecord(f.root,f.intent,invocationKey);
+      expect(invocation !== null).toBe(barrier === 'after-invocation');
+      const owner = readLease(f.root,f.envelope.task_id);
+      retireCampaignDispatch(f.input);
+      expect(observeCampaignReclaimEligibility({...f.input,now:()=>new Date(Date.now()+60000)}).evidence.runtime_effect_inactive).toBeNull();
+      const {reconcileAndRecoverCampaignDispatch}=await import('../../src/effects/automation/campaign-recovery');
+      await expect(reconcileAndRecoverCampaignDispatch(f.input)).rejects.toThrow(barrier==='after-invocation'?'without a persisted final':'preparation lacks a published invocation');
+      expect(readLease(f.root,f.envelope.task_id)).toEqual(owner);
+    } finally {
+      const { readdirSync } = await import('fs');
+      const journals=join(f.home,'campaign-containers');
+      if (existsSync(journals)) for(const entry of readdirSync(journals)) {
+        const requestPath=join(journals,entry,'request.json');
+        if (!existsSync(requestPath)) continue;
+        const request=JSON.parse(readFileSync(requestPath,'utf8'));
+        // Only exact names from this fixture's private protected journal are owned here.
+        const ids=execFileSync('docker',['--host',request.endpoint,'container','ls','--all','--filter',`name=^/${request.name}$`,'--format','{{.ID}}'],{encoding:'utf8',timeout:5000}).trim();
+        if(ids) expect(Bun.spawnSync(['docker','--host',request.endpoint,'rm','-f',request.name],{timeout:5000}).exitCode).toBe(0);
+      }
+    }
+  },40000);
+}
+
+test('duplicate and retired preparation cannot repeat asynchronous effects', async () => {
+  const f = await acquired();
+  const moduleRoot=join(import.meta.dir,'../../src/effects/automation');
+  const code=`import {mock} from 'bun:test'; let calls=0;
+    mock.module(${JSON.stringify(join(moduleRoot,'campaign-revision-admission.ts'))},()=>({requireCampaignActiveAdmission(){}}));
+    const runtime=await import(${JSON.stringify(join(moduleRoot,'campaign-runtime.ts'))});
+    mock.module(${JSON.stringify(join(moduleRoot,'campaign-runtime.ts'))},()=>({...runtime,async prepareCampaignCodexInvocation(){calls++;throw new Error('fixture-preparation-failure')}}));
+    const {bindCampaignWorker}=await import(${JSON.stringify(join(moduleRoot,'campaign-worker.ts'))});
+    const worker=bindCampaignWorker(${JSON.stringify({selector:f.input.selector,worktree:f.envelope.worktree_path,contract:f.envelope.plan.contract_path,
+      worker_command:'codex-exec:worker',verifier_command:'codex-exec:verifier',provider:'codex-exec',env:f.env})});
+    const errors=[];for(let i=0;i<2;i++){try{await worker.prepareChild('worker','unused',Date.now()+10000)}catch(e){errors.push(e.message)}}
+    const {retireCampaignDispatch}=await import(${JSON.stringify(join(moduleRoot,'campaign-recovery.ts'))});
+    retireCampaignDispatch(${JSON.stringify(f.input)});
+    try{await worker.prepareChild('verifier','unused',Date.now()+10000)}catch(e){errors.push(e.message)}
+    console.log(JSON.stringify({calls,errors}));`;
+  const child=Bun.spawn([process.execPath,'-e',code],{env:{...process.env,...f.env},stdout:'pipe',stderr:'pipe'});
+  const streams=Promise.all([new Response(child.stdout).text(),new Response(child.stderr).text()]);
+  const exit=await child.exited;const [stdout,stderr]=await streams;
+  expect(exit,stderr).toBe(0);
+  const result=JSON.parse(stdout);
+  expect(result.calls).toBe(1);
+  expect(result.errors[0]).toBe('fixture-preparation-failure');
+  expect(result.errors[1]).toContain('preparation already claimed');
+  expect(result.errors[2]).toContain('retired');
+},60000);
