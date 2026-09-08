@@ -202,3 +202,7 @@ Baseline run-20260909T031328-26791: all14 contract criteria passed at71792662; o
 Final fixture correction makes the protection mutation non-empty against the minimal fixture registry; the targeted invalidation test passes. Security and architecture delta reviews pass for production source at 9f4e4a8f. No production source changed after that review.
 
 > **Substantive Change SHA256**: `sha256:fff167bce8ae5e57e709f7dd56cd962e6183e96534c97dc0392e462674f622ae`
+
+Integration: main d8c082b1 merged at 90ee5751; only generated architecture manifest conflicted and was regenerated canonically. Campaign production/test source is unchanged from frozen 14/14 run-20260909T032622-41208. CI task-sync requires the new main-relative identity below; local check reproduces it exactly.
+
+> **Substantive Change SHA256**: `sha256:c18d68e36830bbf74db5797b4de0e02121b6ee90dc69bbfd5d92d611251396ac`
