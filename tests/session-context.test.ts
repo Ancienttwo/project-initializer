@@ -1108,7 +1108,7 @@ describe("worktreeBacklogSessionSection — cleanable contract worktree notice",
     });
   }, 30_000);
 
-  test("FALSIFIER: a merged-but-dirty worktree is named as the batch blocker, never offered as cleanable", () => {
+  test("FALSIFIER: a merged-but-dirty worktree is named as retained WIP, never offered as cleanable", () => {
     withWorktreeFixture("wt-backlog-dirty-merged", (fixture) => {
       // The discriminating fixture: absorbed into main exactly like the
       // cleanable case, differing only in working-tree state. Merge state
@@ -1134,15 +1134,16 @@ describe("worktreeBacklogSessionSection — cleanable contract worktree notice",
       expect(content).not.toBeNull();
 
       const blockedBlock = content!.slice(
-        content!.indexOf("- Blocking the batch:"),
+        content!.indexOf("- Retained worktrees:"),
         content!.indexOf("- Cleanable now:"),
       );
       const cleanableBlock = content!.slice(content!.indexOf("- Cleanable now:"));
 
-      // Visible, because one dirty merged worktree aborts the whole
-      // --cleanup-merged run and every worktree after it stays behind.
+      // Retained WIP is visible without claiming it prevents safe cleanup.
       expect(blockedBlock).toContain("codex/dirty-merged-demo");
-      expect(blockedBlock).toContain("`--dry-run` included");
+      expect(blockedBlock).toContain("continues with safe entries");
+      expect(blockedBlock).toContain("`--dry-run` previews the full batch");
+      expect(blockedBlock).toContain("returns nonzero");
       expect(blockedBlock).toContain("--discard-scaffold-only");
       expect(blockedBlock).not.toContain("codex/clean-merged-demo");
 
@@ -1150,6 +1151,22 @@ describe("worktreeBacklogSessionSection — cleanable contract worktree notice",
       expect(cleanableBlock).toContain("Cleanable now: 1 worktree(s) merged into `main` and clean.");
       expect(cleanableBlock).toContain("codex/clean-merged-demo");
       expect(cleanableBlock).not.toContain("codex/dirty-merged-demo");
+    });
+  }, 30_000);
+
+  test("locked merged worktree is retained rather than advertised as cleanable", () => {
+    withWorktreeFixture("wt-backlog-locked", (fixture) => {
+      const locked = addAbsorbedWorktree(fixture, "locked-demo");
+      addAbsorbedWorktree(fixture, "safe-demo");
+      execFileSync("git", ["worktree", "lock", locked], { cwd: fixture.repoRoot });
+      const content = worktreeBacklogSessionContent(fixture.repoRoot)!;
+      const retained = content.slice(0, content.indexOf("- Cleanable now:"));
+      const cleanable = content.slice(content.indexOf("- Cleanable now:"));
+      expect(retained).toContain("codex/locked-demo");
+      expect(retained).toContain("locked");
+      expect(cleanable).toContain("codex/safe-demo");
+      expect(cleanable).not.toContain("codex/locked-demo");
+      execFileSync("git", ["worktree", "unlock", locked], { cwd: fixture.repoRoot });
     });
   }, 30_000);
 
@@ -1163,7 +1180,7 @@ describe("worktreeBacklogSessionSection — cleanable contract worktree notice",
       // Titling an all-blocked body "Cleanable" is the same misdescription
       // this section exists to avoid, one scale down.
       expect(content!.split("\n")[0]).toBe("# Blocked Contract Worktrees");
-      expect(content!).toContain("Blocking the batch: 1 worktree(s)");
+      expect(content!).toContain("Retained worktrees: 1 worktree(s)");
       expect(content!).toContain("codex/only-dirty-demo");
       expect(content!).not.toContain("Cleanable now");
       // Nothing is cleanable, so the cleanup command must not be recommended.

@@ -1405,7 +1405,7 @@ function samePath(left: string, right: string): boolean {
   }
 }
 
-type WorktreeCleanliness = 'clean' | 'dirty' | 'unreadable';
+type WorktreeCleanupState = 'clean' | 'dirty' | 'locked' | 'unreadable';
 
 /**
  * `worktree_status_for_cleanup`'s own probe, verbatim
@@ -1419,12 +1419,17 @@ type WorktreeCleanliness = 'clean' | 'dirty' | 'unreadable';
  * existing consumers already read it independently (`dirty_paths_for_worktree`
  * in ship-worktrees.sh, `worktree_status_for_cleanup` in contract-worktree.sh).
  */
-function worktreeCleanliness(path: string): WorktreeCleanliness {
+function worktreeCleanupState(path: string): WorktreeCleanupState {
   try {
     const status = execFileSync('git', ['-C', path, 'status', '--porcelain=v1', '--untracked-files=all'], {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
+    const lockPath = execFileSync('git', ['-C', path, 'rev-parse', '--git-path', 'locked'], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (existsSync(resolve(path, lockPath))) return 'locked';
     return status.trim().length === 0 ? 'clean' : 'dirty';
   } catch {
     return 'unreadable';
@@ -1438,14 +1443,9 @@ function worktreeCleanliness(path: string): WorktreeCleanliness {
  * would put the same datum back under two authorities, which is the defect
  * issue #196 actually was. One spawn classifies the whole scan.
  *
- * Merged worktrees then split on cleanliness, because merged-and-dirty is not
- * a worktree the operator should be invited to clean: `cleanup_merged` runs
- * `guard_dirty_merged_worktree ... || exit 1` (ship-worktrees.sh:1146) BEFORE
- * its `DRY_RUN` branch, so one dirty worktree aborts the entire batch --
- * including the `--dry-run` this section recommends -- and every worktree
- * after it survives. That is the accumulation dynamic of issue #196 itself, so
- * dirty-merged worktrees are named as the blocker rather than dropped or
- * quietly mixed into the cleanable list.
+ * Merged candidates are split using Git's status and lock metadata. Retained
+ * dirty or locked worktrees are named separately while the batch continues
+ * with safe entries; an unreadable candidate is never offered as cleanable.
  */
 export function worktreeBacklogSessionContent(repoRoot: string): string | null {
   const libPath = join(repoRoot, WORKTREE_MERGE_LIB);
@@ -1492,12 +1492,12 @@ export function worktreeBacklogSessionContent(repoRoot: string): string | null {
   );
 
   const cleanable: LinkedWorktreeEntry[] = [];
-  const blocked: LinkedWorktreeEntry[] = [];
+  const blocked: (LinkedWorktreeEntry & { reason: 'dirty' | 'locked' })[] = [];
   for (const entry of scanned) {
     if (!merged.has(entry.branch)) continue;
-    const cleanliness = worktreeCleanliness(entry.path);
+    const cleanliness = worktreeCleanupState(entry.path);
     if (cleanliness === 'clean') cleanable.push(entry);
-    else if (cleanliness === 'dirty') blocked.push(entry);
+    else if (cleanliness === 'dirty' || cleanliness === 'locked') blocked.push({ ...entry, reason: cleanliness });
     // `unreadable` is a prunable registration: the directory is gone but the
     // worktree is still registered. `contract-worktree cleanup` dies on an
     // unhandled `cd` into that path, and `ship-worktrees --cleanup-merged
@@ -1524,13 +1524,12 @@ export function worktreeBacklogSessionContent(repoRoot: string): string | null {
         : '# Contract Worktree Scan Incomplete';
 
   const lines = [header, ''];
-  // Dirty-merged first: it is the one that stops the batch, so it is the one
-  // that has to be read first.
+  // Put retained WIP first so the operator can see what requires resolution.
   if (blocked.length > 0) {
     lines.push(
-      `- Blocking the batch: ${blocked.length} worktree(s) merged into \`${target}\` but dirty. \`--cleanup-merged\` exits at the first of these it reaches -- \`--dry-run\` included -- so nothing after it is cleaned, which is how a backlog accumulates. Commit or extract those changes first; \`--discard-scaffold-only\` deletes them rather than resolving this.`,
+      `- Retained worktrees: ${blocked.length} worktree(s) merged into \`${target}\` but dirty or locked. \`--cleanup-merged\` preserves these and continues with safe entries; \`--dry-run\` previews the full batch. The command returns nonzero when entries remain blocked. Resolve the reported state before retrying these entries; \`--discard-scaffold-only\` discards dirty scaffold changes and does not unlock worktrees.`,
     );
-    lines.push(...blocked.map(describe));
+    lines.push(...blocked.map((entry) => `${describe(entry)} — ${entry.reason}`));
   }
   if (cleanable.length > 0) {
     lines.push(`- Cleanable now: ${cleanable.length} worktree(s) merged into \`${target}\` and clean.`);

@@ -1,10 +1,12 @@
 import { describe, test, expect, setDefaultTimeout } from "bun:test";
 import {
+  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -99,6 +101,69 @@ function copyHelpers(cwd: string) {
 }
 
 describe("contract-worktree cleanup squash-merge absorption", () => {
+  for (const blockedFirst of [true, false]) {
+    for (const refusal of ["dirty", "locked", "unreadable"]) {
+      for (const dryRun of [false, true]) {
+        test(`cleanup-closeout batch continues after ${refusal}; first=${blockedFirst}; dry-run=${dryRun}`, () => {
+          const cwd = tmpWorkspace("cleanup-closeout-batch");
+          const paths: string[] = [];
+          try {
+            copyHelpers(cwd);
+            initGitRepo(cwd);
+            writeFileSync(join(cwd, ".gitignore"), ".ai/harness/worktrees/\n");
+            commitAll(cwd, "fixture");
+            const add = (slug: string) => {
+              const path = `${cwd}-wt-${slug}`;
+              paths.push(path);
+              expect(run("git", ["worktree", "add", path, "-b", `codex/${slug}`], cwd).status).toBe(0);
+              return path;
+            };
+            const blocked = add(blockedFirst ? "a-blocked" : "z-blocked");
+            const clean = add("m-clean");
+            const squash = add("n-squash");
+            writeFileSync(join(squash, "feature.txt"), "squashed\n");
+            commitAll(squash, "feature");
+            expect(run("git", ["merge", "--squash", "codex/n-squash"], cwd).status).toBe(0);
+            commitAll(cwd, "squash feature");
+            const unmerged = add("p-unmerged");
+            writeFileSync(join(unmerged, "extra.txt"), "unmerged\n");
+            commitAll(unmerged, "unmerged feature");
+            if (refusal === "dirty") writeFileSync(join(blocked, "wip.txt"), "preserve me\n");
+            else if (refusal === "locked") expect(run("git", ["worktree", "lock", blocked], cwd).status).toBe(0);
+            const env: NodeJS.ProcessEnv = {};
+            if (refusal === "unreadable") {
+              const wrapper = `${cwd}-git`;
+              writeFileSync(wrapper, '#!/bin/bash\nif [[ "$1" == "-C" && "$2" == "$CLEANUP_UNREADABLE_PATH" && "$3" == "status" ]]; then exit 128; fi\nexec "$CLEANUP_REAL_GIT" "$@"\n');
+              chmodSync(wrapper, 0o755);
+              env.REPO_HARNESS_GIT_BIN = wrapper;
+              env.CLEANUP_UNREADABLE_PATH = blocked;
+              env.CLEANUP_REAL_GIT = Bun.which("git")!;
+            }
+            const result = run("bash", ["scripts/ship-worktrees.sh", "--cleanup-merged", ...(dryRun ? ["--dry-run"] : [])], cwd, env);
+            expect(result.status, result.stdout + result.stderr).toBe(1);
+            expect(existsSync(blocked)).toBe(true);
+            if (refusal === "dirty") expect(readFileSync(join(blocked, "wip.txt"), "utf-8")).toBe("preserve me\n");
+            expect(existsSync(unmerged)).toBe(true);
+            expect(existsSync(clean)).toBe(dryRun);
+            expect(existsSync(squash)).toBe(dryRun);
+            expect(result.stdout).toContain(dryRun ? "would-clean=2 blocked=1 skipped=1" : "cleaned=2 blocked=1 skipped=1");
+            for (const slug of ["m-clean", "n-squash"]) {
+              expect(run("git", ["show-ref", "--verify", "--quiet", `refs/heads/codex/${slug}`], cwd).status).toBe(dryRun ? 0 : 1);
+            }
+          } finally {
+            for (const path of paths) {
+              run("git", ["worktree", "unlock", path], cwd);
+              run("git", ["worktree", "remove", "--force", path], cwd);
+              rmSync(path, { recursive: true, force: true });
+            }
+            rmSync(`${cwd}-git`, { force: true });
+            rmSync(cwd, { recursive: true, force: true });
+          }
+        }, 30_000);
+      }
+    }
+  }
+
   test("cleanup accepts a squash-merged branch via merge-tree absorption (dry-run)", () => {
     const cwd = tmpWorkspace("helper-cleanup-squash-absorbed");
     const worktreePath = `${cwd}-wt-squash-demo`;
