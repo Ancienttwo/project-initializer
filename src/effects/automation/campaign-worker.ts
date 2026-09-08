@@ -20,7 +20,7 @@ import { LeaseLivenessStoreError, readLeaseLiveness, renewLeaseLiveness } from '
 
 import { campaignRuntimeRecordKey, type CampaignCodexInvocation } from '../../core/automation/campaign-runtime';
 import { campaignAttemptOutcome } from '../../core/automation/campaign-runtime';
-import { prepareCampaignCodexInvocation, assertCampaignInvocationExecutable, observeCampaignCodexTerminal, parseCampaignVerifierResponse } from './campaign-runtime';
+import { prepareCampaignCodexInvocation, assertCampaignInvocationExecutable, observeCampaignCodexTerminal, observeCampaignCodexInterruption, parseCampaignVerifierResponse } from './campaign-runtime';
 
 type Acquisition = Extract<ScheduledEngineerAcquireResult, { ok: true }>;
 export interface CampaignWorkerSelector {
@@ -53,6 +53,7 @@ export interface CampaignWorkerChildObservation {
   readonly termination_cause?: "completed" | "deadline" | "cancelled" | "output_error";
   readonly signal?: NodeJS.Signals | null;
   readonly started?: boolean;
+  readonly container_receipt_sha256?: string;
   readonly process_group_quiescence?: { readonly scope: 'posix_process_group' | 'unsupported'; readonly state: 'quiescent' | 'active' | 'unknown' };
   readonly renewal_failure?: string;
   readonly output_sha256?: { readonly stdout: string; readonly stderr: string };
@@ -138,7 +139,6 @@ export function bindCampaignWorker(input: {
   if (!priorFinal) requireCampaignActiveAdmission();
   if (!priorFinal && (!livenessPolicy || livenessPolicy.renewal_actor_kind !== 'controller')) throw new Error('campaign dispatch requires an explicit controller liveness policy');
   const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env: input.env }).budget;
-  const controllerRun = `sha256:${budget.automation_run_id}`;
   const settleFinal = (final: CampaignWorkerFinal) => settleCampaignFinal({ root, selector, handoff, final, env: input.env });
   if (priorFinal) {
     settleFinal(priorFinal);
@@ -189,7 +189,7 @@ export function bindCampaignWorker(input: {
       validate();
       const invocation = invocations.get(role);
       if (input.provider && !invocation) throw new Error('campaign Codex invocation intent is missing');
-      if (invocation) assertCampaignInvocationExecutable(invocation);
+      if (invocation) assertCampaignInvocationExecutable(invocation, work.worktree_path);
       if (admittedRoles.has(role) || command !== (role === 'worker' ? request.worker_command : request.verifier_command)) throw new Error('campaign worker child identity differs');
       if (role === 'worker') {
         {
@@ -211,11 +211,7 @@ export function bindCampaignWorker(input: {
       activeRole = role;
       persistPlanningRecord(root, intent, key(selector.dispatch_id, `runtime-${role}`), { dispatch_id: selector.dispatch_id, role, runtime_effect_id: canonicalMessageDigest({ dispatch_id: selector.dispatch_id, role }), claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation });
       if (!attemptStarted) {
-        recordTaskAutomationAttemptStart({ repo_root: root, repository_id: offer.repository_id, sprint_path: offer.sprint_path,
-          task_id: work.task_id, task_revision: work.task_revision, work_package_id: offer.work_package_id, work_package_revision: offer.work_package_revision,
-          engineer_id: offer.engineer_id, binding_generation: offer.binding_generation, claim_id: work.claim_id, lease_generation: work.generation,
-          controller_run_id: controllerRun, dispatch_id: selector.dispatch_id, budget_revision: `sha256:${budget.budget_sha256}`,
-          policy: offer.retry_policy, first_eligible_at: offer.eligible_since, started_at: launch.started_at });
+        recordCampaignAttemptStart(root, selector, handoff, reservation);
         attemptStarted = true;
       }
       renewUnderLock();
@@ -230,7 +226,7 @@ export function bindCampaignWorker(input: {
       const terminal = invocation ? observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...observation }) : null;
       if (terminal) withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, runtimeKey(observation.role, 'terminal'), terminal));
       persist(`child-${observation.role}`, evidence);
-      if (terminal?.state === 'unknown' && !(observation.exit_code !== null && observation.exit_code !== 0 && observation.output_complete === true)) throw new Error(`campaign provider termination is unknown; reservation remains unresolved: ${terminal.reason}`);
+      if (terminal?.state === 'unknown' && !(observation.exit_code !== null && observation.exit_code !== 0 && observation.output_complete === true && terminal.supervision_proven === true)) throw new Error(`campaign provider termination is unknown; reservation remains unresolved: ${terminal.reason}`);
       observations.push(observation);
       activeRole = null;
       if (observation.renewal_failure) throw new Error(`campaign Lease renewal failed; reconciliation required: ${observation.renewal_failure}`);
@@ -270,6 +266,18 @@ export function bindCampaignWorker(input: {
       });
     },
   };
+}
+
+function recordCampaignAttemptStart(root: string, selector: CampaignWorkerSelector, handoff: CampaignWorkerHandoff, reservation: ReturnType<typeof reserveAutomationBudget>) {
+  const { intent } = readCampaignWorkerHandoff(selector);
+  const launch = readPlanningRecord<{ started_at: string }>(root, intent, key(selector.dispatch_id, 'launch'));
+  if (!launch || !Number.isFinite(Date.parse(launch.started_at))) throw new Error('campaign attempt has no durable launch time');
+  const work = handoff.acquired.envelope, offer = handoff.acquired.offer;
+  return recordTaskAutomationAttemptStart({ repo_root: root, repository_id: offer.repository_id, sprint_path: offer.sprint_path,
+    task_id: work.task_id, task_revision: work.task_revision, work_package_id: offer.work_package_id, work_package_revision: offer.work_package_revision,
+    engineer_id: offer.engineer_id, binding_generation: offer.binding_generation, claim_id: work.claim_id, lease_generation: work.generation,
+    controller_run_id: `sha256:${reservation.automation_run_id}`, dispatch_id: selector.dispatch_id, budget_revision: `sha256:${reservation.budget_sha256}`,
+    policy: offer.retry_policy, first_eligible_at: offer.eligible_since, started_at: launch.started_at });
 }
 
 function settleCampaignFinal(input: {
@@ -366,7 +374,7 @@ export function settleObservedCampaignFailure(selectorValue: unknown, env?: Node
         || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation
         || observation.command !== launch.request[role === 'worker' ? 'worker_command' : 'verifier_command']) throw new Error('failed child identity differs');
       const stdout = file(work.worktree_path, observation.stdout_path); const stderr = file(work.worktree_path, observation.stderr_path);
-      if (observation.output_complete !== true || observation.output_sha256?.stdout !== `sha256:${digest(stdout)}`
+      if (terminal.supervision_proven !== true || observation.output_complete !== true || observation.output_sha256?.stdout !== `sha256:${digest(stdout)}`
         || observation.output_sha256?.stderr !== `sha256:${digest(stderr)}` || child.stdout_sha256 !== digest(stdout) || child.stderr_sha256 !== digest(stderr)
         || !exact(observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...observation }), terminal)) throw new Error('failed child supervision is incomplete');
       const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
@@ -385,5 +393,42 @@ export function settleObservedCampaignFailure(selectorValue: unknown, env?: Node
       return final;
     }
     return null;
+  });
+}
+
+/** Settle the original attempt as unresolved work, never as provider success or a writable rebind. */
+export function settleInterruptedCampaignWorker(selectorValue: unknown, env?: NodeJS.ProcessEnv): CampaignWorkerFinal {
+  const { root, intent, selector, handoff } = readCampaignWorkerHandoff(selectorValue);
+  return withCampaignPlanningLock(root, intent, () => {
+    const authority = requireCampaignPlanningAuthority(root, intent, env);
+    const prior = readPlanningRecord<CampaignWorkerFinal>(root, intent, key(selector.dispatch_id, 'final'));
+    if (prior) { settleCampaignFinal({ root, selector, handoff, final: prior, env }); return prior; }
+    const work = handoff.acquired.envelope, offer = handoff.acquired.offer;
+    const owner = readLease(root, work.task_id).record;
+    if (!owner || owner.claim_id !== work.claim_id || owner.generation !== work.generation
+      || !readPlanningRecord(root, intent, key(selector.dispatch_id, 'retired'))) throw new Error('interruption settlement requires the retired original owner');
+    const launch = readPlanningRecord<{ request: { provider?: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
+    if (launch?.request.provider !== 'codex-exec') throw new Error('interruption settlement requires a managed launch');
+    const proofs = (['worker', 'verifier'] as const).flatMap(role => {
+      const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
+      if (!invocation) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); return []; }
+      if (invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
+        || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
+        || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
+        || invocation.identity.binding_generation !== offer.binding_generation) throw new Error('interrupted invocation identity differs');
+      return [observeCampaignCodexInterruption(invocation, work.worktree_path)];
+    });
+    const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
+    const reservation = readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), env);
+    if (!reservation || reservation.kind !== 'repo-harness-automation-reservation' || reservation.provider !== 'codex'
+      || reservation.unit_id !== offer.work_package_id || reservation.attempt !== offer.attempt_count + 1) throw new Error('interrupted attempt reservation differs');
+    recordCampaignAttemptStart(root, selector, handoff, reservation);
+    const basis = { proofs, contract_run: { status: 'fail' as const, failure_class: 'controller_interrupted' } };
+    const final: CampaignWorkerFinal = { reservation, contract_run: basis.contract_run, outcome: 'reconciliation_required',
+      ended_at: new Date().toISOString(), result_sha256: digest(canonicalMessageBytes(basis)), evidence: [],
+      runtime_effect_id: canonicalMessageDigest(basis), evidence_refs: proofs.map(proof => proof.receipt_sha256) };
+    persistPlanningRecord(root, intent, key(selector.dispatch_id, 'final'), final);
+    settleCampaignFinal({ root, selector, handoff, final, env });
+    return final;
   });
 }

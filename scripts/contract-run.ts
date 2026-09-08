@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { constants, lstatSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { realpathSync, fstatSync, openSync, closeSync, constants, lstatSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
 import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -81,6 +81,7 @@ interface ChildResult {
   termination_cause?: "completed" | "deadline" | "cancelled" | "output_error";
   signal?: NodeJS.Signals | null;
   started?: boolean;
+  container_receipt_sha256?: string;
   process_group_quiescence?: { scope: 'posix_process_group' | 'unsupported'; state: 'quiescent' | 'active' | 'unknown' };
   renewal_failure?: string;
   output_sha256?: { stdout: string; stderr: string };
@@ -660,7 +661,12 @@ function runBriefPreflight(markdown: string, repo: string, contractPath: string)
 // "wall_time_minutes exceeded" in the manifest instead of a generic child failure.
 const BOUNDED_RUNNER_TIMEOUT_EXIT_CODE = 124;
 
-async function runChild(
+function writeChildStream(path: string, bytes: string): void {
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+  try { writeFileSync(fd, bytes); } finally { closeSync(fd); }
+}
+
+export async function runChild(
   role: "worker" | "verifier",
   command: string,
   repo: string,
@@ -668,12 +674,51 @@ async function runChild(
   env: NodeJS.ProcessEnv,
   deadlineMs: number | null,
   renewal?: { interval_ms: number; renew: () => unknown },
-  invocation?: { executable: string; argv: readonly string[] },
+  invocation?: { executable: string; argv: readonly string[]; deadline_ms: number },
 ): Promise<ChildResult> {
   const stdoutPath = join(runDir, `${role}.stdout.log`);
   const stderrPath = join(runDir, `${role}.stderr.log`);
   const childEnv = { ...process.env, ...env, CONTRACT_RUN_ROLE: role };
 
+  if (invocation) {
+    if (deadlineMs === null || invocation.deadline_ms > deadlineMs) throw new CliError("contract-run: container deadline exceeds the admitted deadline", 1);
+    const packageRoot = env.REPO_HARNESS_PACKAGE_ROOT;
+    if (!packageRoot) throw new CliError("contract-run: managed container runtime package is unavailable", 1);
+    const runtime = await import(pathToFileURL(join(packageRoot, "src/effects/automation/campaign-runtime.ts")).href);
+    const canonicalRepo = realpathSync(repo);
+    const containedRun = resolve(canonicalRepo, relative(repo, runDir));
+    if (relative(canonicalRepo, containedRun).startsWith("..") || realpathSync(runDir) !== containedRun) throw new CliError("contract-run: output directory is not a contained canonical directory", 1);
+    // Acquire files before an untrusted workload can replace names or parent directories.
+    const outputFds: number[] = [];
+    try {
+      for (const path of [stdoutPath, stderrPath]) {
+        const fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+        outputFds.push(fd);
+        if (!fstatSync(fd).isFile()) throw new CliError("contract-run: output is not a regular file", 1);
+      }
+    } catch (error) { for (const fd of outputFds) closeSync(fd); throw error; }
+    const abort = new AbortController();
+    const cancel = () => abort.abort();
+    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, cancel);
+    let renewalFailure: string | null = null;
+    const timer = renewal ? setInterval(() => {
+      try { renewal.renew(); } catch (error) { renewalFailure = error instanceof Error ? error.message : String(error); abort.abort(); }
+    }, renewal.interval_ms) : null;
+    try {
+      const result = await runtime.executeCampaignCodexInvocation(invocation, repo, abort.signal);
+      writeFileSync(outputFds[0]!, result.stdout);
+      writeFileSync(outputFds[1]!, result.stderr);
+      return { role, command, exit_code: result.exit_code, timed_out: result.timed_out, termination_cause: result.termination_cause,
+        signal: result.signal, started: result.started, stdout_path: repoRelative(repo, stdoutPath), stderr_path: repoRelative(repo, stderrPath),
+        output_sha256: { stdout: `sha256:${createHash("sha256").update(result.stdout).digest("hex")}`, stderr: `sha256:${createHash("sha256").update(result.stderr).digest("hex")}` },
+        output_complete: result.output_complete, container_receipt_sha256: result.receipt_sha256,
+        ...(renewalFailure ? { renewal_failure: renewalFailure } : {}) };
+    } finally {
+      for (const fd of outputFds) closeSync(fd);
+      if (timer) clearInterval(timer);
+      for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.off(signal, cancel);
+    }
+  }
   if (deadlineMs !== null) {
     // Provider JSONL must remain separate from diagnostics to preserve terminal evidence.
     const boundedResultPath = join(runDir, `${role}.bounded-result.json`);
@@ -690,9 +735,9 @@ async function runChild(
         stdoutPath,
         "--result",
         boundedResultPath,
-        ...(invocation ? ["--stderr-log", stderrPath] : []),
+
         "--",
-        ...(invocation ? [invocation.executable, ...invocation.argv] : ["/bin/sh", "-c", command]),
+        "/bin/sh", "-c", command,
       ],
       { cwd: repo, stdio: "ignore", env: childEnv },
     );
@@ -710,7 +755,7 @@ async function runChild(
       });
     } finally { if (timer) clearInterval(timer); }
     if (!existsSync(stdoutPath)) writeFileSync(stdoutPath, "", { flag: "wx" });
-    if (!invocation || !existsSync(stderrPath)) writeFileSync(stderrPath, "", { flag: constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW });
+    writeChildStream(stderrPath, "");
     let exitCode: number | null = wrapperExit;
     let timedOut = false;
     let quiescence: ChildResult["process_group_quiescence"] = { scope: "unsupported", state: "unknown" };
@@ -730,7 +775,7 @@ async function runChild(
           output_complete?: boolean;
           process_group_quiescence?: ChildResult["process_group_quiescence"];
         };
-        if (invocation) outputProof = { output_sha256: bounded.output_sha256, output_complete: bounded.output_complete };
+        outputProof = { output_sha256: bounded.output_sha256, output_complete: bounded.output_complete };
         supervision = { termination_cause: bounded.termination_cause, signal: bounded.signal, started: bounded.started };
         if (!Number.isInteger(bounded.exit_code) || bounded.exit_code !== wrapperExit) throw new Error("supervisor exit and receipt differ");
         exitCode = bounded.exit_code;
@@ -755,7 +800,6 @@ async function runChild(
     };
   }
 
-  if (invocation) throw new CliError("contract-run: provider invocation requires a bounded supervisor", 1);
   const result = spawnSync(command, {
     cwd: repo,
     shell: true,
@@ -918,6 +962,7 @@ async function buildRun(opts: Options) {
 
   const manifestPath = join(runDir, "manifest.json");
   const baseEnv = {
+    REPO_HARNESS_PACKAGE_ROOT: packageRoot,
     CONTRACT_RUN_CONTRACT: repoRelative(repo, contractPath),
     CONTRACT_RUN_PLAN: plan,
     CONTRACT_RUN_REVIEW: reviewFile,
@@ -1055,19 +1100,21 @@ async function buildRun(opts: Options) {
       runner_invocation_limit: runnerInvocationLimit,
     },
     children,
-    ...(campaign ? { campaign_attempt: campaign.finish(repoRelative(repo, campaignResultPath), { status, failure_class: failureClass || null }) } : {}),
+    ...(campaign && status !== "dry_run" ? { campaign_attempt: campaign.finish(repoRelative(repo, campaignResultPath), { status, failure_class: failureClass || null }) } : {}),
   };
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   return { manifest, manifestPath };
 }
+
+if (import.meta.main) {
 
 try {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.mode === "recover") {
     const packageRoot = basename(SCRIPT_DIR) === "helpers" && basename(dirname(SCRIPT_DIR)) === "templates" && basename(dirname(dirname(SCRIPT_DIR))) === "assets"
       ? resolve(SCRIPT_DIR, "../../..") : resolve(SCRIPT_DIR, "..");
-    const { recoverCampaignDispatch } = await import(pathToFileURL(join(packageRoot, "src/effects/automation/campaign-recovery.ts")).href);
-    const recovered = recoverCampaignDispatch({ selector: JSON.parse(readFileSync(repoPath(resolve(opts.repo), opts.campaignHandoff!), "utf8")),
+    const { reconcileAndRecoverCampaignDispatch } = await import(pathToFileURL(join(packageRoot, "src/effects/automation/campaign-recovery.ts")).href);
+    const recovered = await reconcileAndRecoverCampaignDispatch({ selector: JSON.parse(readFileSync(repoPath(resolve(opts.repo), opts.campaignHandoff!), "utf8")),
       host: opts.campaignParentHost!, session_id: opts.campaignParentSession!, env: process.env });
     console.log(JSON.stringify(recovered, null, 2));
     process.exit(recovered.disposition === "settled_final" ? 0 : 1);
@@ -1087,4 +1134,6 @@ try {
   const error = err as Error & { exitCode?: number };
   console.error(error.message);
   process.exit(error.exitCode ?? 1);
+}
+
 }

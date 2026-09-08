@@ -1,0 +1,64 @@
+{
+  "raw": [
+    {
+      "path": "Mounts[0].Source",
+      "expected": "/private/fixture/work",
+      "actual": "/private/fixture/common",
+      "expected_type": "string",
+      "actual_type": "string",
+      "classification": "known_representation_difference",
+      "source": "saved same-container readbacks; identical unique destination-keyed mount facts",
+      "decision": "equivalent_for_this_field"
+    },
+    {
+      "path": "Mounts[0].Destination",
+      "expected": "/private/fixture/work",
+      "actual": "/private/fixture/common",
+      "expected_type": "string",
+      "actual_type": "string",
+      "classification": "known_representation_difference",
+      "source": "saved same-container readbacks; identical unique destination-keyed mount facts",
+      "decision": "equivalent_for_this_field"
+    },
+    {
+      "path": "Mounts[1].Source",
+      "expected": "/private/fixture/common",
+      "actual": "/private/fixture/work",
+      "expected_type": "string",
+      "actual_type": "string",
+      "classification": "known_representation_difference",
+      "source": "saved same-container readbacks; identical unique destination-keyed mount facts",
+      "decision": "equivalent_for_this_field"
+    },
+    {
+      "path": "Mounts[1].Destination",
+      "expected": "/private/fixture/common",
+      "actual": "/private/fixture/work",
+      "expected_type": "string",
+      "actual_type": "string",
+      "classification": "known_representation_difference",
+      "source": "saved same-container readbacks; identical unique destination-keyed mount facts",
+      "decision": "equivalent_for_this_field"
+    }
+  ],
+  "semantics": [
+    {
+      "path": "Mounts.order",
+      "expected": [
+        "/private/fixture/work",
+        "/private/fixture/common"
+      ],
+      "actual": [
+        "/private/fixture/common",
+        "/private/fixture/work"
+      ],
+      "expected_type": "array",
+      "actual_type": "array",
+      "classification": "known_representation_difference",
+      "source": "Docker 28.3.2 repeated inspect of same created container; destination-keyed mount facts",
+      "decision": "equivalent_for_this_field"
+    }
+  ],
+  "candidate_equal": true,
+  "production_patch_applied": false
+}
