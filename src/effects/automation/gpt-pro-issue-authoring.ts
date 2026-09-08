@@ -36,6 +36,7 @@ export interface IssueAuthoringBrowserInput {
   readonly provider: 'oracle';
   readonly chatgptApp: 'GitHub';
   readonly requireSecretScan: true;
+  readonly captureNetworkEvidence?: true;
   readonly gitleaksBin?: string;
   readonly profileDir: string;
   readonly profileDirectory: string;

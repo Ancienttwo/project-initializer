@@ -115,14 +115,14 @@ Focused tests cover argument forwarding and current model behavior; valid, forei
 Expected 8-10 existing code/test/doc paths, no new service or dependency. Components flow Oracle exporter -> wrapper evidence -> browser session -> audit answer record, without reverse dependencies. Revert implementation commit to disable future capture; existing private evidence stays original runtime history. BRC6a remains closed; BRC14 real version acceptance and BRC15 active remain separate.
 
 ## Task Breakdown
-- [ ] Wire private invocation-owned Oracle capture through browser and audit metadata.
-- [ ] Verify malformed/partial evidence and retained raw artifact behavior with model-free fixtures.
+- [x] Wire private invocation-owned Oracle capture through browser and audit metadata.
+- [x] Verify malformed/partial evidence and retained raw artifact behavior with model-free fixtures.
 - [ ] Complete scoped verification, independent acceptance and archive.
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Wire private invocation-owned Oracle capture through browser and audit metadata.
-- [ ] Verify malformed/partial evidence and retained raw artifact behavior with model-free fixtures.
+- [x] Wire private invocation-owned Oracle capture through browser and audit metadata.
+- [x] Verify malformed/partial evidence and retained raw artifact behavior with model-free fixtures.
 - [ ] Complete scoped verification, independent acceptance and archive.

@@ -2270,3 +2270,42 @@ describe('chatgpt browser command', () => {
     expect(delegate).not.toContain('Because there is no scanner');
   });
 });
+
+test.each([0, 9])('fresh audit capture survives provider cleanup on exit %s', async exitCode => {
+  await withAsyncRepo(async repoRoot => {
+    const binDir = mkdtempSync(join(tmpdir(), 'capture-oracle-'));
+    try {
+      const id = 'captured-session';
+      const trace = [
+        { sequence: 1, event: 'capture_start', protocol: 1, kind: 'oracle-page-response-streams', sessionId: id, origin: 'https://chatgpt.com' },
+        { sequence: 2, event: 'capture_end', status: 'empty', streams: 0, reasons: [] },
+      ].map(row => JSON.stringify(row)).join('\n');
+      const oracleBin = writeFakeOracle(join(binDir, 'oracle'), { body: [
+        ...sessionDescriptorFixture(id),
+        'OUT=""; TRACE=""; PREV=""; WAIT=""',
+        'for a in "$@"; do',
+        '  if [ "$PREV" = "--write-output" ]; then OUT="$a"; fi',
+        '  if [ "$PREV" = "--write-network-evidence" ]; then TRACE="$a"; fi',
+        '  if [ "$a" = "--wait" ]; then WAIT="yes"; fi',
+        '  if [ "$a" = "--model" ]; then exit 8; fi',
+        '  PREV="$a"', 'done',
+        '[ "$WAIT" = "yes" ] || exit 7',
+        'umask 077',
+        `printf '%s\n' '${trace}' > "$TRACE"`,
+        'printf "%s\n" "private capture retained" > "$OUT"',
+        `exit ${exitCode}`,
+      ] });
+      const result = await runBrowserConsult({ repoRoot, prompt: 'fixture audit', provider: 'oracle', oracleBin, captureNetworkEvidence: true });
+      expect(result.status).toBe(exitCode === 0 ? 'completed' : 'failed');
+      const capture = result.meta.oracle?.networkCapture;
+      expect(capture?.status).toBe('empty'); expect(capture?.sessionId).toBe(id);
+      expect(existsSync(capture!.path)).toBe(true);
+      expect(readFileSync(capture!.path, 'utf8')).toBe(trace + '\n');
+      expect(lstatSync(dirname(capture!.path)).mode & 0o777).toBe(0o700);
+      expect(lstatSync(capture!.path).mode & 0o777).toBe(0o600);
+      expect(result.output).not.toContain('capture_start');
+      expect(result.meta.model.verified).toBe(false);
+      expect(capture).not.toHaveProperty('resolved_commit');
+    } finally { rmSync(binDir, { recursive: true, force: true }); }
+  });
+}, 20000);

@@ -21,3 +21,11 @@ No dependencies were added. The two new source files separate the pure snapshot/
 Named tests cover fresh audit, campaign store, authoring, observer, planning, heartbeat, shadow budget and CLI, plus TypeScript and the six repository integrity checks. No full suite is required by this bounded contract. The contract's final prepare-acceptance run and receipt own the exact accepted subject; development logs do not imply final acceptance.
 
 Two old fixture failures reproduced on integration baseline `67d3e858`: Issue-number selection now fails at campaign creation, and heartbeat authoring requires a committed capability registry. User-authorized fixture alignment updates those inputs/assertions without relaxing production gates. The heartbeat out-of-group case now expects the shared group-sequence error before provider access.
+
+## Private response capture
+
+Fresh audit now requests Oracle's existing `--write-network-evidence` exporter with `--wait`. The wrapper allocates a private per-invocation directory under the controlled Oracle home and retains the original stream file across success, failure and answer-directory cleanup. This is an internal audit input, not a public CLI setting; ordinary authoring and followups do not enable it.
+
+Browser metadata and the durable audit-answer record retain the capture path, byte count, SHA-256 and the exporter-reported `captured`, `empty` or `incomplete` status. The wrapper checks the envelope protocol, sequence, origin and exact descriptor session; unavailable or invalid files have distinct `missing`/`invalid` observations. Symlinks and files above the existing 64 MiB exporter bound are refused. Raw response bodies stay in private ignored runtime storage and are not copied into output text, logs or tracked documents.
+
+This transport observation is not a GitHub tool request/result pairing or a resolved-commit receipt. Historical conversation evidence contains provider-origin fetch results but lacks the matching original tool request and a fresh Oracle audit binding. The fresh-audit revision result therefore remains `unverified`, and active admission remains disabled until actual trusted version evidence is available. No historical canary or BRC6a task is reopened by this wiring.

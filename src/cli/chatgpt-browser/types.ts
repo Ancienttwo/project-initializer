@@ -26,6 +26,8 @@ export interface BrowserConsultInput {
   oracleBin?: string;
   gitleaksBin?: string;
   requireSecretScan?: boolean;
+  /** Internal fresh-audit evidence collection; never implies verified revision. */
+  captureNetworkEvidence?: true;
   files?: BrowserFileInput[];
   followups?: string[];
   model?: string;
@@ -156,6 +158,7 @@ export interface BrowserSessionMeta {
     captureStatus?: 'completed' | 'recoverable';
     observation?: import('./oracle-session-evidence').OracleSessionEvidence['observation'];
     evidenceError?: string;
+    networkCapture?: import('./oracle-session-evidence').OracleNetworkCapture;
   };
   error?: {
     code: string;

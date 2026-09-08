@@ -11,7 +11,7 @@ import {
   runCampaignFreshAudit,
   resolveCampaignGroupBaseline,
 } from '../../src/effects/automation/campaign-fresh-audit';
-import { withCampaignPlanningLock, persistPlanningRecord } from '../../src/effects/automation/campaign-planning-store';
+import { withCampaignPlanningLock, persistPlanningRecord, readPlanningRecord } from '../../src/effects/automation/campaign-planning-store';
 import { campaignCloseoutKey } from '../../src/core/automation/campaign-closeout';
 import { canonicalMessageDigest } from '../../src/core/messages/mechanics';
 import { ensureCampaignAuthoringBudget, readCampaignBudgetLedger } from '../../src/effects/automation/budget-store';
@@ -82,13 +82,14 @@ test('fresh audit uses current default/GitHub, charges after authoring sealed, a
     consult: async (input: any) => {
       calls++;
       expect(input.chatgptApp).toBe('GitHub');
+      expect(input.captureNetworkEvidence).toBe(true);
       expect(input.model).toBeUndefined();
       expect(input.thinkingTime).toBeUndefined();
       expect(input.sessionId).toBeUndefined();
       return {
         sessionId: 'audit-new',
         status: 'completed' as const,
-        meta: { model: { verified: false } },
+        meta: { model: { verified: false }, oracle: { networkCapture: { status: 'captured', path: 'private-fixture-trace', sha256: 'sha256:' + 'a'.repeat(64), bytes: 100, sessionId: 'audit-provider' } } },
         output: JSON.stringify({
           protocol: 1,
           disposition: 'accepted',
@@ -101,6 +102,9 @@ test('fresh audit uses current default/GitHub, charges after authoring sealed, a
   };
   const result = await runCampaignFreshAudit(f.input, deps);
   expect(result.observation.disposition).toBe('unverified');
+  const attempt = canonicalMessageDigest({ kind: 'fresh-audit-attempt', value: f.input.idempotency_key }).slice(7);
+  const answerKey = canonicalMessageDigest({ kind: 'audit-answer', value: attempt }).slice(7);
+  expect(readPlanningRecord(f.root, f.intent, answerKey)).toMatchObject({ network_capture: { status: 'captured', path: 'private-fixture-trace' } });
   expect(result.snapshot.slots).toHaveLength(2);
   expect(readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env).current.state).toBe('group_auditing');
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env });

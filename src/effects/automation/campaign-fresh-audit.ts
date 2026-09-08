@@ -196,7 +196,7 @@ export interface RunCampaignFreshAuditInput {
 }
 export interface AuditBrowserResult extends IssueAuthoringBrowserResult {
   readonly output?: string;
-  readonly meta: IssueAuthoringBrowserResult['meta'] & { readonly providerSessionId?: string };
+  readonly meta: IssueAuthoringBrowserResult['meta'] & { readonly providerSessionId?: string; readonly oracle?: { readonly networkCapture?: unknown } };
 }
 export async function runCampaignFreshAudit(
   input: RunCampaignFreshAuditInput,
@@ -280,6 +280,7 @@ export async function runCampaignFreshAudit(
     provider: 'oracle',
     chatgptApp: 'GitHub',
     requireSecretScan: true,
+    captureNetworkEvidence: true,
     gitleaksBin: input.gitleaks_bin,
     profileDir: binding.binding.profileDir,
     profileDirectory: binding.binding.profileDirectory!,
@@ -295,6 +296,7 @@ export async function runCampaignFreshAudit(
   const rawRecord = {
     session_ref: result.sessionId,
     answer_sha256: messageSha256(raw),
+    network_capture: result.meta.oracle?.networkCapture ?? null,
     output: raw.length <= 2 * 1024 * 1024 ? raw : null,
   };
   withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, key('audit-answer', attemptKey), rawRecord));
