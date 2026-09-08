@@ -4,7 +4,7 @@ import { join, relative } from 'path';
 import { acquireExclusiveDirectoryLock } from '../locking/exclusive-directory-lock';
 import { createInterface } from 'readline';
 import { CLAUDE_REVIEW_MAX_ROUNDS, CLAUDE_REVIEW_SCHEMA, CLAUDE_REVIEW_TIMEOUT_MS, reviewContextDigest, validateClaudeReviewResult, type ClaudeReviewRequest } from '../../core/review/claude-review';
-import { processIdentity, readReviewJson, reviewSessionLocation, tmux, writeReviewJson, type ReviewProcesses, type ReviewSession } from './claude-review-session';
+import { processIdentity, readReviewJson, reviewSessionLocation, reviewHostIdentity, writeReviewJson, type ReviewProcesses, type ReviewSession } from './claude-review-session';
 
 /** One host owns one child. Requests/results are transport evidence, never task or acceptance authority. */
 export async function runClaudeReviewHost(directory: string): Promise<void> {
@@ -22,10 +22,11 @@ export async function runClaudeReviewHost(directory: string): Promise<void> {
   try {
     if (existsSync(join(dir, 'close.request.json')) || existsSync(join(dir, 'closed.json'))) return;
     if (existsSync(join(dir, 'spawn-intent.json'))) throw new Error('claude_review_startup_already_attempted');
-    const pane = process.env.TMUX_PANE;
-    if (!pane) throw new Error('claude_review_host_requires_tmux');
-    const [serverPid, name, paneId, hostPid] = tmux(session, ['display-message', '-p', '-t', pane, '#{pid}\t#{session_name}\t#{pane_id}\t#{pane_pid}']).split('\t');
-    if (name !== session.tmux_session || paneId !== pane || Number(hostPid) !== process.pid) throw new Error('claude_review_host_pane_mismatch');
+    if (session.protocol !== 2) throw new Error('claude_review_session_identity_mismatch');
+    const pane = process.env.HERDR_PANE_ID;
+    if (!pane || process.env.HERDR_ENV !== '1') throw new Error('claude_review_host_requires_herdr');
+    const identity = reviewHostIdentity(session, pane);
+    if (identity.host !== processIdentity(process.pid)) throw new Error('claude_review_host_pane_mismatch');
     const env = { ...process.env };
     delete env.CLAUDECODE;
     writeReviewJson(join(dir, 'spawn-intent.json'), { session_id: session.session_id });
@@ -46,7 +47,7 @@ export async function runClaudeReviewHost(directory: string): Promise<void> {
       throw new Error('claude_review_spawn_failed');
     }
     processes = { host: processIdentity(process.pid), child: processIdentity(child.pid), child_pid: child.pid,
-      server: processIdentity(Number(serverPid)), pane };
+      server: identity.server, pane };
     writeReviewJson(join(dir, 'processes.json'), processes);
   } finally { startup.release(); }
   console.log(`Claude reviewer | session=${session.session_id} pid=${child.pid} contract=${session.contract_file}`);

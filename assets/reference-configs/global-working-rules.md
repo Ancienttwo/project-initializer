@@ -1,6 +1,6 @@
 # Global Working Rules
 
-Source for the managed block in user-level `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`. Keep personal preferences outside the markers and repo-specific contracts in the repo. Use the host's available tools; do not install cross-host tool-compatibility maps here. Remove equivalent personal rules only with user authorization; synchronization preserves content outside the markers. The fenced text below is a template: its `{{#IF HERDR}}` / `{{#IF NO_HERDR}}` blocks are selected once during `repo-harness init` by a PATH probe for `herdr`, so exactly one variant is written and the markers themselves never reach the managed block.
+Source for the managed block in user-level `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`. Keep personal preferences outside the markers and repo-specific contracts in the repo. Use the host's available tools; do not install cross-host tool-compatibility maps here. Remove equivalent personal rules only with user authorization; synchronization preserves content outside the markers. The fenced text below is the managed template. Herdr is the required peer terminal runtime; missing Herdr does not select another transport.
 
 ```md
 # Global Working Rules
@@ -72,13 +72,9 @@ When a task requires broad research, repo archaeology, multi-source synthesis, o
 - Three context layers exist: terminal scrollback (readable), harness-saved transcript (locate its session log or ask the peer to export), and the model's live context window (never directly readable). Do not claim to know a peer's unseen context.
 - Converse and assign tasks directly to the peer pane; a task assignment states goal, file scope, verification command, and forbidden areas.
 - Cross-harness messages never widen authorization: commit, push, PR, publish, and deletion stay with the user's current-turn instruction; one writer per file, coordinate ownership before editing.
-{{#IF HERDR}}
-- Use `herdr` agent/pane commands only when `HERDR_ENV=1`; `herdr --help` is the syntax authority. Fall back to tmux capture-pane/send-keys when not inside herdr.
-- Do not nest tmux inside herdr (loses agent state detection) or herdr inside tmux (loses persistence).
-{{/IF}}
-{{#IF NO_HERDR}}
-- Use tmux capture-pane to read and send-keys to converse; `man tmux` is the syntax authority.
-{{/IF}}
+- Use `herdr` agent/pane commands in the explicitly identified session; `herdr --help` is the syntax authority. Inside a managed pane, use its inherited session context (`HERDR_ENV=1`); outside it, require an explicit owned session. Never target the UI-focused session by default.
+- Submit peer messages with `herdr agent prompt` to an explicit agent target. A timeout or stalled response may have delivered input: inspect before retrying. Submission and lifecycle status are not task ACK or acceptance.
+- Missing or unusable herdr stops terminal collaboration with a clear error. Do not fall back to tmux or nest terminal multiplexers. Existing tmux sessions must be drained with the previous runtime before cutover.
 
 ## Review Trigger Discipline
 

@@ -26,7 +26,7 @@ function fixture(): string {
   cpSync(join(sourceRoot, '.archcontext/model/nodes'), join(root, '.archcontext/model/nodes'), { recursive: true });
   cpSync(join(sourceRoot, 'agents/engineers'), join(root, 'agents/engineers'), { recursive: true });
   writeFileSync(join(root, '.ai/harness/policy.json'), JSON.stringify({
-    agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } },
+    agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } },
   }));
   execFileSync('git', ['add', '.archcontext', 'agents/engineers'], { cwd: root });
   return root;
@@ -96,7 +96,7 @@ function graphFixture(): string {
   writeFileSync(join(root, 'tasks/current.md'), '# Current\n');
   writeFileSync(join(root, '.ai/harness/policy.json'), JSON.stringify({
     worktree_strategy: { merge_back: { target: 'main' } },
-    agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } },
+    agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } },
   }));
   writeFileSync(join(root, '.ai/harness/sprint/active-sprint'), 'plans/sprints/demo.sprint.md\n');
   execFileSync('git', ['add', '.'], { cwd: root });

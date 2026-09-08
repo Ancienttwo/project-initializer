@@ -16,7 +16,7 @@ const principal = {
   protocol: 1, kind: 'repo-harness-engineer-principal', repository_id: 'repo_0123456789abcdef',
   engineer_id: 'engineer:capability.runtime-harness.automation', binding_id: '11111111-1111-4111-8111-111111111111',
   binding_generation: 1, engineer_contract_revision: SHA, carrier: 'mcp_oauth', auth_subject: 'authorization-1',
-  provider: 'tmux-cli-agent', provider_thread_id: null,
+  provider: 'herdr-cli-agent', provider_thread_id: null,
 } as const;
 
 function setup() {

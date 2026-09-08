@@ -35,7 +35,7 @@ function fixture(): { repoRoot: string; home: string } {
   mkdirSync(join(repoRoot, '.ai/harness'), { recursive: true });
   cpSync(join(sourceRoot, '.archcontext/model/nodes'), join(repoRoot, '.archcontext/model/nodes'), { recursive: true });
   cpSync(join(sourceRoot, 'agents/engineers'), join(repoRoot, 'agents/engineers'), { recursive: true });
-  writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } } })}\n`);
+  writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } } })}\n`);
   writeFileSync(join(repoRoot, 'README.md'), 'fixture\n');
   execFileSync('git', ['add', '.'], { cwd: repoRoot });
   execFileSync('git', ['commit', '-qm', 'fixture'], { cwd: repoRoot });

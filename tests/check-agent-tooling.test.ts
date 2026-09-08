@@ -79,7 +79,7 @@ function setupFakeEnvironment(prefix: string) {
 
   mkdirSync(home, { recursive: true });
   mkdirSync(fakeBin, { recursive: true });
-  writeExecutable(join(fakeBin, "tmux"), "#!/bin/sh\nprintf 'tmux 3.7c\\n'\n");
+  writeExecutable(join(fakeBin, "herdr"), "#!/bin/sh\nprintf 'herdr 0.9.0\\n'\n");
   writeOfficialCodexPluginFixture(join(home, ".claude/plugins/cache/openai-codex/codex/1.0.6"));
   writeExecutable(
     join(fakeBin, "timeout"),
@@ -1716,13 +1716,13 @@ describe("check-agent-tooling", () => {
   }, 15000);
 });
 
-test.each(['present', 'missing', 'unavailable'])('tmux is a required runtime capability: %s', status => {
-  const fixture = setupFakeEnvironment('required-tmux');
+test.each(['present', 'missing', 'unavailable'])('herdr is a required runtime capability: %s', status => {
+  const fixture = setupFakeEnvironment('required-herdr');
   try {
-    const tmuxPath = join(fixture.fakeBin, 'tmux');
-    if (status === 'unavailable') writeExecutable(tmuxPath, '#!/bin/sh\nexit 2\n');
-    if (status === 'missing') rmSync(tmuxPath);
-    // An explicit utility PATH makes absence independent of the developer's tmux installation.
+    const herdrPath = join(fixture.fakeBin, 'herdr');
+    if (status === 'unavailable') writeExecutable(herdrPath, '#!/bin/sh\nexit 2\n');
+    if (status === 'missing') rmSync(herdrPath);
+    // An explicit utility PATH makes absence independent of the developer's herdr installation.
     const utilities = ['dirname', 'basename', 'node', 'bun', 'git', 'bash', 'sh', 'which', 'uname'];
     for (const utility of utilities) {
       const actual = Bun.which(utility);
@@ -1732,14 +1732,14 @@ test.each(['present', 'missing', 'unavailable'])('tmux is a required runtime cap
       cwd: ROOT, encoding: 'utf8', env: { ...process.env, HOME: fixture.home, PATH: fixture.fakeBin }, timeout: 15_000,
     });
     const report = JSON.parse(result.stdout);
-    expect(report.runtime_capabilities.tmux.required).toBe(true);
-    expect(report.runtime_capabilities.tmux.status).toBe(status);
+    expect(report.runtime_capabilities.herdr.required).toBe(true);
+    expect(report.runtime_capabilities.herdr.status).toBe(status);
     if (status === 'present') {
-      expect(report.runtime_capabilities.tmux.version).toBe('tmux 3.7c');
-      expect(result.stderr).not.toContain('tmux runtime is');
+      expect(report.runtime_capabilities.herdr.version).toBe('herdr 0.9.0');
+      expect(result.stderr).not.toContain('herdr runtime is');
     } else {
       expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain(`tmux runtime is ${status}`);
+      expect(result.stderr).toContain(`herdr runtime is ${status}`);
     }
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 }, 20_000);

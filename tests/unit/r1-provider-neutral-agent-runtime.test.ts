@@ -59,17 +59,17 @@ const bindingTwo = '22222222-2222-4222-8222-222222222222';
 const messageOne = '33333333-3333-4333-8333-333333333333';
 const digest = `sha256:${'a'.repeat(64)}`;
 
-function fixture(adapter: 'codex-app-thread' | 'tmux-cli-agent' = 'codex-app-thread'): string {
+function fixture(adapter: 'codex-app-thread' | 'herdr-cli-agent' = 'codex-app-thread'): string {
   const repoRoot = realpathSync(mkdtempSync(join(tmpdir(), 'repo-harness-r1-runtime-'))); roots.push(repoRoot);
   execFileSync('git', ['init', '-q'], { cwd: repoRoot }); execFileSync('git', ['config', 'user.email', 'tests@example.invalid'], { cwd: repoRoot }); execFileSync('git', ['config', 'user.name', 'Tests'], { cwd: repoRoot });
   mkdirSync(join(repoRoot, '.archcontext/model'), { recursive: true }); mkdirSync(join(repoRoot, 'agents'), { recursive: true }); mkdirSync(join(repoRoot, '.ai/harness'), { recursive: true });
   cpSync(join(sourceRoot, '.archcontext/model/nodes'), join(repoRoot, '.archcontext/model/nodes'), { recursive: true }); cpSync(join(sourceRoot, 'agents/engineers'), join(repoRoot, 'agents/engineers'), { recursive: true });
-  writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } } })}\n`);
+  writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } } })}\n`);
   execFileSync('git', ['add', '.'], { cwd: repoRoot }); execFileSync('git', ['commit', '-qm', 'fixture'], { cwd: repoRoot });
   bind(repoRoot, adapter, bindingOne); return repoRoot;
 }
 
-function bind(repoRoot: string, adapter: 'codex-app-thread' | 'tmux-cli-agent', bindingId: string) {
+function bind(repoRoot: string, adapter: 'codex-app-thread' | 'herdr-cli-agent', bindingId: string) {
   const profile = loadEngineerProfile(repoRoot, engineerId); const status = readEngineerBindingStatus(repoRoot, engineerId, profile.engineer_contract_revision); const previous = status.current;
   return bindEngineer(repoRoot, {
     engineer_id: engineerId, idempotency_key: `bind-${bindingId}`, provider: adapter, provider_thread_id: `endpoint-${bindingId.slice(0, 4)}`, host_id: 'local', engineer_contract_revision: profile.engineer_contract_revision,
@@ -87,11 +87,11 @@ function message(repoRoot: string, body = 'secret-message-body') {
   }) });
 }
 
-function capability(repoRoot: string, adapter: 'codex-app-thread' | 'tmux-cli-agent' = 'codex-app-thread') {
+function capability(repoRoot: string, adapter: 'codex-app-thread' | 'herdr-cli-agent' = 'codex-app-thread') {
   return recordAgentRuntimeCapability(repoRoot, { adapter_kind: adapter, host_id: 'local', operations: { notify_inbox: 'supported', wake_for_offer: 'supported' }, evidence_refs: [{ ref: 'canary', sha256: digest }], observed_at: '2026-08-30T10:02:00.000Z' });
 }
 
-function prepare(repoRoot: string, adapter: 'codex-app-thread' | 'tmux-cli-agent' = 'codex-app-thread') {
+function prepare(repoRoot: string, adapter: 'codex-app-thread' | 'herdr-cli-agent' = 'codex-app-thread') {
   message(repoRoot); const profile = loadEngineerProfile(repoRoot, engineerId); const binding = readEngineerBindingStatus(repoRoot, engineerId, profile.engineer_contract_revision).binding!; const observed = capability(repoRoot, adapter);
   const status = prepareAgentRuntimeEffect({ repo_root: repoRoot, message_kind: 'module_message', engineer_id: engineerId, message_id: messageOne, idempotency_key: 'runtime-one', expected_binding_id: binding.binding_id, expected_binding_generation: binding.binding_generation, expected_engineer_contract_revision: binding.engineer_contract_revision, expected_capability_sha256: observed.capability_sha256, created_at: '2026-08-30T10:03:00.000Z' });
   if (status.intent.operation !== 'notify_inbox') throw new Error('prepared effect is not a message notification');
@@ -102,10 +102,10 @@ afterEach(() => { while (roots.length) rmSync(roots.pop()!, { recursive: true, f
 
 describe('R1 provider-neutral Agent Runtime', () => {
   test('V2 schemas are closed and host action contains control identity, never message content', () => {
-    const observed = buildAgentRuntimeCapabilityObservation({ adapter_kind: 'tmux-cli-agent', host_id: 'local', operations: { notify_inbox: 'supported', wake_for_offer: 'supported' }, evidence_refs: [{ ref: 'canary', sha256: digest }], observed_at: '2026-08-30T10:00:00.000Z' });
+    const observed = buildAgentRuntimeCapabilityObservation({ adapter_kind: 'herdr-cli-agent', host_id: 'local', operations: { notify_inbox: 'supported', wake_for_offer: 'supported' }, evidence_refs: [{ ref: 'canary', sha256: digest }], observed_at: '2026-08-30T10:00:00.000Z' });
     expect(validateAgentRuntimeCapabilityObservation(JSON.parse(canonicalAgentRuntimeCapabilityBytes(observed)))).toEqual(observed);
     expect(() => validateAgentRuntimeCapabilityObservation({ ...observed, send: 'supported' })).toThrow();
-    const intent = buildAgentRuntimeEffectIntent({ idempotency_key: 'schema', message_ref: { kind: 'module_message', message_id: messageOne, message_event_digest: digest, engineer_id: engineerId, binding_id: bindingOne, binding_generation: 1, engineer_contract_revision: digest, delivery_attempt: 1 }, endpoint_fence: { engineer_id: engineerId, binding_id: bindingOne, binding_generation: 1, engineer_contract_revision: digest, adapter_kind: 'tmux-cli-agent', host_id: 'local', endpoint_id: 'opaque-endpoint' }, operation: 'notify_inbox', capability_sha256: digest, created_at: '2026-08-30T10:00:00.000Z' });
+    const intent = buildAgentRuntimeEffectIntent({ idempotency_key: 'schema', message_ref: { kind: 'module_message', message_id: messageOne, message_event_digest: digest, engineer_id: engineerId, binding_id: bindingOne, binding_generation: 1, engineer_contract_revision: digest, delivery_attempt: 1 }, endpoint_fence: { engineer_id: engineerId, binding_id: bindingOne, binding_generation: 1, engineer_contract_revision: digest, adapter_kind: 'herdr-cli-agent', host_id: 'local', endpoint_id: 'opaque-endpoint' }, operation: 'notify_inbox', capability_sha256: digest, created_at: '2026-08-30T10:00:00.000Z' });
     expect(validateAgentRuntimeEffectIntent(JSON.parse(canonicalAgentRuntimeEffectIntentBytes(intent)))).toEqual(intent);
     const action = buildAgentRuntimeHostAction(intent); expect(JSON.stringify(action)).not.toContain('secret-message-body'); expect(action.control_ref).toBe(`repo-harness-inbox:${action.effect_id}:${action.control_sha256}`);
   });
@@ -182,7 +182,7 @@ describe('R1 provider-neutral Agent Runtime', () => {
       expect(terminal.delivery_evidence.latest?.effect_state).toBe(state);
     }
     expect(() => projectTaskAgentRuntimeState({ ...input, statuses: [{ ...done, current: prepared.current }] })).toThrow(AgentRuntimeEffectStoreError);
-    const mismatched = buildAgentRuntimeEffectObservation({ ...done.observation, adapter: { ...done.observation.adapter, adapter_kind: 'tmux-cli-agent' } });
+    const mismatched = buildAgentRuntimeEffectObservation({ ...done.observation, adapter: { ...done.observation.adapter, adapter_kind: 'herdr-cli-agent' } });
     expect(() => projectTaskAgentRuntimeState({ ...input, statuses: [{ ...done, observation: mismatched, current: buildAgentRuntimeEffectCurrent(mismatched) }] })).toThrow(AgentRuntimeEffectStoreError);
     // Two different messages are two candidates, not two runs or an invented latest effect.
     const secondId = '77777777-7777-4777-8777-777777777777';
@@ -272,16 +272,16 @@ describe('R1 provider-neutral Agent Runtime', () => {
   });
 
   test('shadow records preparation but refuses Host action', () => {
-    const repoRoot = fixture(); const prepared = prepare(repoRoot); writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'shadow', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } } })}\n`);
+    const repoRoot = fixture(); const prepared = prepare(repoRoot); writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'shadow', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } } })}\n`);
     expect(() => startAgentRuntimeEffect({ repo_root: repoRoot, effect_id: prepared.intent.effect_id, started_at: '2026-08-30T10:05:00.000Z' })).toThrow('forbids Host actions');
   });
 
   test('off and adapter disablement refuse mutation or action without fallback', () => {
     const repoRoot = fixture(); message(repoRoot); const profile = loadEngineerProfile(repoRoot, engineerId); const binding = readEngineerBindingStatus(repoRoot, engineerId, profile.engineer_contract_revision).binding!; const observed = capability(repoRoot);
-    writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'off', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } } })}\n`);
+    writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'off', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } } })}\n`);
     expect(() => prepareAgentRuntimeEffect({ repo_root: repoRoot, message_kind: 'module_message', engineer_id: engineerId, message_id: messageOne, idempotency_key: 'off-runtime', expected_binding_id: binding.binding_id, expected_binding_generation: binding.binding_generation, expected_engineer_contract_revision: binding.engineer_contract_revision, expected_capability_sha256: observed.capability_sha256, created_at: '2026-08-30T10:03:00.000Z' })).toThrow('forbids new effects');
     expect(existsSync(join(resolveGitCommonDirectory(repoRoot), 'repo-harness/agent-runtime-effects/v2/effects', deriveAgentRuntimeEffectId('off-runtime').slice(7)))).toBe(false);
-    writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: false }, 'tmux-cli-agent': { enabled: true } } } })}\n`);
+    writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: false }, 'herdr-cli-agent': { enabled: true } } } })}\n`);
     const prepared = prepareAgentRuntimeEffect({ repo_root: repoRoot, message_kind: 'module_message', engineer_id: engineerId, message_id: messageOne, idempotency_key: 'disabled-runtime', expected_binding_id: binding.binding_id, expected_binding_generation: binding.binding_generation, expected_engineer_contract_revision: binding.engineer_contract_revision, expected_capability_sha256: observed.capability_sha256, created_at: '2026-08-30T10:03:00.000Z' });
     expect(() => startAgentRuntimeEffect({ repo_root: repoRoot, effect_id: prepared.intent.effect_id, started_at: '2026-08-30T10:05:00.000Z' })).toThrow('codex-app-thread is disabled');
     expect(readAgentRuntimeEffectStatus(repoRoot, prepared.intent.effect_id).current.state).toBe('intent_persisted');
@@ -289,7 +289,7 @@ describe('R1 provider-neutral Agent Runtime', () => {
 
   test('feature policy rejects undeclared runtime fields instead of accepting a compatibility shape', () => {
     const repoRoot = fixture();
-    writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } }, fallback: 'tmux-cli-agent' } })}\n`);
+    writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } }, fallback: 'herdr-cli-agent' } })}\n`);
     expect(() => readAgentRuntimePolicy(repoRoot)).toThrow('agent_runtime.mode must be off, shadow, or active');
   });
 

@@ -229,7 +229,7 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
 
 
 test('notification evidence is copied by allowlist without exposing raw runtime fields', () => {
-  const latest = { adapter_kind: 'tmux-cli-agent' as const, effect_state: 'stopped' as const, receipt_kind: null,
+  const latest = { adapter_kind: 'herdr-cli-agent' as const, effect_state: 'stopped' as const, receipt_kind: null,
     observed_at: '2026-09-07T00:00:00.000Z', observation_sequence: 2, observation_sha256: `sha256:${'f'.repeat(64)}`,
     endpoint_id: 'private-endpoint', host_id: 'private-host' };
   const baseline = sourceSnapshot();

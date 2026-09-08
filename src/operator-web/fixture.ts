@@ -157,7 +157,7 @@ const stableRepositories: readonly OperatorFleetRepositoryV1[] = [
         effect_sha256: `sha256:${'9'.repeat(64)}`,
         failure_class: 'adapter_unavailable',
         delivery_evidence: { candidate_count: 1, latest: {
-          adapter_kind: 'tmux-cli-agent', effect_state: 'reconciliation_required',
+          adapter_kind: 'herdr-cli-agent', effect_state: 'reconciliation_required',
           receipt_kind: null, observed_at: '2026-08-31T00:00:00.000Z',
           observation_sequence: 2, observation_sha256: `sha256:${'8'.repeat(64)}`,
         } },

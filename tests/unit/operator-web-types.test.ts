@@ -289,7 +289,7 @@ describe('operator browser payload contracts', () => {
 
 
 describe('notification delivery evidence protocol', () => {
-  const latest = { adapter_kind: 'tmux-cli-agent', effect_state: 'stopped', receipt_kind: null,
+  const latest = { adapter_kind: 'herdr-cli-agent', effect_state: 'stopped', receipt_kind: null,
     observed_at: '2026-09-07T00:00:00.000Z', observation_sequence: 2, observation_sha256: `sha256:${'e'.repeat(64)}` } as const;
   function payload(evidence: unknown) {
     const value = validFleetPayload();

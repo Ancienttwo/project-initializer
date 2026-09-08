@@ -287,6 +287,7 @@ contract-assets 前缀，漂移由 `bun run sync:helpers` 的 `--check` 模式�
 
 <!-- BEGIN ARCHITECTURE PENDING REQUESTS -->
 - [ ] 2026-09-08T05:10:12+0800 [low] `src/effects/automation/campaign-capability-registry.ts` -> [runtime-harness-automation-budget](requests/runtime-harness-automation-budget.md)
+- [ ] 2026-09-09T02:02:06+0800 [low] `src/effects/engineers/agent-runtime-adapters/herdr-cli-agent.ts` -> [runtime-harness-agent-runtime-effects](requests/runtime-harness-agent-runtime-effects.md)
 <!-- END ARCHITECTURE PENDING REQUESTS -->
 
 
@@ -296,7 +297,7 @@ contract-assets 前缀，漂移由 `bun run sync:helpers` 的 `--check` 模式�
 - Treat user-level `~/.codex/hooks.json` and `~/.claude/settings.json` as host adapters. Keep hook implementation under `.ai/hooks/`, and treat repo-local `.claude/settings.json` / `.codex/hooks.json` hook adapters as retired legacy config.
 - Consider adding `bun scripts/capability-resolver.ts validate --format text` to the strict workflow gate after the architecture registry has been used through one more real slice.
 
-<!-- BEGIN ARCHCONTEXT:generated target="projection_target.architecture.index" sourceDigest="sha256:ef2231a1deb56cba2ee06d0ffc2c2da4bb321ec9f529090bb65880408f81274f" rendererVersion="archcontext.docs-renderer/v4" outputDigest="sha256:2aaf8d426181a5d8bc11b51d018598e6151607326bc5d67af8db8da84de734eb" -->
+<!-- BEGIN ARCHCONTEXT:generated target="projection_target.architecture.index" sourceDigest="sha256:9d4398ac68f7305111247775e368ec6a34b69e5b1419d758b49f781474a2bb6d" rendererVersion="archcontext.docs-renderer/v4" outputDigest="sha256:2aaf8d426181a5d8bc11b51d018598e6151607326bc5d67af8db8da84de734eb" -->
 # Architecture Index
 
 Generated: 1970-01-01T00:00:00.000Z
