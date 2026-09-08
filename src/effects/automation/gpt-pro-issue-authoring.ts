@@ -1,3 +1,4 @@
+import { assertResumedAuthoringTarget, bindAdoptedResume, validateAdoptedResumeSource, type AdoptedResumeSource } from './campaign-authoring-resume';
 import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
@@ -215,7 +216,7 @@ function prepareBudgetedAuthoring<Result extends IssueAuthoringBrowserResult>(
 }
 
 /** A new run obtains new provider evidence; stopped source artifacts remain historical. */
-function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: readonly IssueBatchSlot[], repository: string): string | undefined {
+function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: readonly IssueBatchSlot[], repository: string): { action: string; adoptedSource?: AdoptedResumeSource } | undefined {
   if (input.resume_from === undefined) return undefined;
   const raw = input.resume_from;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail('issue_authoring_invalid', 'resume_from must be an object');
@@ -232,13 +233,15 @@ function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: read
   const budget = readAutomationBudgetStatus(input.repo_root, run, input.env);
   const ledger = readCampaignBudgetLedger(input.repo_root, run, input.env);
   const next = readDevelopmentCampaignStatus(input.repo_root, input.campaign_id, input.env);
+  const publication = readIssueBatchAdoptionArtifact(input.repo_root, old, 'publication');
+  const adopted = publication !== null;
   if (old.repository_id !== next.campaign.repository_id || old.provider_repository !== repository
     || old.target_ref !== next.campaign.target_ref || source.verification !== 'verified'
-    || status.current.state !== 'group_preparing' || readIssueBatchAdoptionArtifact(input.repo_root, old, 'publication')
+    || (adopted ? status.current.state !== 'stopped' || budget.current.consumed.successful_acquisitions !== 0
+      : status.current.state !== 'group_preparing' || budget.current.state !== 'budget_exhausted' || !budget.stop_receipt)
     || budget.budget.authorization.authorization_sha256 !== grant.authorization_sha256
-    || budget.current.state !== 'budget_exhausted' || !budget.stop_receipt
     || budget.current.open_reservation_sha256s.length !== 0 || ledger.active_step !== null
-    || JSON.stringify(old.slots) !== JSON.stringify(slots)) fail('issue_authoring_invalid', 'resume requires a verified pre-adoption source with a stopped quiescent budget and identical repository scope');
+    || JSON.stringify(old.slots) !== JSON.stringify(slots)) fail('issue_authoring_invalid', 'resume requires a verified quiescent predecessor: exhausted pre-adoption or stopped never-acquired publication, with identical repository scope');
   const targets = request.issues.map((rawIssue: unknown) => {
     if (!rawIssue || typeof rawIssue !== 'object' || Array.isArray(rawIssue)) fail('issue_authoring_invalid', 'resume issue must be an object');
     const issue = rawIssue as Record<string, unknown>;
@@ -253,7 +256,9 @@ function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: read
   if (JSON.stringify(targets.map(t => t.slot)) !== JSON.stringify(slots)
     || new Set(targets.map(t => t.provider_issue_id)).size !== targets.length
     || new Set(targets.map(t => t.provider_issue_url)).size !== targets.length) fail('issue_authoring_invalid', 'resume must name each slot once with unique exact Issue identities');
-  return `Source intent: ${old.intent_sha256}; source session: ${source.session_sha256}; stop receipt: ${budget.stop_receipt.stop_receipt_sha256}. Resume only these existing Issues from the stopped campaign. Do not create any Issue. Before any edit, read every exact URL and verify its opaque database ID and previous body marker match the following manifest; if any mismatch or unavailable read occurs, stop without edits. Then re-audit the new exact baseline and update only these Issues, replacing their old markers with the new slot markers and using the current metadata schema. Preserve their scope; if it is no longer valid, report inability instead of inventing a replacement.\n${JSON.stringify(targets)}`;
+  const adoptedSource = adopted ? { intent: old, source_session_ref: source.session_ref, issues: targets.map(({ previous_marker, ...issue }) => issue) } : undefined;
+  if (adoptedSource) validateAdoptedResumeSource(input.repo_root, adoptedSource, next.campaign.target_revision);
+  return { adoptedSource, action: `Source intent: ${old.intent_sha256}; source session: ${source.session_sha256}; terminal evidence: ${adopted ? status.current.current_sha256 : budget.stop_receipt!.stop_receipt_sha256}. Resume only these existing Issues from the stopped campaign. Do not create any Issue. Before any edit, read every exact URL and verify its opaque database ID and previous body marker match the following manifest; if any mismatch or unavailable read occurs, stop without edits. Then re-audit the new exact baseline and update only these Issues, replacing their old markers with the new slot markers and using the current metadata schema. Preserve their scope; if it is no longer valid, report inability instead of inventing a replacement.\n${JSON.stringify(targets)}` };
 }
 
 export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrowserResult>(input: StartIssueBatchAuthoringInput, deps: Pick<IssueAuthoringDependencies<Result>, 'readBinding' | 'consult' | 'now'>) {
@@ -271,9 +276,11 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
     chrome_profile_directory: value.authorization.campaign!.chrome_profile_directory,
     created_at: createdAt, expires_at: value.authorization.expires_at,
   };
-  const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null, readCampaignCapabilityIdsAtRevision(value.repoRoot, draft.base_main_sha), value.followups, resumeAuthoringAction(input, slots, value.externalPolicy.github.repository));
+  const resume = resumeAuthoringAction(input, slots, value.externalPolicy.github.repository);
+  const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null, readCampaignCapabilityIdsAtRevision(value.repoRoot, draft.base_main_sha), value.followups, resume?.action);
   const intent = buildIssueBatchIntent({ ...draft, prompt_sha256: messageSha256(prompt) });
   persistIssueBatchIntent(value.repoRoot, intent);
+  if (resume?.adoptedSource) bindAdoptedResume(value.repoRoot, intent, resume.adoptedSource);
   return prepareBudgetedAuthoring(input, value.authorization, intent, 'initial', prompt, null,
     () => deps.consult(browserInput(value.repoRoot, prompt, value.binding.profileDir, value.binding.profileDirectory!, input)),
     (result) => persistSession(value.repoRoot, intent, 'initial', slots, null, null, result, createdAt, value.binding.profileDir),
@@ -295,6 +302,7 @@ export function prepareIssueBatchAuthoringContinuation<Result extends IssueAutho
   const locator = input.operation === 'edit_issue' ? providerIssueUrl(input.provider_issue_url, intent.provider_repository) : null;
   if (input.operation === 'edit_issue' && (requested.length !== 1 || providerIssueId === null || locator === null)) fail('issue_authoring_invalid', 'edit_issue requires one slot, provider_issue_id, and an exact provider_issue_url');
   if (input.operation === 'fill_missing' && (input.provider_issue_id !== undefined || input.provider_issue_url !== undefined)) fail('issue_authoring_invalid', 'fill_missing forbids provider_issue_id and provider_issue_url');
+  assertResumedAuthoringTarget(value.repoRoot, intent, input.operation, requested, providerIssueId, locator);
   const prompt = buildIssueAuthoringPrompt(intent, input.operation, requested, providerIssueId, locator, readCampaignCapabilityIdsAtRevision(value.repoRoot, intent.base_main_sha), value.followups);
   return prepareBudgetedAuthoring(input, value.authorization, intent, input.operation, prompt, input.source_session_ref,
     () => deps.followup({

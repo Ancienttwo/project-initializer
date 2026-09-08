@@ -57,7 +57,7 @@ export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'acti
 }
 
 /** Fake transport only; production observation decoder, reservation and settlement stay real. */
-async function observeVerifiedFixtureRevision(f: { root: string; authorization: ReturnType<typeof sealProgramAuthorization>; env: NodeJS.ProcessEnv; readBinding: NonNullable<IssueBatchAdoptionDependencies['readBinding']> }) {
+export async function observeVerifiedFixtureRevision(f: { root: string; authorization: ReturnType<typeof sealProgramAuthorization>; env: NodeJS.ProcessEnv; readBinding: NonNullable<IssueBatchAdoptionDependencies['readBinding']> }) {
   const { runCampaignRevisionObservation } = await import('../../src/effects/automation/campaign-revision-observation');
   const historyFixture = (await import('../fixtures/campaign-revision-evidence/history.json')).default;
   return runCampaignRevisionObservation({ repo_root: f.root, authorization_sha256: f.authorization.authorization_sha256, env: f.env }, {
