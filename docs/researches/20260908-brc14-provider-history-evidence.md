@@ -40,3 +40,11 @@ Protocol2 revision observation now requests same-session history and retains its
 Every active entrypoint, including fleet offer projection, passes its stored intent into one guard. The guard checks the current campaign/grant/group baseline, active policy and provider repository; validates original budget grant and the actual stored reservation plus observed progress event; and rejects stopped or exhausted budget/campaign state. Later groups continue consuming the preceding accepted audit baseline; the bootstrap observation is never treated as evidence for a later main revision.
 
 Offer queries use read-only usage validation: a lagging budget current projection is refolded for reads and is not repaired by a status query. Existing locked settlement and recovery behavior remains separate. These are model-free implementation checks. R3 retains its historical unavailable result; no new real observation or active/manual canary has been run with this package.
+
+## Bounded closeout after R4
+
+The Owner-approved R4 observation on 2026-09-08 stopped before submission: Oracle recorded `promptSubmitted:false` and `APP_SELECTION_UNVERIFIED: GitHub: app-not-found`. Its reservation was reconciled conservatively (`reconciled_reserved`, no open reservations); that charge does not establish a model turn. The original failed result remains unchanged.
+
+A no-send Profile 13 reproduction exposed an actual GitHub inline pill restored while the selector waited for menu candidates. Oracle 14cfbfc6 rechecks the same strict pill identity during that wait. Its regression failed before the fix and passed afterward; 26 browser tests, typecheck and real no-send UI verification pass. This is a local selector repair, not a new BRC6a probe or live BRC14 acceptance.
+
+Owner directed integration of existing work and an end to open-ended evidence experiments. This round ends with BRC6a/BRC15a closures preserved, BRC14/BRC15 live acceptance unfulfilled, and active/manual unstarted. Existing runtime gates and budgets remain enforced. No further GPT call is scheduled by this closeout.
