@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 13:11
+> **Related Plan**: plans/archive/plan-20260908-1237-brc14-pre-active-observation.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-1311
+> **Archive Projection V1**: `plans/plan-20260908-1237-brc14-pre-active-observation.md` => `plans/archive/plan-20260908-1237-brc14-pre-active-observation.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1237-brc14-pre-active-observation.notes.md` => `tasks/archive/notes-20260908-1311-brc14-pre-active-observation.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1237-brc14-pre-active-observation.contract.md` => `tasks/archive/contract-20260908-1311-brc14-pre-active-observation.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1237-brc14-pre-active-observation.review.md` => `tasks/archive/review-20260908-1311-brc14-pre-active-observation.md`
+
 # Task Review: brc14-pre-active-observation
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-1237-brc14-pre-active-observation.md
-> **Contract**: tasks/contracts/20260908-1237-brc14-pre-active-observation.contract.md
-> **Notes File**: tasks/notes/20260908-1237-brc14-pre-active-observation.notes.md
+> **Plan**: plans/archive/plan-20260908-1237-brc14-pre-active-observation.md
+> **Contract**: tasks/archive/contract-20260908-1311-brc14-pre-active-observation.md
+> **Notes File**: tasks/archive/notes-20260908-1311-brc14-pre-active-observation.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 12:37
 > **Recommendation**: pass

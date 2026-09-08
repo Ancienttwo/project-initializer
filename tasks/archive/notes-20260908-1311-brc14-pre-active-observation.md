@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-08 13:11
+> **Related Plan**: plans/archive/plan-20260908-1237-brc14-pre-active-observation.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1311
+> **Archive Projection V1**: `plans/plan-20260908-1237-brc14-pre-active-observation.md` => `plans/archive/plan-20260908-1237-brc14-pre-active-observation.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1237-brc14-pre-active-observation.notes.md` => `tasks/archive/notes-20260908-1311-brc14-pre-active-observation.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1237-brc14-pre-active-observation.contract.md` => `tasks/archive/contract-20260908-1311-brc14-pre-active-observation.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1237-brc14-pre-active-observation.review.md` => `tasks/archive/review-20260908-1311-brc14-pre-active-observation.md`
+
 # Pre-active observation decisions
 
 A completed group is not a bootstrap source. The observation request owns its digest and has no issue-batch intent. Existing campaign provider accounting remains the only ledger; no authoring rounds or active state are created. Raw transport observation is never revision authority.
