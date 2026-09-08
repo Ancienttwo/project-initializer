@@ -85,8 +85,9 @@ export function readCampaignRevisionEvidence(capture: unknown, expected: Revisio
       && content.parts[0]==='@GitHub '+expected.prompt && Array.isArray(userMeta.system_hints) && userMeta.system_hints.includes('plugin:'+expected.connectorId)
       && typeof userMeta.turn_exchange_id==='string');
     const turn=userMeta.turn_exchange_id as string;
+    requireThat(turn.length>0 && userMeta.working_turn_id===turn);
     const final=messages.find(m=>m.id===history.current_node);requireThat(final && object(final.author).role==='assistant' && final.status==='finished_successfully' && final.end_turn===true
-      && object(final.metadata).turn_exchange_id===turn);
+      && object(final.metadata).turn_exchange_id===turn && object(final.metadata).working_turn_id===turn);
     const finalContent=object(final.content);requireThat(finalContent.content_type==='text' && Array.isArray(finalContent.parts) && finalContent.parts.length===1
       && typeof finalContent.parts[0]==='string' && finalContent.parts[0].trim()===expected.answer.trim());
     requireThat(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(expected.repository) && expected.ref.startsWith('refs/heads/') && /^[a-f0-9]{40}$/.test(expected.commit));

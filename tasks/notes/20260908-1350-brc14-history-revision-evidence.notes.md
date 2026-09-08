@@ -7,7 +7,7 @@
 > **Last Updated**: 2026-09-08 13:50
 > **Lifecycle**: notes
 
-> **Substantive Change SHA256**: `sha256:5e1655b0b5bd9f6c76462b54b88410b3c9f1cb3c8cd099e63270f46c56352a05`
+> **Substantive Change SHA256**: `sha256:7c7e76955c085331aee9e3a30b710c269fa75e60c25e4832e3db8460c45a5bbc`
 
 ## Design Decisions
 
@@ -23,6 +23,10 @@
 |--------|----------|--------|
 | Exact commit/ref returns | Accepted | Both are complete provider-origin responses. |
 | Truncated tree wrapper | Excluded | No partial-wrapper reconstruction protocol. |
+
+## Review correction
+
+Security review proved final/user working_turn_id contradictions were not checked. `/tmp/brc14-turn-mismatch-red.log` records the unfixed counterexample; the decoder now requires user/final/tool turn_exchange_id and working_turn_id to agree. Four focused regressions cover missing and contradictory IDs. Canonical baseline run-20260908T140716-56781 passed 14/14 before this bounded correction and remains baseline only.
 
 ## Open Questions
 

@@ -128,9 +128,9 @@ Fragile assumption: provider history preserves the observed typed tool response 
 ## Task Breakdown
 
 - [x] Persist the observed read-only result and exact evidence boundary in repo research with immutable raw-history digest; leave sprint BRC14/BRC15 pending.
-- [ ] Add same-page history collection and exact provider-session export to Oracle; preserve its destination through the worker; focused capture/CLI/session tests.
-- [ ] Add bounded private history transport validation and strict commit/ref evidence decoder to repo-harness, with redacted structural fixtures from the real response.
-- [ ] Connect verified revision evidence to fresh-audit acceptance and group transitions; retain rejected/unverified and active admission guards.
+- [x] Add same-page history collection and exact provider-session export to Oracle; preserve its destination through the worker; focused capture/CLI/session tests.
+- [x] Add bounded private history transport validation and strict commit/ref evidence decoder to repo-harness, with redacted structural fixtures from the real response.
+- [x] Connect verified revision evidence to fresh-audit acceptance and group transitions; retain rejected/unverified and active admission guards.
 - [ ] Freeze implementation; run named focused tests, TypeScript and six repository integrity checks. Consume evidence once for semantic acceptance and archive/finish without merging dirty main.
 
 ## Verification
@@ -144,7 +144,7 @@ Positive: complete captured commit/ref and current session/turn/connector; exact
 
 ## Task Breakdown
 - [x] Persist the observed read-only result and exact evidence boundary in repo research with immutable raw-history digest; leave sprint BRC14/BRC15 pending.
-- [ ] Add same-page history collection and exact provider-session export to Oracle; preserve its destination through the worker; focused capture/CLI/session tests.
-- [ ] Add bounded private history transport validation and strict commit/ref evidence decoder to repo-harness, with redacted structural fixtures from the real response.
-- [ ] Connect verified revision evidence to fresh-audit acceptance and group transitions; retain rejected/unverified and active admission guards.
+- [x] Add same-page history collection and exact provider-session export to Oracle; preserve its destination through the worker; focused capture/CLI/session tests.
+- [x] Add bounded private history transport validation and strict commit/ref evidence decoder to repo-harness, with redacted structural fixtures from the real response.
+- [x] Connect verified revision evidence to fresh-audit acceptance and group transitions; retain rejected/unverified and active admission guards.
 - [ ] Freeze implementation; run named focused tests, TypeScript and six repository integrity checks. Consume evidence once for semantic acceptance and archive/finish without merging dirty main.

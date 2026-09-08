@@ -10,6 +10,10 @@ test('provider commit and ref responses establish exact revision without assista
 });
 test.each([
  ['assistant imitation',(b:any)=>{b.messages[1].author.role='assistant';}],
+ ['user working turn missing',(b:any)=>{delete b.messages[0].metadata.working_turn_id;}],
+ ['user working turn differs',(b:any)=>{b.messages[0].metadata.working_turn_id='other';}],
+ ['final working turn missing',(b:any)=>{delete b.messages[3].metadata.working_turn_id;}],
+ ['final working turn differs',(b:any)=>{b.messages[3].metadata.working_turn_id='other';}],
  ['cross turn',(b:any)=>{b.messages[1].metadata.turn_exchange_id='other';}],
  ['cross connector',(b:any)=>{b.messages[1].metadata.citation_metadata.__connector_id='other';}],
  ['not GitHub',(b:any)=>{b.messages[1].metadata.invoked_resource.app_name='Other';}],
