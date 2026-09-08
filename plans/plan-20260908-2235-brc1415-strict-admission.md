@@ -1,5 +1,5 @@
 # Plan: BRC14 BRC15 strict admission restoration
-> **Substantive Change SHA256**: `sha256:d73da8e105fef1e838894e31b9ec737756236eac4e8f3984416b6fa4c05926ff`
+> **Substantive Change SHA256**: `sha256:e483a8dc08858dcaea7fd83f2c125836004eb8e497c2a772ec19e7fd90468efa`
 
 > **Status**: Executing
 > **Created**: 20260908-2235
@@ -113,7 +113,7 @@ Stored immutable observation and original settled ledger -> current grant/policy
 Remove only the obsolete unconditional refusal, keep existing strict authority checks, and update real-store regression cases to assert successful read-only admission and continued refusal of unavailable, forged, unsettled, stopped, expired and mismatched evidence. No bypass flag or second admission authority. Existing Docker runtime tests retain their accepted input-bound evidence; no runtime code changes. At 10x scale browser/provider and Docker runtime dominate, not the synchronous guard. Revert this bounded source/test slice to restore unconditional refusal.
 
 ## Scope
-src/effects/automation/campaign-revision-admission.ts; tests/effects/campaign-revision-observation.test.ts; docs/researches/20260908-brc14-provider-history-evidence.md; required workflow and deterministic architecture projections. Do not change repository activation policy, provider settings, model, grants, or old campaign state. Live Canary 3 is a separate authorized operation requiring a named disposable target and new finite budget. Publishing the admission restoration is gated on explicit resolution of the prior active-disabled boundary.
+src/effects/automation/campaign-revision-admission.ts; tests/effects/campaign-revision-observation.test.ts; docs/researches/20260908-brc14-provider-history-evidence.md; required workflow and deterministic architecture projections. Do not change repository activation policy, provider settings, model, grants, or old campaign state. Live Canary 3 is a separate authorized operation requiring a named disposable target and new finite budget. Owner resolved the activation boundary by delegating the AiphaBee target and finite budget; use isolated target, preserve manual merge.
 
 ## Verification
 Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, covering fresh audit, revision observation and slot reconciliation. Focused final check: bun test tests/effects/campaign-revision-observation.test.ts. TypeScript and six required integrity checks. Compare runtime source/profile/container inputs against cc2fbc48 to retain its Docker evidence; no local full suite. Required CI applies before merge.
@@ -121,7 +121,7 @@ Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, 
 ## Task Breakdown
 - [x] Prepare strict admission restoration and focused positive/negative real-store regression coverage.
 - [x] Freeze and verify focused checks, TypeScript and required repository integrity gates, retaining unchanged Docker baseline scope.
-- [ ] Record reviewable boundary and pending live authorization; publish only after the active-disabled boundary is explicitly resolved.
+- [ ] Verify the single AiphaBee capability-source blocker fix, then execute newly authorized shadow/active canary within its finite budget and record actual outcomes.
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
@@ -129,4 +129,4 @@ Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, 
 ## Task Breakdown
 - [x] Prepare strict admission restoration and focused positive/negative real-store regression coverage.
 - [x] Freeze and verify focused checks, TypeScript and required repository integrity gates, retaining unchanged Docker baseline scope.
-- [ ] Record reviewable boundary and pending live authorization; publish only after the active-disabled boundary is explicitly resolved.
+- [ ] Verify the single AiphaBee capability-source blocker fix, then execute newly authorized shadow/active canary within its finite budget and record actual outcomes.

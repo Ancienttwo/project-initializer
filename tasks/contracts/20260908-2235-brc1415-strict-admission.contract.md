@@ -17,11 +17,11 @@ The temporary supervision refusal blocks BRC14/BRC15 despite the subsequently ac
 
 ## Goal
 
-Prepare a reviewable strict-admission restoration with positive and negative real-store regression evidence. Live canary and publication remain pending the separately recorded authorization boundary.
+Prepare a reviewable strict-admission restoration with positive and negative real-store regression evidence. Owner delegated the AiphaBee target and budget on 2026-09-08. Use the isolated canary branch, one group, at most two active Issues, parallel limit two, and a total forty provider calls/ninety minutes across shadow and active grants. Keep manual merge.
 
 ## Scope
 
-- In scope: obsolete unconditional refusal, real-store regression expectations, durable evidence boundary.
+- In scope: obsolete unconditional refusal, real-store regression expectations, durable evidence boundary, and the single directly blocking frozen capability-source selection defect observed on AiphaBee.
 - Out of scope: activation policy changes, live provider operations, grants, stopped campaigns, package release.
 - Taste constraints: <!-- advisory only, no run gate; default style/taste lives in AGENTS.md and the minimal-change policy, use this to record a per-task override -->
 
@@ -72,6 +72,9 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 ```yaml
 allowed_paths:
   - src/effects/automation/campaign-revision-admission.ts
+  - src/effects/automation/campaign-capability-registry.ts
+  - tests/effects/
+  - tests/helpers/
   - tests/effects/campaign-revision-observation.test.ts
   - docs/researches/20260908-brc14-provider-history-evidence.md
   - docs/architecture/
@@ -146,7 +149,7 @@ exit_criteria:
     {
       "id": "revision-admission",
       "kind": "command",
-      "command": "bun test tests/effects/campaign-revision-observation.test.ts",
+      "command": "bun test tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-step.test.ts tests/effects/campaign-planning.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
