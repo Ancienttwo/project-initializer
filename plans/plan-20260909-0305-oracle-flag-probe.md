@@ -15,7 +15,7 @@
 > **Task Contract**: `tasks/contracts/20260909-0305-oracle-flag-probe.contract.md`
 > **Task Review**: `tasks/reviews/20260909-0305-oracle-flag-probe.review.md`
 > **Implementation Notes**: `tasks/notes/20260909-0305-oracle-flag-probe.notes.md`
-> **Substantive Change SHA256**: `sha256:86efb42bf95c0f8e92425ea21f513daa920a39ab315c261e1bac461761fa31b7`
+> **Substantive Change SHA256**: `sha256:a0d017e76b2bf9f0d3addda1b8b97f4831c0ebd1aefaf6dcfee91a2690afc842`
 
 ## Agentic Routing
 - Selected route: planning
