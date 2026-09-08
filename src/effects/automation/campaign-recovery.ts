@@ -12,8 +12,8 @@ import { resumeReclaimedEngineerTask } from '../engineers/acquire';
 import { readLease, withTaskLock } from '../state/coordination-lease-store';
 import { readEngineerBindingStatus } from '../engineers/binding-store';
 import { readClaimActorReceipt, validateClaimActorReceiptLive } from '../engineers/claim-actor-store';
-import { readCampaignWorkerHandoff, settleObservedCampaignFailure, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation, type CampaignWorkerFinal } from './campaign-worker';
-import { observeCampaignCodexTerminal } from './campaign-runtime';
+import { readCampaignWorkerHandoff, settleInterruptedCampaignWorker, settleObservedCampaignFailure, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation, type CampaignWorkerFinal } from './campaign-worker';
+import { observeCampaignCodexTerminal, reconcileCampaignCodexInvocation, observeCampaignCodexInterruption, reconcileCampaignCodexPreparation, observeCampaignCodexPreparationInterruption, type CampaignCodexPreparation } from './campaign-runtime';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
 
@@ -57,16 +57,21 @@ function observe(context: Context, owner: LeaseOwnerRecord): LeaseReclaimEvidenc
     const terminal = readPlanningRecord<ReturnType<typeof observeCampaignCodexTerminal>>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'terminal'));
     const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation }>(root, intent, key(selector.dispatch_id, `child-${role}`));
     if (!started) return { role, inactive: retired && (!launch || launch.request.provider === 'codex-exec') ? true : null, invocation, started, terminal };
-    if (!invocation || !terminal || !child || started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)
+    if (!invocation || started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)
       || invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
       || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
       || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
       || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation) {
       return { role, inactive: null, invocation, started, terminal };
     }
+    if (!terminal || !child) {
+      try { const interruption = observeCampaignCodexInterruption(invocation, work.worktree_path);
+        return { role, inactive: true, invocation, started, terminal, interruption };
+      } catch { return { role, inactive: null, invocation, started, terminal }; }
+    }
     try {
       const current = observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...child.observation });
-      return { role, inactive: exact(current, terminal) && current.state === 'terminal' && current.runtime_effect_inactive === true ? true : null, invocation, started, terminal };
+      return { role, inactive: exact(current, terminal) && current.runtime_effect_inactive === true ? true : null, invocation, started, terminal };
     } catch { return { role, inactive: null, invocation, started, terminal }; }
   });
   const binding = readEngineerBindingStatus(root, handoff.acquired.offer.engineer_id, handoff.acquired.offer.engineer_contract_revision);
@@ -126,6 +131,10 @@ export function recoverCampaignDispatch(input: {
   if (!final) throw new Error('trusted exact revision readback is unavailable; recovery without a persisted final cannot rebind');
   if (!storedFinal) validateUsage(final);
   retireCampaignDispatch(input);
+  if (final.contract_run.failure_class === 'controller_interrupted') return {
+    envelope: context.handoff.acquired.envelope, receipt: context.handoff.acquired.receipt, final,
+    disposition: 'controller_interrupted_reconciliation_required' as const,
+  };
   if (failed && !readPlanningRecord(context.root, context.intent, key(context.selector.dispatch_id, 'recovery-intent'))) {
     const eligibility = observeCampaignReclaimEligibility(input);
     if (eligibility.classification !== 'reclaimable') return { envelope: context.handoff.acquired.envelope,
@@ -165,4 +174,44 @@ export function recoverCampaignDispatch(input: {
     const final = settleRecoveredCampaignWorkerFinal(selector, input.env);
     return { ...recovered, final, disposition: final ? 'settled_final' as const : 'reconciliation_required' as const };
   });
+}
+
+/** Async daemon observation is outside the short planning/Task locks. Revalidate before settlement. */
+export async function reconcileAndRecoverCampaignDispatch(input: Parameters<typeof recoverCampaignDispatch>[0]) {
+  const context = readCampaignWorkerHandoff(input.selector);
+  assertRecoveryParent(context, input);
+  const { root, intent, selector, handoff } = context;
+  if (readPlanningRecord(root, intent, key(selector.dispatch_id, 'final'))) return recoverCampaignDispatch(input);
+  const launch = readPlanningRecord<{ request: { provider?: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
+  const preparations = (['worker', 'verifier'] as const).map(role => ({ role,
+    preparation: readPlanningRecord<CampaignCodexPreparation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparation')),
+    invocation: readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent')),
+  }));
+  if (launch && launch.request.provider !== 'codex-exec' || !launch && !preparations.some(p => p.preparation)) return recoverCampaignDispatch(input);
+  if (settleObservedCampaignFailure(selector, input.env)) return recoverCampaignDispatch(input);
+  const work = handoff.acquired.envelope;
+  for (const { role, invocation, preparation } of preparations) {
+    const record = invocation ?? preparation;
+    if (!record) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); continue; }
+    if (record.identity.dispatch_id !== selector.dispatch_id || record.identity.role !== role
+      || record.identity.claim_id !== work.claim_id || record.identity.lease_generation !== work.generation
+      || record.identity.task_id !== work.task_id || record.identity.task_revision !== work.task_revision
+      || record.identity.binding_generation !== handoff.acquired.offer.binding_generation
+      || !Number.isSafeInteger(record.deadline_ms) || Date.now() < record.deadline_ms) throw new Error('reconciliation requires the original expired invocation');
+  }
+  retireCampaignDispatch(input);
+  for (const { invocation, preparation } of preparations) {
+    if (invocation) await reconcileCampaignCodexInvocation(invocation, work.worktree_path);
+    else if (preparation) await reconcileCampaignCodexPreparation(preparation, work.worktree_path);
+  }
+  assertRecoveryParent(context, input);
+  if (!launch) {
+    // A version probe/precreated workload has no execution reservation. Preserve
+    // the Claim and report interruption; do not invent a final or a budget charge.
+    const proofs = preparations.filter(p => p.preparation).map(p => observeCampaignCodexPreparationInterruption(p.preparation!, work.worktree_path));
+    return { envelope: work, receipt: handoff.acquired.receipt, final: null,
+      disposition: 'preparation_interrupted_reconciliation_required' as const, proofs };
+  }
+  settleInterruptedCampaignWorker(selector, input.env);
+  return recoverCampaignDispatch(input);
 }

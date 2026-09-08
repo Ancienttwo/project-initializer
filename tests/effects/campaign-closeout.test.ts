@@ -1,4 +1,4 @@
-import { prepareCampaignCodexInvocation } from '../../src/effects/automation/campaign-runtime';
+import { prepareHistoricalCodexInvocation } from '../helpers/historical-campaign-lifecycle';
 import { runCampaignNotPlanned } from '../../src/effects/automation/campaign-not-planned';
 import { automationDigest } from '../../src/core/automation/budget';
 import { listProviderIssueObservations } from '../../src/effects/external-sources/store';
@@ -151,11 +151,11 @@ test.each(['normal', 'source-drift', 'release-crash', 'cleanup-crash', 'target-a
   const attempt = installHistoricalAttempt(f, f.historical);
   for (const role of ['worker', 'verifier'] as const) {
     writeFileSync(join(worktree, `${role}.prompt.md`), 'Fixture prompt');
-    const invocation = await prepareCampaignCodexInvocation({ deadline_ms: Date.now() + 10000, repo_root:f.root,worktree,prompt_path:`${role}.prompt.md`,env,
+    const invocation = await prepareHistoricalCodexInvocation({ deadline_ms: Date.now() + 10000, repo_root:f.root,worktree,prompt_path:`${role}.prompt.md`,env,
       identity:{dispatch_id:f.input.selector.dispatch_id,role,task_id:f.envelope.task_id,task_revision:f.envelope.task_revision,claim_id:f.envelope.claim_id,lease_generation:f.envelope.generation,binding_generation:f.historical.acquired.offer.binding_generation}});
     const child = spawnSync(process.execPath, [join(import.meta.dir, '../../scripts/run-bounded-verifier-command.ts'), '--deadline-ms', String(Date.now() + 10_000),
       '--log', join(worktree, `${role}.stdout`), '--stderr-log', join(worktree, `${role}.stderr`), '--result', join(worktree, `${role}.result`),
-      '--', invocation.executable, ...invocation.argv], { cwd: worktree, env: { ...env, CONTRACT_RUN_ROLE: role, CONTRACT_RUN_ATTEMPT_RESULT: 'final.json' }, encoding: 'utf8' });
+      '--', join(env.PATH!.split(':')[0]!, 'codex'), ...invocation.argv], { cwd: worktree, env: { ...env, CONTRACT_RUN_ROLE: role, CONTRACT_RUN_ATTEMPT_RESULT: 'final.json' }, encoding: 'utf8' });
     expect(child.status, child.stderr).toBe(0);
     installHistoricalChild(f, f.historical, invocation, { ...JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8')), role, command: `codex-exec:${role}`, stdout_path: `${role}.stdout`, stderr_path: `${role}.stderr` });
   }
