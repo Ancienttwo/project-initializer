@@ -2369,13 +2369,12 @@ export interface AppendAutomationUsageInput extends AutomationUsageResultV1 {
 
 /** Existing settlement is immutable authority, including across producer upgrades. */
 export function readAutomationUsageForResult(
-  input: Pick<AppendAutomationUsageInput, 'repo_root' | 'reservation' | 'evidence_refs' | 'env'>,
+  input: Pick<AppendAutomationUsageInput, 'repo_root' | 'reservation' | 'evidence_refs' | 'env'> & { readonly read_only?: true },
 ): AutomationUsageEventV1 | null {
   const root = resolve(input.repo_root);
   const reservation = validateAutomationReservation(input.reservation);
   const paths = runPaths(root, reservation.automation_run_id);
-  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
-    lockedStatus(root, paths, reservation.automation_run_id, automationStoreNow(), input.env);
+  const read = () => {
     const storedReservation = parse(readRaw(join(paths.reservationsByDigest, `${reservation.reservation_sha256}.json`), 'automation reservation'), validateAutomationReservation, 'automation reservation');
     if (canonicalAutomationJson(storedReservation) !== canonicalAutomationJson(reservation)) {
       fail('automation_budget_store_conflict', 'result reservation differs from stored authority');
@@ -2389,6 +2388,14 @@ export function readAutomationUsageForResult(
       fail('automation_budget_store_conflict', 'stored usage does not bind this exact observed result');
     }
     return event;
+  };
+  if (input.read_only) {
+    readAutomationBudgetStatus(root, reservation.automation_run_id, input.env);
+    return read();
+  }
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
+    lockedStatus(root, paths, reservation.automation_run_id, automationStoreNow(), input.env);
+    return read();
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 

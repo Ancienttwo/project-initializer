@@ -236,7 +236,8 @@ export function collectRepoTaskOffers(
     // Current execution projection is distinct from immutable envelope antecedent validation.
     if (proofResult?.ok) {
       try {
-        if (campaignTaskIntent(repo.path, card.task_id, targetRef)) requireCampaignActiveAdmission();
+        const intent = campaignTaskIntent(repo.path, card.task_id, targetRef);
+        if (intent) requireCampaignActiveAdmission(repo.path, intent, options.env);
       } catch (error) {
         proofResult = { ok: false, code: 'plan_not_projectable', error: String(error), candidates: [proofResult.proof.plan_path] };
       }

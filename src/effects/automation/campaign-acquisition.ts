@@ -78,7 +78,7 @@ export function runCampaignAcquisition(input: CampaignAcquisitionInput, acquire 
   if (input.host !== authority.grant.campaign!.local_parent_host || !input.session_id?.trim() || input.session_id.length > 256) throw new CampaignPlanningError('human_attention_required', 'execution requires the authorized local parent host and session');
   if (!input.idempotency_key || input.idempotency_key.length > 512) throw new CampaignPlanningError('human_attention_required', 'execution requires a bounded idempotency key');
   if (authority.policy.mode === 'shadow') return { action: 'idle' as const, reason: 'shadow campaign cannot acquire workers' };
-  requireCampaignActiveAdmission();
+  requireCampaignActiveAdmission(root, intent, input.env);
   const parent = readPlanningRecord<{ host: string; session_id: string }>(root, intent, 'parent');
   if (!parent || parent.host !== input.host || parent.session_id !== input.session_id) throw new CampaignPlanningError('human_attention_required', 'execution session does not own this group planning');
   if (!authority.grant.campaign?.liveness_policy || authority.grant.campaign.liveness_policy.renewal_actor_kind !== 'controller') throw new CampaignPlanningError('human_attention_required', 'campaign execution requires an explicit controller liveness policy');

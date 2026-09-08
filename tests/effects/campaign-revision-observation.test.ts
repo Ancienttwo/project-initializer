@@ -1,7 +1,13 @@
+import historyFixture from '../fixtures/campaign-revision-evidence/history.json';
+import { createHash } from 'crypto';
+import { requireCampaignActiveAdmission } from '../../src/effects/automation/campaign-revision-admission';
+import { startIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
+import { validateCampaignRevisionRequest, validateCampaignRevisionResult } from '../../src/core/automation/campaign-revision-observation';
+import * as campaignStore from '../../src/effects/automation/development-campaign-store';
 import * as budgetStore from '../../src/effects/automation/budget-store';
 import { test, expect, afterEach, spyOn } from 'bun:test';
 import { execFileSync } from 'child_process';
-import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
@@ -17,8 +23,8 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const SPRINT = 'plans/sprints/repair.sprint.md';
-function fixture(maxCalls = 4, create = true, finiteSelection = false) {
-  const mode = 'shadow', capability = CAP, rounds = 1;
+function fixture(maxCalls = 4, create = true, finiteSelection = false, mode: 'shadow' | 'active' = 'shadow') {
+  const capability = CAP, rounds = 1;
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-adoption-'))); const home = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-home-')));
   git(root, ['init', '-q', '-b', 'main']); git(root, ['config', 'user.name', 'Test']); git(root, ['config', 'user.email', 'test@example.invalid']);
   for (const path of ['.ai/harness', '.archcontext/model/nodes', 'src', 'plans/sprints', 'plans/policies']) mkdirSync(join(root, path), { recursive: true });
@@ -208,4 +214,79 @@ test('durable result settles after stop and target movement without re-admission
   git(f.root, ['commit', '--allow-empty', '-qm', 'post-result target movement']);
   expect((await runCampaignRevisionObservation(f.input, deps)).replayed).toBe(true);
   expect(calls).toBe(1); expect(f.budget().current.open_reservation_sha256s).toHaveLength(0);
+});
+
+function historyBrowser(f: ReturnType<typeof fixture>, prompt: string) {
+  const value=f.browser(), output=JSON.stringify({observed_main_sha:f.campaign.target_revision,summary:'Read commit and ref.'});
+  const history=structuredClone(historyFixture);
+  const body=JSON.parse(history.response.body.replaceAll('example/canary','acme/widgets').replaceAll('a'.repeat(40),f.campaign.target_revision));
+  body.messages[0].content.parts=['@GitHub '+prompt]; body.messages[3].content.parts=[output];
+  history.response.body=JSON.stringify(body);history.response.decodedBodySha256=createHash('sha256').update(history.response.body).digest('hex');
+  const oracle=value.meta.oracle;
+  return {...value,output,meta:{...value.meta,oracle:{...oracle,observation:{...oracle.observation!,appSelection:{...oracle.observation!.appSelection!,pluginId:'plugin:connector_76869538009648d5b282a4bb21c3d157'}},conversationCapture:{status:'captured',sessionId:value.meta.providerSessionId,conversationId:history.conversationId,sha256:'sha256:'+'f'.repeat(64),history}}}};
+}
+async function authoringIntent(f: ReturnType<typeof fixture>) {
+  const status=readDevelopmentCampaignStatus(f.root,f.campaign.campaign_id,f.env);
+  appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:status.current.current_sha256,operation:'prepare_group',idempotency_key:'prepare-active',observed_at:new Date().toISOString(),env:f.env});
+  return (await startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.campaign.campaign_id,group_number:1,dry_run:true,env:f.env},{readBinding:f.readBinding,consult:async()=>({...f.browser(),sessionId:'authoring'})})).intent;
+}
+test('formal history plus observed ledger admits the exact active intent and never another profile or campaign', async () => {
+  const f=fixture(4,true,false,'active'); let calls=0;
+  const deps={readBinding:f.readBinding,consult:async(input:any)=>{calls++;expect(input.captureConversationEvidence).toBe(true);return historyBrowser(f,input.prompt);}};
+  expect((await runCampaignRevisionObservation(f.input,deps)).revision_evidence).toBe('verified');
+  const intent=await authoringIntent(f);
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();
+  expect((await runCampaignRevisionObservation(f.input,deps)).replayed).toBe(true);expect(calls).toBe(1);
+  expect(()=>requireCampaignActiveAdmission(f.root,{...intent,campaign_id:'other'},f.env)).toThrow();
+  expect(()=>requireCampaignActiveAdmission(f.root,{...intent,chrome_profile_directory:'Profile 2'},f.env)).toThrow();
+  const request=validateCampaignRevisionRequest(readCampaignRevisionRecord(f.root,f.campaign.campaign_id,'request'));
+  const record=readCampaignRevisionRecord<any>(f.root,f.campaign.campaign_id,'result');
+  expect(()=>validateCampaignRevisionRequest({...request,protocol:1})).toThrow();
+  for (const patch of [{session_ref:'different'},{provider_session_ref:'different'},{answer_sha256:'sha256:'+'0'.repeat(64)},{revision_evidence:'unavailable'},{protocol:1},{extra:true}])
+    expect(()=>validateCampaignRevisionResult({...record,...patch},request)).toThrow();
+  expect(()=>validateCampaignRevisionResult({...record,conversation_capture:null},request)).toThrow();
+});
+test('history without observed settlement cannot admit; crash replay settles without another provider call', async () => {
+  const f=fixture(4,true,false,'active');let calls=0;
+  const deps={readBinding:f.readBinding,consult:async(input:any)=>{calls++;return historyBrowser(f,input.prompt);}};
+  const crash=spyOn(budgetStore,'appendAutomationUsage').mockImplementationOnce(()=>{throw new Error('before observed settlement');});
+  try {await expect(runCampaignRevisionObservation(f.input,deps)).rejects.toThrow('before observed settlement');} finally {crash.mockRestore();}
+  const intent=await authoringIntent(f);
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');
+  await runCampaignRevisionObservation(f.input,deps);
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();expect(calls).toBe(1);
+});
+test('successful history does not reopen an exhausted budget or stopped campaign', async () => {
+  for(const stopped of [false,true]) {
+    const f=fixture(stopped?4:1,true,false,'active');
+    await runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async(input:any)=>historyBrowser(f,input.prompt)});
+    const intent=await authoringIntent(f);
+    if(!stopped) { const b=f.budget(); expect(()=>reserveCampaignAuthoringBudget({repo_root:f.root,automation_run_id:b.budget.automation_run_id,expected_budget_sha256:b.budget.budget_sha256,campaign_id:f.campaign.campaign_id,group_number:1,intent_sha256:intent.intent_sha256,operation:'initial',idempotency_key:'exhaust',env:f.env})).toThrow(); }
+    if(stopped) {const s=readDevelopmentCampaignStatus(f.root,f.campaign.campaign_id,f.env);appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:s.current.current_sha256,operation:'stop',idempotency_key:'stop-active',observed_at:new Date().toISOString(),env:f.env});}
+    expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');
+  }
+});
+
+test('active offer admission reads a lagging budget projection without repairing it', async () => {
+  const f=fixture(4,true,false,'active');let path='', before='';
+  await runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async(input:any)=>{
+    path=join(f.root,'.git','repo-harness','automation-budget','v1','runs',f.budget().budget.automation_run_id,'current.json');
+    before=readFileSync(path,'utf8');return historyBrowser(f,input.prompt);
+  }});
+  const intent=await authoringIntent(f);
+  writeFileSync(path,before);
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();
+  expect(readFileSync(path,'utf8')).toBe(before);
+});
+test('self-consistent changed history cannot borrow the original ledger settlement', async () => {
+  const f=fixture(4,true,false,'active');
+  await runCampaignRevisionObservation(f.input,{readBinding:f.readBinding,consult:async(input:any)=>historyBrowser(f,input.prompt)});
+  const intent=await authoringIntent(f);
+  const request=validateCampaignRevisionRequest(readCampaignRevisionRecord(f.root,f.campaign.campaign_id,'request'));
+  const record=readCampaignRevisionRecord<any>(f.root,f.campaign.campaign_id,'result');
+  const changed={...record,conversation_capture:{...record.conversation_capture,sha256:'sha256:'+'e'.repeat(64)}};
+  expect(validateCampaignRevisionResult(changed,request).revision_evidence).toBe('verified');
+  const original=campaignStore.readCampaignRevisionRecord;
+  const spy=spyOn(campaignStore,'readCampaignRevisionRecord').mockImplementation((root,id,name)=>name==='result'?changed:original(root,id,name));
+  try {expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('stored usage does not bind');} finally {spy.mockRestore();}
 });

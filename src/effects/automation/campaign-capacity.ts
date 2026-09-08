@@ -25,7 +25,7 @@ export function withCampaignCapacity<T>(root: string, taskId: string, targetRef:
     const selected = campaignTaskIntent(root, taskId, targetRef);
     if (!selected || selected.intent_sha256 !== intent.intent_sha256) throw new CampaignCapacityError('campaign_capacity_unavailable', 'campaign membership changed before claim');
     const authority = requireCampaignPlanningAuthority(root, selected, env);
-    requireCampaignActiveAdmission();
+    requireCampaignActiveAdmission(root, selected, env);
     const limit = authority.grant.campaign!.max_parallel_tasks;
     if (authority.policy.mode !== 'active' || limit > authority.policy.limits.maximum_parallel_tasks) throw new CampaignCapacityError('campaign_capacity_unavailable', 'campaign execution is disabled or exceeds current policy');
     const taskIds = new Set<string>();

@@ -70,7 +70,7 @@ function file(root: string, path: string): Buffer {
 export function createCampaignWorkerHandoff(input: CampaignAcquisitionInput, acquired: Acquisition): CampaignWorkerSelector {
   const root = realpathSync(input.repo_root);
   const intent = readIssueBatchIntent(root, input.campaign_id, input.group_number, input.intent_sha256);
-  requireCampaignActiveAdmission();
+  requireCampaignActiveAdmission(root, intent, input.env);
   const dispatch = canonicalMessageDigest({ operation: 'campaign-worker', intent: intent.intent_sha256, claim: acquired.envelope.claim_id, generation: acquired.envelope.generation });
   const selector = { repo_root: root, campaign_id: intent.campaign_id, group_number: intent.group_number, intent_sha256: intent.intent_sha256, dispatch_id: dispatch };
   const handoff: CampaignWorkerHandoff = { selector, host: input.host, session_id: input.session_id, authorization_id: input.authorization_id, acquired,
@@ -135,7 +135,7 @@ export function bindCampaignWorker(input: {
   if (priorLaunch && !exact(priorLaunch.request, request)) throw new Error('campaign worker replay changes its launch request');
   const priorFinal = read<CampaignWorkerFinal>('final');
   if (priorLaunch && !priorFinal) throw new Error('campaign worker launch requires reconciliation; replay cannot spawn again');
-  if (!priorFinal) requireCampaignActiveAdmission();
+  if (!priorFinal) requireCampaignActiveAdmission(root, intent, input.env);
   if (!priorFinal && (!livenessPolicy || livenessPolicy.renewal_actor_kind !== 'controller')) throw new Error('campaign dispatch requires an explicit controller liveness policy');
   const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env: input.env }).budget;
   const controllerRun = `sha256:${budget.automation_run_id}`;

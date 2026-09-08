@@ -51,7 +51,7 @@ export function runCampaignPlanningStep(input: CampaignPlanningStepInput, deps: 
   const shadow = authority.policy.mode === 'shadow';
   if (shadow && input.result !== undefined) throw new CampaignPlanningError('human_attention_required', 'shadow cannot persist planning outcomes');
   const submitted = input.result === undefined ? null : validatePlanningResult(input.result);
-  if (!shadow && (!submitted || submitted.outcome === 'plan_ready')) requireCampaignActiveAdmission();
+  if (!shadow && (!submitted || submitted.outcome === 'plan_ready')) requireCampaignActiveAdmission(root, intent, input.env);
   const execute = () => {
     // Closing an issued job cannot authorize execution and must remain possible after source drift.
     if (submitted && submitted.outcome !== 'plan_ready') {

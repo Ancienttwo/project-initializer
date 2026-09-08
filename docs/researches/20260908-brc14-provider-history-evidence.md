@@ -32,3 +32,11 @@ The real run above is a pre-active revision observation, not a completed-group a
 The original group-loop design (plans/sprints/20260902-GPT-issues-loop.md:1168) permits accepted_with_followups to feed the next authorized group. The authoring context now reads the previous accepted observation and passes its findings verbatim into both initial and continuation prompts before the prompt digest and provider admission. Planning and observer callers retain their SHA-only baseline projection. Findings do not create extra slots, change allowed issue kinds or authorize a fourth group.
 
 The canonical campaign lifecycle records complete_with_followups -> completed_with_followups separately from complete -> completed. Both completion paths require all authorized groups and the matching final verified audit disposition; findings length never substitutes for that disposition. Historical status stays a pure event projection, and prior recorded completed outcomes are not reinterpreted. This is model-free implementation evidence, not full live BRC14 or BRC15 acceptance.
+
+## Formal pre-active admission
+
+Protocol2 revision observation now requests same-session history and retains its immutable raw result before settlement. It validates exact request/output/session/profile/connector/commit/ref identity through the existing history decoder. Protocol1 and historical unavailable observations are retained as original artifacts and cannot serve as active authority.
+
+Every active entrypoint, including fleet offer projection, passes its stored intent into one guard. The guard checks the current campaign/grant/group baseline, active policy and provider repository; validates original budget grant and the actual stored reservation plus observed progress event; and rejects stopped or exhausted budget/campaign state. Later groups continue consuming the preceding accepted audit baseline; the bootstrap observation is never treated as evidence for a later main revision.
+
+Offer queries use read-only usage validation: a lagging budget current projection is refolded for reads and is not repaired by a status query. Existing locked settlement and recovery behavior remains separate. These are model-free implementation checks. R3 retains its historical unavailable result; no new real observation or active/manual canary has been run with this package.
