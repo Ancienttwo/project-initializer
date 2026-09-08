@@ -30,6 +30,20 @@ const ROOT = join(import.meta.dir, "..");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 }, 30_000);
 
+for (const stream of ['stdout', 'stderr']) test(`contract-run rejects reused ${stream} FIFO without blocking its caller`, () => {
+  const repo = makeRepo('contract-fifo-');
+  try {
+    writePilotContract(repo);
+    const out = '.ai/harness/runs/fifo'; mkdirSync(join(repo, out), { recursive: true });
+    expect(spawnSync('mkfifo', [join(repo, out, `worker.${stream}.log`)]).status).toBe(0);
+    const run = spawnSync(process.execPath, ['scripts/contract-run.ts', 'run', '--repo', repo,
+      '--contract', 'tasks/contracts/pilot.contract.md', '--worker-command', 'true', '--verifier-command', 'touch verifier-started',
+      '--out', out, '--json'], { cwd: ROOT, encoding: 'utf8', timeout: 3000 });
+    expect((run.error as NodeJS.ErrnoException | undefined)?.code).not.toBe('ETIMEDOUT');
+    expect(run.status).not.toBe(0); expect(existsSync(join(repo, 'verifier-started'))).toBe(false);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}, 5000);
+
 function makeRepo(prefix = "contract-run-"): string {
   const repo = mkdtempSync(join(tmpdir(), prefix));
   mkdirSync(join(repo, "plans"), { recursive: true });

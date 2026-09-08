@@ -1,3 +1,4 @@
+import { ISSUE_BATCH_METADATA_KIND } from '../../core/automation/issue-batch-reconcile';
 import { resolve } from 'path';
 
 import { automationDigest, type ProgramAuthorizationV1 } from '../../core/automation/budget';
@@ -117,7 +118,11 @@ export function buildIssueAuthoringPrompt(intent: Omit<IssueBatchIntentV1, 'prom
     'You may read that exact commit and create the requested Issues, or edit only the explicitly named Issue. Do not change code, branches, PRs, labels, milestones, assignees, or close Issues.',
     'The title prefix is display-only. The body marker below is the sole slot authority. Copy it exactly; do not add hashes, digests, or extra keys inside the marker.',
     markerExamples(intent, requestedSlots),
-    'Each Issue body must also state the audit baseline and contain exactly one fenced ```json metadata object with protocol=1, kind=repo-harness-campaign-issue-metadata, issue_kind, primary_capability, priority, depends_on_slots, and suspected_paths.',
+    'Each Issue body must state the audit baseline and contain exactly one JSON fence: an opening line of ```json, JSON on following lines, and a closing line of ```. Do not use any other JSON fences in the body.',
+    `The metadata object has exactly seven keys (no extra keys): protocol must be the number 1; kind must be "${ISSUE_BATCH_METADATA_KIND}"; issue_kind must be "bugfix" or "test_gap" and permitted by the allowed kinds above; primary_capability must be a non-blank string naming the actual capability; priority must be a numeric safe integer in 0–100.`,
+    'depends_on_slots and suspected_paths must be arrays of non-blank strings, sorted in ascending JavaScript string order with no duplicates. Empty arrays are allowed. Do not guess missing metadata; report inability to author a valid Issue.',
+    'Syntax example only: replace the capability and paths with observed facts for the Issue.',
+    '```json\n' + JSON.stringify({ protocol: 1, kind: ISSUE_BATCH_METADATA_KIND, issue_kind: 'bugfix', primary_capability: 'capability.example', priority: 50, depends_on_slots: [], suspected_paths: ['src/a.ts', 'src/z.ts'] }, null, 2) + '\n```',
     'Do not claim success for an Issue you did not observe GitHub create or update. Return a concise action log; the local controller will independently read GitHub.',
   ].join('\n\n');
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { constants, lstatSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { constants, closeSync, fstatSync, ftruncateSync, openSync, lstatSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
 import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -709,8 +709,7 @@ async function runChild(
         wrapper.once("exit", resolve);
       });
     } finally { if (timer) clearInterval(timer); }
-    if (!existsSync(stdoutPath)) writeFileSync(stdoutPath, "", { flag: "wx" });
-    if (!invocation || !existsSync(stderrPath)) writeFileSync(stderrPath, "", { flag: constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW });
+
     let exitCode: number | null = wrapperExit;
     let timedOut = false;
     let quiescence: ChildResult["process_group_quiescence"] = { scope: "unsupported", state: "unknown" };
@@ -740,6 +739,18 @@ async function runChild(
       } catch {
         throw new CliError("contract-run: supervisor result is invalid or differs from its exit", 1);
       }
+    }
+    if (supervision.started === false && supervision.termination_cause === "output_error") {
+      throw new CliError("contract-run: supervisor refused its output targets", 1);
+    }
+    // A reused directory may contain a special file even after the wrapper exits.
+    // Validate the opened object without a blocking open or pre-validation truncation.
+    for (const [path, truncate] of [[stdoutPath, false], [stderrPath, !invocation]] as const) {
+      const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
+      try {
+        if (!fstatSync(fd).isFile()) throw new CliError("contract-run: child log is not a regular file", 1);
+        if (truncate) ftruncateSync(fd, 0);
+      } finally { closeSync(fd); }
     }
     return {
       ...outputProof,
