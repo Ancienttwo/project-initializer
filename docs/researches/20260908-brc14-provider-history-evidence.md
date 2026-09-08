@@ -130,3 +130,10 @@ P1/P2: the first closeout revision request returned the authorized target and va
 P3: encode the complete revision/audit instruction as a JSON string with colon and period Unicode escapes before submitting it. JSON decoding preserves every original URL and snapshot byte, while the submitted text contains no URL autolink tokens. Both request generators share this operation; the evidence decoder still requires the exact submitted prompt. No provider-history normalization, Oracle change, new dependency or acceptance bypass. Model-free tests establish round-trip and real-call-chain behavior; only a subsequent authorized live capture can establish browser transport. At larger snapshots the prompt grows, but existing size/budget limits retain their refusal boundary.
 
 Baseline: PR 367 merged at 4893cf82021a7b8eabfde2ed9995b7cc6532bd9c; required CI run 34256529308 succeeded for c09e32a0. The current live grant cannot consume changed source; preserve its failed record and original total call/deadline limits for any replacement authorization.
+
+
+## Target protection prerequisites
+
+Active campaign targets must commit `.ai/harness/campaign-protection.json` before their initialization SHA is frozen. This is an owner-authored protocol1 inventory (capabilities, unmapped_surfaces and unmapped_closure), not a generated empty default. Revision observation and authoring refuse missing or malformed protection before reserving budget or calling a provider. Planning reads the same inventory and configured capability source, including custom JSON registry paths; its protection digest binds the policy, selected registry inputs and inventory at one exact revision. Those authority inputs cannot be automated repair paths. Default off and shadow remain unchanged. The self-host inventory moved from the former test fixture without byte changes; characterization consumes the new authority.
+
+The existing stopped BYOK campaign completed real revision, authoring, challenge and adoption, but never dispatched a worker. Its stopped records remain immutable. This source correction does not revive its grant or claim real delivery/audit completion.

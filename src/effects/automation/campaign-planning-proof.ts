@@ -1,17 +1,18 @@
+import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { resolveCampaignGroupBaseline } from './campaign-fresh-audit';
 import { assertCampaignCleanupReceipt, campaignCloseoutKey } from '../../core/automation/campaign-closeout';
 import { execFileSync } from 'child_process';
 import { lstatSync, readFileSync, realpathSync } from 'fs';
 import { join, relative } from 'path';
 import { canonicalMessageBytes, canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
-import { capabilityRegistryFromArchcontextNodes, matchCapabilityPath } from '../../core/capabilities/registry';
+import { matchCapabilityPath } from '../../core/capabilities/registry';
 import { CampaignPlanningError, planningPath, rejectPlannedFeatures, validatePlanningResult, type CampaignPlanningJob, type CampaignPlanningResultInput, type PlanningArtifact } from '../../core/automation/campaign-planning';
 import { buildIssueBatchAdoption, type IssueBatchAdoptionInput, type CampaignIssueBatchAdoptionReceiptV1 } from '../../core/automation/issue-batch-adoption';
 import type { IssueBatchIntentV1 } from '../../core/automation/issue-batch';
 import { markdownHeader, parseAllowedPaths } from '../../core/state/artifact-parsers';
 import { readIssueBatchAdoptionArtifact, readIssueBatchIntent } from './issue-batch-store';
 import type { CampaignPublicationV1 } from './issue-batch-publication';
-import { readDevelopmentCampaignPolicyAtRevision, readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
+import { DevelopmentCampaignPolicyError, readDevelopmentCampaignPolicyAtRevision, readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
 import { readStoredProgramAuthorization } from './grant-store';
 import { readDevelopmentCampaignStatus } from './development-campaign-store';
 import { readPlanningRecord, storedPlanningIntents } from './campaign-planning-store';
@@ -59,23 +60,21 @@ export function requireCampaignPlanningAuthority(root: string, intent: IssueBatc
   if (intent.group_number > policy.limits.maximum_group_count || manifest.slots.length > policy.limits.maximum_issues_per_group) throw new CampaignPlanningError('human_attention_required', 'campaign exceeds current policy');
   return { grant, publication: p, manifest, target, policy };
 }
+function planningProtection(root: string, target: string) {
+  try { return readCampaignProtectionAtRevision(root, planningGit(root, ['rev-parse', '--verify', `${target}^{commit}`])); }
+  catch (error) {
+    if (error instanceof DevelopmentCampaignPolicyError) throw new CampaignPlanningError('planning_failed', error.message);
+    throw error;
+  }
+}
 export function planningProtectionDigest(root: string, target: string): string {
-  return canonicalMessageDigest({
-    inventory: planningGit(root, ['rev-parse', `${target}:tests/fixtures/repair-campaign/protected-capabilities.json`]),
-    registry: planningGit(root, ['rev-parse', `${target}:.archcontext/model/nodes`]),
-  });
+  return planningProtection(root, target).digest;
 }
 export function rejectProtectedPlanning(root: string, target: string, capability: string, paths: readonly string[]): void {
-  const inventoryPath = 'tests/fixtures/repair-campaign/protected-capabilities.json';
-  const inventory = JSON.parse(at(root, target, inventoryPath));
-  if (inventory.protocol !== 1 || !Array.isArray(inventory.capabilities) || !Array.isArray(inventory.unmapped_surfaces) || !Array.isArray(inventory.unmapped_closure?.roots) || !Array.isArray(inventory.unmapped_closure?.exempt_paths)) throw new CampaignPlanningError('planning_failed', 'frozen protection inventory is unavailable');
-  const protectedIds = inventory.capabilities.map((c: { capability_id: string }) => c.capability_id);
+  const { inventory, registry, authorityInputs } = planningProtection(root, target);
+  const protectedIds = inventory.capabilities.map(c => c.capability_id);
   if (protectedIds.includes(capability)) throw new CampaignPlanningError('protected_surface_detected', `protected capability: ${capability}`);
-  const nodePaths = planningGit(root, ['ls-tree', '-r', '--name-only', target, '.archcontext/model/nodes']).split('\n').filter(p => p.endsWith('.yaml'));
-  const registry = capabilityRegistryFromArchcontextNodes(nodePaths.map(path => ({ path, value: Bun.YAML.parse(at(root, target, path)) })), { repoRoot: root, isExistingDirectory: path => { try { return planningGit(root, ['cat-file', '-t', `${target}:${path}`]) === 'tree'; } catch { return false; } } });
-  if (registry.status !== 'valid') throw new CampaignPlanningError('planning_failed', 'canonical capability registry is unavailable');
-  if (!registry.registry.capabilities.some(c => `capability.${c.domain}.${c.name}` === capability)) throw new CampaignPlanningError('source_stale', 'primary capability is no longer registered');
-  const authorityInputs = new Set([inventoryPath, ...nodePaths]);
+  if (!registry.capabilities.some(c => `capability.${c.domain}.${c.name}` === capability)) throw new CampaignPlanningError('source_stale', 'primary capability is no longer registered');
   for (const raw of paths) {
     const path = planningPath(raw);
     let type: string | null = null;
@@ -84,7 +83,7 @@ export function rejectProtectedPlanning(root: string, target: string, capability
     if (authorityInputs.has(path)) throw new CampaignPlanningError('protected_surface_detected', `protected guard authority input: ${path}`);
     const explicit = inventory.unmapped_surfaces.some((s: { paths: string[] }) => s.paths.includes(path));
     const closure = inventory.unmapped_closure.roots.some((p: string) => path === p || path.startsWith(`${p}/`)) && !inventory.unmapped_closure.exempt_paths.includes(path);
-    const matched = matchCapabilityPath(registry.registry, path, { repoRoot: root });
+    const matched = matchCapabilityPath(registry, path, { repoRoot: root });
     if (matched.status === 'invalid') throw new CampaignPlanningError('planning_failed', 'planned path has ambiguous capability ownership');
     const owner = matched.status === 'matched' ? `capability.${matched.match.capability.domain}.${matched.match.capability.name}` : null;
     if (explicit || closure || owner && protectedIds.includes(owner)) throw new CampaignPlanningError('protected_surface_detected', `protected planned path: ${path}`);

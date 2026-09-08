@@ -1,3 +1,4 @@
+import { planningProtectionDigest, rejectProtectedPlanning } from '../../src/effects/automation/campaign-planning-proof';
 import { afterEach, expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -34,4 +35,38 @@ test('invalid selected registry never falls back to valid ArchContext',()=>{
 });
 test('unknown source fails closed',()=>{
   const f=fixture('invented');expect(()=>readCampaignCapabilityIdsAtRevision(f.root,f.commit())).toThrow();
+});
+
+const protection = {protocol:1,capabilities:[],unmapped_surfaces:[],unmapped_closure:{roots:[],exempt_paths:[]}};
+test('target-owned protection admits configured registry without repo-harness fixtures or ArchContext', () => {
+  const f=fixture('registry');
+  rmSync(join(f.root,'.archcontext'),{recursive:true});
+  f.write('.ai/harness/campaign-protection.json',protection);
+  const revision=f.commit();
+  expect(()=>rejectProtectedPlanning(f.root,revision,'capability.product.registry',['src/new.ts'])).not.toThrow();
+  for(const path of ['.ai/harness/campaign-protection.json','.ai/harness/policy.json','.ai/context/capabilities.json'])
+    expect(()=>rejectProtectedPlanning(f.root,revision,'capability.product.registry',[path])).toThrow('protected guard authority input');
+  expect(planningProtectionDigest(f.root,revision)).toStartWith('sha256:');
+});
+test('protection digest binds selected inputs and preserves exact frozen revision', () => {
+  const f=fixture('registry'); f.write('.ai/harness/campaign-protection.json',protection);
+  const before=f.commit(), digest=planningProtectionDigest(f.root,before);
+  f.write('.archcontext/model/nodes/capability.yaml',{invalid:'unselected'});
+  expect(planningProtectionDigest(f.root,f.commit())).toBe(digest);
+  f.write('.ai/harness/campaign-protection.json',{...protection,unmapped_closure:{roots:['src'],exempt_paths:[]}});
+  const after=f.commit();expect(planningProtectionDigest(f.root,after)).not.toBe(digest);
+  expect(()=>rejectProtectedPlanning(f.root,after,'capability.product.registry',['src/new.ts'])).toThrow('protected planned path');
+  expect(()=>rejectProtectedPlanning(f.root,before,'capability.product.registry',['src/new.ts'])).not.toThrow();
+});
+test.each([undefined,{protocol:1},{...protection,unmapped_surfaces:[{paths:['../escape']}] }])('missing or malformed target protection fails closed', value => {
+  const f=fixture('registry'); if(value!==undefined)f.write('.ai/harness/campaign-protection.json',value);
+  expect(()=>planningProtectionDigest(f.root,f.commit())).toThrow();
+});
+
+test('target protection IDs must resolve in the same selected registry', () => {
+  const f=fixture('registry');
+  f.write('.ai/harness/campaign-protection.json',{...protection,capabilities:[{capability_id:'capability.product.registrx'}]});
+  expect(()=>planningProtectionDigest(f.root,f.commit())).toThrow('protection inventory');
+  f.write('.ai/harness/campaign-protection.json',{...protection,capabilities:[{capability_id:'capability.product.registry'}]});
+  expect(()=>rejectProtectedPlanning(f.root,f.commit(),'capability.product.registry',['src/new.ts'])).toThrow('protected capability');
 });

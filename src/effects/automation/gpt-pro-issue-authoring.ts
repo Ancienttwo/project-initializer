@@ -1,3 +1,4 @@
+import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
 import { resolveCampaignGroupAuthoringContext } from './campaign-fresh-audit';
@@ -19,7 +20,7 @@ import {
   type IssueBatchSlot,
 } from '../../core/automation/issue-batch';
 import { assertAuthorityBinding, readDevelopmentCampaignStatus, readExactAuthorityBinding } from './development-campaign-store';
-import { readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
+import { readDevelopmentCampaignPolicyAtRevision, readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
 import { requireManualGithubPolicy } from '../external-sources/policy';
 import { assertIssueAuthoringSourceSession, readIssueBatchAdoptionArtifact, persistIssueAuthoringSession, persistIssueBatchIntent, readIssueBatchIntent } from './issue-batch-store';
 
@@ -148,6 +149,7 @@ function context(input: StartIssueBatchAuthoringInput, readBinding: IssueAuthori
   if (bindingResult.error || !bindingResult.binding?.profileDir || !bindingResult.binding.profileDirectory) fail('issue_authoring_profile_mismatch', `ChatGPT browser binding is unavailable: ${bindingResult.error ?? bindingResult.path}`);
   if (bindingResult.binding.profileDirectory !== authorization.campaign.chrome_profile_directory) fail('issue_authoring_profile_mismatch', 'ChatGPT browser profile does not match the campaign authorization');
   const { baseMain, followups } = resolveCampaignGroupAuthoringContext(repoRoot, status.campaign, status.events, input.group_number, input.env);
+  if (readDevelopmentCampaignPolicyAtRevision(repoRoot, baseMain).mode === 'active') readCampaignProtectionAtRevision(repoRoot, baseMain);
   return { repoRoot, status, authorization, externalPolicy, binding: bindingResult.binding, baseMain, followups };
 }
 

@@ -183,3 +183,30 @@ Development regression: 63 tests, 260 assertions passed across revision decoding
 Integrated main e9794576 (architecture recovery and its locked archctx 0.5.8) after the first 14/14 run. Source transport delta remains unchanged; the generated projection conflict is resolved from main and regenerated through the canonical apply command. No Oracle files changed.
 
 > **Substantive Change SHA256**: `sha256:4d6709c9fea4824f69d2b69b1231005f768d5d546c06fcd2acd27f30e0f95589`
+
+
+## Target protection authority correction
+
+P1/P2: transport canary completed exact revision, authoring, challenge and adoption, but `rejectProtectedPlanning` reads a repo-harness test fixture in the target. BYOK materialization15d3c598 lacks that file. The planner also ignores configured registry authority when computing ownership and protection digest.
+P3: use one target-owned `.ai/harness/campaign-protection.json`; share the frozen selected registry result and its input paths with authoring and planning. No inferred empty inventory or fallback. Active observation validates both before request persistence, budget reservation or provider I/O. Target owners author their own inventory; init/off does not invent it. Existing self-host inventory bytes move unchanged, and characterization consumes that authority directly. At10x capability nodes, Git reads grow linearly as before; no second registry cache or authority is introduced.
+
+Regression evidence: /tmp/brc-target-protection-red.log fails against the original planner with the exact missing fixture error. Updated five-file focused run:98 pass,0 fail,892 assertions. The new target-owned guard was tested without ArchContext or repo-harness test directories.
+
+> **Substantive Change SHA256**: `sha256:3bd97974262cf98b408fbbea321f73b3146315172b7d838872d0a6a61af7034a`
+
+Review corrections: shared protection failures use existing campaign_policy_invalid; only the planning adapter maps to planning_failed. Protected capability IDs must resolve in the selected registry, so typos fail before provider I/O. Historical fixtures now explicitly declare only their own capability protection set while retaining the existing unmapped-path rules.
+Baseline run-20260909T031328-26791: all14 contract criteria passed at71792662; overall preparation was blocked solely because Change Assessment did not declare its existing executable oracle for the new helper. Declare that mapping and use the three affected protection/planning/observation files for final delta verification; do not rerun the eight-file baseline.
+
+> **Substantive Change SHA256**: `sha256:2d8ef123e3ff48743d047e9cacf50e9251c4753ad331a7850c727e2283a5a62c`
+
+Final fixture correction makes the protection mutation non-empty against the minimal fixture registry; the targeted invalidation test passes. Security and architecture delta reviews pass for production source at 9f4e4a8f. No production source changed after that review.
+
+> **Substantive Change SHA256**: `sha256:fff167bce8ae5e57e709f7dd56cd962e6183e96534c97dc0392e462674f622ae`
+
+Integration: main d8c082b1 merged at 90ee5751; only generated architecture manifest conflicted and was regenerated canonically. Campaign production/test source is unchanged from frozen 14/14 run-20260909T032622-41208. CI task-sync requires the new main-relative identity below; local check reproduces it exactly.
+
+> **Substantive Change SHA256**: `sha256:c18d68e36830bbf74db5797b4de0e02121b6ee90dc69bbfd5d92d611251396ac`
+
+CI run34269496496: only tests/claude-review.test.ts and tests/herdr-transport.test.ts fail, with missing herdr executable. Install upstream v0.9.0 binary only in Linux CI, pinned to release SHA256; download verified locally. No source or test behavior changed. Source: https://github.com/herdrdev/herdr/releases/tag/v0.9.0 .
+
+> **Substantive Change SHA256**: `sha256:2ff262455fea95e9c49ec99cc427d9343e77765ffbb5629145f987090a92c44c`
