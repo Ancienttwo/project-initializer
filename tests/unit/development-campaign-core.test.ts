@@ -39,3 +39,10 @@ describe('development campaign canonical protocol', () => {
     expect(() => buildDevelopmentCampaignEvent({ campaign_id: 'campaign-1', revision: 1, idempotency_key: 'complete-early', operation: 'complete', previous_state: null, evidence_refs: [], observed_at: observedAt, previous_event_sha256: null })).toThrow('cannot follow empty');
   });
 });
+
+test('completed_with_followups is canonical and refuses every later transition', () => {
+  const event = buildDevelopmentCampaignEvent({campaign_id:'campaign-1',revision:6,idempotency_key:'finish-followups',operation:'complete_with_followups',previous_state:'group_accepted',evidence_refs:[],observed_at:observedAt,previous_event_sha256:'sha256:'+hex('previous')});
+  expect(validateDevelopmentCampaignEvent(event).next_state).toBe('completed_with_followups');
+  for (const operation of ['prepare_group','complete','complete_with_followups','stop','exhaust_budget','require_human_attention','require_reconciliation','expire_authorization'] as const)
+    expect(() => buildDevelopmentCampaignEvent({...event,revision:7,idempotency_key:'next',operation,previous_state:event.next_state,previous_event_sha256:event.event_sha256})).toThrow('cannot follow');
+});

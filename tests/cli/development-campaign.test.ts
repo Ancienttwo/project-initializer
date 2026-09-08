@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test, spyOn } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -25,7 +25,7 @@ function fixture() {
   execFileSync('git', ['config', 'user.email', 'fixture@example.com'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
-  writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({ development_campaign: { version: 1, mode: 'active', limits: { maximum_group_count: 1, maximum_issues_per_group: 10, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'issue_numbers', issue_numbers: [1] }, limits: { max_pages: 1, max_issues: 1, max_body_bytes: 1024, max_total_bytes: 4096, deadline_ms: 1000 } } } })}\n`);
+  writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({ development_campaign: { version: 1, mode: 'active', limits: { maximum_group_count: 1, maximum_issues_per_group: 10, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 1, max_issues: 1, max_body_bytes: 1024, max_total_bytes: 4096, deadline_ms: 1000 } } } })}\n`);
   execFileSync('git', ['add', '.'], { cwd: root }); execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: root });
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
   const limits: ProgramBudgetLimitV1 = { max_agent_turns: 10, max_successful_acquisitions: 2, max_runner_invocations: 10, max_provider_failures: 2, max_consecutive_no_progress_steps: 2, max_repair_cycles: 2, max_wall_clock_seconds: 3600, max_input_tokens: null, max_output_tokens: null, max_cost_micros: null };
@@ -109,3 +109,35 @@ describe('development campaign CLI', () => {
    const missing = run(['campaign', 'adopt']);
    expect(missing.status).not.toBe(0);
  });
+
+test('revision observation CLI exposes readonly entry and rejects missing campaign without provider access', () => {
+  const help = run(['campaign', 'observe-revision', '--help']);
+  expect(help.status).toBe(0); expect(help.stdout).toContain('--authorization-sha256');
+  expect(help.stdout).not.toContain('--model'); expect(help.stdout).not.toContain('--group-number');
+  const f = fixture(); const missing = run(['campaign', 'observe-revision', '--repo', f.root, '--authorization-sha256', 'a'.repeat(64)], f.env);
+  expect(missing.status).toBe(1); expect(JSON.parse(missing.stderr).error).toBe('campaign_unavailable');
+  expect(missing.stdout).toBe('');
+});
+
+for (const outcome of ['verified', 'unavailable', 'error', 'replay'] as const) test(`revision observation CLI exit status: ${outcome}`, async () => {
+  const effect = await import('../../src/effects/automation/campaign-revision-observation');
+  const { buildCampaignCommand } = await import('../../src/cli/commands/campaign');
+  const expected = { revision_evidence: outcome === 'unavailable' ? 'unavailable' : 'verified', replayed: outcome === 'replay' };
+  const observe = spyOn(effect, 'runCampaignRevisionObservation').mockImplementation(async input => {
+    expect(input.authorization_sha256).toBe('a'.repeat(64));
+    if (outcome === 'error') throw new Error('provider observation failed');
+    return expected as Awaited<ReturnType<typeof effect.runCampaignRevisionObservation>>;
+  });
+  let stdout = '', stderr = '';
+  const out = spyOn(process.stdout, 'write').mockImplementation(value => { stdout += String(value); return true; });
+  const err = spyOn(process.stderr, 'write').mockImplementation(value => { stderr += String(value); return true; });
+  const prior = process.exitCode;
+  try {
+    process.exitCode = 0;
+    await buildCampaignCommand().parseAsync(['observe-revision', '--repo', '.', '--authorization-sha256', 'a'.repeat(64)], { from: 'user' });
+    expect(process.exitCode).toBe(outcome === 'unavailable' || outcome === 'error' ? 1 : 0);
+    expect(observe).toHaveBeenCalledTimes(1);
+    if (outcome === 'error') { expect(stdout).toBe(''); expect(JSON.parse(stderr).message).toBe('provider observation failed'); }
+    else { expect(JSON.parse(stdout)).toEqual(expected); expect(stderr).toBe(''); }
+  } finally { process.exitCode = prior; observe.mockRestore(); out.mockRestore(); err.mockRestore(); }
+});

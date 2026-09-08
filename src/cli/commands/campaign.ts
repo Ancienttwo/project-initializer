@@ -1,3 +1,6 @@
+import { runCampaignRevisionObservation } from '../../effects/automation/campaign-revision-observation';
+import { CampaignFreshAuditError } from '../../core/automation/campaign-fresh-audit';
+import { runCampaignFreshAudit } from '../../effects/automation/campaign-fresh-audit';
 import { runCampaignNotPlanned } from '../../effects/automation/campaign-not-planned';
 import { runCampaignCloseout } from '../../effects/automation/campaign-closeout';
 import { Command } from 'commander';
@@ -48,7 +51,7 @@ function output(value: unknown): void {
 
 function outputError(error: unknown): void {
   const code = error instanceof CampaignArgumentError ? error.code
-    : error instanceof CampaignPlanningError || error instanceof DevelopmentCampaignStoreError || error instanceof DevelopmentCampaignPolicyError
+    : error instanceof CampaignFreshAuditError || error instanceof CampaignPlanningError || error instanceof DevelopmentCampaignStoreError || error instanceof DevelopmentCampaignPolicyError
       || error instanceof GptProIssueAuthoringError || error instanceof IssueBatchStoreError || error instanceof IssueBatchProtocolError
       || error instanceof AutomationBudgetStoreError || error instanceof IssueBatchAdoptionError || error instanceof ConnectorChallengeError || error instanceof CampaignStepError || error instanceof IssueBatchObserverError || error instanceof IssueBatchReconcileError ? error.code
       : 'campaign_unavailable';
@@ -237,6 +240,32 @@ export function buildCampaignCommand(): Command {
     .option('--repo <path>', 'Repository root', '.')
     .requiredOption('--campaign-id <id>', 'Development campaign id')
     .action((options) => { try { runCampaignStatus(options); } catch (error) { outputError(error); } });
+  command.command('observe-revision')
+    .description('Collect a budgeted pre-active revision observation without authoring or group acceptance')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--authorization-sha256 <digest>', 'Exact stored campaign authorization')
+    .option('--gitleaks-bin <path>', 'Mandatory prompt scanner')
+    .action(async raw => {
+      try {
+        const result = await runCampaignRevisionObservation({ repo_root: resolve(raw.repo), authorization_sha256: required(raw.authorizationSha256, '--authorization-sha256'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult });
+        output(result);
+        process.exitCode = result.revision_evidence === 'verified' ? 0 : 1;
+      } catch (error) { outputError(error); }
+    });
+  command.command('audit')
+    .description('Run a budgeted fresh read-only group audit; unavailable revision proof remains unverified')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--campaign-id <id>', 'Development campaign id')
+    .requiredOption('--group-number <number>', 'Current lifecycle group')
+    .requiredOption('--intent-sha256 <digest>', 'Exact group intent')
+    .requiredOption('--idempotency-key <key>', 'Fresh audit attempt key')
+    .option('--gitleaks-bin <path>', 'Mandatory prompt scanner')
+    .action(async raw => {
+      try { const result = await runCampaignFreshAudit({repo_root:resolve(raw.repo),campaign_id:required(raw.campaignId,'--campaign-id'),group_number:groupNumber(raw.groupNumber),
+        intent_sha256:required(raw.intentSha256,'--intent-sha256'),idempotency_key:required(raw.idempotencyKey,'--idempotency-key'),gitleaks_bin:raw.gitleaksBin},
+        {readBinding:readBrowserBinding,consult:runBrowserConsult}); output(result); if(result.observation.disposition==='unverified')process.exitCode=1; }
+      catch(error){outputError(error);}
+    });
   command.command('author')
     .description('Persist an IssueBatchIntentV1, then open the GPT Pro authoring lane')
     .option('--repo <path>', 'Repository root', '.')

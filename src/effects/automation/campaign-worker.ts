@@ -70,7 +70,7 @@ function file(root: string, path: string): Buffer {
 export function createCampaignWorkerHandoff(input: CampaignAcquisitionInput, acquired: Acquisition): CampaignWorkerSelector {
   const root = realpathSync(input.repo_root);
   const intent = readIssueBatchIntent(root, input.campaign_id, input.group_number, input.intent_sha256);
-  requireCampaignActiveAdmission();
+  requireCampaignActiveAdmission(root, intent, input.env);
   const dispatch = canonicalMessageDigest({ operation: 'campaign-worker', intent: intent.intent_sha256, claim: acquired.envelope.claim_id, generation: acquired.envelope.generation });
   const selector = { repo_root: root, campaign_id: intent.campaign_id, group_number: intent.group_number, intent_sha256: intent.intent_sha256, dispatch_id: dispatch };
   const handoff: CampaignWorkerHandoff = { selector, host: input.host, session_id: input.session_id, authorization_id: input.authorization_id, acquired,
@@ -135,7 +135,7 @@ export function bindCampaignWorker(input: {
   if (priorLaunch && !exact(priorLaunch.request, request)) throw new Error('campaign worker replay changes its launch request');
   const priorFinal = read<CampaignWorkerFinal>('final');
   if (priorLaunch && !priorFinal) throw new Error('campaign worker launch requires reconciliation; replay cannot spawn again');
-  if (!priorFinal) requireCampaignActiveAdmission();
+  if (!priorFinal) requireCampaignActiveAdmission(root, intent, input.env);
   if (!priorFinal && (!livenessPolicy || livenessPolicy.renewal_actor_kind !== 'controller')) throw new Error('campaign dispatch requires an explicit controller liveness policy');
   const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env: input.env }).budget;
   const controllerRun = `sha256:${budget.automation_run_id}`;
@@ -248,7 +248,7 @@ export function bindCampaignWorker(input: {
         || (contractRun.status === 'pass' ? contractRun.failure_class !== null : typeof contractRun.failure_class !== 'string' || contractRun.failure_class.length === 0)) throw new Error('campaign worker requires the actual contract-run status');
       if (!attemptStarted) throw new Error('campaign worker never started an admitted attempt');
       if (contractRun.status === 'fail') {
-        const failed = settleObservedCampaignFailure(selector, input.env);
+        const failed = settleObservedCampaignFailureUnderLock({ root, intent, selector, handoff }, input.env);
         if (failed) return failed;
       }
       const resultBytes = file(work.worktree_path, resultPath);
@@ -341,49 +341,54 @@ export function readCompletedCampaignWorker(value: unknown, env?: NodeJS.Process
 
 /** Controller settlement consumes supervised failure bytes; it grants no runtime inactivity or ownership. */
 export function settleObservedCampaignFailure(selectorValue: unknown, env?: NodeJS.ProcessEnv): CampaignWorkerFinal | null {
-  const { root, intent, selector, handoff } = readCampaignWorkerHandoff(selectorValue);
-  return withCampaignPlanningLock(root, intent, () => {
-    const authority = requireCampaignPlanningAuthority(root, intent, env);
-    const prior = readPlanningRecord<CampaignWorkerFinal>(root, intent, key(selector.dispatch_id, 'final'));
-    if (prior) {
-      if (prior.contract_run.status !== 'fail') return null;
-      settleCampaignFinal({ root, selector, handoff, final: prior, env }); return prior;
-    }
-    const work = handoff.acquired.envelope;
-    const launch = readPlanningRecord<{ request: { provider?: string; worker_command: string; verifier_command: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
-    if (launch?.request.provider !== 'codex-exec') return null;
-    for (const role of ['worker', 'verifier'] as const) {
-      const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation; stdout_sha256: string; stderr_sha256: string }>(root, intent, key(selector.dispatch_id, `child-${role}`));
-      if (!child || child.observation.exit_code === null || child.observation.exit_code === 0) continue;
-      const observation = child.observation;
-      const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
-      const started = readPlanningRecord<{ invocation_sha256: string; identity: unknown }>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'started'));
-      const terminal = readPlanningRecord<ReturnType<typeof observeCampaignCodexTerminal>>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'terminal'));
-      if (!invocation || !started || !terminal || started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)
-        || invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role || observation.role !== role
-        || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
-        || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
-        || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation
-        || observation.command !== launch.request[role === 'worker' ? 'worker_command' : 'verifier_command']) throw new Error('failed child identity differs');
-      const stdout = file(work.worktree_path, observation.stdout_path); const stderr = file(work.worktree_path, observation.stderr_path);
-      if (observation.output_complete !== true || observation.output_sha256?.stdout !== `sha256:${digest(stdout)}`
-        || observation.output_sha256?.stderr !== `sha256:${digest(stderr)}` || child.stdout_sha256 !== digest(stdout) || child.stderr_sha256 !== digest(stderr)
-        || !exact(observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...observation }), terminal)) throw new Error('failed child supervision is incomplete');
-      const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
-      const reservation = readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), env);
-      if (!reservation || reservation.kind !== 'repo-harness-automation-reservation' || reservation.unit_id !== handoff.acquired.offer.work_package_id
-        || reservation.attempt !== handoff.acquired.offer.attempt_count + 1 || reservation.provider !== 'codex') throw new Error('failed child reservation differs');
-      const cancelled = observation.termination_cause === 'cancelled';
-      const contract_run = { status: 'fail' as const, failure_class: cancelled ? 'cancelled' : observation.timed_out ? 'wall_time_exceeded' : `${role}_failed` };
-      const result_sha256 = digest(canonicalMessageBytes({ invocation, child, terminal, contract_run }));
-      const final: CampaignWorkerFinal = { reservation, contract_run, outcome: cancelled ? 'cancelled' : 'permanent_failure',
-        ended_at: automationStoreNow(), result_sha256,
-        evidence: [{ path: observation.stdout_path, sha256: digest(stdout) }, { path: observation.stderr_path, sha256: digest(stderr) }],
-        runtime_effect_id: canonicalMessageDigest({ invocation, terminal }), evidence_refs: [canonicalMessageDigest({ child, terminal })] };
-      persistPlanningRecord(root, intent, key(selector.dispatch_id, 'final'), final);
-      settleCampaignFinal({ root, selector, handoff, final, env });
-      return final;
-    }
-    return null;
-  });
+  const context = readCampaignWorkerHandoff(selectorValue);
+  return withCampaignPlanningLock(context.root, context.intent, () => settleObservedCampaignFailureUnderLock(context, env));
+}
+
+/** Caller owns the group planning lock for validation, final persistence and settlement. */
+function settleObservedCampaignFailureUnderLock(
+  { root, intent, selector, handoff }: ReturnType<typeof readCampaignWorkerHandoff>, env?: NodeJS.ProcessEnv,
+): CampaignWorkerFinal | null {
+  const authority = requireCampaignPlanningAuthority(root, intent, env);
+  const prior = readPlanningRecord<CampaignWorkerFinal>(root, intent, key(selector.dispatch_id, 'final'));
+  if (prior) {
+    if (prior.contract_run.status !== 'fail') return null;
+    settleCampaignFinal({ root, selector, handoff, final: prior, env }); return prior;
+  }
+  const work = handoff.acquired.envelope;
+  const launch = readPlanningRecord<{ request: { provider?: string; worker_command: string; verifier_command: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
+  if (launch?.request.provider !== 'codex-exec') return null;
+  for (const role of ['worker', 'verifier'] as const) {
+    const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation; stdout_sha256: string; stderr_sha256: string }>(root, intent, key(selector.dispatch_id, `child-${role}`));
+    if (!child || child.observation.exit_code === null || child.observation.exit_code === 0) continue;
+    const observation = child.observation;
+    const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
+    const started = readPlanningRecord<{ invocation_sha256: string; identity: unknown }>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'started'));
+    const terminal = readPlanningRecord<ReturnType<typeof observeCampaignCodexTerminal>>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'terminal'));
+    if (!invocation || !started || !terminal || started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)
+      || invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role || observation.role !== role
+      || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
+      || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
+      || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation
+      || observation.command !== launch.request[role === 'worker' ? 'worker_command' : 'verifier_command']) throw new Error('failed child identity differs');
+    const stdout = file(work.worktree_path, observation.stdout_path); const stderr = file(work.worktree_path, observation.stderr_path);
+    if (observation.output_complete !== true || observation.output_sha256?.stdout !== `sha256:${digest(stdout)}`
+      || observation.output_sha256?.stderr !== `sha256:${digest(stderr)}` || child.stdout_sha256 !== digest(stdout) || child.stderr_sha256 !== digest(stderr)
+      || !exact(observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...observation }), terminal)) throw new Error('failed child supervision is incomplete');
+    const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
+    const reservation = readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), env);
+    if (!reservation || reservation.kind !== 'repo-harness-automation-reservation' || reservation.unit_id !== handoff.acquired.offer.work_package_id
+      || reservation.attempt !== handoff.acquired.offer.attempt_count + 1 || reservation.provider !== 'codex') throw new Error('failed child reservation differs');
+    const cancelled = observation.termination_cause === 'cancelled';
+    const contract_run = { status: 'fail' as const, failure_class: cancelled ? 'cancelled' : observation.timed_out ? 'wall_time_exceeded' : `${role}_failed` };
+    const result_sha256 = digest(canonicalMessageBytes({ invocation, child, terminal, contract_run }));
+    const final: CampaignWorkerFinal = { reservation, contract_run, outcome: cancelled ? 'cancelled' : 'permanent_failure',
+      ended_at: automationStoreNow(), result_sha256,
+      evidence: [{ path: observation.stdout_path, sha256: digest(stdout) }, { path: observation.stderr_path, sha256: digest(stderr) }],
+      runtime_effect_id: canonicalMessageDigest({ invocation, terminal }), evidence_refs: [canonicalMessageDigest({ child, terminal })] };
+    persistPlanningRecord(root, intent, key(selector.dispatch_id, 'final'), final);
+    settleCampaignFinal({ root, selector, handoff, final, env });
+    return final;
+  }
+  return null;
 }

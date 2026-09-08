@@ -51,7 +51,7 @@ describe('IssueBatchIntentV1 and marker authority', () => {
   test('fails adoption closed for an unverified authoring session', () => {
     const session = buildIssueAuthoringSession({
       intent_sha256: intent().intent_sha256, operation: 'fill_missing', requested_slots: ['08', '09', '10'], provider_issue_id: null,
-      session_ref: 'session-2', source_session_ref: 'session-1', browser_status: 'completed', verification: 'unverified', created_at: '2026-09-05T01:00:00.000Z',
+      session_ref: 'session-2', source_session_ref: 'session-1', browser_status: 'completed', browser_evidence: null, created_at: '2026-09-05T01:00:00.000Z',
     });
     expect(() => requireVerifiedIssueAuthoringSession(session)).toThrow('cannot be adopted');
   });

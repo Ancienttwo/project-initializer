@@ -1,3 +1,4 @@
+import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
 import { createAdoptionRepository } from '../helpers/campaign-adoption-repository';
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
 import { afterEach, describe, expect, test } from 'bun:test';
@@ -123,7 +124,7 @@ test('recoverable challenge reads its exact completed session without another ad
   await expect(adoptIssueBatch(f.input, deps)).rejects.toThrow('unresolved');
   const challenge = readIssueBatchAdoptionArtifact(f.root, f.intent, 'challenge')!;
   const response = JSON.stringify({ base_main_sha: f.intent.base_main_sha, answers: (challenge.targets as { expected: string }[]).map(t => t.expected) });
-  const result = await adoptIssueBatch(f.input, { ...deps, readSession: () => ({ output: response, meta: { repo: f.root, sessionId: 'recoverable', sourceSessionId: 'initial', status: 'completed', model: { verified: true }, browser: { profileDirectory: 'Profile 1' } } }) });
+  const result = await adoptIssueBatch(f.input, { ...deps, readSession: () => ({ output: response, meta: campaignBrowserMetadata({ repoRoot: f.root, sessionId: 'recoverable', sourceSessionId: 'initial', profileDir: f.home, profileDirectory: 'Profile 1' }) }) });
   expect(result.receipt.connector_evidence).toBe('challenge_verified'); expect(calls).toBe(1);
 });
 
@@ -179,3 +180,16 @@ test('interrupted shadow observation remains unsealed and cannot repeat I/O', as
   expect(calls).toBe(2);
   expect(readIssueBatchAdoptionArtifact(f.root, f.intent, 'publication')).toBeNull();
 });
+
+ test('profile root drift rejects before challenge reservation and can resume after restoring binding', async () => {
+  const f = await fixture();
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env });
+  const directory = join(f.root, '.git', AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, 'runs', budget.budget.automation_run_id, 'reservations');
+  const before = readdirSync(directory).sort();
+  await expect(adoptIssueBatch(f.input, { ...f.deps, readBinding: () => ({ path: 'fixture', binding: { profileDir: f.home + '-foreign', profileDirectory: 'Profile 1' } }) })).rejects.toThrow('profile');
+  expect(f.calls()).toBe(0);
+  expect(readdirSync(directory).sort()).toEqual(before);
+  expect(readIssueBatchAdoptionArtifact(f.root, f.intent, 'response')).toBeNull();
+  const resumed = await adoptIssueBatch(f.input, f.deps);
+  expect(resumed.receipt.connector_evidence).toBe('challenge_verified'); expect(f.calls()).toBe(1);
+ });

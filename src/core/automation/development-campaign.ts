@@ -13,13 +13,13 @@ export const DEVELOPMENT_CAMPAIGN_EVENT_SCHEMA_VERSION = 'repo-harness.developme
 export const DEVELOPMENT_CAMPAIGN_CURRENT_SCHEMA_VERSION = 'repo-harness.development-campaign-current/v1' as const;
 
 export const DEVELOPMENT_CAMPAIGN_STATES = Object.freeze([
-  'authorized', 'group_preparing', 'group_running', 'group_auditing', 'group_accepted', 'completed',
+  'authorized', 'group_preparing', 'group_running', 'group_auditing', 'group_accepted', 'completed', 'completed_with_followups',
   'stopped', 'budget_exhausted', 'human_attention_required', 'reconciliation_required', 'authorization_expired',
 ] as const);
 export type DevelopmentCampaignState = (typeof DEVELOPMENT_CAMPAIGN_STATES)[number];
 
 export const DEVELOPMENT_CAMPAIGN_OPERATIONS = Object.freeze([
-  'authorize', 'prepare_group', 'start_group', 'begin_group_audit', 'accept_group', 'complete',
+  'authorize', 'prepare_group', 'start_group', 'begin_group_audit', 'accept_group', 'complete', 'complete_with_followups',
   'stop', 'exhaust_budget', 'require_human_attention', 'require_reconciliation', 'expire_authorization',
 ] as const);
 export type DevelopmentCampaignOperation = (typeof DEVELOPMENT_CAMPAIGN_OPERATIONS)[number];
@@ -103,7 +103,7 @@ function state(value: unknown, field: string): DevelopmentCampaignState {
   return value as DevelopmentCampaignState;
 }
 
-const TERMINAL = new Set<DevelopmentCampaignState>(['completed', 'stopped', 'budget_exhausted', 'authorization_expired']);
+const TERMINAL = new Set<DevelopmentCampaignState>(['completed', 'completed_with_followups', 'stopped', 'budget_exhausted', 'authorization_expired']);
 const NON_TERMINAL = DEVELOPMENT_CAMPAIGN_STATES.filter((value) => !TERMINAL.has(value));
 const TRANSITIONS: Readonly<Record<DevelopmentCampaignOperation, readonly (DevelopmentCampaignState | null)[]>> = Object.freeze({
   authorize: [null],
@@ -112,6 +112,7 @@ const TRANSITIONS: Readonly<Record<DevelopmentCampaignOperation, readonly (Devel
   begin_group_audit: ['group_running'],
   accept_group: ['group_auditing'],
   complete: ['group_accepted'],
+  complete_with_followups: ['group_accepted'],
   stop: NON_TERMINAL,
   exhaust_budget: NON_TERMINAL,
   require_human_attention: NON_TERMINAL,
@@ -120,7 +121,7 @@ const TRANSITIONS: Readonly<Record<DevelopmentCampaignOperation, readonly (Devel
 });
 const NEXT: Readonly<Record<DevelopmentCampaignOperation, DevelopmentCampaignState>> = Object.freeze({
   authorize: 'authorized', prepare_group: 'group_preparing', start_group: 'group_running', begin_group_audit: 'group_auditing',
-  accept_group: 'group_accepted', complete: 'completed', stop: 'stopped', exhaust_budget: 'budget_exhausted',
+  accept_group: 'group_accepted', complete: 'completed', complete_with_followups: 'completed_with_followups', stop: 'stopped', exhaust_budget: 'budget_exhausted',
   require_human_attention: 'human_attention_required', require_reconciliation: 'reconciliation_required', expire_authorization: 'authorization_expired',
 });
 

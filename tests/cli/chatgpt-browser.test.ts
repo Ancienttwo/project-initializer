@@ -112,6 +112,20 @@ function writeFakeGitleaks(dir: string, version = '8.30.0'): string {
 // oracle used with a profile binding must answer --help/--debug-help.
 const FAKE_ORACLE_HELP = 'Usage: oracle --engine browser --browser-archive never --write-output <p> --browser-follow-up <t> --followup <id> --browser-model-strategy current --browser-cookie-path <path> --copy-profile <dir> --browser-chrome-profile <name> --chatgpt-url <url> --heartbeat <seconds>';
 
+function sessionDescriptorFixture(id: string, parent: string | null = null): string[] {
+  const descriptor = JSON.stringify({ protocol: 1, kind: 'oracle-session', sessionId: id, parentSessionId: parent });
+  const metadata = JSON.stringify({ id, browser: { modelSelection: { strategy: 'current', resolvedLabel: '6 Pro', verified: false } } });
+  return [
+    'SESSION=""', 'PREV=""',
+    'for a in "$@"; do',
+    '  if [ "$PREV" = "--write-session" ]; then SESSION="$a"; fi',
+    '  PREV="$a"', 'done',
+    `mkdir -p "$ORACLE_HOME_DIR/sessions/${id}"`,
+    `printf '%s\\n' '${metadata}' > "$ORACLE_HOME_DIR/sessions/${id}/meta.json"`,
+    `if [ -n "$SESSION" ]; then printf '%s\\n' '${descriptor}' > "$SESSION"; fi`,
+  ];
+}
+
 function writeFakeOracle(path: string, opts: { help?: string; sessionLine?: string; body?: string[] } = {}): string {
   writeFileSync(path, [
     '#!/bin/sh',
@@ -1266,7 +1280,9 @@ describe('chatgpt browser command', () => {
         expect(output).toContain('ORACLE_REMOTE_HOST:');
         const meta = JSON.parse(readFileSync(join(repoRoot, '.ai/harness/chatgpt/sessions', payload.sessionId, 'meta.json'), 'utf-8'));
         expect(meta.browser.conversationUrl).toBe('https://chatgpt.com/c/fake-conversation');
-        expect(meta.providerSessionId).toBe('oracle_fake_123');
+        expect(meta.providerSessionId).toBeUndefined();
+        // Completed output alone proves neither provider identity nor model/effort.
+        expect(meta.model.verified).toBe(false);
         expect(meta.oracle.binary).toBe(oraclePath);
         expect(meta.oracle.captureStatus).toBe('completed');
         expect(meta.output.artifacts).toEqual([]);
@@ -1666,7 +1682,7 @@ describe('chatgpt browser command', () => {
         expect(payload.status).toBe('recoverable');
         expect(payload.error.code).toBe('ORACLE_CAPTURE_INCOMPLETE');
         const meta = JSON.parse(readFileSync(join(repoRoot, '.ai/harness/chatgpt/sessions', payload.sessionId, 'meta.json'), 'utf-8'));
-        expect(meta.providerSessionId).toBe('oracle_recover_789');
+        expect(meta.providerSessionId).toBeUndefined();
         expect(meta.oracle.captureStatus).toBe('recoverable');
       } finally {
         rmSync(binDir, { recursive: true, force: true });
@@ -2137,6 +2153,7 @@ describe('chatgpt browser command', () => {
             'case "$1" in',
             '  --version) printf "%s\\n" "0.18.0"; exit 0;;',
             'esac',
+            ...sessionDescriptorFixture('oracle_followup_456', 'oracle_upstream_123'),
             'ARGS="$*"',
             'OUT=""',
             'PREV=""',
@@ -2171,6 +2188,9 @@ describe('chatgpt browser command', () => {
         // providerSessionId reflects what oracle returned for the reopened run.
         expect(followupMeta.parentProviderSessionId).toBe('oracle_upstream_123');
         expect(followupMeta.providerSessionId).toBe('oracle_followup_456');
+        expect(followupMeta.oracle.observation.modelSelection).toMatchObject({ strategy: 'current', resolvedLabel: '6 Pro', verified: false });
+        expect(followupMeta.model.verified).toBe(false);
+        expect(followupMeta.model.requested).toBeUndefined();
       } finally {
         rmSync(binDir, { recursive: true, force: true });
       }
@@ -2250,3 +2270,69 @@ describe('chatgpt browser command', () => {
     expect(delegate).not.toContain('Because there is no scanner');
   });
 });
+
+test.each([0, 9])('fresh audit capture survives provider cleanup on exit %s', async exitCode => {
+  await withAsyncRepo(async repoRoot => {
+    const binDir = mkdtempSync(join(tmpdir(), 'capture-oracle-'));
+    try {
+      const id = 'captured-session';
+      const trace = [
+        { sequence: 1, event: 'capture_start', protocol: 1, kind: 'oracle-page-response-streams', sessionId: id, origin: 'https://chatgpt.com' },
+        { sequence: 2, event: 'capture_end', status: 'empty', streams: 0, reasons: [] },
+      ].map(row => JSON.stringify(row)).join('\n');
+      const oracleBin = writeFakeOracle(join(binDir, 'oracle'), { body: [
+        ...sessionDescriptorFixture(id),
+        'OUT=""; TRACE=""; PREV=""; WAIT=""',
+        'for a in "$@"; do',
+        '  if [ "$PREV" = "--write-output" ]; then OUT="$a"; fi',
+        '  if [ "$PREV" = "--write-network-evidence" ]; then TRACE="$a"; fi',
+        '  if [ "$a" = "--wait" ]; then WAIT="yes"; fi',
+        '  if [ "$a" = "--model" ]; then exit 8; fi',
+        '  PREV="$a"', 'done',
+        '[ "$WAIT" = "yes" ] || exit 7',
+        'umask 077',
+        `printf '%s\n' '${trace}' > "$TRACE"`,
+        'printf "%s\n" "private capture retained" > "$OUT"',
+        `exit ${exitCode}`,
+      ] });
+      const result = await runBrowserConsult({ repoRoot, prompt: 'fixture audit', provider: 'oracle', oracleBin, captureNetworkEvidence: true });
+      expect(result.status).toBe(exitCode === 0 ? 'completed' : 'failed');
+      const capture = result.meta.oracle?.networkCapture;
+      expect(capture?.status).toBe('empty'); expect(capture?.sessionId).toBe(id);
+      expect(existsSync(capture!.path)).toBe(true);
+      expect(readFileSync(capture!.path, 'utf8')).toBe(trace + '\n');
+      expect(lstatSync(dirname(capture!.path)).mode & 0o777).toBe(0o700);
+      expect(lstatSync(capture!.path).mode & 0o777).toBe(0o600);
+      expect(result.output).not.toContain('capture_start');
+      expect(result.meta.model.verified).toBe(false);
+      expect(capture).not.toHaveProperty('resolved_commit');
+    } finally { rmSync(binDir, { recursive: true, force: true }); }
+  });
+}, 20000);
+
+test('session history capture crosses provider cleanup with allocated identity', async () => {
+  await withAsyncRepo(async repoRoot => {
+    const binDir=mkdtempSync(join(tmpdir(),'history-oracle-'));
+    try {
+      const id='history-session', conversationId='fixture-conversation';
+      const metadata=JSON.stringify({id,status:'completed',browser:{runtime:{promptSubmitted:true,conversationId}}});
+      const history=JSON.stringify({protocol:1,kind:'oracle-session-conversation-history',sessionId:id,history:{conversationId}});
+      const oracleBin=writeFakeOracle(join(binDir,'oracle'),{body:[...sessionDescriptorFixture(id),
+        'OUT=""; HISTORY=""; PREV=""; WAIT=""',
+        'for a in "$@"; do',
+        'if [ "$PREV" = "--write-output" ]; then OUT="$a"; fi',
+        'if [ "$PREV" = "--write-conversation-evidence" ]; then HISTORY="$a"; fi',
+        'if [ "$a" = "--wait" ]; then WAIT="yes"; fi',
+        'if [ "$a" = "--model" ]; then exit 8; fi',
+        'PREV="$a"','done','[ "$WAIT" = "yes" ] || exit 7','umask 077',
+        `printf '%s\n' '${metadata}' > "$ORACLE_HOME_DIR/sessions/${id}/meta.json"`,
+        `printf '%s\n' '${history}' > "$HISTORY"`,
+        'printf "%s\n" "audit fixture" > "$OUT"',
+      ]});
+      const result=await runBrowserConsult({repoRoot,prompt:'fixture audit',provider:'oracle',oracleBin,captureConversationEvidence:true});
+      expect(result.status).toBe('completed');
+      expect(result.meta.oracle?.conversationCapture).toMatchObject({status:'captured',sessionId:id,conversationId});
+      expect(result.meta.model.verified).toBe(false);
+    }finally{rmSync(binDir,{recursive:true,force:true});}
+  });
+},20000);

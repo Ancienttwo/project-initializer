@@ -1,3 +1,4 @@
+import { campaignSessionEvidence } from './campaign-browser-session';
 import { campaignAttemptOutcome } from '../../src/core/automation/campaign-runtime';
 import { reserveAutomationBudget } from '../../src/effects/automation/budget-store';
 import { recordTaskAutomationAttemptStart } from '../../src/effects/engineers/automation-attempt-store';
@@ -158,13 +159,13 @@ export function installHistoricalAdoption(f: Awaited<ReturnType<typeof createAdo
   const continuation = verifyCampaignAuthoringReadonlyContinuation({ ...binding, terminal });
   const session = listIssueAuthoringSessions(f.root, f.intent.campaign_id, f.intent.group_number, f.intent.intent_sha256).find(s => s.operation === 'initial')!;
   const source = execFileSync('git', ['show', `${f.intent.base_main_sha}:src/index.ts`], { cwd: f.root });
-  const challenge = buildConnectorChallenge({ intent_sha256: f.intent.intent_sha256, base_main_sha: f.intent.base_main_sha, source_session_ref: session.session_ref,
+  const challenge = buildConnectorChallenge({ intent_sha256: f.intent.intent_sha256, base_main_sha: f.intent.base_main_sha, source_session_ref: session.session_ref, source_provider_session_ref: session.browser_evidence!.provider_session_ref,
     targets: [{kind:'directory_entries',path:'src',line:null,expected:git(f.root,['ls-tree','--name-only',`${f.intent.base_main_sha}:src`])},
       {kind:'text_line',path:'src/index.ts',line:1,expected:source.toString().split('\n')[0]!},
       {kind:'file_sha256',path:'src/index.ts',line:null,expected:createHash('sha256').update(source).digest('hex')}] });
   const input = { intent: f.intent, session, terminal, authorization_sha256: f.authorization.authorization_sha256,
     snapshot: { snapshot_receipt: snapshot.receipt, observations: snapshot.observations }, capability_ids: capabilities, challenge,
-    challenge_response: JSON.stringify({base_main_sha:f.intent.base_main_sha,answers:challenge.targets.map(t=>t.expected)}), response_session_ref:'historical-challenge',model_verified:true };
+    challenge_response: JSON.stringify({base_main_sha:f.intent.base_main_sha,answers:challenge.targets.map(t=>t.expected)}), response_session_ref:'historical-challenge',response_session_evidence:campaignSessionEvidence('historical-challenge', session.session_ref, session.browser_evidence!.repo_root, session.browser_evidence!.profile_dir, session.browser_evidence!.profile_directory) };
   const adopted = buildIssueBatchAdoption(input);
   const policy = JSON.parse(readFileSync(join(f.root, f.input.publication_policy_path), 'utf8'));
   persistIssueBatchAdoptionArtifact(f.root,f.intent,'adoption',{input,sprint_path:sprint,publication_policy:policy,readonly_continuation:continuation});

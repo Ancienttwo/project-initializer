@@ -7,7 +7,7 @@ import {
   canonicalIssueBatchIntentBytes,
   validateIssueAuthoringSession,
   validateIssueBatchIntent,
-  type IssueAuthoringSessionV1,
+  type IssueAuthoringSessionV2,
   type IssueBatchIntentV1,
 } from '../../core/automation/issue-batch';
 import { canonicalMessageBytes, canonicalMessageDigest } from '../../core/messages/mechanics';
@@ -100,7 +100,7 @@ export function readIssueBatchIntent(repoRoot: string, campaignId: string, group
   return intent;
 }
 
-export function persistIssueAuthoringSession(repoRoot: string, campaignId: string, groupNumber: number, sessionInput: IssueAuthoringSessionV1): IssueAuthoringSessionV1 {
+export function persistIssueAuthoringSession(repoRoot: string, campaignId: string, groupNumber: number, sessionInput: IssueAuthoringSessionV2): IssueAuthoringSessionV2 {
   const session = validateIssueAuthoringSession(sessionInput); const value = paths(repoRoot, campaignId, groupNumber);
   return withExclusiveDirectoryLock(value.root, value.lock, () => {
     ensure(value.root, value.campaign); ensure(value.root, value.group); ensure(value.root, value.sessions);
@@ -110,7 +110,7 @@ export function persistIssueAuthoringSession(repoRoot: string, campaignId: strin
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
-export function listIssueAuthoringSessions(repoRoot: string, campaignId: string, groupNumber: number, intentSha256?: string): readonly IssueAuthoringSessionV1[] {
+export function listIssueAuthoringSessions(repoRoot: string, campaignId: string, groupNumber: number, intentSha256?: string): readonly IssueAuthoringSessionV2[] {
   const value = paths(repoRoot, campaignId, groupNumber);
   if (!existsSync(value.sessions)) return Object.freeze([]);
   const sessions = readdirSync(value.sessions, { withFileTypes: true }).map((entry) => {
@@ -129,7 +129,7 @@ export function assertIssueAuthoringSourceSession(
   groupNumber: number,
   intentSha256: string,
   sessionRef: string,
-): IssueAuthoringSessionV1 {
+): IssueAuthoringSessionV2 {
   const value = paths(repoRoot, campaignId, groupNumber);
   return withExclusiveDirectoryLock(value.root, value.lock, () => {
     readIssueBatchIntent(repoRoot, campaignId, groupNumber, intentSha256);

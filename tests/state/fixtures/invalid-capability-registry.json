@@ -122,7 +122,6 @@
       "allowedToEdit": {
         "decision": "block",
         "reasons": [
-          "required_work_package_missing",
           "hard_blocker_present"
         ]
       },
@@ -146,7 +145,7 @@
           {
             "key": "complete_approved_work_package",
             "status": "required",
-            "satisfied": false
+            "satisfied": true
           },
           {
             "key": "separate_contract",

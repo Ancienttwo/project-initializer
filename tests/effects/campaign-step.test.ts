@@ -1,3 +1,4 @@
+import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { execFileSync } from 'child_process';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'fs';
@@ -62,15 +63,15 @@ function runCampaignStep(input: Parameters<typeof runCampaignStepEffect>[0], dep
 const hex = (seed: string): string => new Bun.CryptoHasher('sha256').update(seed).digest('hex');
 const limits: ProgramBudgetLimitV1 = { max_agent_turns: 10, max_successful_acquisitions: 2, max_runner_invocations: 10, max_provider_failures: 2, max_consecutive_no_progress_steps: 2, max_repair_cycles: 2, max_wall_clock_seconds: 3600, max_input_tokens: null, max_output_tokens: null, max_cost_micros: null };
 
-function browserResult(input: BrowserConsultInput, sessionId: string, status: BrowserConsultResult['status'], verified = true): BrowserConsultResult {
+function browserResult(input: BrowserConsultInput & { sessionId?: string }, sessionId: string, status: BrowserConsultResult['status'], verified = true): BrowserConsultResult {
   return {
     sessionId, status,
     paths: { sessionDir: sessionId, prompt: 'prompt.md', transcript: 'transcript.md', output: 'output.md', events: 'events.jsonl', artifactsDir: 'artifacts' },
-    meta: { version: 1, sessionId, engine: 'chatgpt-browser', provider: 'oracle', status, repo: input.repoRoot, createdAt: at, updatedAt: at, model: { requested: input.model, verified }, browser: { mode: 'manual-login', transport: 'copy_profile', chatgptUrl: 'https://chatgpt.com/', profileDir: input.profileDir, profileDirectory: input.profileDirectory }, input: { promptPath: 'prompt.md', files: [], followups: 0 }, output: { outputPath: 'output.md', transcriptPath: 'transcript.md', artifactsDir: 'artifacts', artifacts: [] }, diagnostics: { dryRun: false, reattachable: true, lastCaptureAt: at } },
+    meta: { ...(verified ? campaignBrowserMetadata({ sessionId, repoRoot: input.repoRoot, profileDir: input.profileDir!, profileDirectory: input.profileDirectory!, sourceSessionId: input.sessionId, status }) : {}), version: 1, sessionId, engine: 'chatgpt-browser', provider: 'oracle', status, repo: input.repoRoot, createdAt: at, updatedAt: at, model: { requested: input.model, verified: false }, browser: { ...(verified ? { chatgptApp: 'GitHub' } : {}), mode: 'manual-login', transport: 'copy_profile', chatgptUrl: 'https://chatgpt.com/', profileDir: input.profileDir, profileDirectory: input.profileDirectory }, input: { promptPath: 'prompt.md', files: [], followups: 0 }, output: { outputPath: 'output.md', transcriptPath: 'transcript.md', artifactsDir: 'artifacts', artifacts: [] }, diagnostics: { dryRun: false, reattachable: true, lastCaptureAt: at } },
   };
 }
 
-async function fixture(status: BrowserConsultResult['status'] = 'completed', maxIssues = 20) {
+async function fixture(status: BrowserConsultResult['status'] = 'completed', maxIssues = 20, slotCount = 2) {
   const root = mkdtempSync(join(tmpdir(), 'campaign-step-'));
   const home = mkdtempSync(join(tmpdir(), 'campaign-step-home-'));
   const profile = mkdtempSync(join(tmpdir(), 'campaign-step-profile-'));
@@ -80,14 +81,19 @@ async function fixture(status: BrowserConsultResult['status'] = 'completed', max
   execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
   writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
-    development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: 2, maximum_parallel_tasks: 2 } },
+    development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: slotCount, maximum_parallel_tasks: 2 } },
     external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: maxIssues, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } },
   })}\n`);
   mkdirSync(join(root, '.repo-harness'), { recursive: true });
   writeFileSync(join(root, '.repo-harness', 'chatgpt-browser.local.json'), `${JSON.stringify({ version: 1, product: 'chatgpt', profileDir: profile, profileDirectory: 'Profile 1', selectedProfilePath: join(profile, 'Profile 1'), browserChannel: 'chrome', chatgptUrl: 'https://chatgpt.com/', updatedAt: at })}\n`);
+  mkdirSync(join(root, '.archcontext/model/nodes'), { recursive: true });
+  mkdirSync(join(root, 'src'), { recursive: true });
+  writeFileSync(join(root, 'src/index.ts'), 'export {};\n');
+  writeFileSync(join(root, '.archcontext/model/nodes/capability.yaml'), JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: 'capability.runtime-harness.authoring', kind: 'capability', name: 'Authoring', status: 'active', summary: 'Own authoring', responsibilities: ['Own authoring'], source: { include: ['src/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } }));
+  execFileSync('git', ['add', '.archcontext', 'src'], { cwd: root });
   execFileSync('git', ['add', '.ai'], { cwd: root }); execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: root });
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-  const authorization = sealProgramAuthorization({ authorization_id: 'auth-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: limits, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: 1, issues_per_group: 2, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', max_authoring_rounds_per_group: 5, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: at, expires_at: '2027-09-05T00:00:00.000Z' });
+  const authorization = sealProgramAuthorization({ authorization_id: 'auth-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: limits, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: 1, issues_per_group: slotCount, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', max_authoring_rounds_per_group: 5, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: at, expires_at: '2027-09-05T00:00:00.000Z' });
   const env = { ...process.env, REPO_HARNESS_HOME: home };
   mintProgramAuthorization({ repo_root: root, authorization, env });
   const campaign = buildDevelopmentCampaignDefinition({ campaign_id: 'campaign-1', authorization_id: authorization.authorization_id, authorization_sha256: authorization.authorization_sha256, repository_id: authorization.repository_id, target_ref: authorization.target_ref, target_revision: authorization.target_revision, created_at: at });
@@ -98,7 +104,7 @@ async function fixture(status: BrowserConsultResult['status'] = 'completed', max
 }
 
 function body(intent: IssueBatchIntentV1, slot: string, valid = true): string {
-  const metadata = valid ? '\n```json\n{"protocol":1,"kind":"repo-harness-campaign-issue-metadata","issue_kind":"bugfix","primary_capability":"capability","priority":1,"depends_on_slots":[],"suspected_paths":["src/index.ts"]}\n```' : '';
+  const metadata = valid ? '\n```json\n{"protocol":1,"kind":"repo-harness-campaign-issue-metadata","issue_kind":"bugfix","primary_capability":"capability.runtime-harness.authoring","priority":1,"depends_on_slots":[],"suspected_paths":["src/index.ts"]}\n```' : '';
   return `${renderIssueBatchMarker(intent.campaign_id, intent.group_number, slot)}${metadata}`;
 }
 
@@ -271,7 +277,7 @@ describe('durable campaign heartbeat step', () => {
     let observations = 0; let mutations = 0;
     await expect(runCampaignStep({ ...input(f, 'over-group'), group_number: 2, intent_sha256: forged.intent_sha256 }, {
       now: () => new Date(later), observe: () => { observations += 1; return snapshot(forged, []); }, mutate_issue: () => { mutations += 1; return { stdout: '{}' }; },
-    })).rejects.toMatchObject({ code: 'campaign_step_invalid' });
+    })).rejects.toMatchObject({ code: 'campaign_group_sequence_invalid' });
     expect({ observations, mutations }).toEqual({ observations: 0, mutations: 0 });
   });
 
@@ -351,7 +357,7 @@ describe('durable campaign heartbeat step', () => {
     await runCampaignStep(input(f, 'first-failed-edit'), deps);
     hiddenJournalReads = { root: f.root, reservations: 1, results: 1 };
 
-    await expect(runCampaignStep(input(f, 'stale-edit-decision'), deps)).rejects.toMatchObject({ code: 'campaign_reconciliation_required' });
+    await expect(runCampaignStep(input(f, 'stale-edit-decision'), deps)).rejects.toMatchObject({ code: 'issue_authoring_state_invalid' });
     expect(followups).toBe(1);
     expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'reservations')).toHaveLength(1);
     expect(listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'results')).toHaveLength(1);
@@ -361,7 +367,7 @@ describe('durable campaign heartbeat step', () => {
     const f = await fixture();
     const before = snapshot(f.intent, [{ id: '201', number: 1, slot: '01', valid: false }]);
     before.observations.forEach((entry) => writeProviderIssueObservation(f.root, entry));
-    await runCampaignStep(input(f, 'repair-baseline-edit'), { ...browserDependencies, now: () => new Date(later), observe: () => before, followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => browserResult(browserInput, 'session-edit-unverified', 'completed', false) });
+    await runCampaignStep(input(f, 'repair-baseline-edit'), { ...browserDependencies, now: () => new Date(later), observe: () => before, followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => browserResult(browserInput, 'session-edit', 'completed') });
     const repairedInvalid = snapshot(f.intent, [{ id: '201', number: 1, slot: '01', body_override: `${renderIssueBatchMarker(f.intent.campaign_id, 1, '01')}\nstill invalid` }], '2026-09-05T00:11:00.000Z');
     repairedInvalid.observations.forEach((entry) => writeProviderIssueObservation(f.root, entry));
     const baseline = await runCampaignStep(input(f, 'repair-baseline-observe'), { ...browserDependencies, now: () => new Date('2026-09-05T00:11:00.000Z'), observe: () => repairedInvalid, followup: async (browserInput: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => browserResult(browserInput, 'session-fill-after-repair', 'completed') });
@@ -403,6 +409,46 @@ describe('durable campaign heartbeat step', () => {
     expect(readCampaignBudgetLedger(f.root, runId, f.env)).toEqual(before);
     expect(readdirSync(receipts)).toHaveLength(0);
     expect(mutations).toBe(1);
+  });
+
+  test('Canary 1: seven of ten Issues survive a disconnected tail request without blind retry', async () => {
+    const f = await fixture('completed', 20, 10);
+    const issues = Array.from({ length: 7 }, (_, i) => ({
+      id: 201 + i, number: i + 1, html_url: `https://github.com/acme/widgets/issues/${i + 1}`,
+      state: 'open', title: 'repair', body: body(f.intent, String(i + 1).padStart(2, '0')),
+      labels: [{ name: 'campaign' }], assignees: [], created_at: null, updated_at: null,
+    }));
+    const original = JSON.stringify(issues);
+    let reads = 0; let followups = 0; let mutations = 0;
+    const deps: Partial<CampaignStepDependencies> = {
+      now: () => new Date(later),
+      provider_command: () => ({ stdout: JSON.stringify(++reads === 1
+        ? { id: 100, full_name: 'acme/widgets', html_url: 'https://github.com/acme/widgets' } : issues) }),
+      mutate_issue: () => { mutations++; throw new Error('existing Issues must not be mutated'); },
+      followup: async request => {
+        followups++;
+        expect(request.prompt).toContain('missing slots: 08, 09, 10.');
+        expect(request.prompt).toContain('Do not edit or duplicate any other slot.');
+        expect(request).not.toHaveProperty('model');
+        expect(request.chatgptApp).toBe('GitHub');
+        throw new Error('browser disconnected after seven observed Issues');
+      },
+    };
+    const args = input(f, 'canary-seven');
+    await expect(runCampaignStep(args, deps)).rejects.toMatchObject({ code: 'campaign_step_mutation_failed' });
+    expect({ reads, followups, mutations }).toEqual({ reads: 2, followups: 1, mutations: 0 });
+    const reservations = listIssueBatchJournalRecords(f.root, 'campaign-1', 1, 'reservations');
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0]).toMatchObject({ requested_slots: ['08', '09', '10'] });
+    const runId = campaignAutomationRunId({ repository_id: f.intent.repository_id, campaign_id: f.intent.campaign_id });
+    const before = readCampaignBudgetLedger(f.root, runId, f.env);
+    expect(before.reserved_provider_calls).toBe(1);
+    for (const key of ['canary-seven', 'canary-another-key']) {
+      await expect(runCampaignStep(input(f, key), deps)).rejects.toMatchObject({ code: 'campaign_reconciliation_required' });
+      expect(readCampaignBudgetLedger(f.root, runId, f.env)).toEqual(before);
+    }
+    expect({ reads, followups, mutations }).toEqual({ reads: 2, followups: 1, mutations: 0 });
+    expect(JSON.stringify(issues)).toBe(original);
   });
 
   test('leaves an unknown mutation reserved and blocks any blind retry or new provider read', async () => {

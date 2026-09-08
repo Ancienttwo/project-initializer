@@ -4,7 +4,7 @@ import { spawnSync } from 'child_process';
 import { resolve } from 'path';
 test('campaign exposes closeout while step retains local-host planning handoff', () => {
   const command = buildCampaignCommand();
-  expect(command.commands.map(c => c.name())).toEqual(['close-not-planned', 'closeout', 'start', 'transition', 'status', 'author', 'author-followup', 'step', 'adopt']);
+  expect(command.commands.map(c => c.name())).toEqual(['close-not-planned', 'closeout', 'start', 'transition', 'status', 'observe-revision', 'audit', 'author', 'author-followup', 'step', 'adopt']);
   const step = command.commands.find(c => c.name() === 'step')!;
   for (const option of ['--host', '--session-id', '--planning-result', '--authorization-id']) expect(step.options.some(o => o.long === option)).toBe(true);
   const rendered = spawnSync('bun', [resolve(import.meta.dir, '../../src/cli/index.ts'), 'campaign', 'step', '--help'], { encoding: 'utf8' });

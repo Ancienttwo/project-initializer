@@ -110,8 +110,12 @@ export function readCampaignExternalSourcesPolicyAtRevision(repoRoot: string, re
 export function requireDevelopmentCampaignStartPolicy(repoRoot: string, revision: string): DevelopmentCampaignEnabledPolicyV1 {
   const policy = readDevelopmentCampaignPolicyAtRevision(repoRoot, revision);
   if (policy.mode === 'off') fail('campaign_mode_disabled', 'development_campaign.mode is off at the authorized target revision');
-  if (readCampaignExternalSourcesPolicyAtRevision(repoRoot, revision).mode === 'off') {
+  const external = readCampaignExternalSourcesPolicyAtRevision(repoRoot, revision);
+  if (external.mode === 'off') {
     fail('campaign_external_sources_disabled', 'external_sources.mode must be enabled before a development campaign can start');
+  }
+  if (external.mode === 'manual' && external.github.selection.kind === 'issue_numbers') {
+    fail('campaign_policy_invalid', 'campaign requires a complete repository Issue snapshot; issue-number selection is not supported');
   }
   return policy;
 }

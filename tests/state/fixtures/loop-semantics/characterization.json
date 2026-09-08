@@ -14,7 +14,7 @@
     },
     {
       "scenario": "missing-contract",
-      "source_sha256": "d168f124a429ceb24e19dff0cf74c464a9795bc328ce6e37eb547381d3456cf1",
+      "source_sha256": "0e296f649a6c11e9b2658483abe3718321bc53e699342a224d9ab82afa880328",
       "baseline": "82550779cdccf0575d674ae53bbc95ba63e44743",
       "cli_exit": 0,
       "workflow_profile": "standard",
@@ -22,7 +22,7 @@
     },
     {
       "scenario": "executing-fresh-evidence",
-      "source_sha256": "3fd46a92535d8be205d1442a8121be22c0aa5b6848657c70869efa8c9d81b6ae",
+      "source_sha256": "eac4c4e988e2c05eb3d6bf8bec8675c6f7b2be800ffdb16f1d4e66f550c14bae",
       "baseline": "82550779cdccf0575d674ae53bbc95ba63e44743",
       "cli_exit": 0,
       "workflow_profile": "standard",

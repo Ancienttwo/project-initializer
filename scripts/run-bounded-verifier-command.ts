@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { constants, closeSync, openSync, writeFileSync, writeSync } from 'fs';
+import { constants, closeSync, fstatSync, ftruncateSync, openSync, writeFileSync, writeSync } from 'fs';
 import { createHash } from 'crypto';
 import { spawn } from 'child_process';
 
@@ -72,8 +72,28 @@ let terminating = false;
 let forcedTerminationSent = false;
 let forcedTerminationConfirmDeadlineMs = 0;
 let forceTermination: Promise<void> | undefined;
-const logFd = openSync(logPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
-const stderrFd = stderrPath === null ? logFd : openSync(stderrPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+function openLog(path: string): number {
+  // Nonblocking open prevents a FIFO from trapping the supervisor before its timers exist.
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
+  try {
+    if (!fstatSync(fd).isFile()) throw new Error('supervisor log must be a regular file');
+    ftruncateSync(fd, 0);
+    return fd;
+  } catch (error) { closeSync(fd); throw error; }
+}
+let logFd: number;
+let stderrFd: number;
+try {
+  logFd = openLog(logPath);
+  try { stderrFd = stderrPath === null ? logFd : openLog(stderrPath); }
+  catch (error) { closeSync(logFd); throw error; }
+} catch (error) {
+  const result: Result = { started: false, termination_cause: 'output_error', output_complete: false,
+    duration_ms: Date.now() - startedAt, timed_out: false, exit_code: 1, signal: null,
+    process_group_quiescence: { scope: 'unsupported', state: 'unknown' } };
+  writeFileSync(resultPath, `${JSON.stringify(result)}\n`, { flag: 'wx', mode: 0o600 });
+  process.exit(1);
+}
 // Refusal happens at the actual spawn boundary, including time spent opening logs.
 if (Date.now() >= deadlineMs) {
   closeSync(logFd);
@@ -106,7 +126,7 @@ if (stderrPath !== null) {
       try { let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset); }
       catch { outputError = true; beginTermination(); }
     });
-    stream.on('error', () => { outputError = true; });
+    stream.on('error', () => { outputError = true; beginTermination(); });
   }
 }
 
@@ -145,9 +165,15 @@ async function waitForProcessGroupQuiescence(): Promise<void> {
   }
 }
 
+let cleanupDeadlineMs: number | null = null;
+let notifyTermination: (() => void) | undefined;
+const terminationStarted = new Promise<void>(resolve => { notifyTermination = resolve; });
+
 function beginTermination(): void {
   if (terminating) return;
   terminating = true;
+  cleanupDeadlineMs = Date.now() + 500 + FORCED_TERMINATION_CONFIRM_MS;
+  notifyTermination?.();
   terminate('SIGTERM');
   forceTermination = new Promise((resolve) => {
     setTimeout(() => {
@@ -184,10 +210,18 @@ const completion = await leaderCompletion.then(async (result) => {
 });
 
 if (stderrPath !== null && !outputClosed) {
-  let streamTimer: ReturnType<typeof setTimeout> | undefined;
-  await Promise.race([closed, new Promise<void>(resolve => { streamTimer = setTimeout(resolve, Math.max(0, deadlineMs - Date.now())); })]);
-  if (streamTimer) clearTimeout(streamTimer);
-  if (!outputClosed) { timedOut = true; outputError = true; child.stdout?.destroy(); child.stderr?.destroy(); beginTermination(); }
+  while (!outputClosed) {
+    const drainDeadline = Math.min(deadlineMs, cleanupDeadlineMs ?? deadlineMs);
+    if (Date.now() >= drainDeadline) break;
+    let streamTimer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([closed, ...(cleanupDeadlineMs === null ? [terminationStarted] : []),
+      new Promise<void>(resolve => { streamTimer = setTimeout(resolve, Math.max(0, drainDeadline - Date.now())); })]);
+    if (streamTimer) clearTimeout(streamTimer);
+  }
+  if (!outputClosed) {
+    if (Date.now() >= deadlineMs) timedOut = true;
+    outputError = true; child.stdout?.destroy(); child.stderr?.destroy(); beginTermination();
+  }
 }
 clearTimeout(deadlineTimer);
 if (forceTermination) await forceTermination;
