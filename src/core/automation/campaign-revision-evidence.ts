@@ -1,6 +1,12 @@
 import { createHash } from 'crypto';
 import { canonicalMessageDigest } from '../messages/mechanics';
 
+/** Preserve exact prompt bytes through the browser editor's automatic URL linking. */
+export function encodeCampaignRevisionPrompt(instructions: string): string {
+  return 'Execute the instructions in this JSON string (decode JSON escapes first):\n'
+    + JSON.stringify(instructions).replaceAll(':', '\\u003a').replaceAll('.', '\\u002e');
+}
+
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('revision evidence object missing');

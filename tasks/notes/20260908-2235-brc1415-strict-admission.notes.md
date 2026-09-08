@@ -166,3 +166,20 @@ CI 34254078294 failed only tests/state/loop-semantics-characterization.test.ts: 
 > **Substantive Change SHA256**: `sha256:b85a3d568f4668b403113e2a0d094c844c34adf53d6b4beef3ed79233b71e1cb`
 
 > **Substantive Change SHA256**: `sha256:1c36bd83dac7715737a63c01924ebe7151537b1f5128fe6c2f062c27ecd8b8d7`
+
+
+## Exact prompt transport correction
+
+P1/P2: the first closeout revision request returned the authorized target and valid tool history, but the browser editor serialized naked URLs as Markdown self-links. The exact user-prompt comparison correctly refused the changed text. Session chgpt_20260909_014236_byok-brc1415-20260909-closeout-pre-active-revisi and observation sha256:68b61377a71381edcea2e3db2dd54591db2534efb998986afd2b5b9dee6437f0 remain unavailable; one call was settled and no authoring began.
+
+P3: encode the complete revision/audit instruction as a JSON string with colon and period Unicode escapes before submitting it. JSON decoding preserves every original URL and snapshot byte, while the submitted text contains no URL autolink tokens. Both request generators share this operation; the evidence decoder still requires the exact submitted prompt. No provider-history normalization, Oracle change, new dependency or acceptance bypass. Model-free tests establish round-trip and real-call-chain behavior; only a subsequent authorized live capture can establish browser transport. At larger snapshots the prompt grows, but existing size/budget limits retain their refusal boundary.
+
+Baseline: PR 367 merged at 4893cf82021a7b8eabfde2ed9995b7cc6532bd9c; required CI run 34256529308 succeeded for c09e32a0. The current live grant cannot consume changed source; preserve its failed record and original total call/deadline limits for any replacement authorization.
+
+> **Substantive Change SHA256**: `sha256:eb3cda39a71918c369b622cefa76396b0764b532a9b8ec1905a893d8f66e9602`
+
+Development regression: 63 tests, 260 assertions passed across revision decoding, observation and fresh audit.
+
+Integrated main e9794576 (architecture recovery and its locked archctx 0.5.8) after the first 14/14 run. Source transport delta remains unchanged; the generated projection conflict is resolved from main and regenerated through the canonical apply command. No Oracle files changed.
+
+> **Substantive Change SHA256**: `sha256:4d6709c9fea4824f69d2b69b1231005f768d5d546c06fcd2acd27f30e0f95589`

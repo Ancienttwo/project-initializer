@@ -86,9 +86,10 @@ test('fresh audit uses current default/GitHub, charges after authoring sealed, a
     consult: async (input: any) => {
       calls++;
       expect(input.chatgptApp).toBe('GitHub');
-      expect(input.prompt).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/commits/${git(f.root, ['rev-parse', 'HEAD'])}`);
-      expect(input.prompt).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/ref/${f.intent.target_ref.slice(5)}`);
-      expect(input.prompt).toContain('Use the GitHub fetch action');
+      const instructions = JSON.parse(input.prompt.slice(input.prompt.indexOf('\n') + 1));
+    expect(instructions).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/commits/${git(f.root, ['rev-parse', 'HEAD'])}`);
+      expect(instructions).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/ref/${f.intent.target_ref.slice(5)}`);
+      expect(instructions).toContain('Use the GitHub fetch action');
       expect(input.captureNetworkEvidence).toBe(true);
       expect(input.model).toBeUndefined();
       expect(input.thinkingTime).toBeUndefined();

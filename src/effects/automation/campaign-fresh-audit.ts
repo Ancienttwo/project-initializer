@@ -1,4 +1,4 @@
-import { readCampaignRevisionEvidence, buildCampaignRevisionReadInstruction } from '../../core/automation/campaign-revision-evidence';
+import { readCampaignRevisionEvidence, buildCampaignRevisionReadInstruction, encodeCampaignRevisionPrompt } from '../../core/automation/campaign-revision-evidence';
 import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
 import { execFileSync } from 'child_process';
 import { canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
@@ -261,13 +261,13 @@ export async function runCampaignFreshAudit(
       observed_at: (deps.now ?? (() => new Date().toISOString()))(),
       env: input.env,
     });
-  const prompt = [
+  const prompt = encodeCampaignRevisionPrompt([
     'Perform a fresh read-only GitHub main audit for this complete campaign group. Use the selected GitHub app. Do not create, edit, close or reopen Issues. Do not change repository files. Do not start another group.',
     buildCampaignRevisionReadInstruction(snapshot.provider_repository, snapshot.target_ref, snapshot.expected_final_main_sha),
     `Group snapshot: ${JSON.stringify(snapshot)}`,
     `Issue mapping: ${JSON.stringify(requireCampaignPlanningAuthority(root, intent, input.env).manifest.receipt.issues)}`,
     `Read the exact expected_final_main_sha. Include every slot, including unfilled/not_planned. Return only one JSON object matching this schema: ${JSON.stringify(campaignAuditAnswerSchema(snapshot))}. Use actual observed SHA only when returned by the tool; otherwise null. Do not infer version evidence from this prompt. The local controller independently evaluates version authority.`,
-  ].join('\n\n');
+  ].join('\n\n'));
   withCampaignPlanningLock(root, intent, () =>
     persistPlanningRecord(root, intent, key('audit-request', attemptKey), {
       snapshot_sha256: snapshot.snapshot_sha256,

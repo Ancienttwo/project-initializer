@@ -157,14 +157,14 @@ exit_criteria:
   "protocol": 1,
   "checks": [
     {
-      "id": "integrated-main-snapshot-delta",
+      "id": "revision-prompt-transport-delta",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/state/loop-semantics-characterization.test.ts",
+      "command": "bun test --timeout 60000 tests/unit/campaign-revision-evidence.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/campaign-fresh-audit.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "The accepted c2ef4c62 source and CI run 34254078294 cover BRC behavior. Only the inherited main Stop snapshot changes: verify the three added cascade-state paths without rerunning BRC suites.",
+      "necessity": "Merged PR 367 and successful CI 34256529308 are the baseline. Verify lossless prompt transport, unchanged exact evidence rejection, real observation admission and fresh audit including complete three-group sequencing. No local full-suite rerun is needed.",
       "inputs": {
         "env": []
       }
@@ -224,7 +224,7 @@ exit_criteria:
     {
       "id": "task-sync",
       "kind": "command",
-      "command": "REPO_HARNESS_DIFF_BASE=aa3cb452 REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh",
+      "command": "REPO_HARNESS_DIFF_BASE=e9794576 REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
