@@ -14,6 +14,7 @@ export interface OracleSessionEvidence {
   };
   evidenceError?: string;
   networkCapture?: OracleNetworkCapture;
+  conversationCapture?: OracleConversationCapture;
 }
 
 function readJson(path: string): Record<string, unknown> {
@@ -58,11 +59,11 @@ export interface OracleNetworkCapture {
   readonly sessionId: string | null;
 }
 
-function readPrivateEvidenceBytes(path: string, limit: number): Buffer {
+function readPrivateEvidenceBytes(path: string, limit: number, requirePrivate = false): Buffer {
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size > limit) throw new Error('invalid evidence file');
+    if (!stat.isFile() || stat.size > limit || (requirePrivate && ((stat.mode & 0o077) !== 0 || (process.getuid && stat.uid !== process.getuid())))) throw new Error('invalid evidence file');
     const bytes = readFileSync(fd);
     if (bytes.length > limit) throw new Error('invalid evidence file');
     return bytes;
@@ -96,4 +97,28 @@ export function readOracleNetworkCapture(path: string, sessionId: string | undef
       || lines.slice(1, -1).some(line => line.event === 'capture_start' || line.event === 'capture_end')) throw new Error('invalid capture binding');
     return { ...basis, sessionId, status: last.status as 'captured' | 'empty' | 'incomplete' };
   } catch { return { ...basis, status: 'invalid' }; }
+}
+
+export interface OracleConversationCapture {
+  readonly status: 'captured' | 'missing' | 'invalid';
+  readonly sessionId: string | null;
+  readonly conversationId: string | null;
+  readonly sha256: string | null;
+  readonly history: unknown;
+}
+
+/** Only the invocation-owned path and completed session metadata can supply history. */
+export function readOracleConversationCapture(path: string, sessionId: string | undefined, oracleHome: string): OracleConversationCapture {
+  const invalid = (status: 'missing' | 'invalid'): OracleConversationCapture => ({status,sessionId:null,conversationId:null,sha256:null,history:null});
+  try {
+    const stat=lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || (process.getuid && stat.uid !== process.getuid())) return invalid('invalid');
+    const bytes=readPrivateEvidenceBytes(path, 12*1024*1024, true);
+    const value=JSON.parse(bytes.toString('utf8'));
+    if (!sessionId || value.protocol!==1 || value.kind!=='oracle-session-conversation-history' || value.sessionId!==sessionId) return invalid('invalid');
+    const meta=readJson(join(oracleHome,'sessions',sessionId,'meta.json'));
+    const runtime=(meta.browser as {runtime?:{conversationId?:string;promptSubmitted?:boolean}}|undefined)?.runtime;
+    if(meta.id!==sessionId || meta.status!=='completed' || runtime?.promptSubmitted!==true || value.history?.conversationId!==runtime.conversationId) return invalid('invalid');
+    return {status:'captured',sessionId,conversationId:runtime.conversationId!,sha256:'sha256:'+createHash('sha256').update(bytes).digest('hex'),history:value.history};
+  } catch(error) { return invalid((error as NodeJS.ErrnoException).code==='ENOENT'?'missing':'invalid'); }
 }

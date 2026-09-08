@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, truncateSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, truncateSync, chmodSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { readOracleSessionEvidence, readOracleNetworkCapture } from '../../src/cli/chatgpt-browser/oracle-session-evidence';
+import { readOracleSessionEvidence, readOracleNetworkCapture, readOracleConversationCapture } from '../../src/cli/chatgpt-browser/oracle-session-evidence';
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function fixture(overrides = {}) {
@@ -73,4 +73,18 @@ test('unexplained sequence gaps cannot use the byte-limit exception', () => {
   const records = [{ sequence: 1, event: 'capture_start', protocol: 1, kind: 'oracle-page-response-streams', sessionId: 'allocated-2', origin: 'https://chatgpt.com' }, { sequence: 3, event: 'capture_end', status: 'captured', streams: 1, reasons: [] }];
   writeFileSync(f.path, records.map(r => JSON.stringify(r)).join('\n'));
   expect(readOracleNetworkCapture(f.path, 'allocated-2', 'https://chatgpt.com').status).toBe('invalid');
+});
+
+test('history requires private invocation output and matching completed conversation',()=>{
+ const f=fixture(), path=join(f.root,'history.json'),metaPath=join(f.root,'sessions','allocated-2','meta.json');
+ const meta={id:'allocated-2',status:'completed',browser:{runtime:{promptSubmitted:true,conversationId:'conversation-one'}}};
+ writeFileSync(metaPath,JSON.stringify(meta));
+ writeFileSync(path,JSON.stringify({protocol:1,kind:'oracle-session-conversation-history',sessionId:'allocated-2',history:{conversationId:'conversation-one'}}),{mode:0o600});
+ expect(readOracleConversationCapture(path,'allocated-2',f.root).status).toBe('captured');
+ expect(readOracleConversationCapture(path,'other',f.root).status).toBe('invalid');
+ chmodSync(path,0o644);expect(readOracleConversationCapture(path,'allocated-2',f.root).status).toBe('invalid');chmodSync(path,0o600);
+ const link=join(f.root,'history-link');symlinkSync(path,link);expect(readOracleConversationCapture(link,'allocated-2',f.root).status).toBe('invalid');
+ writeFileSync(metaPath,JSON.stringify({...meta,browser:{runtime:{promptSubmitted:true,conversationId:'other'}}}));
+ expect(readOracleConversationCapture(path,'allocated-2',f.root).status).toBe('invalid');
+ expect(readOracleConversationCapture(join(f.root,'missing'),'allocated-2',f.root).status).toBe('missing');
 });

@@ -1,4 +1,4 @@
-import { readOracleSessionEvidence, readOracleNetworkCapture, type OracleSessionEvidence } from './oracle-session-evidence';
+import { readOracleSessionEvidence, readOracleNetworkCapture, readOracleConversationCapture, type OracleSessionEvidence } from './oracle-session-evidence';
 import { spawn, spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
@@ -232,11 +232,12 @@ function probeBrowserThinkingTime(binary: string): boolean {
  * is oracle's authoritative `--write-output` answer file (an internal managed path,
  * distinct from the user's repo-relative `--write-output` copy-out).
  */
-export function buildOracleCommand(input: BrowserConsultInput, answerPath?: string, sessionPath?: string, networkPath?: string): string[] {
+export function buildOracleCommand(input: BrowserConsultInput, answerPath?: string, sessionPath?: string, networkPath?: string, historyPath?: string): string[] {
   const args = ['--engine', 'browser', '--browser-archive', 'never', '--prompt', input.prompt];
   if (answerPath) args.push('--write-output', answerPath);
   if (sessionPath) args.push('--write-session', sessionPath);
   if (networkPath) args.push('--wait', '--write-network-evidence', networkPath);
+  if (historyPath) args.push('--wait', '--write-conversation-evidence', historyPath);
   if (input.providerSessionId) args.push('--followup', input.providerSessionId);
   if (input.model) args.push('--model', input.model, '--browser-model-strategy', 'select');
   else args.push('--browser-model-strategy', 'current');
@@ -602,7 +603,8 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
     const sessionPath = join(answerDir, 'session.json');
     const capturePath = input.captureNetworkEvidence === true
       ? join(mkdtempSync(join(oracleHomeDir, 'response-capture-')), 'streams.jsonl') : undefined;
-    const args = buildOracleCommand(providerInput, answerPath, sessionPath, capturePath);
+    const historyPath = input.captureConversationEvidence === true ? join(mkdtempSync(join(oracleHomeDir, 'history-capture-')), 'history.json') : undefined;
+    const args = buildOracleCommand(providerInput, answerPath, sessionPath, capturePath, historyPath);
     const command = [resolution.binary, ...args];
     const result = await runOracleProcess(resolution.binary, args, {
       cwd: runCwd,
@@ -616,6 +618,7 @@ export async function runOracleProvider(input: BrowserConsultInput, bundle: Prom
     const conversationUrl = extractConversationUrl(log);
     const evidence = readOracleSessionEvidence(sessionPath, oracleHomeDir, input.providerSessionId);
     const providerSessionId = evidence.providerSessionId;
+    if (historyPath) evidence.conversationCapture = readOracleConversationCapture(historyPath, providerSessionId, oracleHomeDir);
     if (capturePath) evidence.networkCapture = readOracleNetworkCapture(capturePath, providerSessionId, new URL(input.chatgptUrl ?? 'https://chatgpt.com/').origin);
 
     // Pre/at-start failures are safe to surface as failed; the prompt never landed.

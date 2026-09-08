@@ -1,9 +1,12 @@
+import { readCampaignRevisionEvidence } from '../../core/automation/campaign-revision-evidence';
+import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
 import { execFileSync } from 'child_process';
 import { canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
 import { automationDigest, type ProgramAuthorizationV1, type CampaignAutomationBudgetReservationV1 } from '../../core/automation/budget';
 import { assertCampaignCleanupReceipt, campaignCloseoutKey } from '../../core/automation/campaign-closeout';
 import {
   campaignGroupProgress,
+  campaignAuditAccepted,
   CampaignFreshAuditError,
   auditInvalid,
   sealCampaignGroupSnapshot,
@@ -13,7 +16,7 @@ import {
   sealCampaignFreshAuditObservation,
   validateCampaignFreshAuditObservation,
   type CampaignGroupSnapshotV1,
-  type CampaignFreshAuditObservationV1,
+  type CampaignFreshAuditObservationV2,
 } from '../../core/automation/campaign-fresh-audit';
 import type { IssueBatchIntentV1 } from '../../core/automation/issue-batch';
 import type { DevelopmentCampaignDefinitionV1, DevelopmentCampaignEventV1 } from '../../core/automation/development-campaign';
@@ -127,12 +130,13 @@ export function requireCampaignGroupTransition(
       if (buildCampaignGroupSnapshot(root, intent, env).snapshot_sha256 !== snapshot.snapshot_sha256)
         auditInvalid('audit snapshot is stale');
     } else {
-      const observation = readPlanningRecord<CampaignFreshAuditObservationV1>(root, intent, refs[0]!.slice(7));
+      const observation = readPlanningRecord<CampaignFreshAuditObservationV2>(root, intent, refs[0]!.slice(7));
       if (!observation) auditInvalid('fresh audit observation is missing');
       const snapshot = readCampaignAuditSnapshot(root, intent, observation.snapshot_sha256);
       validateCampaignFreshAuditObservation(observation, snapshot);
       if (observation.observation_sha256 !== refs[0]) auditInvalid('audit observation reference differs');
-      throw new CampaignFreshAuditError('campaign_audit_unverified', 'fresh audit has no trusted exact-version evidence');
+      if (buildCampaignGroupSnapshot(root, intent, env).snapshot_sha256 !== snapshot.snapshot_sha256) auditInvalid('audit snapshot is stale');
+      if (!campaignAuditAccepted(observation)) throw new CampaignFreshAuditError('campaign_audit_unverified', 'fresh audit is rejected or lacks trusted exact-version evidence');
     }
   }
 }
@@ -149,12 +153,12 @@ function requireAcceptedCampaignGroup(
   const intent = oneIntent(root, campaign.campaign_id, group),
     reference = accepted.evidence_refs[0]!;
   if (!/^sha256:[a-f0-9]{64}$/.test(reference)) auditInvalid('previous group audit reference is invalid');
-  const observation = readPlanningRecord<CampaignFreshAuditObservationV1>(root, intent, reference.slice(7));
+  const observation = readPlanningRecord<CampaignFreshAuditObservationV2>(root, intent, reference.slice(7));
   if (!observation) auditInvalid('previous group audit observation is missing');
   const snapshot = readCampaignAuditSnapshot(root, intent, observation.snapshot_sha256);
   validateCampaignFreshAuditObservation(observation, snapshot);
   if (observation.observation_sha256 !== reference) auditInvalid('previous group audit digest differs');
-  if (observation.disposition === 'unverified')
+  if (!campaignAuditAccepted(observation))
     throw new CampaignFreshAuditError('campaign_audit_unverified', 'previous group has no trusted fresh-audit revision evidence');
   return snapshot;
 }
@@ -196,7 +200,7 @@ export interface RunCampaignFreshAuditInput {
 }
 export interface AuditBrowserResult extends IssueAuthoringBrowserResult {
   readonly output?: string;
-  readonly meta: IssueAuthoringBrowserResult['meta'] & { readonly providerSessionId?: string; readonly oracle?: { readonly networkCapture?: unknown } };
+  readonly meta: IssueAuthoringBrowserResult['meta'] & { readonly providerSessionId?: string; readonly oracle?: { readonly networkCapture?: unknown; readonly conversationCapture?: unknown } };
 }
 export async function runCampaignFreshAudit(
   input: RunCampaignFreshAuditInput,
@@ -281,6 +285,7 @@ export async function runCampaignFreshAudit(
     chatgptApp: 'GitHub',
     requireSecretScan: true,
     captureNetworkEvidence: true,
+    captureConversationEvidence: true,
     gitleaksBin: input.gitleaks_bin,
     profileDir: binding.binding.profileDir,
     profileDirectory: binding.binding.profileDirectory!,
@@ -294,6 +299,7 @@ export async function runCampaignFreshAudit(
     browser_status: result.status,
     answer_sha256: messageSha256(raw),
     network_capture: result.meta.oracle?.networkCapture ?? null,
+    conversation_capture: result.meta.oracle?.conversationCapture ?? null,
     output: raw.length <= 2 * 1024 * 1024 ? raw : null,
   };
   withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, key('audit-answer', attemptKey), rawRecord));
@@ -302,7 +308,7 @@ export async function runCampaignFreshAudit(
       'campaign_audit_reconciliation_required',
       'audit provider is not terminal-completed; reservation retained',
     );
-  let observation: CampaignFreshAuditObservationV1;
+  let observation: CampaignFreshAuditObservationV2;
   try {
     if (raw.length > 2 * 1024 * 1024) auditInvalid('audit answer exceeds bound');
     if (
@@ -313,7 +319,14 @@ export async function runCampaignFreshAudit(
     )
       auditInvalid('audit reused an authoring session');
     const recommendation = parseCampaignAuditAnswer(raw, snapshot);
+    const browserSession=readCampaignBrowserSessionEvidence(result,{repoRoot:root,profileDir:binding.binding.profileDir,profileDirectory:binding.binding.profileDirectory!,sourceSessionId:null,parentProviderSessionId:null});
+    const revision=browserSession ? readCampaignRevisionEvidence(result.meta.oracle?.conversationCapture,{
+      providerSessionId:browserSession.provider_session_ref,connectorId:browserSession.plugin_id.slice(7),repository:snapshot.provider_repository,
+      ref:snapshot.target_ref,commit:snapshot.expected_final_main_sha,prompt,answer:raw,
+    }) : null;
     observation = sealCampaignFreshAuditObservation({
+      prompt_sha256:messageSha256(prompt),
+      revision_evidence:revision,
       snapshot_sha256: snapshot.snapshot_sha256,
       session_ref: result.sessionId,
       provider_session_ref: result.meta.providerSessionId ?? null,

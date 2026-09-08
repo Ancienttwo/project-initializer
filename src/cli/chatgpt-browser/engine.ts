@@ -453,6 +453,7 @@ export async function runBrowserConsult(input: BrowserConsultInput): Promise<Bro
         oracle: {
           observation: oracle.observation,
           networkCapture: oracle.networkCapture,
+          conversationCapture: oracle.conversationCapture,
           evidenceError: oracle.evidenceError,
           binary: oracle.oracleBinary,
           version: oracle.oracleVersion,

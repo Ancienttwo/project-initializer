@@ -2309,3 +2309,30 @@ test.each([0, 9])('fresh audit capture survives provider cleanup on exit %s', as
     } finally { rmSync(binDir, { recursive: true, force: true }); }
   });
 }, 20000);
+
+test('session history capture crosses provider cleanup with allocated identity', async () => {
+  await withAsyncRepo(async repoRoot => {
+    const binDir=mkdtempSync(join(tmpdir(),'history-oracle-'));
+    try {
+      const id='history-session', conversationId='fixture-conversation';
+      const metadata=JSON.stringify({id,status:'completed',browser:{runtime:{promptSubmitted:true,conversationId}}});
+      const history=JSON.stringify({protocol:1,kind:'oracle-session-conversation-history',sessionId:id,history:{conversationId}});
+      const oracleBin=writeFakeOracle(join(binDir,'oracle'),{body:[...sessionDescriptorFixture(id),
+        'OUT=""; HISTORY=""; PREV=""; WAIT=""',
+        'for a in "$@"; do',
+        'if [ "$PREV" = "--write-output" ]; then OUT="$a"; fi',
+        'if [ "$PREV" = "--write-conversation-evidence" ]; then HISTORY="$a"; fi',
+        'if [ "$a" = "--wait" ]; then WAIT="yes"; fi',
+        'if [ "$a" = "--model" ]; then exit 8; fi',
+        'PREV="$a"','done','[ "$WAIT" = "yes" ] || exit 7','umask 077',
+        `printf '%s\n' '${metadata}' > "$ORACLE_HOME_DIR/sessions/${id}/meta.json"`,
+        `printf '%s\n' '${history}' > "$HISTORY"`,
+        'printf "%s\n" "audit fixture" > "$OUT"',
+      ]});
+      const result=await runBrowserConsult({repoRoot,prompt:'fixture audit',provider:'oracle',oracleBin,captureConversationEvidence:true});
+      expect(result.status).toBe('completed');
+      expect(result.meta.oracle?.conversationCapture).toMatchObject({status:'captured',sessionId:id,conversationId});
+      expect(result.meta.model.verified).toBe(false);
+    }finally{rmSync(binDir,{recursive:true,force:true});}
+  });
+},20000);

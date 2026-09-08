@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+import historyFixture from '../fixtures/campaign-revision-evidence/history.json';
 import { test, expect, afterEach } from 'bun:test';
 import { execFileSync } from 'child_process';
 import { readFileSync, rmSync, writeFileSync } from 'fs';
@@ -218,3 +220,23 @@ test.each(['failed', 'recoverable'] as const)('audit retains exact %s attempt ca
   await expect(runCampaignFreshAudit(f.input, deps)).rejects.toThrow('do not repeat provider I/O');
   expect(calls).toBe(1); expect(JSON.stringify(readPlanningRecord(f.root, f.intent, answerKey))).toBe(JSON.stringify(record));
 }, 60000);
+
+test.each(['accepted','accepted_with_followups','rejected'])('verified provider history gates %s recommendation', async disposition => {
+  const f=await fixture(); const snapshot=buildCampaignGroupSnapshot(f.root,f.intent,f.env);
+  const result=await runCampaignFreshAudit(f.input,{readBinding:f.binding,consult:async input=>{
+    expect(input.captureConversationEvidence).toBe(true);
+    const output=JSON.stringify({protocol:1,disposition,observed_main_sha:snapshot.expected_final_main_sha,slots:['01','02'],findings:[]});
+    const history=structuredClone(historyFixture);
+    const body=JSON.parse(history.response.body.replaceAll('example/canary',snapshot.provider_repository).replaceAll('a'.repeat(40),snapshot.expected_final_main_sha));
+    body.messages[0].content.parts=['@GitHub '+input.prompt];body.messages[3].content.parts=[output];history.response.body=JSON.stringify(body);
+    history.response.decodedBodySha256=createHash('sha256').update(history.response.body).digest('hex');
+    return {sessionId:'audit-fresh-local',status:'completed' as const,output,meta:{status:'completed',sessionId:'audit-fresh-local',provider:'oracle',engine:'chatgpt-browser',repo:f.root,providerSessionId:'audit-fresh-provider',model:{verified:false},
+      browser:{transport:'copy_profile',profileDir:'/fixture/profile',profileDirectory:f.authorization.campaign!.chrome_profile_directory,chatgptApp:'GitHub'},
+      oracle:{observation:{source:'oracle-session-metadata',sessionId:'audit-fresh-provider',parentSessionId:null,appSelection:{status:'selected',app:'GitHub',source:'chatgpt-composer-pill',pluginId:'plugin:connector_76869538009648d5b282a4bb21c3d157',capturedAt:new Date().toISOString()}},
+        conversationCapture:{status:'captured',sessionId:'audit-fresh-provider',conversationId:history.conversationId,sha256:'sha256:'+'f'.repeat(64),history}}}};
+  }});
+  expect(result.observation.disposition).toBe(disposition);
+  const status=readDevelopmentCampaignStatus(f.root,f.intent.campaign_id,f.env);
+  const accept=()=>appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.intent.campaign_id,operation:'accept_group',expected_current_sha256:status.current.current_sha256,idempotency_key:'verified-accept',evidence_refs:[result.observation.observation_sha256],observed_at:new Date().toISOString(),env:f.env});
+  if(disposition==='rejected')expect(accept).toThrow('rejected');else expect(accept).not.toThrow();
+},60000);

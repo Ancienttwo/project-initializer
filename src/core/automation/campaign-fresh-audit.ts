@@ -1,3 +1,4 @@
+import type { CampaignRevisionEvidence } from './campaign-revision-evidence';
 import { canonicalMessageDigest } from '../messages/mechanics';
 import type { DevelopmentCampaignEventV1 } from './development-campaign';
 
@@ -151,63 +152,51 @@ export function parseCampaignAuditAnswer(raw: string, snapshot: CampaignGroupSna
   return decoded as CampaignAuditAnswerV1;
 }
 
-/** A provider answer observation, never a trusted revision receipt. */
-export interface CampaignFreshAuditObservationV1 {
-  readonly protocol: 1;
+/** Fresh audit result with separately verified provider revision provenance. */
+export interface CampaignFreshAuditObservationV2 {
+  readonly protocol: 2;
   readonly kind: 'repo-harness-campaign-fresh-audit-observation';
   readonly snapshot_sha256: string;
   readonly session_ref: string;
   readonly provider_session_ref: string | null;
+  readonly prompt_sha256: string;
   readonly answer_sha256: string;
   readonly recommendation: CampaignAuditAnswerV1;
-  readonly disposition: 'unverified';
-  readonly revision_evidence: 'unavailable';
+  readonly disposition: 'unverified' | CampaignAuditAnswerV1['disposition'];
+  readonly revision_evidence: CampaignRevisionEvidence | null;
   readonly observed_at: string;
   readonly observation_sha256: string;
 }
 export function sealCampaignFreshAuditObservation(
-  input: Omit<CampaignFreshAuditObservationV1, 'protocol' | 'kind' | 'disposition' | 'revision_evidence' | 'observation_sha256'>,
-): CampaignFreshAuditObservationV1 {
-  const basis = {
-    protocol: 1 as const,
-    kind: 'repo-harness-campaign-fresh-audit-observation' as const,
-    ...input,
-    disposition: 'unverified' as const,
-    revision_evidence: 'unavailable' as const,
-  };
-  return { ...basis, observation_sha256: canonicalMessageDigest(basis) };
+  input: Omit<CampaignFreshAuditObservationV2, 'protocol' | 'kind' | 'disposition' | 'observation_sha256'>,
+): CampaignFreshAuditObservationV2 {
+  const basis = {protocol:2 as const,kind:'repo-harness-campaign-fresh-audit-observation' as const,...input,
+    disposition: input.revision_evidence ? input.recommendation.disposition : 'unverified' as const};
+  return {...basis,observation_sha256:canonicalMessageDigest(basis)};
 }
-export function validateCampaignFreshAuditObservation(value: unknown, snapshot: CampaignGroupSnapshotV1): CampaignFreshAuditObservationV1 {
-  const r = exact(value, [
-    'protocol',
-    'kind',
-    'snapshot_sha256',
-    'session_ref',
-    'provider_session_ref',
-    'answer_sha256',
-    'recommendation',
-    'disposition',
-    'revision_evidence',
-    'observed_at',
-    'observation_sha256',
-  ]);
-  if (
-    r.protocol !== 1 ||
-    r.kind !== 'repo-harness-campaign-fresh-audit-observation' ||
-    r.snapshot_sha256 !== snapshot.snapshot_sha256 ||
-    !text(r.session_ref) ||
-    (r.provider_session_ref !== null && !text(r.provider_session_ref)) ||
-    !digest(r.answer_sha256) ||
-    r.disposition !== 'unverified' ||
-    r.revision_evidence !== 'unavailable' ||
-    typeof r.observed_at !== 'string' ||
-    !Number.isFinite(Date.parse(r.observed_at))
-  )
-    auditInvalid('audit observation binding is invalid');
-  parseCampaignAuditAnswer(JSON.stringify(r.recommendation), snapshot);
-  const { observation_sha256, ...basis } = r;
-  if (observation_sha256 !== canonicalMessageDigest(basis)) auditInvalid('audit observation digest differs');
-  return value as CampaignFreshAuditObservationV1;
+export function validateCampaignFreshAuditObservation(value: unknown, snapshot: CampaignGroupSnapshotV1): CampaignFreshAuditObservationV2 {
+  const r=exact(value,['protocol','kind','snapshot_sha256','session_ref','provider_session_ref','prompt_sha256','answer_sha256','recommendation','disposition','revision_evidence','observed_at','observation_sha256']);
+  if(r.protocol!==2 || r.kind!=='repo-harness-campaign-fresh-audit-observation' || r.snapshot_sha256!==snapshot.snapshot_sha256
+    || !text(r.session_ref) || (r.provider_session_ref!==null && !text(r.provider_session_ref)) || !digest(r.prompt_sha256) || !digest(r.answer_sha256)
+    || typeof r.observed_at!=='string' || !Number.isFinite(Date.parse(r.observed_at))) auditInvalid('audit observation binding is invalid');
+  const recommendation=parseCampaignAuditAnswer(JSON.stringify(r.recommendation),snapshot);
+  if(r.revision_evidence===null) { if(r.disposition!=='unverified')auditInvalid('missing revision evidence'); }
+  else {
+    const e=exact(r.revision_evidence,['protocol','kind','provider_session_ref','conversation_id','turn_id','connector_id','repository','ref','commit_sha','tree_sha','history_sha256','capture_sha256','prompt_sha256','answer_sha256','commit_message_id','ref_message_id','evidence_sha256']);
+    const {evidence_sha256,...basis}=e;
+    if(e.protocol!==1 || e.kind!=='repo-harness-campaign-revision-evidence' || evidence_sha256!==canonicalMessageDigest(basis)
+      || e.provider_session_ref!==r.provider_session_ref || !text(e.provider_session_ref) || !text(e.conversation_id) || !text(e.turn_id) || !text(e.connector_id)
+      || !text(e.commit_message_id) || !text(e.ref_message_id) || e.commit_message_id===e.ref_message_id || !oid(e.tree_sha)
+      || !digest(e.history_sha256) || !digest(e.capture_sha256) || e.prompt_sha256!==r.prompt_sha256 || e.answer_sha256!==r.answer_sha256
+      || e.repository!==snapshot.provider_repository || e.ref!==snapshot.target_ref || e.commit_sha!==snapshot.expected_final_main_sha
+      || recommendation.observed_main_sha!==e.commit_sha || r.disposition!==recommendation.disposition) auditInvalid('audit revision evidence differs');
+  }
+  const {observation_sha256,...basis}=r;
+  if(observation_sha256!==canonicalMessageDigest(basis))auditInvalid('audit observation digest differs');
+  return value as CampaignFreshAuditObservationV2;
+}
+export function campaignAuditAccepted(observation: CampaignFreshAuditObservationV2): boolean {
+  return observation.revision_evidence!==null && ['accepted','accepted_with_followups'].includes(observation.disposition);
 }
 
 /** Group identity is a deterministic projection of the canonical lifecycle. */

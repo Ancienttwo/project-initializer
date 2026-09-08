@@ -37,6 +37,7 @@ export interface IssueAuthoringBrowserInput {
   readonly chatgptApp: 'GitHub';
   readonly requireSecretScan: true;
   readonly captureNetworkEvidence?: true;
+  readonly captureConversationEvidence?: true;
   readonly gitleaksBin?: string;
   readonly profileDir: string;
   readonly profileDirectory: string;

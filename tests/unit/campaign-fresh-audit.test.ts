@@ -74,6 +74,7 @@ test('model SHA echo and accepted recommendation never create version authority'
   const s = snapshot(),
     raw = JSON.stringify({ protocol: 1, disposition: 'accepted', observed_main_sha: oid, slots: s.slots.map((r) => r.slot), findings: [] });
   const observation = sealCampaignFreshAuditObservation({
+    prompt_sha256: "sha256:"+"1".repeat(64), revision_evidence:null,
     snapshot_sha256: s.snapshot_sha256,
     session_ref: 'fresh',
     provider_session_ref: 'provider',
