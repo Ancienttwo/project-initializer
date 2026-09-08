@@ -90,7 +90,7 @@ test('operation updates require an open same-type lifecycle and terminal IDs can
     .toEqual(['agent_message', 'file_change']);
 });
 
-for (const role of ['worker', 'verifier'] as const) test(`runtime ${role} preparation refuses expired deadline and supervises a stuck version probe`, async () => {
+for (const role of ['worker', 'verifier'] as const) test(`runtime ${role} preparation refuses expired deadline and never falls back to host PATH`, async () => {
   const root = mkdtempSync(join(tmpdir(), 'brc-probe-')); roots.push(root);
   execFileSync('git', ['init', '-q', root]);
   mkdirSync(join(root, '.codex/agents'), { recursive: true });
@@ -104,17 +104,8 @@ for (const role of ['worker', 'verifier'] as const) test(`runtime ${role} prepar
     identity: { dispatch_id: 'sha256:' + 'a'.repeat(64), role, task_id: 'task', task_revision: 'revision', claim_id: 'claim', lease_generation: 1, binding_generation: 1 } };
   await expect(prepareCampaignCodexInvocation({ ...input, deadline_ms: 1 })).rejects.toThrow('deadline');
   expect(existsSync(marker)).toBe(false);
-  const invocation = await prepareCampaignCodexInvocation({ ...input, deadline_ms: Date.now() + 1000 });
-  const malformed = stream([start, { type: 'item.updated', item: { id: 'write', type: 'file_change', status: 'in_progress' } }, message, terminal]);
-  writeFileSync(join(root, 'out'), malformed); writeFileSync(join(root, 'err'), '');
-  const observation = observeCampaignCodexTerminal({ invocation, worktree: root, stdout_path: 'out', stderr_path: 'err', exit_code: 0,
-    output_complete: true, output_sha256: { stdout: `sha256:${createHash('sha256').update(malformed).digest('hex')}`, stderr: `sha256:${createHash('sha256').update('').digest('hex')}` },
-    process_group_quiescence: { scope: 'posix_process_group', state: 'quiescent' } });
-  expect(observation.state).toBe('unknown'); expect(observation.runtime_effect_inactive).toBeNull();
-  writeFileSync(executable, `#!${process.execPath}\nprocess.on('SIGTERM', () => {}); await Bun.sleep(10000);`);
-  const began = Date.now();
-  await expect(prepareCampaignCodexInvocation({ ...input, deadline_ms: began + 150 })).rejects.toThrow('probe failed');
-  expect(Date.now() - began).toBeLessThan(2000);
+  await expect(prepareCampaignCodexInvocation({ ...input, deadline_ms: Date.now() + 1000 })).rejects.toThrow('BRC_CAMPAIGN_IMAGE');
+  expect(existsSync(marker)).toBe(false);
 }, 5000);
 
 test('verifier rejection cannot retain a completed attempt disposition', async () => {

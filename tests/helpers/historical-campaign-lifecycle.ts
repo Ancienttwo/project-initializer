@@ -1,4 +1,8 @@
+import { campaignContainerJournalRoot } from '../../src/effects/automation/campaign-container';
 import { campaignSessionEvidence } from './campaign-browser-session';
+import { buildContainmentSpec, type CampaignContainer } from '../../src/core/automation/campaign-containment';
+import { resolveGitCommonDirectory } from '../../src/effects/git/common-directory';
+import { realpathSync } from 'fs';
 import { campaignAttemptOutcome } from '../../src/core/automation/campaign-runtime';
 import { reserveAutomationBudget } from '../../src/effects/automation/budget-store';
 import { recordTaskAutomationAttemptStart } from '../../src/effects/engineers/automation-attempt-store';
@@ -234,9 +238,48 @@ export function installHistoricalAttempt(f: Pick<Awaited<ReturnType<typeof histo
   return {reservation,request};
 }
 
+/** Modeled protected host facts for lifecycle unit tests; never production admission or Docker acceptance. */
+export async function prepareHistoricalCodexInvocation(input: Parameters<typeof import('../../src/effects/automation/campaign-runtime').prepareCampaignCodexInvocation>[0]): Promise<CampaignCodexInvocation> {
+  const worktree = realpathSync(input.worktree), common = resolveGitCommonDirectory(worktree);
+  const profile_ref = `.codex/agents/${input.identity.role === 'worker' ? 'fast-worker' : 'gatekeeper'}.toml`;
+  const bytes = readFileSync(join(input.repo_root, profile_ref)); const profile = Bun.TOML.parse(bytes.toString()) as Record<string, unknown>;
+  const prompt = readFileSync(join(worktree, input.prompt_path));
+  const sha = (v: string | Buffer) => `sha256:${createHash('sha256').update(v).digest('hex')}`;
+  const argv = ['exec', '--json', '--ephemeral', '--ignore-user-config', '--strict-config', '--sandbox', 'danger-full-access', '--model', String(profile.model), '-c', 'model_reasoning_effort="high"', '-c', 'developer_instructions="Fixture role"', prompt.toString()];
+  const image = 'sha256:' + 'c'.repeat(64);
+  const make = (probe: boolean): CampaignContainer => {
+    const directory = join(campaignContainerJournalRoot(), randomUUID()); mkdirSync(directory, { recursive: true });
+    const expected = buildContainmentSpec({ image, image_env: [], worktree, common, argv: ['/usr/local/bin/codex', ...(probe ? ['--version'] : argv)],
+      deadline: input.deadline_ms, uid: 1000, gid: 1000, writable: !probe && input.identity.role === 'worker', probe });
+    const request = { identity: probe ? { ...input.identity, phase: 'version' } : input.identity, deadline_ms: input.deadline_ms, expected, endpoint: 'unix:///modeled-fixture.sock', daemon_id: 'modeled-fixture' };
+    const request_sha256 = canonicalMessageDigest(request);
+    const handle: CampaignContainer = { protocol: 1, directory, endpoint: request.endpoint, daemon_id: request.daemon_id, image, container_id: sha(directory).slice(7), request_sha256, configuration_sha256: sha('modeled configuration') };
+    writeFileSync(join(directory, 'request.json'), JSON.stringify({ ...request, request_sha256 }));
+    writeFileSync(join(directory, 'created.json'), JSON.stringify(handle)); return handle;
+  };
+  const container = make(false), probeContainer = make(true);
+  const stdout = 'codex-cli 1.0.0\n';
+  const receipt_sha256 = modeledContainerTerminal(probeContainer, stdout, '', { exit_code: 0, output_complete: true, termination_cause: 'completed', started: true });
+  const body = { protocol: 2 as const, kind: 'repo-harness-campaign-codex-invocation' as const, identity: input.identity, executable: '/usr/local/bin/codex', executable_version: stdout.trim(),
+    container, probe: { container: probeContainer, receipt_sha256, stdout, stderr: '' }, deadline_ms: input.deadline_ms,
+    profile_ref, profile_sha256: sha(bytes), prompt_sha256: sha(prompt), model: String(profile.model), sandbox: 'danger-full-access' as const,
+    workspace_access: input.identity.role === 'worker' ? 'read-write' as const : 'read-only' as const, argv };
+  return { ...body, invocation_sha256: canonicalMessageDigest(body) };
+}
+export function modeledContainerTerminal(handle: CampaignContainer, stdout: string, stderr: string, observation: { exit_code: number | null; output_complete?: boolean; termination_cause?: string; started?: boolean }): string {
+  const body = { protocol: 1, handle, started: observation.started !== false, termination_cause: observation.termination_cause ?? 'completed', exit_code: observation.exit_code,
+    daemon_state: { Running: false, Pid: 0, Dead: false, Restarting: false, Status: 'exited' }, restart_count: 0, inactive: true,
+    output_complete: observation.output_complete === true, stdout_sha256: canonicalMessageDigest({ bytes: stdout }), stderr_sha256: canonicalMessageDigest({ bytes: stderr }) };
+  const receipt_sha256 = canonicalMessageDigest(body); writeFileSync(join(handle.directory, 'terminal.json'), JSON.stringify({ ...body, receipt_sha256 })); return receipt_sha256;
+}
+
 export function installHistoricalChild(f: Pick<Awaited<ReturnType<typeof historicalPlanningFixture>>, 'root' | 'intent' | 'authorization' | 'env'>, d: ReturnType<typeof installHistoricalBoundDispatch>, invocation: CampaignCodexInvocation, observation: CampaignWorkerChildObservation) {
   const dispatch=d.worker_handoff.dispatch_id; const role=observation.role;
   if(invocation.identity.dispatch_id!==dispatch || invocation.identity.claim_id!==d.envelope.claim_id || invocation.identity.role!==role) throw new Error('historical child identity differs');
+  const output = readFileSync(join(d.envelope.worktree_path, observation.stdout_path), 'utf8');
+  // The detached-host negative fixture deliberately has no container evidence.
+  if (!output.includes('command_execution')) observation = { ...observation, container_receipt_sha256: modeledContainerTerminal(invocation.container, output,
+    readFileSync(join(d.envelope.worktree_path, observation.stderr_path), 'utf8'), observation) };
   const terminal=observeCampaignCodexTerminal({invocation,worktree:d.envelope.worktree_path,...observation});
   persistPlanningRecord(f.root,f.intent,campaignRuntimeRecordKey(dispatch,role,'intent'),invocation);
   persistPlanningRecord(f.root,f.intent,campaignRuntimeRecordKey(dispatch,role,'started'),{invocation_sha256:invocation.invocation_sha256,identity:invocation.identity});
