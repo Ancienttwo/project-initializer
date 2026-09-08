@@ -50,8 +50,4 @@ export function requireCampaignActiveAdmission(repoRoot: string, candidate: Issu
     throw new CampaignPlanningError('human_attention_required',
       `trusted exact revision readback cannot admit active work: ${(error as Error).message}`);
   }
-  // The live worker still consumes worker-writable supervisor files (#354).
-  // Revision proof cannot authorize that execution path; terminal recovery bypasses this new-work gate.
-  throw new CampaignPlanningError('human_attention_required',
-    'independent supervision unavailable: active preparation and launch remain disabled');
 }

@@ -81,7 +81,7 @@ async function fixture(status: BrowserConsultResult['status'] = 'completed', max
   execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
   writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
-    development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: slotCount, maximum_parallel_tasks: 2 } },
+    context: { capability_source: 'archcontext' }, development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: 1, maximum_issues_per_group: slotCount, maximum_parallel_tasks: 2 } },
     external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: maxIssues, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } },
   })}\n`);
   mkdirSync(join(root, '.repo-harness'), { recursive: true });

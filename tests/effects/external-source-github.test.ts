@@ -71,6 +71,19 @@ describe('GitHub external-source adapter', () => {
     catch (error) { expect((error as GithubAdapterError).failure_class).toBe('rate_limit'); }
   });
 
+  test('constrains every collection page to the configured labels before downloading bodies', () => {
+    const calls: string[][] = [];
+    let page = 0;
+    fetchGithubIssues(policy, (args) => {
+      calls.push([...args]);
+      if (args[3] === 'repos/acme/widgets') return { stdout: JSON.stringify({ id: 101, full_name: 'acme/widgets', html_url: 'https://github.com/acme/widgets' }) };
+      expect(args).toContain('labels=ready');
+      return { stdout: JSON.stringify(page++ === 0 ? Array.from({ length: 100 }, (_, index) => ({ id: index + 1, number: index + 1, html_url: `https://github.com/acme/widgets/issues/${index + 1}`, state: 'open', title: 'selected', body: '', labels: [{ name: 'ready' }], assignees: [] })) : []) };
+    });
+    expect(calls).toHaveLength(3);
+    expect(calls.slice(1).every(args => args.includes('labels=ready'))).toBe(true);
+  });
+
   test('retains immutable repository identity across rename and rejects bounded failures', () => {
     const renamed = fetchGithubIssues(policy, runner([
       { id: 101, full_name: 'acme/renamed', html_url: 'https://github.com/acme/renamed' },

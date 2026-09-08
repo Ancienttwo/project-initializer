@@ -1,3 +1,4 @@
+import { buildCampaignRevisionReadInstruction } from '../../core/automation/campaign-revision-evidence';
 import { validateCampaignRevisionRequest, validateCampaignRevisionResult, revisionEvidenceForObservation, type CampaignRevisionResultV2 } from '../../core/automation/campaign-revision-observation';
 import { execFileSync } from 'child_process';
 import { readStoredProgramAuthorization } from './grant-store';
@@ -68,7 +69,8 @@ export async function runCampaignRevisionObservation(input: {
   const prompt = [
     'Perform a fresh read-only revision observation using the selected GitHub app. This is pre-active evidence collection, not a completed-group audit.',
     `Repository: ${policy.github.repository}. Target ref: ${authority.target_ref}. Requested exact commit: ${authority.target_revision}.`,
-    'Use GitHub to read the exact commit resource and the target branch ref resource. Return only one JSON object with observed_main_sha (the commit actually returned by the tool, or null) and summary (a string). Do not add markdown or citations to the final JSON. Do not echo the requested SHA as observed evidence; the controller verifies the original tool returns separately.',
+    buildCampaignRevisionReadInstruction(policy.github.repository, authority.target_ref, authority.target_revision),
+    'Return only one JSON object with observed_main_sha (the commit actually returned by the tool, or null) and summary (a string). Do not add markdown or citations to the final JSON. Do not echo the requested SHA as observed evidence; the controller verifies the original tool returns separately.',
     'Do not create, edit, close or reopen Issues. Do not change files, branches, PRs, labels or repository settings. Do not start any campaign group. The controller retains original tool transport separately and does not treat your answer as a version receipt.',
   ].join('\n\n');
   const request = {

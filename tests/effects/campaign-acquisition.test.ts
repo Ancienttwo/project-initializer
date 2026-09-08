@@ -94,3 +94,26 @@ test('real Engineer acquire-next skips a campaign with unavailable revision admi
   }
   expect(readLease(f.root, campaignTask).record).toBeNull();
 });
+test('verified revision admits a real acquisition and worker binding while missing image refuses preparation', async () => {
+  const f = await historicalPlanningFixture(false, false, undefined, true, {}, false, false, true); roots.push(f.root, f.home);
+  const result = runCampaignAcquisition(f.executeInput);
+  expect(result, JSON.stringify(result)).toHaveProperty('action', 'dispatch');
+  if (!('action' in result) || result.action !== 'dispatch') throw new Error('expected actual dispatch');
+  roots.push(result.envelope.worktree_path);
+  expect(() => validateFleetWorkEnvelope(f.root, result.envelope, f.env)).not.toThrow();
+  expect(() => validateClaimActorReceiptLive(f.root, result.receipt, result.envelope)).not.toThrow();
+  expect(runCampaignAcquisition(f.executeInput)).toEqual(result);
+  const { bindCampaignWorker } = await import('../../src/effects/automation/campaign-worker');
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  const before = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env);
+  expect(() => bindCampaignWorker({ selector: result.worker_handoff, worktree: result.envelope.worktree_path,
+    contract: result.envelope.plan.contract_path, worker_command: 'touch forbidden-worker', verifier_command: 'true', env: f.env }))
+    .toThrow('requires the supervised codex-exec provider');
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env)).toEqual(before);
+  const bound = bindCampaignWorker({ selector: result.worker_handoff, worktree: result.envelope.worktree_path,
+    contract: result.envelope.plan.contract_path, worker_command: 'worker', verifier_command: 'verifier', provider: 'codex-exec',
+    env: { ...f.env, BRC_CAMPAIGN_IMAGE: '' } });
+  expect(bound.replay).toBeNull();
+  await expect(bound.prepareChild('worker', 'prompt.md', Date.now() + 60000)).rejects.toThrow('BRC_CAMPAIGN_IMAGE');
+  expect(() => bound.beforeChild('worker', 'worker')).toThrow('invocation intent is missing');
+}, 60000);

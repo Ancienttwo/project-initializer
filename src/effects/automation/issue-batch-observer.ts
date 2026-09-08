@@ -129,7 +129,7 @@ function failedReceipt(input: ObserveIssueBatchInput, startedAt: string, complet
 }
 
 /**
- * Reads one complete provider snapshot under the policy frozen at the intent's
+ * Reads one complete label-scoped provider snapshot under the policy frozen at the intent's
  * target revision. A policy that selects individual issue numbers cannot prove
  * absence, duplicates, or unexpected issues, so it is never a batch snapshot.
  */

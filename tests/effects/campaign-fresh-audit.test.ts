@@ -86,6 +86,9 @@ test('fresh audit uses current default/GitHub, charges after authoring sealed, a
     consult: async (input: any) => {
       calls++;
       expect(input.chatgptApp).toBe('GitHub');
+      expect(input.prompt).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/commits/${git(f.root, ['rev-parse', 'HEAD'])}`);
+      expect(input.prompt).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/ref/${f.intent.target_ref.slice(5)}`);
+      expect(input.prompt).toContain('Use the GitHub fetch action');
       expect(input.captureNetworkEvidence).toBe(true);
       expect(input.model).toBeUndefined();
       expect(input.thinkingTime).toBeUndefined();
@@ -271,3 +274,74 @@ test.each([1,2,3].flatMap(groupCount => (['accepted','accepted_with_followups','
   await continueIssueBatchAuthoring({repo_root:f.root,campaign_id:f.intent.campaign_id,group_number:2,intent_sha256:started.intent.intent_sha256,source_session_ref:started.session.session_ref,operation:'fill_missing',requested_slots:['02'],dry_run:true,env:f.env},{readBinding:f.binding,followup:consult});
   expect(prompt).toContain('only for these missing slots: 02');
 },60000);
+
+test('three-group real-store sequence carries each final SHA and refuses Group 4', async () => {
+  const f = await fixture(true, 3);
+  let intent = f.intent;
+  const finals: string[] = [];
+  let calls = 0;
+  const transition = (operation: 'accept_group' | 'prepare_group' | 'start_group' | 'complete', group: number, evidence: string[] = []) => {
+    const current = readDevelopmentCampaignStatus(f.root, intent.campaign_id, f.env).current;
+    return appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: intent.campaign_id,
+      expected_current_sha256: current.current_sha256, operation, idempotency_key: `chain-${group}-${operation}`,
+      evidence_refs: evidence, observed_at: new Date().toISOString(), env: f.env });
+  };
+  for (const group of [1, 2, 3]) {
+    if (group > 1) {
+      transition('prepare_group', group);
+      const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: intent.campaign_id, group_number: group, env: f.env }, {
+        readBinding: f.binding, consult: async input => {
+          expect(input.prompt).toContain(`at commit ${finals[group - 2]}`);
+          const sessionId = `chain-author-${group}`;
+          return { sessionId, status: 'completed' as const, meta: campaignBrowserMetadata({ repoRoot: f.root, sessionId,
+            profileDir: input.profileDir, profileDirectory: input.profileDirectory }) };
+        },
+      });
+      intent = started.intent;
+      expect(intent.base_main_sha).toBe(finals[group - 2]);
+      transition('start_group', group);
+      // Synthetic adoption/cleanup only: this regression proves group sequencing, not live delivery.
+      const publication = installHistoricalAdoption({ ...f, intent, input: { ...f.input, group_number: group,
+        intent_sha256: intent.intent_sha256, sprint_path: 'plans/sprints/repair.sprint.md', publication_policy_path: 'plans/policies/publication.json' } });
+      git(f.root, ['merge', '--ff-only', publication.materialized_commit]);
+      const manifest = JSON.parse(git(f.root, ['show', `${publication.materialized_commit}:${publication.manifest_path}`]));
+      withCampaignPlanningLock(f.root, intent, () => {
+        for (const row of manifest.slots) persistPlanningRecord(f.root, intent, campaignCloseoutKey(row.task_id, 'complete'), {
+          protocol: 1, kind: 'repo-harness-campaign-cleanup', disposition: 'not_planned',
+          decision_sha256: canonicalMessageDigest({ group, task: row.task_id }), execution_topology: null,
+          task_id: row.task_id, task_revision: 'c'.repeat(64),
+        });
+      });
+    }
+    const snapshot = buildCampaignGroupSnapshot(f.root, intent, f.env);
+    finals.push(snapshot.expected_final_main_sha);
+    const result = await runCampaignFreshAudit({ ...f.input, group_number: group, intent_sha256: intent.intent_sha256, idempotency_key: `chain-audit-${group}` }, {
+      readBinding: f.binding, consult: async input => {
+        calls++;
+        const output = JSON.stringify({ protocol: 1, disposition: 'accepted', observed_main_sha: snapshot.expected_final_main_sha, slots: ['01', '02'], findings: [] });
+        const history = structuredClone(historyFixture);
+        const body = JSON.parse(history.response.body.replaceAll('example/canary', snapshot.provider_repository).replaceAll('a'.repeat(40), snapshot.expected_final_main_sha));
+        body.messages[0].content.parts = ['@GitHub ' + input.prompt]; body.messages[3].content.parts = [output];
+        history.response.body = JSON.stringify(body); history.response.decodedBodySha256 = createHash('sha256').update(history.response.body).digest('hex');
+        const sessionId = `chain-audit-${group}`, providerSessionId = `chain-provider-${group}`;
+        const meta = campaignBrowserMetadata({ repoRoot: f.root, sessionId, profileDir: input.profileDir, profileDirectory: input.profileDirectory });
+        return { sessionId, status: 'completed' as const, output, meta: { ...meta, providerSessionId,
+          oracle: { observation: { source: 'oracle-session-metadata', sessionId: providerSessionId, parentSessionId: null,
+            appSelection: { status: 'selected', app: 'GitHub', source: 'chatgpt-composer-pill', pluginId: 'plugin:connector_76869538009648d5b282a4bb21c3d157', capturedAt: new Date().toISOString() } },
+            conversationCapture: { status: 'captured', sessionId: providerSessionId, conversationId: history.conversationId, sha256: 'sha256:' + 'f'.repeat(64), history } } } };
+      },
+    });
+    expect(result.observation.disposition).toBe('accepted');
+    transition('accept_group', group, [result.observation.observation_sha256]);
+    if (group < 3) expect(() => transition('complete', group)).toThrow('all authorized groups');
+  }
+  expect(calls).toBe(3);
+  expect(new Set(finals).size).toBe(3);
+  expect(transition('complete', 3).current.state).toBe('completed');
+  expect(() => transition('prepare_group', 4)).toThrow();
+  const before = listIssueAuthoringSessions(f.root, intent.campaign_id, 3).length;
+  await expect(startIssueBatchAuthoring({ repo_root: f.root, campaign_id: intent.campaign_id, group_number: 4, env: f.env }, {
+    readBinding: f.binding, consult: async () => { throw new Error('Group 4 provider must not run'); },
+  })).rejects.toThrow();
+  expect(listIssueAuthoringSessions(f.root, intent.campaign_id, 3)).toHaveLength(before);
+}, 60000);

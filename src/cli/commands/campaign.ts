@@ -111,10 +111,11 @@ function groupNumber(value: string | undefined): number {
   return parsed;
 }
 
-export async function runCampaignAuthor(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly dryRun?: boolean; readonly gitleaksBin?: string }): Promise<void> {
+export async function runCampaignAuthor(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly dryRun?: boolean; readonly gitleaksBin?: string; readonly resumeFrom?: string }): Promise<void> {
   output(await startIssueBatchAuthoring({
     repo_root: raw.repo?.trim() || process.cwd(), campaign_id: required(raw.campaignId, '--campaign-id'),
     group_number: groupNumber(raw.groupNumber), dry_run: raw.dryRun === true, gitleaks_bin: raw.gitleaksBin?.trim(),
+    ...(raw.resumeFrom ? { resume_from: requestJson(raw.resumeFrom) } : {}),
   }, { readBinding: readBrowserBinding, consult: runBrowserConsult }));
 }
 
@@ -268,6 +269,7 @@ export function buildCampaignCommand(): Command {
     });
   command.command('author')
     .description('Persist an IssueBatchIntentV1, then open the GPT Pro authoring lane')
+    .option('--resume-from <path>', 'Explicit stopped-campaign source and exact existing Issue identities')
     .option('--repo <path>', 'Repository root', '.')
     .requiredOption('--campaign-id <id>', 'Development campaign id')
     .requiredOption('--group-number <number>', 'Authorized group number')
