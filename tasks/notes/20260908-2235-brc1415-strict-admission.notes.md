@@ -179,3 +179,7 @@ Baseline: PR 367 merged at 4893cf82021a7b8eabfde2ed9995b7cc6532bd9c; required CI
 > **Substantive Change SHA256**: `sha256:eb3cda39a71918c369b622cefa76396b0764b532a9b8ec1905a893d8f66e9602`
 
 Development regression: 63 tests, 260 assertions passed across revision decoding, observation and fresh audit.
+
+Integrated main e9794576 (architecture recovery and its locked archctx 0.5.8) after the first 14/14 run. Source transport delta remains unchanged; the generated projection conflict is resolved from main and regenerated through the canonical apply command. No Oracle files changed.
+
+> **Substantive Change SHA256**: `sha256:4d6709c9fea4824f69d2b69b1231005f768d5d546c06fcd2acd27f30e0f95589`

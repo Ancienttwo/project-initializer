@@ -224,7 +224,7 @@ exit_criteria:
     {
       "id": "task-sync",
       "kind": "command",
-      "command": "REPO_HARNESS_DIFF_BASE=4893cf82 REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh",
+      "command": "REPO_HARNESS_DIFF_BASE=e9794576 REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
