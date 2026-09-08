@@ -499,6 +499,7 @@ export function applyRepoHarnessRegistryBatch(
     readonly requireAdopted?: boolean;
     readonly bumpAuthorizationRevision?: boolean;
     readonly beforeCommit?: (authorizationRevision: number) => void;
+    readonly recordChanges?: (before: readonly RepoHarnessRegisteredRepo[], after: readonly RepoHarnessRegisteredRepo[]) => void;
     readonly onCommitFailure?: () => void;
   } = {},
 ): RepoHarnessRegistryBatchResult {
@@ -509,7 +510,7 @@ export function applyRepoHarnessRegistryBatch(
       const unadopted = canonicalEntries.find((entry) => !isRepoHarnessAdoptedPath(entry.repoRoot));
       if (unadopted) throw new Error(`repo is not repo-harness adopted: ${unadopted.repoRoot}`);
     }
-    const registry = readRegistryFile(registryPath);
+    const registry = opts.recordChanges ? readRepoHarnessRegistryStrictSnapshot({ env: opts.env }) : readRegistryFile(registryPath);
     const now = new Date().toISOString();
     let repos = dedupeRepos(registry.repos);
     let accessChanged = false;
@@ -535,6 +536,7 @@ export function applyRepoHarnessRegistryBatch(
     const changed = JSON.stringify(repos) !== JSON.stringify(dedupeRepos(registry.repos)) || revisionChanged;
     let prepared = false;
     try {
+      opts.recordChanges?.(registry.repos, repos);
       opts.beforeCommit?.(authorizationRevision);
       prepared = true;
       if (changed) writeRegistryFile(registryPath, repos, authorizationRevision);
@@ -631,4 +633,33 @@ export function setRepoHarnessAccessMode(
       authorizationRevision,
     };
   });
+}
+
+/** Restore only proven setup-owned rows while holding the registry's mutation lock. */
+export function restoreRepoHarnessRegistryEntries(
+  changes: readonly { before: RepoHarnessRegisteredRepo | null; installed: RepoHarnessRegisteredRepo }[],
+  opts: { env?: NodeJS.ProcessEnv; dryRun?: boolean } = {},
+): { restored: string[]; conflicts: string[] } {
+  const apply = () => {
+    const snapshot = readRepoHarnessRegistryStrictSnapshot({ env: opts.env });
+    let repos = [...snapshot.repos];
+    const restored: string[] = [], conflicts: string[] = [];
+    for (const entry of changes) {
+      strictRegistryEntry(entry.installed, 0);
+      if (entry.before) strictRegistryEntry(entry.before, 0);
+      if (entry.before && entry.before.path !== entry.installed.path) throw new Error('registry restore identity mismatch');
+      const current = repos.find((row) => row.path === entry.installed.path) ?? null;
+      const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      if (equal(current, entry.before)) { restored.push(entry.installed.path); continue; }
+      if (!equal(current, entry.installed)) { conflicts.push(entry.installed.path); continue; }
+      repos = repos.filter((row) => row.path !== entry.installed.path);
+      if (entry.before) repos.push(entry.before);
+      restored.push(entry.installed.path);
+    }
+    if (!opts.dryRun && JSON.stringify(repos) !== JSON.stringify(snapshot.repos)) {
+      writeRegistryFile(snapshot.registryPath, repos, snapshot.authorizationRevision + 1);
+    }
+    return { restored, conflicts };
+  };
+  return opts.dryRun ? apply() : withRegistryMutationLock(repoHarnessRegisteredReposPath(opts.env), apply);
 }

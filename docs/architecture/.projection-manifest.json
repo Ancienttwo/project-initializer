@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:ef2231a1deb56cba2ee06d0ffc2c2da4bb321ec9f529090bb65880408f81274f",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "79527ec512c343450c00c6a3a1d8abd80496aea2",
-    "worktreeDigest": "sha256:4c3c814a560151b0c17d6c6987738d35040d0ea6b548ca5a421287e49c7b1c85",
-    "sourceTreeDigest": "sha256:56883ff5be9da39cebdbe050a3f66ce02b48e42159475d7e9dba9d0b7b4329a2",
+    "baseHeadSha": "db0b2445c9604b3dccc0589ed7e09df98cae4a54",
+    "worktreeDigest": "sha256:33b627adabe3872ae7b3bc098739f2264ddf7cfe438b3b7b477d0c5c71c2deb7",
+    "sourceTreeDigest": "sha256:fc5573e870c88a4c1e210460b7d645a03756b378517b63c25b1257bbfaad889b",
     "modelDigest": "sha256:15fab52dfbb29756c50b746ce12dfb5e67461b828280d38dbfa8c3190e9eb272",
-    "codeGraphDigest": "sha256:ba5bddec354796948bb57c7f0bc507dff0feed01f1044d5a1a0ff520afc9337f",
-    "indexedWorktreeDigest": "sha256:6877248b15734adca188a525b7416404c599ddcda12ca7d2e5a955511fe9fb1b",
+    "codeGraphDigest": "sha256:20b29735ea49b2796cbcf4db954c0d77c4f146057bf8a1cccb3a562bb6ffee5c",
+    "indexedWorktreeDigest": "sha256:424e855236c9beff3e02fc66d998e600a031e0a33fb79ecfaa4f40b304cc10f4",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:86f7c1de356c66c72dc5227c69ae0ab22751f70b066b725fcd55f1fa37342da7"
+    "projectionInputDigest": "sha256:de22d05e15259c7d5f32f9044eba521b27f93c9046295b3c442d2904918c6366"
   },
-  "projectionDigest": "sha256:1481fc4c293ffbccd18b53d896959c9fe6348d02f5c684cfb49ad4f755705927",
+  "projectionDigest": "sha256:1a4c75ff30519d0739bbdd8cdbcc9f97d5b6fa4a3d2fd5466ebe6a78f5a33e94",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:15fab52dfbb29756c50b746ce12dfb5e67461b828280d38dbfa8c3190e9eb272",
-      "sourceTreeDigest": "sha256:56883ff5be9da39cebdbe050a3f66ce02b48e42159475d7e9dba9d0b7b4329a2",
+      "sourceTreeDigest": "sha256:fc5573e870c88a4c1e210460b7d645a03756b378517b63c25b1257bbfaad889b",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:1481fc4c293ffbccd18b53d896959c9fe6348d02f5c684cfb49ad4f755705927"
+      "projectionDigest": "sha256:1a4c75ff30519d0739bbdd8cdbcc9f97d5b6fa4a3d2fd5466ebe6a78f5a33e94"
     }
   },
-  "receiptDigest": "sha256:33791eb71e51ae6f3a0a2471a53c490e83bb4d07eb8ed2a7edef4377954dbc01",
+  "receiptDigest": "sha256:cd387861464ab9964cc9205e1d582e71575144779785a19974665da1eed77313",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -787,9 +787,9 @@
       "sourceDigest": "sha256:5c192000c887502bac2e9787d6ffb992e49a57f955b4e7b4655b7c01d18c6dd0",
       "outputDigest": "sha256:c831589b4ccffcbd58d0502102abfbecc01025326f7fa0f0e9ba60fc3dbd0cb4",
       "verifiedAgainst": {
-        "branch": "codex/user-config-uninstall",
-        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
-        "committedAt": "2026-09-08T23:13:52+08:00"
+        "branch": "codex/mcp-setup-uninstall",
+        "commit": "846a55813cf13e358d7be3052ca9f06473cb551c",
+        "committedAt": "2026-09-08T23:39:50+08:00"
       }
     },
     {
@@ -1047,9 +1047,9 @@
       "sourceDigest": "sha256:132d8cab10d94dc2d5add313cea2a2cfa120b63b2d180ff084f4d9a0fae044bf",
       "outputDigest": "sha256:49427c6729ca7883ed1d9f6f3b23ac6c4ed307748a6344c0e24a4bed00b701ce",
       "verifiedAgainst": {
-        "branch": "codex/user-config-uninstall",
-        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
-        "committedAt": "2026-09-08T23:13:52+08:00"
+        "branch": "codex/mcp-setup-uninstall",
+        "commit": "db0b2445c9604b3dccc0589ed7e09df98cae4a54",
+        "committedAt": "2026-09-09T00:07:21+08:00"
       }
     },
     {
@@ -1107,9 +1107,9 @@
       "sourceDigest": "sha256:98aca01f5972a801ccbed7b23063276724226233393bfd9d69dda2743eb9a26f",
       "outputDigest": "sha256:f77e33f1153051b1b06a584faf6bd25a8581694d6b6148650dc66c9160b0cf2c",
       "verifiedAgainst": {
-        "branch": "codex/architecture-runtime-closure",
-        "commit": "24a83be78db5caf28659be6a19c9118df4455ad8",
-        "committedAt": "2026-09-04T12:11:51+08:00"
+        "branch": "codex/mcp-setup-uninstall",
+        "commit": "846a55813cf13e358d7be3052ca9f06473cb551c",
+        "committedAt": "2026-09-08T23:39:50+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/user-config-uninstall",
-        "commit": "79527ec512c343450c00c6a3a1d8abd80496aea2",
-        "committedAt": "2026-09-08T23:13:52+08:00"
+        "branch": "codex/mcp-setup-uninstall",
+        "commit": "db0b2445c9604b3dccc0589ed7e09df98cae4a54",
+        "committedAt": "2026-09-09T00:07:21+08:00"
       }
     },
     {

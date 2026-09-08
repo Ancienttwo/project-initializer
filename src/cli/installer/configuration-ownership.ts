@@ -58,20 +58,20 @@ function jsonObject(raw: string): Record<string, any> {
 }
 
 function validSelector(path: string, selector: string): boolean {
-  if (path.endsWith('.toml')) return selector === 'default_mode_request_user_input' || selector === 'mcp_servers.codegraph';
+  if (path.endsWith('.toml')) return selector === 'default_mode_request_user_input' || selector === 'mcp_servers.codegraph' || selector === 'mcp_servers.repo_harness';
   return selector === 'mcpServers.codegraph' || selector === 'allowedTools.codegraph';
 }
 
 function tomlValue(raw: string, selector: string): unknown {
   const parsed = Bun.TOML.parse(raw) as Record<string, any>;
-  return selector === 'default_mode_request_user_input' ? parsed[selector] : parsed.mcp_servers?.codegraph;
+  return selector === 'default_mode_request_user_input' ? parsed[selector] : parsed.mcp_servers?.[selector.slice(12)];
 }
 
 function tomlSpan(raw: string, selector: string): { start: number; end: number } | null {
   if (tomlValue(raw, selector) === undefined) return null;
   const pattern = selector === 'default_mode_request_user_input'
     ? /^default_mode_request_user_input\s*=.*(?:\r?\n|$)/gm
-    : /^\[mcp_servers\.codegraph\][^\S\r\n]*(?:\r?\n|$)[\s\S]*?(?=^\s*\[|(?![\s\S]))/gm;
+    : new RegExp(`^\\[mcp_servers\\.${selector.slice(12)}\\][^\\S\\r\\n]*(?:\\r?\\n|$)[\\s\\S]*?(?=^\\s*\\[|(?![\\s\\S]))`, 'gm');
   const matches = [...raw.matchAll(pattern)];
   if (matches.length !== 1) throw new Error(`unsupported TOML spelling for ${selector}; preserving configuration`);
   const match = matches[0]!;
@@ -79,7 +79,7 @@ function tomlSpan(raw: string, selector: string): { start: number; end: number }
   const without = raw.slice(0, span.start) + raw.slice(span.end);
   const expected = Bun.TOML.parse(raw) as Record<string, any>;
   if (selector === 'default_mode_request_user_input') delete expected[selector];
-  else { delete expected.mcp_servers.codegraph; if (Object.keys(expected.mcp_servers).length === 0) delete expected.mcp_servers; }
+  else { delete expected.mcp_servers[selector.slice(12)]; if (Object.keys(expected.mcp_servers).length === 0) delete expected.mcp_servers; }
   if (!deepEqual(Bun.TOML.parse(without), expected)) throw new Error(`ambiguous TOML fragment ${selector}; preserving configuration`);
   return span;
 }
@@ -165,7 +165,7 @@ export function recordConfigurationChange(path: string, before: string, after: s
   assertConfigurationPath(path, env);
   const receipt = readConfigurationReceipt(env);
   if (receipt.pending && receipt.pending.id !== pendingId) throw new Error(`interrupted configuration transaction; preimage retained at ${configurationReceiptPath(env)}`);
-  const selectors = path.endsWith('.toml') ? ['default_mode_request_user_input', 'mcp_servers.codegraph'] : ['mcpServers.codegraph', 'allowedTools.codegraph'];
+  const selectors = path.endsWith('.toml') ? ['default_mode_request_user_input', 'mcp_servers.codegraph', 'mcp_servers.repo_harness'] : ['mcpServers.codegraph', 'allowedTools.codegraph'];
   for (const selector of selectors) {
     const previous = readConfigurationFragment(path, before, selector);
     const installed = readConfigurationFragment(path, after, selector);
@@ -217,7 +217,7 @@ export function withConfigurationMutation<T>(paths: readonly string[], env: Node
   });
   const id = randomUUID();
   receipt.pending = { id, before: before.flatMap(({ path, raw }) => (path.endsWith('.toml')
-    ? ['default_mode_request_user_input', 'mcp_servers.codegraph'] : ['mcpServers.codegraph', 'allowedTools.codegraph'])
+    ? ['default_mode_request_user_input', 'mcp_servers.codegraph', 'mcp_servers.repo_harness'] : ['mcpServers.codegraph', 'allowedTools.codegraph'])
     .map((selector) => ({ path, selector, value: readConfigurationFragment(path, raw, selector) }))) };
   saveConfigurationReceipt(receipt, env);
   const result = mutate();
