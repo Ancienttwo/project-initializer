@@ -79,9 +79,10 @@ allowed_paths:
   - tests/effects/campaign-revision-observation.test.ts
   - tests/unit/issue-282-automation-budget-store.test.ts
   - tests/unit/campaign-authoring-budget-prerequisite.test.ts
-  - tests/cli/campaign.test.ts
+  - tests/cli/development-campaign.test.ts
   - docs/researches/20260908-brc14-fresh-audit-runtime.md
   - plans/
+  - tasks/todos.md
   - tasks/contracts/20260908-1237-brc14-pre-active-observation.contract.md
   - tasks/reviews/20260908-1237-brc14-pre-active-observation.review.md
   - tasks/notes/20260908-1237-brc14-pre-active-observation.notes.md
@@ -153,7 +154,7 @@ exit_criteria:
     {
       "id": "focused",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/unit/issue-282-automation-budget-store.test.ts tests/unit/campaign-authoring-budget-prerequisite.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-fresh-audit.test.ts tests/cli/campaign.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/unit/issue-282-automation-budget-store.test.ts tests/unit/campaign-authoring-budget-prerequisite.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-fresh-audit.test.ts tests/cli/development-campaign.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",

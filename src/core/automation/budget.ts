@@ -1074,10 +1074,10 @@ const OUTCOMES: readonly AutomationOutcome[] = Object.freeze(['progress', 'no_pr
 
 export type CampaignAuthoringOperation = 'initial' | 'fill_missing' | 'edit_issue';
 export type CampaignCloseoutOperation = 'github_comment_attempt' | 'github_close_attempt' | 'git_ref_delete_attempt';
-export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'audit' | 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation;
+export type CampaignProviderOperation = CampaignAuthoringOperation | 'challenge' | 'audit' | 'observe_revision' | 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation;
 export function campaignProviderForOperation(operation: CampaignProviderOperation): 'github' | 'git' | 'gpt-pro' {
   switch (operation) {
-    case 'initial': case 'fill_missing': case 'edit_issue': case 'challenge': case 'audit': return 'gpt-pro';
+    case 'initial': case 'fill_missing': case 'edit_issue': case 'challenge': case 'audit': case 'observe_revision': return 'gpt-pro';
     case 'github_read': case 'github_comment': case 'github_close': case 'github_comment_attempt': case 'github_close_attempt': return 'github';
     case 'git_read': case 'git_ref_delete_attempt': return 'git';
     default: return invalid('unsupported campaign Provider operation');
@@ -1104,10 +1104,10 @@ interface CampaignReservationContextBase {
   readonly step_admission_sha256: string | null;
 }
 
-export type CampaignAutomationReservationContextV1 = CampaignReservationContextBase & (
+export type CampaignAutomationReservationContextV1 = (CampaignReservationContextBase & (
   | { readonly operation: CampaignAuthoringOperation | 'challenge' | 'audit' }
   | { readonly operation: 'git_read' | 'github_read' | 'github_comment' | 'github_close' | CampaignCloseoutOperation; readonly request_sha256: string }
-);
+)) | { readonly campaign_id: string; readonly group_number: 1; readonly intent_sha256: null; readonly step_admission_sha256: null; readonly operation: 'observe_revision'; readonly request_sha256: string };
 
 const CAMPAIGN_PROVIDER_OPERATIONS: readonly CampaignProviderOperation[] = Object.freeze([
   'initial',
@@ -1115,6 +1115,7 @@ const CAMPAIGN_PROVIDER_OPERATIONS: readonly CampaignProviderOperation[] = Objec
   'edit_issue',
   'challenge',
   'audit',
+  'observe_revision',
   'git_read',
   'github_read',
   'github_comment',
@@ -1128,6 +1129,11 @@ export function validateCampaignAutomationReservationContext(
   value: CampaignAutomationReservationContextV1,
 ): CampaignAutomationReservationContextV1 {
   if (value === null || typeof value !== 'object') invalid('campaign reservation context must be an object');
+  if (value.operation === 'observe_revision') {
+    const fields = ['campaign_id', 'group_number', 'intent_sha256', 'operation', 'request_sha256', 'step_admission_sha256'].sort();
+    if (JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(fields) || value.group_number !== 1 || value.intent_sha256 !== null || value.step_admission_sha256 !== null) invalid('revision observation requires first-group standalone request without an issue intent');
+    return Object.freeze({ campaign_id: assertIdentifier(value.campaign_id, 'campaign reservation campaign_id'), group_number: 1, intent_sha256: null, step_admission_sha256: null, operation: 'observe_revision', request_sha256: assertDigest(value.request_sha256, 'revision observation request digest') });
+  }
   const github = campaignProviderForOperation(value.operation) !== 'gpt-pro';
   const expected = ['campaign_id', 'group_number', 'intent_sha256', 'operation', 'step_admission_sha256', ...(github ? ['request_sha256'] : [])].sort();
   if (JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(expected)) invalid('campaign reservation context fields are invalid');
@@ -1568,7 +1574,7 @@ export function foldCampaignBudgetLedger(
     if (prior !== undefined && prior !== intent) invalid('campaign group is bound to a different intent');
     groupIntents.set(group, intent);
   };
-  for (const r of reservations) if (r.kind === CAMPAIGN_AUTOMATION_RESERVATION_KIND) bindIntent(r.campaign_context.group_number, r.campaign_context.intent_sha256);
+  for (const r of reservations) if (r.kind === CAMPAIGN_AUTOMATION_RESERVATION_KIND && r.campaign_context.operation !== 'observe_revision') bindIntent(r.campaign_context.group_number, r.campaign_context.intent_sha256);
   let active: CampaignBudgetStepAdmissionV1 | null = null;
   let steps = 0;
   let calls = 0;

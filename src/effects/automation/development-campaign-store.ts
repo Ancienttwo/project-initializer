@@ -1,3 +1,4 @@
+import { canonicalMessageBytes, canonicalMessageDigest } from '../../core/messages/mechanics';
 import { requireCampaignGroupTransition, resolveCampaignAuthorizedTarget } from './campaign-fresh-audit';
 import { requireCampaignCleanupComplete } from './campaign-planning-proof';
 import { constants, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeSync } from 'fs';
@@ -381,4 +382,26 @@ export function readDevelopmentCampaignStatus(repoRootInput: string, campaignId:
   if (!rebuilt.current) fail('campaign_conflict', 'development campaign has no event chain');
   assertCurrentProjection(value, rebuilt.current);
   return Object.freeze({ campaign, current: rebuilt.current, events: Object.freeze(rebuilt.events) });
+}
+
+/** Immutable bootstrap evidence uses the campaign store, before any group intent exists. */
+export function readCampaignRevisionRecord<T>(repoRoot: string, campaignId: string, name: 'request' | 'result'): T | null {
+  const value = paths(repoRoot, campaignId);
+  const path = join(value.campaign, `revision-${name}.json`);
+  if (!existsSync(path)) return null;
+  const dir = lstatSync(value.campaign);
+  if (!dir.isDirectory() || dir.isSymbolicLink()) fail('campaign_unsafe', 'unsafe revision observation directory');
+  const raw = regular(path).toString('utf8');
+  const envelope = JSON.parse(raw);
+  if (envelope.campaign_id !== campaignId || envelope.record_sha256 !== canonicalMessageDigest({ campaign_id: campaignId, record: envelope.record })
+    || raw !== `${canonicalMessageBytes(envelope)}\n`) fail('campaign_conflict', 'revision observation record identity differs');
+  return envelope.record as T;
+}
+export function persistCampaignRevisionRecord(repoRoot: string, campaignId: string, name: 'request' | 'result', record: unknown): void {
+  const value = paths(repoRoot, campaignId);
+  if (!existsSync(value.definition)) fail('campaign_not_found', 'revision observation requires existing campaign');
+  withExclusiveDirectoryLock(value.common, value.lock, () => {
+    const basis = { campaign_id: campaignId, record };
+    immutable(join(value.campaign, `revision-${name}.json`), Buffer.from(`${canonicalMessageBytes({ ...basis, record_sha256: canonicalMessageDigest(basis) })}\n`));
+  });
 }

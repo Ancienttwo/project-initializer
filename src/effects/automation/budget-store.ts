@@ -1472,7 +1472,7 @@ function campaignGroupLedger(
       && reservation.campaign_context.group_number === context.group_number
   ));
   for (const reservation of groupReservations) {
-    if (reservation.campaign_context.intent_sha256 !== context.intent_sha256) {
+    if (reservation.campaign_context.operation !== 'observe_revision' && context.operation !== 'observe_revision' && reservation.campaign_context.intent_sha256 !== context.intent_sha256) {
       fail('automation_budget_store_conflict', 'a campaign group is already bound to a different issue-batch intent');
     }
   }
@@ -1523,6 +1523,11 @@ function validateCampaignReservationAdmission(
   if (context === null) fail('automation_budget_store_invalid', 'a campaign provider invocation requires campaign reservation context');
   if (context.campaign_id !== campaign.campaign_id) fail('automation_budget_store_conflict', 'campaign reservation names a different campaign');
   if (context.group_number > campaign.group_count) fail('automation_budget_store_invalid', 'campaign reservation group_number exceeds the authorized group count');
+  if (context.operation === 'observe_revision') {
+    const reservations = jsonEntries(paths.reservations).map(entry => parse(readRaw(join(paths.reservations, entry), 'automation reservation'), validateAutomationReservation, 'automation reservation'));
+    if (reservations.some(r => r.kind === CAMPAIGN_AUTOMATION_RESERVATION_KIND)) fail('automation_budget_refused', 'revision observation must be the first campaign provider operation');
+    return context;
+  }
   const terminal = readCampaignTerminalOptional(paths, context.campaign_id, context.group_number);
   if (terminal !== null && terminal.intent_sha256 !== context.intent_sha256) {
     fail('automation_budget_store_conflict', 'a sealed campaign group is bound to a different issue-batch intent');
@@ -2004,6 +2009,22 @@ export function ensureCampaignAuthoringBudget(input: EnsureCampaignAuthoringBudg
     assertCampaignBudgetBinding(raced, authorization);
     return raced;
   }
+}
+
+/** Bootstrap observation shares the campaign ledger but has no authoring intent. */
+export function reserveCampaignRevisionObservationBudget(input: {
+  readonly repo_root: string; readonly automation_run_id: string; readonly expected_budget_sha256: string;
+  readonly campaign_id: string; readonly request_sha256: string; readonly env?: NodeJS.ProcessEnv;
+}): CampaignAuthoringBudgetAdmissionV1 {
+  const admission = reserveAutomationBudgetAdmission({
+    ...input, idempotency_key: input.request_sha256, original_idempotency_key: input.request_sha256,
+    reservation_kind: 'campaign', operation: 'provider_invocation', unit_kind: 'execute',
+    unit_id: `${input.campaign_id}:revision-observation`, attempt: 1, provider: 'gpt-pro',
+    campaign_context: { campaign_id: input.campaign_id, group_number: 1, intent_sha256: null,
+      step_admission_sha256: null, operation: 'observe_revision', request_sha256: input.request_sha256 },
+  });
+  if (admission.reservation.kind !== CAMPAIGN_AUTOMATION_RESERVATION_KIND) return fail('automation_budget_store_invalid', 'revision observation returned generic reservation');
+  return { reservation: admission.reservation, disposition: admission.disposition };
 }
 
 export interface ReserveCampaignAuthoringBudgetInput {
