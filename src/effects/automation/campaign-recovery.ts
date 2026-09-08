@@ -13,7 +13,7 @@ import { readLease, withTaskLock } from '../state/coordination-lease-store';
 import { readEngineerBindingStatus } from '../engineers/binding-store';
 import { readClaimActorReceipt, validateClaimActorReceiptLive } from '../engineers/claim-actor-store';
 import { readCampaignWorkerHandoff, settleInterruptedCampaignWorker, settleObservedCampaignFailure, settleRecoveredCampaignWorkerFinal, type CampaignWorkerChildObservation, type CampaignWorkerFinal } from './campaign-worker';
-import { observeCampaignCodexTerminal, reconcileCampaignCodexInvocation, observeCampaignCodexInterruption } from './campaign-runtime';
+import { observeCampaignCodexTerminal, reconcileCampaignCodexInvocation, observeCampaignCodexInterruption, reconcileCampaignCodexPreparation, observeCampaignCodexPreparationInterruption, type CampaignCodexPreparation } from './campaign-runtime';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
 
@@ -56,6 +56,18 @@ function observe(context: Context, owner: LeaseOwnerRecord): LeaseReclaimEvidenc
     const started = readPlanningRecord<{ invocation_sha256: string; identity: unknown }>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'started'));
     const terminal = readPlanningRecord<ReturnType<typeof observeCampaignCodexTerminal>>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'terminal'));
     const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation }>(root, intent, key(selector.dispatch_id, `child-${role}`));
+    const preparation = readPlanningRecord<CampaignCodexPreparation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparation'));
+    if (!started && preparation) {
+      try {
+        const identity = preparation.identity;
+        if (!retired || identity.dispatch_id !== selector.dispatch_id || identity.role !== role
+          || identity.claim_id !== work.claim_id || identity.lease_generation !== work.generation
+          || identity.task_id !== work.task_id || identity.task_revision !== work.task_revision
+          || identity.binding_generation !== handoff.acquired.offer.binding_generation) throw new Error('preparation identity differs');
+        const interruption = observeCampaignCodexPreparationInterruption(preparation, work.worktree_path);
+        return { role, inactive: true, invocation, started, terminal, interruption };
+      } catch { return { role, inactive: null, invocation, started, terminal }; }
+    }
     if (!started) return { role, inactive: retired && (!launch || launch.request.provider === 'codex-exec') ? true : null, invocation, started, terminal };
     if (!invocation || started.invocation_sha256 !== invocation.invocation_sha256 || !exact(started.identity, invocation.identity)
       || invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
@@ -183,23 +195,36 @@ export async function reconcileAndRecoverCampaignDispatch(input: Parameters<type
   const { root, intent, selector, handoff } = context;
   if (readPlanningRecord(root, intent, key(selector.dispatch_id, 'final'))) return recoverCampaignDispatch(input);
   const launch = readPlanningRecord<{ request: { provider?: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
-  if (launch?.request.provider !== 'codex-exec') return recoverCampaignDispatch(input);
-  // Preserve complete recorded failures; interruption observation is for lost child/terminal handoffs.
+  const preparations = (['worker', 'verifier'] as const).map(role => ({ role,
+    preparation: readPlanningRecord<CampaignCodexPreparation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'preparation')),
+    invocation: readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent')),
+  }));
+  if ((launch && launch.request.provider !== 'codex-exec')
+    || (!launch && (!preparations.some(p => p.preparation) || preparations.some(p => p.invocation)))) return recoverCampaignDispatch(input);
   if (settleObservedCampaignFailure(selector, input.env)) return recoverCampaignDispatch(input);
-  const invocations = (['worker', 'verifier'] as const).flatMap(role => {
-    const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
-    if (!invocation) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); return []; }
-    const work = handoff.acquired.envelope;
-    if (invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
-      || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
-      || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
-      || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation
-      || !Number.isSafeInteger(invocation.deadline_ms) || Date.now() < invocation.deadline_ms) throw new Error('reconciliation requires the original expired invocation');
-    return [invocation];
-  });
+  const work = handoff.acquired.envelope;
+  for (const { role, invocation, preparation } of preparations) {
+    const record = invocation ?? preparation;
+    if (!record) { if (role === 'worker') throw new Error('interrupted worker intent is missing'); continue; }
+    if (record.identity.dispatch_id !== selector.dispatch_id || record.identity.role !== role
+      || record.identity.claim_id !== work.claim_id || record.identity.lease_generation !== work.generation
+      || record.identity.task_id !== work.task_id || record.identity.task_revision !== work.task_revision
+      || record.identity.binding_generation !== handoff.acquired.offer.binding_generation
+      || !Number.isSafeInteger(record.deadline_ms) || Date.now() < record.deadline_ms) throw new Error('reconciliation requires the original expired invocation');
+  }
   retireCampaignDispatch(input);
-  for (const invocation of invocations) await reconcileCampaignCodexInvocation(invocation, handoff.acquired.envelope.worktree_path);
+  for (const { invocation, preparation } of preparations) {
+    if (invocation) await reconcileCampaignCodexInvocation(invocation, work.worktree_path);
+    else if (preparation) await reconcileCampaignCodexPreparation(preparation, work.worktree_path);
+  }
   assertRecoveryParent(context, input);
+  if (!launch) {
+    // A version probe/precreated workload has no execution reservation. Preserve
+    // the Claim and report interruption; do not invent a final or a budget charge.
+    const proofs = preparations.filter(p => p.preparation).map(p => observeCampaignCodexPreparationInterruption(p.preparation!, work.worktree_path));
+    return { envelope: work, receipt: handoff.acquired.receipt, final: null,
+      disposition: 'preparation_interrupted_reconciliation_required' as const, proofs };
+  }
   settleInterruptedCampaignWorker(selector, input.env);
   return recoverCampaignDispatch(input);
 }

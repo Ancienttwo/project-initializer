@@ -312,3 +312,110 @@ test.skipIf(!process.env.BRC_TEST_CONTAINER_IMAGE)('expired Docker handoff recon
     }
   }
 }, 40000);
+
+test('preparation without protected inactivity never authorizes reclaim', async () => {
+  const f = await acquired();
+  const work = f.envelope;
+  persistPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'preparation'), {
+    deadline_ms: Date.now() + 10000,
+    identity: { dispatch_id: f.input.selector.dispatch_id, role: 'worker', task_id: work.task_id,
+      task_revision: work.task_revision, claim_id: work.claim_id, lease_generation: work.generation,
+      binding_generation: f.historical.acquired.offer.binding_generation },
+  });
+  retireCampaignDispatch(f.input);
+  const receipt = observeCampaignReclaimEligibility({ ...f.input, now: () => new Date(Date.now() + 60000) });
+  expect(receipt.classification).not.toBe('reclaimable');
+  expect(readLease(f.root, work.task_id).record?.claim_id).toBe(work.claim_id);
+});
+
+for (const createdCount of [1, 2]) test.skipIf(!process.env.BRC_TEST_CONTAINER_IMAGE)(`prepareChild controller death after container ${createdCount} recovers original preparation without charge`, async () => {
+  const { reconcileAndRecoverCampaignDispatch } = await import('../../src/effects/automation/campaign-recovery');
+  const { campaignContainerDirectory } = await import('../../src/effects/automation/campaign-container');
+  const f = await acquired(); const env = { ...installProviderFixture(f), BRC_CAMPAIGN_IMAGE: process.env.BRC_TEST_CONTAINER_IMAGE! };
+  const worktree = f.envelope.worktree_path; writeFileSync(join(worktree, 'lost.prompt'), 'no model launch');
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env }).budget;
+  const before = readAutomationBudgetStatus(f.root, budget.automation_run_id, env).current;
+  const owner = readLease(f.root, f.envelope.task_id).record;
+  const input = { selector: f.input.selector, worktree, contract: f.envelope.plan.contract_path,
+    worker_command: 'codex-exec:worker', verifier_command: 'codex-exec:verifier', provider: 'codex-exec', env };
+  const deadline = Date.now() + 10000;
+  const identity = { dispatch_id: f.input.selector.dispatch_id, role: 'worker', task_id: f.envelope.task_id,
+    task_revision: f.envelope.task_revision, claim_id: f.envelope.claim_id, lease_generation: f.envelope.generation,
+    binding_generation: f.historical.acquired.offer.binding_generation };
+  const directories = [{ ...identity, phase: 'version' }, identity].map(i => campaignContainerDirectory(join(f.root, '.git'), i));
+  // A disposable historical fixture bypasses admission only in this subprocess;
+  // the actual runtime, journal publication and consumer remain unmocked.
+  const code = `import * as fs from 'fs'; import { mock } from 'bun:test';
+    const link=fs.linkSync;let created=0;
+    mock.module('fs',()=>({...fs,linkSync(from,to){link(from,to);if(String(to).endsWith('/created.json')&&++created===${createdCount})process.kill(process.pid,'SIGKILL')}}));
+    mock.module(${JSON.stringify(join(import.meta.dir, '../../src/effects/automation/campaign-revision-admission'))},()=>({requireCampaignActiveAdmission(){}}));
+    const {bindCampaignWorker}=await import(${JSON.stringify(join(import.meta.dir, '../../src/effects/automation/campaign-worker'))});
+    await bindCampaignWorker(${JSON.stringify(input)}).prepareChild('worker','lost.prompt',${deadline});`;
+  const child = Bun.spawn([process.execPath, '-e', code], { env: { ...process.env }, stdout: 'ignore', stderr: 'pipe' });
+  const timer = setTimeout(() => child.kill('SIGKILL'), 15000);
+  try {
+    expect(await child.exited, await new Response(child.stderr).text()).toBe(137);
+    clearTimeout(timer);
+    expect(readPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'preparation'))).not.toBeNull();
+    expect(readPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'intent'))).toBeNull();
+    await expect(reconcileAndRecoverCampaignDispatch({ ...f.input, env })).rejects.toThrow('expired');
+    while (Date.now() <= deadline) await Bun.sleep(20);
+    const result = await reconcileAndRecoverCampaignDispatch({ ...f.input, env });
+    expect(result.disposition).toBe('preparation_interrupted_reconciliation_required');
+    expect(result.final).toBeNull();
+    expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, env).current).toEqual(before);
+    expect(readLease(f.root, f.envelope.task_id).record).toEqual(owner);
+    expect(await reconcileAndRecoverCampaignDispatch({ ...f.input, env })).toEqual(result);
+    expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, env).current).toEqual(before);
+  } finally {
+    clearTimeout(timer); child.kill('SIGKILL'); await child.exited;
+    for (const directory of directories) {
+      if (existsSync(join(directory, 'request.json'))) {
+        const request = JSON.parse(readFileSync(join(directory, 'request.json'), 'utf8'));
+        expect(Bun.spawnSync(['docker', '--host', request.endpoint, 'rm', '-f', request.name], { timeout: 5000 }).exitCode).toBe(0);
+      }
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+}, 30000);
+
+test.skipIf(!process.env.BRC_TEST_CONTAINER_IMAGE)('verifier preparation interruption settles the existing attempt once', async () => {
+  const { prepareCampaignCodexInvocation } = await import('../../src/effects/automation/campaign-runtime');
+  const { reconcileAndRecoverCampaignDispatch } = await import('../../src/effects/automation/campaign-recovery');
+  const f = await acquired(); const env = { ...installProviderFixture(f), BRC_CAMPAIGN_IMAGE: process.env.BRC_TEST_CONTAINER_IMAGE! };
+  const attempt = installHistoricalAttempt(f, f.historical); const worktree = f.envelope.worktree_path;
+  writeFileSync(join(worktree, 'lost.prompt'), 'fixture never started');
+  const invocation = await prepareCampaignCodexInvocation({ repo_root: f.root, worktree, prompt_path: 'lost.prompt', env, deadline_ms: Date.now() + 10000,
+    identity: { dispatch_id: f.input.selector.dispatch_id, role: 'worker', task_id: f.envelope.task_id, task_revision: f.envelope.task_revision,
+      claim_id: f.envelope.claim_id, lease_generation: f.envelope.generation, binding_generation: f.historical.acquired.offer.binding_generation } });
+  const verifier = await prepareCampaignCodexInvocation({ repo_root: f.root, worktree, prompt_path: 'lost.prompt', env,
+    deadline_ms: invocation.deadline_ms, identity: { ...invocation.identity, role: 'verifier' } });
+  persistPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'verifier', 'preparation'), {
+    identity: verifier.identity, deadline_ms: verifier.deadline_ms,
+  });
+  try {
+    persistPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'intent'), invocation);
+    persistPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.input.selector.dispatch_id, 'worker', 'started'), { invocation_sha256: invocation.invocation_sha256, identity: invocation.identity });
+    await expect(reconcileAndRecoverCampaignDispatch({ ...f.input, env })).rejects.toThrow('expired invocation');
+    const owner = readLease(f.root, f.envelope.task_id).record;
+    while (Date.now() < invocation.deadline_ms + 100) await Bun.sleep(20);
+    const result = await reconcileAndRecoverCampaignDispatch({ ...f.input, env });
+    expect(result.disposition).toBe('controller_interrupted_reconciliation_required');
+    expect(result.final!.outcome).toBe('reconciliation_required');
+    expect(result.final!.contract_run.status).toBe('fail');
+    expect(readLease(f.root, f.envelope.task_id).record).toEqual(owner);
+    const budget = readAutomationBudgetStatus(f.root, attempt.reservation.automation_run_id, f.env).current;
+    expect(budget.open_reservation_sha256s).toHaveLength(0);
+    expect(await reconcileAndRecoverCampaignDispatch({ ...f.input, env })).toEqual(result);
+    expect(readAutomationBudgetStatus(f.root, attempt.reservation.automation_run_id, f.env).current).toEqual(budget);
+    expect(readLease(f.root, f.envelope.task_id).record).toEqual(owner);
+    const observation = JSON.parse(readFileSync(join(invocation.container.directory, 'interrupted.json'), 'utf8'));
+    expect(observation.output_complete).toBe(false);
+    expect(existsSync(join(invocation.container.directory, 'start.json'))).toBe(false);
+    expect(existsSync(join(invocation.container.directory, 'terminal.json'))).toBe(false);
+  } finally {
+    for (const handle of [invocation.container, invocation.probe.container, verifier.container, verifier.probe.container]) {
+      expect(Bun.spawnSync(['docker', '--host', handle.endpoint, 'rm', '-f', handle.container_id], { timeout: 5000 }).exitCode).toBe(0);
+    }
+  }
+}, 40000);
