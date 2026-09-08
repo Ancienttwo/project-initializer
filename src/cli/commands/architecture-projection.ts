@@ -60,7 +60,7 @@ export function buildArchitectureProjectionCommand(): Command {
           if (!cascade.ok) throw new Error(cascade.error);
         }, { deadlineMs, nowMs: Date.now });
       } else if (result.acknowledgeSourceEvents && changedSet.headSha !== null) {
-        advanceArchitectureDriftCursor(root, changedSet.headSha);
+        advanceArchitectureDriftCursor(root, changedSet.headSha, changedSet.cursorSha);
       }
       write({ ...result, sourceJournalPending: readPendingPostEditEvents(root).length });
       if (result.status === 'reconcile-pending' || result.status === 'retry-pending' || result.status === 'dead-letter') process.exitCode = 1;

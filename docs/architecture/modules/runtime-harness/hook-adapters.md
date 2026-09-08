@@ -266,8 +266,21 @@ does not inspect legacy command shapes, so there is no dual-read path.
   The Git cursor advances only to the frozen batch HEAD once all paths finish;
   commits arriving during delivery remain in the next range. Pending working-tree
   edits are observed again by the next Stop. Malformed batch state fails closed,
-  and a separately acknowledged cursor supersedes a stale batch rather than being
-  rewound. A crash between an effect and its offset write may repeat that path:
+  and historical paths are validated lexically, independent of the current target
+  of completed paths. Each unfinished path must still resolve to its frozen name
+  inside the repository immediately before delivery; retargeted or unsafe paths
+  retain their offset and fail closed. All cursor writers (legacy, Stop, CLI and
+  publication acknowledgement) use the same directory lock and expected-cursor
+  comparison. Publication proof validation runs inside that transaction; the
+  legacy holder uses the private held-lock writer rather than acquiring twice.
+  An external cursor acknowledgement does not prove coverage of an old suffix:
+  legacy recovery finishes that suffix first, preserves the external cursor,
+  and observes its new range on the following window. A provider mode switch
+  retains the legacy batch; only legacy delivery acknowledges its offsets.
+  Stale empty locks from creation/release crashes use the existing identity-
+  checked recovery protocol; fresh empty directories and live owners remain
+  protected. This does not introduce a power-loss/fsync durability guarantee.
+  A crash between an effect and its offset write may repeat that path:
   delivery is at least once. Subprocess cost still limits throughput, but a finite
   backlog whose individual cascades fit the budget makes progress across Stops.
   A missing or unresolvable cursor re-anchors at HEAD,

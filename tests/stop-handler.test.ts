@@ -177,7 +177,7 @@ describe('runStopHandler', () => {
     expect(freshnessOnly.stdout).not.toContain('Strict projection failure gate blocked Stop');
 
     const strictRoot = fixture();
-    writeFileSync(join(strictRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_version":"0.5.7","projection_failure_gate":"strict"}}\n');
+    writeFileSync(join(strictRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_version":"0.5.8","projection_failure_gate":"strict"}}\n');
     const strict = runStopHandler({ collector: collector(strictRoot, () => canonicalState()), dependencies: { drainArchitectureProjection: failedDrain } });
     expect(strict.exitCode).toBe(0);
     expect(JSON.parse(strict.stdout).decision).toBe('block');
@@ -190,7 +190,7 @@ describe('runStopHandler', () => {
     expect(deadLetter.stdout).toContain('retry-dead-letter --job-id job-test --json');
 
     const invalidGateRoot = fixture();
-    writeFileSync(join(invalidGateRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_version":"0.5.7","projection_failure_gate":"block"}}\n');
+    writeFileSync(join(invalidGateRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_version":"0.5.8","projection_failure_gate":"block"}}\n');
     const invalidGate = runStopHandler({ collector: collector(invalidGateRoot, () => canonicalState()), dependencies: { drainArchitectureProjection: failedDrain } });
     expect(invalidGate.stdout).toContain('Strict projection failure gate blocked Stop');
     expect(invalidGate.stdout).toContain('projection policy invalid');
@@ -407,7 +407,7 @@ describe('runStopHandler', () => {
   test('retains a committed drift range when the disabled-provider cascade runner is unavailable', () => {
     const { cwd, head: anchor } = gitFixture();
     writeFileSync(join(cwd, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
     writeFileSync(join(cwd, 'committed-only.ts'), 'export const committed = true;\n');
     git(cwd, ['add', 'committed-only.ts']);
     git(cwd, ['commit', '-m', 'committed drift']);
@@ -427,7 +427,7 @@ describe('runStopHandler', () => {
   test('retains a committed drift range when a request-triggered cascade follow-up fails', () => {
     const { cwd, head: anchor } = gitFixture();
     writeFileSync(join(cwd, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
     writeFileSync(join(cwd, 'follow-up-failure.ts'), 'export const followUp = true;\n');
     git(cwd, ['add', 'follow-up-failure.ts']);
     git(cwd, ['commit', '-m', 'follow-up drift']);
@@ -500,7 +500,7 @@ describe('runStopHandler', () => {
 
     // The commit above already landed, so only a cursor at the earlier anchor
     // proves the commit range is part of the changed set.
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
 
     const result = runStopHandler({
       collector: collector(cwd, () => canonicalState()),
@@ -520,7 +520,7 @@ describe('runStopHandler', () => {
 
   test('resumes completed cascade paths across Stop deadlines and preserves newer commits', () => {
     const { cwd, head: anchor } = gitFixture();
-    advanceArchitectureDriftCursor(cwd, anchor);
+    advanceArchitectureDriftCursor(cwd, anchor, null);
     const paths = ['a.test.ts', 'b.test.ts', 'z-source.ts'];
     for (const path of paths) writeFileSync(join(cwd, path), 'export const value = 1;\n');
     git(cwd, ['add', '-A']);
@@ -557,7 +557,7 @@ describe('runStopHandler', () => {
 
   test('bounds a slow cascade child and retains the unacknowledged drift range', () => {
     const { cwd, head } = gitFixture();
-    advanceArchitectureDriftCursor(cwd, head);
+    advanceArchitectureDriftCursor(cwd, head, null);
     writeFileSync(join(cwd, 'slow.ts'), 'export const slow = true;\n');
     git(cwd, ['add', 'slow.ts']);
     git(cwd, ['commit', '-m', 'change']);

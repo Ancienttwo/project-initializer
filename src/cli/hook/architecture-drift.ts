@@ -22,8 +22,8 @@
  */
 import { execFileSync } from 'child_process';
 import { createHash, randomUUID } from 'crypto';
-import { mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
+import { readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { join, posix, win32 } from 'path';
 import { canonicalRepoRelativePath } from '../../effects/state/collect-state-inputs';
 import { withExclusiveDirectoryLock } from '../../effects/locking/exclusive-directory-lock';
 import type { ArchitectureProjectionSourceEvent } from '../../effects/architecture/projection-orchestrator';
@@ -90,14 +90,33 @@ export function readArchitectureDriftCursor(repoRoot: string): ArchitectureDrift
   }
 }
 
-/** Called only on an acknowledged drain/cascade outcome -- see module doc. */
-export function advanceArchitectureDriftCursor(repoRoot: string, headSha: string, now: Date = new Date()): void {
+const CURSOR_LOCK_PATH = '.ai/harness/state/architecture-drift-cascade.lock';
+const CURSOR_LOCK_OPTIONS = { waitTimeoutMs: 50, reclaimStaleOwner: true, reclaimStaleEmptyDirectory: true } as const;
+
+/** All cursor writers share the cascade transaction and its observed cursor. */
+export function advanceArchitectureDriftCursor(
+  repoRoot: string, headSha: string, expectedCursorSha: string | null, now: Date = new Date(),
+): void {
+  withExclusiveDirectoryLock(realpathSync(repoRoot), CURSOR_LOCK_PATH, () => {
+    writeArchitectureDriftCursorLocked(repoRoot, headSha, expectedCursorSha, now);
+  }, CURSOR_LOCK_OPTIONS);
+}
+
+function writeArchitectureDriftCursorLocked(
+  repoRoot: string, headSha: string, expectedCursorSha: string | null, now: Date,
+): void {
+  if ((readArchitectureDriftCursor(repoRoot)?.head_sha ?? null) !== expectedCursorSha) {
+    throw new Error('architecture drift cursor changed; refusing stale acknowledgement');
+  }
   const target = join(repoRoot, CURSOR_RELATIVE_PATH);
-  mkdirSync(dirname(target), { recursive: true });
-  const temp = `${target}.tmp-${process.pid}-${Date.now()}`;
+  const temp = `${target}.tmp-${randomUUID()}`;
   const state: ArchitectureDriftCursorState = { version: 1, head_sha: headSha, updated_at: now.toISOString() };
-  writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
-  renameSync(temp, target);
+  writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+  try { renameSync(temp, target); } finally {
+    try { unlinkSync(temp); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
 }
 
 interface ArchitectureCascadeBatch {
@@ -122,7 +141,8 @@ function readCascadeBatch(repoRoot: string): ArchitectureCascadeBatch | null {
   const sha = (value: unknown) => value === null || (typeof value === 'string' && /^[0-9a-f]{40,64}$/.test(value));
   if (!batch || batch.version !== 1 || !sha(batch.cursorSha) || !sha(batch.headSha)
     || !Array.isArray(batch.paths) || !batch.paths.every((path) => typeof path === 'string'
-      && path.length > 0 && !path.includes('\0') && canonicalRepoRelativePath(repoRoot, path) === path)
+      && path.length > 0 && !/[\0\r\n\\]/.test(path) && !posix.isAbsolute(path)
+      && win32.parse(path).root === '' && path.split('/').every((part) => part !== '' && part !== '.' && part !== '..'))
     || !Number.isSafeInteger(batch.completed) || batch.completed! < 0 || batch.completed! > batch.paths.length) {
     throw new Error('invalid architecture drift cascade batch; retained for operator repair');
   }
@@ -143,13 +163,13 @@ export function drainArchitectureDriftCascade(
 ): void {
   const remaining = budget.deadlineMs - budget.nowMs();
   if (remaining <= 0) throw new Error('legacy architecture cascade deadline exhausted; drift retained for retry');
-  withExclusiveDirectoryLock(realpathSync(repoRoot), '.ai/harness/state/architecture-drift-cascade.lock', () => {
+  withExclusiveDirectoryLock(realpathSync(repoRoot), CURSOR_LOCK_PATH, () => {
     const cursorSha = readArchitectureDriftCursor(repoRoot)?.head_sha ?? null;
     if (cursorSha !== changedSet.cursorSha) throw new Error('architecture drift cursor changed before cascade; retry with a fresh changed set');
     const previous = readCascadeBatch(repoRoot);
-    // A different acknowledged cursor (for example, an archctx publication)
-    // supersedes the old batch. Never move that cursor back to its old HEAD.
-    let batch: ArchitectureCascadeBatch = previous?.cursorSha === cursorSha ? previous : {
+    // A cursor acknowledgement is not proof that the old suffix was consumed.
+    // Finish the frozen batch first, without rewinding an externally advanced cursor.
+    let batch: ArchitectureCascadeBatch = previous ?? {
       version: 1, cursorSha, headSha: changedSet.headSha, paths: changedSet.paths, completed: 0,
     };
     const target = join(repoRoot, CASCADE_BATCH_PATH);
@@ -165,16 +185,22 @@ export function drainArchitectureDriftCascade(
     save();
     for (let index = batch.completed; index < batch.paths.length; index += 1) {
       if (budget.nowMs() >= budget.deadlineMs) throw new Error(`legacy architecture cascade deadline exhausted before ${batch.paths[index]}; drift retained for retry`);
-      processPath(batch.paths[index]!);
+      const path = batch.paths[index]!;
+      if (canonicalRepoRelativePath(repoRoot, path) !== path) {
+        throw new Error(`unsafe or retargeted architecture drift path: ${path}; drift retained for retry`);
+      }
+      processPath(path);
       batch = { ...batch, completed: index + 1 };
       save();
     }
     if ((readArchitectureDriftCursor(repoRoot)?.head_sha ?? null) !== cursorSha) {
       throw new Error('architecture drift cursor changed during cascade; refusing stale acknowledgement');
     }
-    if (batch.headSha !== null) advanceArchitectureDriftCursor(repoRoot, batch.headSha, now);
+    if (batch.cursorSha === cursorSha && batch.headSha !== null) {
+      writeArchitectureDriftCursorLocked(repoRoot, batch.headSha, cursorSha, now);
+    }
     unlinkSync(target);
-  }, { waitTimeoutMs: Math.max(1, Math.min(remaining, 50)), reclaimStaleOwner: true });
+  }, { ...CURSOR_LOCK_OPTIONS, waitTimeoutMs: Math.max(1, Math.min(remaining, 50)) });
 }
 
 /**
@@ -194,44 +220,47 @@ export function acknowledgeArchitectureProjectionPublication(
   publicationSha: string,
   now: Date = new Date(),
 ): ArchitectureProjectionPublicationAcknowledgement {
-  if (!/^[0-9a-f]{40,64}$/.test(publicationSha)) throw new Error('architecture projection publication SHA is invalid');
+  return withExclusiveDirectoryLock(realpathSync(repoRoot), CURSOR_LOCK_PATH, () => {
+    const expectedCursorSha = readArchitectureDriftCursor(repoRoot)?.head_sha ?? null;
+    if (!/^[0-9a-f]{40,64}$/.test(publicationSha)) throw new Error('architecture projection publication SHA is invalid');
 
-  const headSha = git(repoRoot, ['rev-parse', 'HEAD'])?.trim() ?? '';
-  if (headSha !== publicationSha) throw new Error(`architecture projection publication is not checked-out HEAD: expected ${publicationSha}, got ${headSha || '(unavailable)'}`);
+    const headSha = git(repoRoot, ['rev-parse', 'HEAD'])?.trim() ?? '';
+    if (headSha !== publicationSha) throw new Error(`architecture projection publication is not checked-out HEAD: expected ${publicationSha}, got ${headSha || '(unavailable)'}`);
 
-  const status = git(repoRoot, ['status', '--porcelain=v1', '--untracked-files=no']);
-  if (status === null) throw new Error('architecture projection publication worktree status is unavailable');
-  if (status.trim() !== '') throw new Error('architecture projection publication worktree has tracked changes');
+    const status = git(repoRoot, ['status', '--porcelain=v1', '--untracked-files=no']);
+    if (status === null) throw new Error('architecture projection publication worktree status is unavailable');
+    if (status.trim() !== '') throw new Error('architecture projection publication worktree has tracked changes');
 
-  const message = git(repoRoot, ['log', '-1', '--format=%B', publicationSha]);
-  if (message === null || !/^Source-Worktree-Head: [0-9a-f]{40,64}$/m.test(message)) {
-    throw new Error('architecture projection publication lacks the Source-Worktree-Head proof');
-  }
+    const message = git(repoRoot, ['log', '-1', '--format=%B', publicationSha]);
+    if (message === null || !/^Source-Worktree-Head: [0-9a-f]{40,64}$/m.test(message)) {
+      throw new Error('architecture projection publication lacks the Source-Worktree-Head proof');
+    }
 
-  const manifestPath = 'docs/architecture/.projection-manifest.json';
-  const changedPaths = git(repoRoot, ['diff-tree', '--no-commit-id', '--name-only', '-r', `${publicationSha}^`, publicationSha]);
-  if (changedPaths === null || !changedPaths.split('\n').includes(manifestPath)) {
-    throw new Error('architecture projection publication did not change the projection manifest');
-  }
+    const manifestPath = 'docs/architecture/.projection-manifest.json';
+    const changedPaths = git(repoRoot, ['diff-tree', '--no-commit-id', '--name-only', '-r', `${publicationSha}^`, publicationSha]);
+    if (changedPaths === null || !changedPaths.split('\n').includes(manifestPath)) {
+      throw new Error('architecture projection publication did not change the projection manifest');
+    }
 
-  let worktreeManifest: string;
-  try {
-    worktreeManifest = readFileSync(join(repoRoot, manifestPath), 'utf8');
-  } catch {
-    throw new Error('architecture projection publication manifest is unavailable');
-  }
-  const publishedManifest = git(repoRoot, ['show', `${publicationSha}:${manifestPath}`]);
-  if (publishedManifest === null || publishedManifest !== worktreeManifest) {
-    throw new Error('architecture projection publication manifest differs from the published blob');
-  }
+    let worktreeManifest: string;
+    try {
+      worktreeManifest = readFileSync(join(repoRoot, manifestPath), 'utf8');
+    } catch {
+      throw new Error('architecture projection publication manifest is unavailable');
+    }
+    const publishedManifest = git(repoRoot, ['show', `${publicationSha}:${manifestPath}`]);
+    if (publishedManifest === null || publishedManifest !== worktreeManifest) {
+      throw new Error('architecture projection publication manifest differs from the published blob');
+    }
 
-  advanceArchitectureDriftCursor(repoRoot, publicationSha, now);
-  return {
-    schemaVersion: 'repo-harness.architecture-projection-publication-ack/v1',
-    publicationSha,
-    manifestDigest: `sha256:${createHash('sha256').update(worktreeManifest).digest('hex')}`,
-    cursorSha: publicationSha,
-  };
+    writeArchitectureDriftCursorLocked(repoRoot, publicationSha, expectedCursorSha, now);
+    return {
+      schemaVersion: 'repo-harness.architecture-projection-publication-ack/v1',
+      publicationSha,
+      manifestDigest: `sha256:${createHash('sha256').update(worktreeManifest).digest('hex')}`,
+      cursorSha: publicationSha,
+    };
+  }, CURSOR_LOCK_OPTIONS);
 }
 
 /**
