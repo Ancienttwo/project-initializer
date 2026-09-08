@@ -161,7 +161,6 @@ exit_criteria:
       "necessity": "Actual producer, caller and consumer; post-exit tamper, identity, isolated mounts, cancellation, controller loss and atomic recovery. Synthetic executable and version only.",
       "inputs": {
         "env": [
-          "BRC_TEST_CONTAINER_IMAGE",
           "BRC_TEST_CONTAINER_IMAGE"
         ]
       }

@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:ef2231a1deb56cba2ee06d0ffc2c2da4bb321ec9f529090bb65880408f81274f",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1",
-    "worktreeDigest": "sha256:726a232b97456122a6eff2018f4c49d610bc09ac47357e97a27b104ec94b15df",
-    "sourceTreeDigest": "sha256:ae3fef6c54eb8776f7c96b9f724d1b94c06d6dc200fbe7d2a53b288f03501351",
+    "baseHeadSha": "f62517931bbd1bd511b556141bc8304df585f65d",
+    "worktreeDigest": "sha256:ee6250937a41de18435f951d203bcf40805d4204de2f320cd86fabc839ed9869",
+    "sourceTreeDigest": "sha256:9a930063527ff802023b46276cb8592fa1a51c5855dc35e51d41074a0fbd2387",
     "modelDigest": "sha256:15fab52dfbb29756c50b746ce12dfb5e67461b828280d38dbfa8c3190e9eb272",
-    "codeGraphDigest": "sha256:91bb740af672777293ae61d7fdd039aa763aaf167d51ffb4d555b073c2aae7ec",
-    "indexedWorktreeDigest": "sha256:6c23e9ff5eae2c1d5b812902ea354378519f28385c85918e6c760dda3386a713",
+    "codeGraphDigest": "sha256:6602e95149a5bb953391edffba867c577acad8b3b7748d5f513021c52fceaeec",
+    "indexedWorktreeDigest": "sha256:e096467ad9b049374d7ed094afe2db0f7fa277e73670f9e4cc0ba7497f0ab50f",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:0b17a23774a02137e81ca6d0bbe40b9e6ff2deeb01661e0ec6b1fd911d2a94a4"
+    "projectionInputDigest": "sha256:fd5d552327e38a4b71e5df5319ac10ea355667a1a819c8c4b4163a9f3f07ac1b"
   },
-  "projectionDigest": "sha256:f002f78a279ec92b731f7370e52f73067bc9bba82d5c9a432db7f27699e86664",
+  "projectionDigest": "sha256:88ac5e285cbeaee6adb1c005423df060d8e9b106619d79cffad1f5e9ea28dac3",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:15fab52dfbb29756c50b746ce12dfb5e67461b828280d38dbfa8c3190e9eb272",
-      "sourceTreeDigest": "sha256:ae3fef6c54eb8776f7c96b9f724d1b94c06d6dc200fbe7d2a53b288f03501351",
+      "sourceTreeDigest": "sha256:9a930063527ff802023b46276cb8592fa1a51c5855dc35e51d41074a0fbd2387",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:f002f78a279ec92b731f7370e52f73067bc9bba82d5c9a432db7f27699e86664"
+      "projectionDigest": "sha256:88ac5e285cbeaee6adb1c005423df060d8e9b106619d79cffad1f5e9ea28dac3"
     }
   },
-  "receiptDigest": "sha256:2fb2bced5ffc479e9c13fad5e234bbef194fb2e383cc76b353c792316a3049fe",
+  "receiptDigest": "sha256:6b40e7ccdbb63119a19475cc86f672cb6d51bb85b8f9c7472522c4198e60fee4",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -828,8 +828,8 @@
       "outputDigest": "sha256:9deae9f17a3ad75c541b1b0ca258721b329b5a4d9521eedfab8186eb635af91a",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1",
-        "committedAt": "2026-09-08T16:20:59+08:00"
+        "commit": "f62517931bbd1bd511b556141bc8304df585f65d",
+        "committedAt": "2026-09-08T16:41:29+08:00"
       }
     },
     {
@@ -908,8 +908,8 @@
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1",
-        "committedAt": "2026-09-08T16:20:59+08:00"
+        "commit": "f62517931bbd1bd511b556141bc8304df585f65d",
+        "committedAt": "2026-09-08T16:41:29+08:00"
       }
     },
     {
@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1",
-        "committedAt": "2026-09-08T16:20:59+08:00"
+        "commit": "f62517931bbd1bd511b556141bc8304df585f65d",
+        "committedAt": "2026-09-08T16:41:29+08:00"
       }
     },
     {
@@ -1248,8 +1248,8 @@
       "outputDigest": "sha256:aa5aac73ff819f8ad0c053a57d5b1627faf2fc5bdbc18e8ab4722de0ab085d59",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1",
-        "committedAt": "2026-09-08T16:20:59+08:00"
+        "commit": "f62517931bbd1bd511b556141bc8304df585f65d",
+        "committedAt": "2026-09-08T16:41:29+08:00"
       }
     },
     {
