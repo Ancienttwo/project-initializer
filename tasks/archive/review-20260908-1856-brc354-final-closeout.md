@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 18:56
+> **Related Plan**: plans/archive/plan-20260908-1830-brc354-final-closeout.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-1856
+> **Archive Projection V1**: `plans/plan-20260908-1830-brc354-final-closeout.md` => `plans/archive/plan-20260908-1830-brc354-final-closeout.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1830-brc354-final-closeout.notes.md` => `tasks/archive/notes-20260908-1856-brc354-final-closeout.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1830-brc354-final-closeout.contract.md` => `tasks/archive/contract-20260908-1856-brc354-final-closeout.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1830-brc354-final-closeout.review.md` => `tasks/archive/review-20260908-1856-brc354-final-closeout.md`
+
 # Task Review: brc354-final-closeout
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-1830-brc354-final-closeout.md
-> **Contract**: tasks/contracts/20260908-1830-brc354-final-closeout.contract.md
-> **Notes File**: tasks/notes/20260908-1830-brc354-final-closeout.notes.md
+> **Plan**: plans/archive/plan-20260908-1830-brc354-final-closeout.md
+> **Contract**: tasks/archive/contract-20260908-1856-brc354-final-closeout.md
+> **Notes File**: tasks/archive/notes-20260908-1856-brc354-final-closeout.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 18:30
 > **Recommendation**: pass
