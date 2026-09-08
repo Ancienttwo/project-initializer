@@ -157,3 +157,12 @@ P1/P2: contract-run accepts an optional campaign provider; bindCampaignWorker pr
 The retained initial-base task-sync criterion includes the merged main changes. Bind that exact integrated diff without changing ownership or claiming those changes as this slice. All behavior criteria passed in run-20260909T004725-61115; only the missing workflow fingerprint failed.
 
 > **Substantive Change SHA256**: `sha256:bb9f6bd7f4648697bd80356d1b929f05fd479464d019c47f097aa12b17332e75`
+
+
+## Single blocking CI snapshot correction
+
+CI 34254078294 failed only tests/state/loop-semantics-characterization.test.ts: main fe35f0a9 persists architecture-drift-cascade.json, but its three Stop golden lists were not updated. The canonical fixture generator changes exactly those three lines; no production behavior changes. This is the one directly blocking unrelated-main correction. All BRC tests in that CI passed. Preserve the accepted BRC subject and use this snapshot regression plus required integrity checks for local delta acceptance.
+
+> **Substantive Change SHA256**: `sha256:b85a3d568f4668b403113e2a0d094c844c34adf53d6b4beef3ed79233b71e1cb`
+
+> **Substantive Change SHA256**: `sha256:1c36bd83dac7715737a63c01924ebe7151537b1f5128fe6c2f062c27ecd8b8d7`

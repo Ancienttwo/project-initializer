@@ -71,6 +71,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - tests/state/fixtures/loop-semantics/characterization.json
   - tests/unit/campaign-revision-evidence.test.ts
   - src/effects/automation/gpt-pro-issue-authoring.ts
   - src/cli/commands/campaign.ts
@@ -156,14 +157,14 @@ exit_criteria:
   "protocol": 1,
   "checks": [
     {
-      "id": "revision-admission",
+      "id": "integrated-main-snapshot-delta",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/effects/campaign-fresh-audit.test.ts tests/unit/campaign-revision-evidence.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/campaign-acquisition.test.ts tests/effects/campaign-worker.test.ts",
+      "command": "bun test --timeout 60000 tests/state/loop-semantics-characterization.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Covers real positive admission, acquisition and worker identity binding, missing-image refusal, recovery, and complete three-group sequencing with synthetic provider I/O.",
+      "necessity": "The accepted c2ef4c62 source and CI run 34254078294 cover BRC behavior. Only the inherited main Stop snapshot changes: verify the three added cascade-state paths without rerunning BRC suites.",
       "inputs": {
         "env": []
       }
@@ -281,6 +282,8 @@ only when a referenced immutable baseline plus named current delta checks prove
 the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
+
+- Current delta: CI run 34254078294 passed all BRC suites and failed only loop-semantics-characterization. Main commit fe35f0a9 adds architecture-drift-cascade.json persistence; update its three golden Stop touched-path lists. No BRC source or runtime input changes after accepted subject sha256:6b807c6b42cfb4d8208ca03a15aa9e282bbe6cc5b24a543e8bb965b430466516 (14/14 run-20260909T005135-27777). Final acceptance uses the isolated snapshot regression plus required integrity checks; the prior full CI remains evidence for its original candidate, not a green result for this head.
 
 - Runtime scope: the source-equality check excludes campaign-revision-evidence.ts because its shared URL derivation is this tested delta, not the Docker containment implementation. Docker runtime, launch inputs and every other core automation file remain compared to cc2fbc48.
 - Baseline: run-20260908T230034-3349 retains its original 86-case source subject. The subsequent delta changes only revision-resource prompt construction and its two callers. Final coverage names observation, fresh audit and evidence decoder suites; no full-suite trigger.
