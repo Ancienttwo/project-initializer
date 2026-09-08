@@ -948,7 +948,8 @@ describe('mcp setup', () => {
 
       const result = runMcpSetupCodex({ repo: repoRoot, scope: 'project' });
       expect(result.changed.some((path) => path.endsWith('.codex/config.toml'))).toBe(true);
-      expect(existsSync(join(repoRoot, '.codex/config.toml.bak'))).toBe(true);
+      expect(existsSync(join(repoRoot, '.repo-harness/configuration-restore.json'))).toBe(true);
+      expect(existsSync(join(repoRoot, '.codex/config.toml.bak'))).toBe(false);
       const config = readFileSync(join(repoRoot, '.codex/config.toml'), 'utf-8');
       expect(config).toContain('[profiles.default]');
       expect(config).toContain('[mcp_servers.repo_harness]');

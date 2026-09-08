@@ -1,3 +1,4 @@
+import { runMcpUninstall, type McpUninstallOptions } from '../mcp/uninstall';
 import { Command } from 'commander';
 import { isAbsolute, relative } from 'path';
 import { createMcpToolContext } from '../mcp/server';
@@ -247,6 +248,27 @@ export function buildMcpCommand(): Command {
       });
     });
   mcp.addCommand(workspaces);
+
+  mcp.command('uninstall')
+    .description('Remove local MCP setup configuration while preserving workspaces and archives')
+    .option('--repo <path>', 'Project whose Codex MCP registration to remove', '.')
+    .option('--target <target>', 'codex|chatgpt|both', 'both')
+    .option('--dry-run', 'Preview cleanup without filesystem writes')
+    .option('--json', 'Output structured local cleanup result')
+    .option('--services-stopped', 'Confirm all MCP HTTP services have been stopped before credential deletion')
+    .option('--recover-interrupted', 'Restore recorded project fragments from an interrupted setup before uninstall')
+    .action((opts: McpUninstallOptions & { json?: boolean }) => {
+      void runMcpAction(() => {
+        const result = runMcpUninstall(opts);
+        console.log(opts.json ? JSON.stringify(result, null, 2) : [
+          ...result.items.map((item) => `[${item.action}] ${item.path}: ${item.reason}`),
+          ...result.retained.map((item) => `[preserve] ${item}`),
+          ...result.externalActions.map((item) => `[external] ${item}`),
+          `[mcp uninstall] ${result.status} (local configuration${result.dryRun ? ', dry-run' : ''})`,
+        ].join('\n'));
+        if (result.status === 'partial') process.exitCode = 1;
+      });
+    });
 
   const setup = new Command('setup').description('Generate MCP setup files for ChatGPT or Codex');
 

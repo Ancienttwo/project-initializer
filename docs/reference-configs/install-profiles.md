@@ -138,7 +138,8 @@ repo-harness update
 # Read-only repair guidance, no writes.
 repo-harness update --check
 
-# Remove managed host adapters without touching sibling or third-party hooks.
+# Preview and remove owned user configuration; preserve user edits and history.
+repo-harness uninstall --dry-run
 repo-harness uninstall
 
 # Install only the host hook adapters (adapter-only surface).

@@ -1,3 +1,6 @@
+import { recordMcpRegistryChanges, withMcpSetupLock } from './setup-ownership';
+import { replaceConfigurationFragment, writeOwnedConfiguration } from '../installer/configuration-ownership';
+import { withRuntimeHostTransactionLock } from '../installer/runtime-host-lock';
 import { createHash, randomBytes } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'fs';
 import { isIP } from 'net';
@@ -628,7 +631,11 @@ Use repo-harness-chatgpt-bridge. Execute the latest ChatGPT-generated Codex goal
 `;
 }
 
-export function runMcpSetupChatgpt(opts: {
+export function runMcpSetupChatgpt(opts: Parameters<typeof setupChatgptLocked>[0]): McpSetupResult {
+  return withMcpSetupLock(() => setupChatgptLocked(opts));
+}
+
+function setupChatgptLocked(opts: {
   repo?: string;
   host?: string;
   port?: string;
@@ -748,6 +755,7 @@ export function runMcpSetupChatgpt(opts: {
   ];
   const registryBatch = applyRepoHarnessRegistryBatch(registryEntries, {
     bumpAuthorizationRevision: profileAuthorizationChanged,
+    recordChanges: recordMcpRegistryChanges,
     beforeCommit: (authorizationRevision) => {
       writePrivateFileAtomicIfChanged(configPath, `${JSON.stringify({ ...config, authorizationRevision }, null, 2)}\n`, changed);
     },
@@ -923,14 +931,16 @@ default_tools_approval_mode = "prompt"
 `;
 
 export function patchCodexConfigToml(current: string): string {
-  const normalized = current.trimEnd();
-  const blockPattern = /\n?\[mcp_servers\.repo_harness\][\s\S]*?(?=\n\[|$)/;
-  const prefix = normalized.length > 0 ? `${normalized}\n\n` : '';
-  if (!blockPattern.test(normalized)) return `${prefix}${CODEX_MCP_BLOCK}`;
-  return `${normalized.replace(blockPattern, `\n${CODEX_MCP_BLOCK}`.trimEnd())}\n`;
+  return replaceConfigurationFragment('config.toml', current, 'mcp_servers.repo_harness', CODEX_MCP_BLOCK);
 }
 
-export function runMcpSetupCodex(opts: { repo?: string; scope?: string; dryRun?: boolean }): McpSetupResult {
+export function runMcpSetupCodex(opts: Parameters<typeof setupCodexLocked>[0]): McpSetupResult {
+  if (opts.dryRun) return setupCodexLocked(opts);
+  const repoRoot = resolveMcpRepoRoot(opts.repo ?? '.');
+  return withRuntimeHostTransactionLock({ HOME: repoRoot }, () => setupCodexLocked(opts));
+}
+
+function setupCodexLocked(opts: { repo?: string; scope?: string; dryRun?: boolean }): McpSetupResult {
   if ((opts.scope ?? 'project') !== 'project') {
     throw new Error('repo-harness mcp setup codex currently supports --scope project only');
   }
@@ -947,11 +957,8 @@ export function runMcpSetupCodex(opts: { repo?: string; scope?: string; dryRun?:
       lines: [`[repo-harness mcp] Dry run: would patch ${relative(repoRoot, configPath)}`, next],
     };
   }
-  if (existsSync(configPath) && current !== next) {
-    const backupPath = `${configPath}.bak`;
-    writeFileIfChanged(backupPath, current, changed);
-  }
-  writeFileIfChanged(configPath, next, changed);
+  writeOwnedConfiguration(configPath, next, { HOME: repoRoot });
+  if (current !== next) changed.push(configPath);
   return {
     status: 'ok',
     repoRoot,

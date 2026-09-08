@@ -125,7 +125,10 @@ looks wrong, stop and read
 ```bash
 repo-harness update          # reconcile CLI, mandatory deps, profile tooling, and CodeGraph
 repo-harness update --check  # read-only repair guidance, no writes
-repo-harness uninstall       # remove managed host adapters only
+repo-harness uninstall --dry-run # preview owned user configuration cleanup
+repo-harness uninstall           # remove owned configuration; preserve user changes/history
+repo-harness mcp uninstall --dry-run # preview independent MCP setup cleanup
+repo-harness mcp uninstall --services-stopped # after stopping all MCP HTTP services
 ```
 
 ## Why repo-harness

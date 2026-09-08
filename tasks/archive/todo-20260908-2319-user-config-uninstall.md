@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-08 23:19
+> **Related Plan**: plans/archive/plan-20260908-2246-user-config-uninstall.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260908-2319
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: 2026-09-08 22:35
+> **Updated**: 2026-09-08 22:46
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
@@ -62,4 +68,4 @@ Audit evidence and closure rationale: `docs/researches/20260907-deferred-goal-le
 
 ## User uninstall follow-up
 
-- Deferred: explicit repository unadoption. Independent MCP setup teardown is implemented by `mcp uninstall`; service shutdown, remote Connector/tunnel cleanup and workspace lifecycle remain explicit operator actions. Revisit repository unadoption when requested; preserve repository content and archives.
+- Deferred: explicit repository unadoption and independent MCP setup teardown (credentials/registrations/workspaces). Current user-level installer uninstall preserves these separate surfaces. Revisit when the owner requests product-wide teardown beyond the approved first slice; define running-service/workspace preservation before removal.

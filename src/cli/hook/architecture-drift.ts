@@ -21,10 +21,11 @@
  * are different data, not two authorities for one.
  */
 import { execFileSync } from 'child_process';
-import { createHash } from 'crypto';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { createHash, randomUUID } from 'crypto';
+import { mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { canonicalRepoRelativePath } from '../../effects/state/collect-state-inputs';
+import { withExclusiveDirectoryLock } from '../../effects/locking/exclusive-directory-lock';
 import type { ArchitectureProjectionSourceEvent } from '../../effects/architecture/projection-orchestrator';
 
 const CURSOR_RELATIVE_PATH = '.ai/harness/state/architecture-drift-cursor.json';
@@ -97,6 +98,83 @@ export function advanceArchitectureDriftCursor(repoRoot: string, headSha: string
   const state: ArchitectureDriftCursorState = { version: 1, head_sha: headSha, updated_at: now.toISOString() };
   writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
   renameSync(temp, target);
+}
+
+interface ArchitectureCascadeBatch {
+  readonly version: 1;
+  readonly cursorSha: string | null;
+  readonly headSha: string | null;
+  readonly paths: readonly string[];
+  readonly completed: number;
+}
+
+const CASCADE_BATCH_PATH = '.ai/harness/state/architecture-drift-cascade.json';
+
+function readCascadeBatch(repoRoot: string): ArchitectureCascadeBatch | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(readFileSync(join(repoRoot, CASCADE_BATCH_PATH), 'utf8'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+  const batch = value as Partial<ArchitectureCascadeBatch> | null;
+  const sha = (value: unknown) => value === null || (typeof value === 'string' && /^[0-9a-f]{40,64}$/.test(value));
+  if (!batch || batch.version !== 1 || !sha(batch.cursorSha) || !sha(batch.headSha)
+    || !Array.isArray(batch.paths) || !batch.paths.every((path) => typeof path === 'string'
+      && path.length > 0 && !path.includes('\0') && canonicalRepoRelativePath(repoRoot, path) === path)
+    || !Number.isSafeInteger(batch.completed) || batch.completed! < 0 || batch.completed! > batch.paths.length) {
+    throw new Error('invalid architecture drift cascade batch; retained for operator repair');
+  }
+  return batch as ArchitectureCascadeBatch;
+}
+
+/**
+ * Freeze a range before delivery and persist each complete path acknowledgement.
+ * A timeout can repeat the interrupted path, but never starves the tail by
+ * replaying its acknowledged prefix. Later commits are left for the next range.
+ */
+export function drainArchitectureDriftCascade(
+  repoRoot: string,
+  changedSet: ArchitectureDriftChangedSet,
+  processPath: (path: string) => void,
+  budget: { readonly deadlineMs: number; readonly nowMs: () => number },
+  now: Date = new Date(),
+): void {
+  const remaining = budget.deadlineMs - budget.nowMs();
+  if (remaining <= 0) throw new Error('legacy architecture cascade deadline exhausted; drift retained for retry');
+  withExclusiveDirectoryLock(realpathSync(repoRoot), '.ai/harness/state/architecture-drift-cascade.lock', () => {
+    const cursorSha = readArchitectureDriftCursor(repoRoot)?.head_sha ?? null;
+    if (cursorSha !== changedSet.cursorSha) throw new Error('architecture drift cursor changed before cascade; retry with a fresh changed set');
+    const previous = readCascadeBatch(repoRoot);
+    // A different acknowledged cursor (for example, an archctx publication)
+    // supersedes the old batch. Never move that cursor back to its old HEAD.
+    let batch: ArchitectureCascadeBatch = previous?.cursorSha === cursorSha ? previous : {
+      version: 1, cursorSha, headSha: changedSet.headSha, paths: changedSet.paths, completed: 0,
+    };
+    const target = join(repoRoot, CASCADE_BATCH_PATH);
+    const save = () => {
+      const temporary = `${target}.tmp-${randomUUID()}`;
+      writeFileSync(temporary, `${JSON.stringify(batch)}\n`, { mode: 0o600, flag: 'wx' });
+      try { renameSync(temporary, target); } finally {
+        try { unlinkSync(temporary); } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
+    };
+    save();
+    for (let index = batch.completed; index < batch.paths.length; index += 1) {
+      if (budget.nowMs() >= budget.deadlineMs) throw new Error(`legacy architecture cascade deadline exhausted before ${batch.paths[index]}; drift retained for retry`);
+      processPath(batch.paths[index]!);
+      batch = { ...batch, completed: index + 1 };
+      save();
+    }
+    if ((readArchitectureDriftCursor(repoRoot)?.head_sha ?? null) !== cursorSha) {
+      throw new Error('architecture drift cursor changed during cascade; refusing stale acknowledgement');
+    }
+    if (batch.headSha !== null) advanceArchitectureDriftCursor(repoRoot, batch.headSha, now);
+    unlinkSync(target);
+  }, { waitTimeoutMs: Math.max(1, Math.min(remaining, 50)), reclaimStaleOwner: true });
 }
 
 /**
