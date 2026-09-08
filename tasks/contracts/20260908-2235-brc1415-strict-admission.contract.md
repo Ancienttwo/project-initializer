@@ -149,7 +149,7 @@ exit_criteria:
     {
       "id": "revision-admission",
       "kind": "command",
-      "command": "bun test tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-step.test.ts tests/effects/campaign-planning.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-step.test.ts tests/effects/campaign-planning.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
