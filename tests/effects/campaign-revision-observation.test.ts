@@ -60,9 +60,10 @@ test('pre-active observation without intent charges once and permits later real 
     expect(input.captureNetworkEvidence).toBe(true); expect(input.chatgptApp).toBe('GitHub');
     expect(input.model).toBeUndefined(); expect(input.thinkingTime).toBeUndefined(); expect(input.sessionId).toBeUndefined();
     expect(input.prompt).toContain('Do not create, edit, close or reopen Issues');
-    expect(input.prompt).toContain(`https://api.github.com/repos/acme/widgets/git/commits/${f.authorization.target_revision}`);
-    expect(input.prompt).toContain('https://api.github.com/repos/acme/widgets/git/ref/heads/main');
-    expect(input.prompt).toContain('Use the GitHub fetch action');
+    const instructions = JSON.parse(input.prompt.slice(input.prompt.indexOf('\n') + 1));
+    expect(instructions).toContain(`https://api.github.com/repos/acme/widgets/git/commits/${f.authorization.target_revision}`);
+    expect(instructions).toContain('https://api.github.com/repos/acme/widgets/git/ref/heads/main');
+    expect(instructions).toContain('Use the GitHub fetch action');
     const budget = f.budget(); expect(budget.current.open_reservation_sha256s).toHaveLength(1);
     expect(readCampaignRevisionRecord(f.root, f.campaign.campaign_id, 'request')).not.toBeNull();
     return f.browser();

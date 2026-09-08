@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { createHash } from 'crypto';
 import history from '../fixtures/campaign-revision-evidence/history.json';
-import { readCampaignRevisionEvidence } from '../../src/core/automation/campaign-revision-evidence';
+import { readCampaignRevisionEvidence, encodeCampaignRevisionPrompt } from '../../src/core/automation/campaign-revision-evidence';
 const expected={providerSessionId:'session-fixture',connectorId:'connector_76869538009648d5b282a4bb21c3d157',repository:'example/canary',ref:'refs/heads/main',commit:'a'.repeat(40),prompt:'Read exact revision.',answer:'audit fixture'};
 const capture=()=>({status:'captured',sessionId:expected.providerSessionId,conversationId:history.conversationId,sha256:'sha256:'+'f'.repeat(64),history:structuredClone(history)});
 function mutate(fn:(b:any)=>void){const c=capture();const b=JSON.parse(c.history.response.body);fn(b);c.history.response.body=JSON.stringify(b);c.history.response.decodedBodySha256=createHash('sha256').update(c.history.response.body).digest('hex');return c;}
@@ -32,3 +32,16 @@ test('provider tool identity remains authoritative when user UI system hints are
  expect(readCampaignRevisionEvidence(c,expected)?.commit_sha).toBe(expected.commit);
  expect(readCampaignRevisionEvidence(c,{...expected,connectorId:'other'})).toBeNull();
 });
+
+ test('revision prompt transport round-trips all instructions without autolink tokens', () => {
+  const instructions = 'Read https://api.github.com/repos/example/canary/git/commits/abc.\nSnapshot: '+JSON.stringify({url:'https://github.com/example/canary/issues/1', summary:'quoted "text" and \\ escape'});
+  const prompt = encodeCampaignRevisionPrompt(instructions);
+  expect(prompt).not.toContain('https:');
+  expect(prompt).not.toContain('github.com');
+  expect(JSON.parse(prompt.slice(prompt.indexOf('\n') + 1))).toBe(instructions);
+  const request = {...expected, prompt};
+  const c = mutate(b => {b.messages[0].content.parts = ['@GitHub '+prompt];});
+  expect(readCampaignRevisionEvidence(c, request)?.commit_sha).toBe(expected.commit);
+  const changed = mutate(b => {b.messages[0].content.parts = ['@GitHub '+prompt+' changed'];});
+  expect(readCampaignRevisionEvidence(changed, request)).toBeNull();
+ });
