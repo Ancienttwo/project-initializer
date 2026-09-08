@@ -119,8 +119,8 @@ Owner approved BRC14 fresh readonly evidence capture with a new budget and then 
 Focused tests cover allowed initial states without an authoring intent; wrong/stopped/later state, expired grant/target/profile mismatch; admission before I/O; one provider charge and zero authoring rounds; same-call replay including crash after result before settlement; unknown/failed outcomes blocking both same and changed requests; concurrency; fresh session/GitHub evidence and raw capture retention without revision promotion. Run budget and authoring/audit regression plus TypeScript and the six root integrity commands. No full suite: named contracts and typecheck cover the union extension. Freeze before canonical prepare acceptance and independent check; retain immutable evidence rather than rerun.
 
 ## Task Breakdown
-- [ ] Implement pre-active revision observation with existing campaign budget and immutable request/result.
-- [ ] Verify refusal, replay, budget and default-session boundaries; document actual scope and pass independent acceptance.
+- [x] Implement pre-active revision observation with existing campaign budget and immutable request/result.
+- [x] Verify refusal, replay, budget and default-session boundaries; document actual scope and pass independent acceptance.
 
 ## Completion
 Archive this bounded package with contract-worktree finish --no-merge; main has unrelated WIP. Raw live evidence is private and a later semantic receipt must derive from actual tool request/results, never an invented DTO. Reverting this package leaves prior capture and active gate behavior intact; retained observations are historical evidence.
@@ -129,8 +129,8 @@ Archive this bounded package with contract-worktree finish --no-merge; main has 
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Implement pre-active revision observation with existing campaign budget and immutable request/result.
-- [ ] Verify refusal, replay, budget and default-session boundaries; document actual scope and pass independent acceptance.
+- [x] Implement pre-active revision observation with existing campaign budget and immutable request/result.
+- [x] Verify refusal, replay, budget and default-session boundaries; document actual scope and pass independent acceptance.
 
 
 ## Observed entrypoint correction
