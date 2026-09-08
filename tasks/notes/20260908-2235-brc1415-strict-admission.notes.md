@@ -206,3 +206,7 @@ Final fixture correction makes the protection mutation non-empty against the min
 Integration: main d8c082b1 merged at 90ee5751; only generated architecture manifest conflicted and was regenerated canonically. Campaign production/test source is unchanged from frozen 14/14 run-20260909T032622-41208. CI task-sync requires the new main-relative identity below; local check reproduces it exactly.
 
 > **Substantive Change SHA256**: `sha256:c18d68e36830bbf74db5797b4de0e02121b6ee90dc69bbfd5d92d611251396ac`
+
+CI run34269496496: only tests/claude-review.test.ts and tests/herdr-transport.test.ts fail, with missing herdr executable. Install upstream v0.9.0 binary only in Linux CI, pinned to release SHA256; download verified locally. No source or test behavior changed. Source: https://github.com/herdrdev/herdr/releases/tag/v0.9.0 .
+
+> **Substantive Change SHA256**: `sha256:2ff262455fea95e9c49ec99cc427d9343e77765ffbb5629145f987090a92c44c`

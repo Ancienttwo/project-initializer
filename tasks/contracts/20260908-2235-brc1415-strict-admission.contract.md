@@ -71,6 +71,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - .github/workflows/ci.yml
   - .ai/harness/campaign-protection.json
   - tests/fixtures/repair-campaign/protected-capabilities.json
   - tests/characterization/repair-campaign-authority-freeze.test.ts
@@ -287,6 +288,8 @@ only when a referenced immutable baseline plus named current delta checks prove
 the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
+
+- Integration-only CI repair: main Herdr cutover introduced real Herdr tests but did not install Herdr in CI. Run34269496496 passes BRC tests and fails only claude-review/herdr-transport with missing executable. Install pinned upstream0.9.0 Linux binary with verified SHA256 before CI gate. This is the single directly blocking out-of-scope fix; no runtime/test behavior changes. Frozen14/14 run-20260909T032622-41208 retains its source scope; validate CI YAML and required integrity checks, then use mandatory remote CI for the Linux runtime.
 
 - Current delta: CI run 34254078294 passed all BRC suites and failed only loop-semantics-characterization. Main commit fe35f0a9 adds architecture-drift-cascade.json persistence; update its three golden Stop touched-path lists. No BRC source or runtime input changes after accepted subject sha256:6b807c6b42cfb4d8208ca03a15aa9e282bbe6cc5b24a543e8bb965b430466516 (14/14 run-20260909T005135-27777). Final acceptance uses the isolated snapshot regression plus required integrity checks; the prior full CI remains evidence for its original candidate, not a green result for this head.
 

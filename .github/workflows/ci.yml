@@ -33,6 +33,13 @@ jobs:
       - name: Install shell dependencies
         run: sudo apt-get update && sudo apt-get install -y jq rsync
 
+      - name: Install pinned Herdr runtime
+        run: |
+          curl --fail --location --retry 3 https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-x86_64 --output "$RUNNER_TEMP/herdr"
+          echo "4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f  $RUNNER_TEMP/herdr" | sha256sum --check
+          sudo install -m 755 "$RUNNER_TEMP/herdr" /usr/local/bin/herdr
+          herdr --version
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
