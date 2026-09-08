@@ -8,7 +8,7 @@
 > **Last Updated**: 2026-09-08 22:35
 > **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: sha256:06fd3e8f321f172e82325c63960de8b43a675c386569f56dbd129cfc8404e538
+> **Reviewed Subject SHA256**: sha256:a9602ee5a8d0f147b3a3bb1511a76e105a34377369329b50dec83990ce1647bd
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: aa3cb4522e842e04e5f7188f62b2a80b6049b28f
 
@@ -44,13 +44,13 @@
 > **Reviewer**: Codex
 > **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: sha256:06fd3e8f321f172e82325c63960de8b43a675c386569f56dbd129cfc8404e538
+> **Reviewed Subject SHA256**: sha256:a9602ee5a8d0f147b3a3bb1511a76e105a34377369329b50dec83990ce1647bd
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: aa3cb4522e842e04e5f7188f62b2a80b6049b28f
-> **Verification Evidence SHA256**: sha256:6508ef3631e81627a3e8ce65c2c852814dc1a1a7ed5bcf2146fdb673256156ea
-> **Issued At**: 2026-09-08T14:42:29.436Z
+> **Verification Evidence SHA256**: sha256:961e6a1a94cdb56993da17b953e0573b5d255fa8cbeb15e32b28df5624ead1b7
+> **Issued At**: 2026-09-08T15:04:52.259Z
 
-- Summary: Local strict-admission candidate passes 14 scoped criteria. Exact authority checks and the independent authoring-session refusal remain; runtime inputs are unchanged. This is not live active acceptance. Publication and BRC14/BRC15 completion await a new disposable target, finite budget and explicit activation boundary.
+- Summary: All 14 scoped criteria pass for strict admission and frozen selected capability authority; 86 affected cases and TypeScript pass, unchanged Docker runtime retains original evidence. Owner authorized bounded AiphaBee canary. Live BRC14/BRC15 acceptance remains pending actual results.
 - Findings: none
 
 ## Behavior Diff Notes

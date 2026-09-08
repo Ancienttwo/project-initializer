@@ -121,7 +121,8 @@ Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, 
 ## Task Breakdown
 - [x] Prepare strict admission restoration and focused positive/negative real-store regression coverage.
 - [x] Freeze and verify focused checks, TypeScript and required repository integrity gates, retaining unchanged Docker baseline scope.
-- [ ] Verify the single AiphaBee capability-source blocker fix, then execute newly authorized shadow/active canary within its finite budget and record actual outcomes.
+- [x] Verify the AiphaBee capability-source fix: 86 affected tests and 14 scoped criteria pass.
+- [ ] Complete AiphaBee shadow/active canary: first observation failed before submission; reservation reconciled, Oracle preselection blocker retained for scope decision.
 
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
@@ -129,4 +130,5 @@ Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, 
 ## Task Breakdown
 - [x] Prepare strict admission restoration and focused positive/negative real-store regression coverage.
 - [x] Freeze and verify focused checks, TypeScript and required repository integrity gates, retaining unchanged Docker baseline scope.
-- [ ] Verify the single AiphaBee capability-source blocker fix, then execute newly authorized shadow/active canary within its finite budget and record actual outcomes.
+- [x] Verify the AiphaBee capability-source fix: 86 affected tests and 14 scoped criteria pass.
+- [ ] Complete AiphaBee shadow/active canary: first observation failed before submission; reservation reconciled, Oracle preselection blocker retained for scope decision.
