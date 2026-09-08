@@ -828,8 +828,8 @@
       "outputDigest": "sha256:9deae9f17a3ad75c541b1b0ca258721b329b5a4d9521eedfab8186eb635af91a",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "e7074663a7785dea1359006a0d4d3fa44ca6b76d",
-        "committedAt": "2026-09-08T16:51:17+08:00"
+        "commit": "6740b6e9d735e3076bc0f79f7a5977195714f541",
+        "committedAt": "2026-09-08T18:36:29+08:00"
       }
     },
     {
@@ -908,8 +908,8 @@
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "f62517931bbd1bd511b556141bc8304df585f65d",
-        "committedAt": "2026-09-08T16:41:29+08:00"
+        "commit": "6740b6e9d735e3076bc0f79f7a5977195714f541",
+        "committedAt": "2026-09-08T18:36:29+08:00"
       }
     },
     {
@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/brc354-independent-supervision",
-        "commit": "f9e24f50764994e9fc8e5a3e3a5cde8178f6d7e7",
-        "committedAt": "2026-09-08T17:58:26+08:00"
+        "commit": "6740b6e9d735e3076bc0f79f7a5977195714f541",
+        "committedAt": "2026-09-08T18:36:29+08:00"
       }
     },
     {

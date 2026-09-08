@@ -34,3 +34,9 @@ Follow-up scope:
 
 Complete PR scope:
 > **Substantive Change SHA256**: `sha256:738c6f2ef4393961100b88b49a08e9183e7b0dc155d7cd39209d1a219f0897d1`
+
+## Frozen verification and handoff transition
+
+All 26 contract checks passed on 6740b6e9 with the pinned image enabled: lifecycle vx-354cdd76279743f9a206 (126333 ms), Docker vx-bde4860757e842ca8d01 (91162 ms), closeout/failure vx-2c6336b1b9c14281a7b8 (109134 ms). The wrapper remained failed because Change Assessment lacked the deterministic_test oracle declaration. Add the oracle for the already executed actual reclaim regression; preserve all execution records with source/image delta checks. This is not a test waiver or a replacement full-suite claim.
+
+During execution, remote #360 was merged by another executor as main a1393e44. `git diff --quiet f9e24f50 a1393e44` returned zero: identical trees, no implementation input drift. This approved slice continues as branch codex/brc354-preparation-recovery and a follow-up PR; it does not push into the merged #360 or reopen a duplicate task.

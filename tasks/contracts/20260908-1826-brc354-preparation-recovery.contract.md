@@ -58,7 +58,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[{"id":"preparation-recovery","kind":"runtime_readback","paths":["*"]}]}
+{"protocol":1,"oracles":[{"id":"preparation-recovery","kind":"runtime_readback","paths":["*"]},{"id":"preparation-reclaim","kind":"deterministic_test","paths":["*"]}]}
 ```
 
 ## Acceptance Policy
@@ -159,7 +159,9 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Final Docker criteria must not silently skip.",
       "inputs": {
-        "env": []
+        "env": [
+          "BRC_TEST_CONTAINER_IMAGE"
+        ]
       }
     },
     {
@@ -169,13 +171,21 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "expensive",
-      "evidence_policy": "current_exact",
-      "necessity": "Actual reclaim, preparation recovery and settlement regression, including the pre-fix guard.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Actual reclaim, preparation recovery and settlement regression, including the pre-fix guard. Passed on frozen implementation 6740b6e9; subsequent changes only complete workflow/oracle declarations and provenance. Reuse that immutable execution with exact source and image comparisons.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
         ]
-      }
+      },
+      "baseline": {
+        "execution_id": "vx-354cdd76279743f9a206",
+        "run_file": ".ai/harness/runs/verification-vx-354cdd76279743f9a206.json"
+      },
+      "delta_checks": [
+        "source-unchanged",
+        "image-required"
+      ]
     },
     {
       "id": "docker",
@@ -184,13 +194,21 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "expensive",
-      "evidence_policy": "current_exact",
-      "necessity": "Producer address and lost-create recovery changed; real Docker phase death, tamper, and actual runtime checks are required.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Producer address and lost-create recovery changed; real Docker phase death, tamper, and actual runtime checks are required. Passed on frozen implementation 6740b6e9; subsequent changes only complete workflow/oracle declarations and provenance. Reuse that immutable execution with exact source and image comparisons.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
         ]
-      }
+      },
+      "baseline": {
+        "execution_id": "vx-bde4860757e842ca8d01",
+        "run_file": ".ai/harness/runs/verification-vx-bde4860757e842ca8d01.json"
+      },
+      "delta_checks": [
+        "source-unchanged",
+        "image-required"
+      ]
     },
     {
       "id": "closeout",
@@ -199,13 +217,21 @@ exit_criteria:
       "cwd": ".",
       "phase": "verification",
       "cost": "expensive",
-      "evidence_policy": "current_exact",
-      "necessity": "Changed recovery/settlement consumer requires historical finals, failure settlement, closeout and containment checks.",
+      "evidence_policy": "baseline_with_delta",
+      "necessity": "Changed recovery/settlement consumer requires historical finals, failure settlement, closeout and containment checks. Passed on frozen implementation 6740b6e9; subsequent changes only complete workflow/oracle declarations and provenance. Reuse that immutable execution with exact source and image comparisons.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
         ]
-      }
+      },
+      "baseline": {
+        "execution_id": "vx-2c6336b1b9c14281a7b8",
+        "run_file": ".ai/harness/runs/verification-vx-2c6336b1b9c14281a7b8.json"
+      },
+      "delta_checks": [
+        "source-unchanged",
+        "image-required"
+      ]
     },
     {
       "id": "typecheck",
@@ -307,6 +333,19 @@ exit_criteria:
       "cost": "normal",
       "evidence_policy": "current_exact",
       "necessity": "Required repository integrity.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "source-unchanged",
+      "kind": "command",
+      "command": "git diff --exit-code 6740b6e9 -- src tests scripts assets deploy agents package.json bun.lock .ai/harness/policy.json .ai/harness/workflow-contract.json",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Freeze all code, tests, runtime assets and configuration inputs against the passing execution subject; only workflow and provenance changed.",
       "inputs": {
         "env": []
       }
