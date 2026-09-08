@@ -19,3 +19,9 @@ Initial integration run vx-9f7ed717614f4b8f9140: 21 passed, four Docker deadline
 > **Substantive Change SHA256**: `sha256:f4f82c666e8b3912df3f0de30e12ba79bc687635e74d2bb9ee523ce85e7de52e`
 
 Independent security delta review found no actionable issue in #361 request/name reconstruction composed with cleanup. Architecture review retained #361's whole preparation authority; no conflicting marker was ported.
+
+Remote publication diff (merge-base:origin/main..HEAD, after workflow archival):
+
+> **Substantive Change SHA256**: `sha256:e1b61573cf62bcb56d2094d7329823c45fc46f925a61671aa8eeb5c687a5a847`
+
+This binds the remote diff projection; it does not replace the original runtime execution identity or expand acceptance to new source.
