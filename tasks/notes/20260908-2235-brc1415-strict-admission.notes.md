@@ -124,3 +124,12 @@ One directly blocking runtime correction: fresh provider history omitted user me
 > **Substantive Change SHA256**: `sha256:484b692a36453825a81427ca63fcd2949d1bcfaa13c427c47020776112abe827`
 
 UI-hint delta: 43 decoder/observation cases pass with wrong-connector rejection retained, plus TypeScript and six integrity checks. The earlier unavailable capture is not relabeled.
+
+
+## Live continuation result (2026-09-09 00:27 HKT)
+
+New campaign byok-brc1415-20260909-resume-ready uses grant 023f24116e033256189ba47587d1428b435848c5592bb521b05377c3c6525451, seventeen provider calls and the original expiry 2026-09-08T16:34:27.212Z. New revision observation verified. New intent sha256:efc8de82ca2689fa5bb45fa6fcc628649ced379b41f9926e3dc82c70e249242c was authored via --resume-from; verified session chgpt_20260909_002449_byok-brc1415-20260909-resume-ready-group-1-issue updated existing #177/#178 only, preserving their exact database IDs and scopes. No Issue creation was requested.
+
+Adoption with --repo . first failed the pre-existing exact repo_root string comparison; the absolute root passed that check. The challenge followup then failed with `Failed to focus prompt textarea`. Oracle read-github-repository-ancienttwo-byok metadata records status:error and promptSubmitted:false. ReconcileAutomationReservation charged the full reserved call as provider_failure. Run 2192456aa8095baf3d2d081097c21f02a5c6bb349409dff0a306da634772e7da has provider_calls=3, no open reservations and no active controller step. Immutable response remains failed; no adoption, worker, merge or BRC completion claim. Evidence is in the BYOK clone .canary-scratch/resume-author.log, resume-adoption-absolute.log and resume-challenge-reconciliation.json.
+
+After the single directly blocking UI-hint correction, the new Oracle editor-focus fault reaches the second out-of-scope stop boundary. No retry is scheduled. A subsequent slice must prove and fix followup editor readiness, then reconcile the failed immutable challenge response through a canonical recovery path; never overwrite it or reuse the old call as success.
