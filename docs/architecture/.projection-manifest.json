@@ -828,8 +828,8 @@
       "outputDigest": "sha256:93a824fb8d2d33de1b45acfc16783a53193c6ef1bb4843b5c3dcf3c6ae5524f2",
       "verifiedAgainst": {
         "branch": "codex/brc-final-integration",
-        "commit": "037abfb49d38c42621e5aae2e1c91e33802dbcd5",
-        "committedAt": "2026-09-08T14:10:32+08:00"
+        "commit": "4c5229b287090f3021dee99e9479e3288fbabc24",
+        "committedAt": "2026-09-08T14:31:50+08:00"
       }
     },
     {
@@ -908,8 +908,8 @@
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
         "branch": "codex/brc-final-integration",
-        "commit": "571a636522d233a8efdf2f7c42bc14180e129b21",
-        "committedAt": "2026-09-08T14:07:16+08:00"
+        "commit": "4c5229b287090f3021dee99e9479e3288fbabc24",
+        "committedAt": "2026-09-08T14:31:50+08:00"
       }
     },
     {
@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/brc-final-integration",
-        "commit": "037abfb49d38c42621e5aae2e1c91e33802dbcd5",
-        "committedAt": "2026-09-08T14:10:32+08:00"
+        "commit": "4c5229b287090f3021dee99e9479e3288fbabc24",
+        "committedAt": "2026-09-08T14:31:50+08:00"
       }
     },
     {
