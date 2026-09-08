@@ -28,6 +28,8 @@
 
 Security review proved final/user working_turn_id contradictions were not checked. `/tmp/brc14-turn-mismatch-red.log` records the unfixed counterexample; the decoder now requires user/final/tool turn_exchange_id and working_turn_id to agree. Four focused regressions cover missing and contradictory IDs. Canonical baseline run-20260908T140716-56781 passed 14/14 before this bounded correction and remains baseline only.
 
+The package source reference identifies its bounded research/implementation slice, rather than a whole sprint row: finishing this package must not auto-complete BRC14. Original group-loop design at plans/sprints/20260902-GPT-issues-loop.md:1168 permits accepted_with_followups to feed a next authorized group. Follow-up brief propagation and completed_with_followups terminal projection remain subsequent BRC14 work.
+
 ## Open Questions
 
 - None.

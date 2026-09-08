@@ -5,7 +5,7 @@
 > **Slug**: brc14-history-revision-evidence
 > **Planning Source**: waza-think
 > **Orchestration Kind**: host-plan
-> **Source Ref**: sprint:plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md#BRC14
+> **Source Ref**: docs/researches/20260908-brc14-provider-history-evidence.md#bounded-implementation
 > **Artifact Level**: work-package
 > **Promotion Reason**: verification_boundary
 > **Verification Boundary**: Provider history identity and bounded fresh-audit sequencing
@@ -19,7 +19,7 @@
 ## Agentic Routing
 - Selected route: planning
 - Routing reason: Captured from waza-think planning output.
-- Source ref: sprint:plans/sprints/20260902-2238-gpt-pro-seeded-repair-campaign.sprint.md#BRC14
+- Source ref: docs/researches/20260908-brc14-provider-history-evidence.md#bounded-implementation
 - Due diligence:
   - P1 map: See captured planning output below.
   - P2 trace: See captured planning output below.
