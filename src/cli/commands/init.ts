@@ -69,9 +69,6 @@ const GLOBAL_RULES_BEGIN = "<!-- BEGIN: repo-harness global-working-rules -->";
 const GLOBAL_RULES_END = "<!-- END: repo-harness global-working-rules -->";
 const GLOBAL_RULES_SELF_NOTE =
   "<!-- repo-harness manages this block; edits inside are overwritten on sync. Keep personal rules outside the markers. -->";
-const PEER_HARNESS_IF_HERDR = "{{#IF HERDR}}";
-const PEER_HARNESS_IF_NO_HERDR = "{{#IF NO_HERDR}}";
-const PEER_HARNESS_END_IF = "{{/IF}}";
 const COMPLETION_SUMMARY_LABEL_EN = "Next cut";
 const COMPLETION_SUMMARY_LABEL_ZH = "下一刀";
 
@@ -329,42 +326,13 @@ function renderCompletionSummaryLabel(template: string, preset: ReportingLanguag
   return template.replaceAll(COMPLETION_SUMMARY_LABEL_EN, COMPLETION_SUMMARY_LABEL_ZH);
 }
 
-/**
- * The peer-harness guidance depends on whether `herdr` exists on this machine,
- * which the committed repo context cannot know. The template carries both
- * variants behind `{{#IF HERDR}}` / `{{#IF NO_HERDR}}` line markers and exactly
- * one survives rendering; the markers themselves never reach the managed block.
- */
-export function selectPeerHarnessVariant(template: string, herdrAvailable: boolean): string {
-  const kept = herdrAvailable ? PEER_HARNESS_IF_HERDR : PEER_HARNESS_IF_NO_HERDR;
-  const lines: string[] = [];
-  let dropping = false;
-  for (const line of template.split("\n")) {
-    if (line === PEER_HARNESS_IF_HERDR || line === PEER_HARNESS_IF_NO_HERDR) {
-      dropping = line !== kept;
-      continue;
-    }
-    if (line === PEER_HARNESS_END_IF) {
-      dropping = false;
-      continue;
-    }
-    if (!dropping) lines.push(line);
-  }
-  if (dropping) throw new Error("global_working_rules_unbalanced_variant_marker");
-  return lines.join("\n");
-}
-
 function renderGlobalRules(
   sourceRoot: string,
   instruction: string,
   preset: ReportingLanguagePreset,
-  herdrAvailable: boolean,
 ): string {
   const template = readGlobalRulesTemplate(sourceRoot);
-  const rendered = selectPeerHarnessVariant(
-    renderCompletionSummaryLabel(template, preset),
-    herdrAvailable,
-  ).replace(
+  const rendered = renderCompletionSummaryLabel(template, preset).replace(
     /^- Use the user's language for reports; keep technical terms in English\.$/m,
     `- ${instruction}`,
   );
@@ -419,17 +387,11 @@ function mergeManagedBlock(current: string, block: string): MergedManagedBlock {
   return { content: `${trimmed}${trimmed ? "\n\n" : ""}${block}`, status: "written" };
 }
 
-/**
- * `probeHerdr` is injectable because the peer-harness variant is selected from a
- * machine property (PATH), which a hermetic test cannot set up without a real
- * binary. Production callers use the PATH probe.
- */
 export function writeGlobalContextFiles(
   sourceRoot: string,
   target: InstallTargetSpec,
   opts: GlobalContextOptions,
   env?: NodeJS.ProcessEnv,
-  probeHerdr: () => boolean = () => Bun.which("herdr") !== null,
 ): InitStep {
   const home = homeDir(env);
   if (!home) {
@@ -440,7 +402,6 @@ export function writeGlobalContextFiles(
     sourceRoot,
     opts.reportLanguageInstruction,
     opts.reportLanguagePreset,
-    probeHerdr(),
   );
   const targets: string[] = [];
   if (target === "codex" || target === "both") targets.push(join(home, ".codex", "AGENTS.md"));

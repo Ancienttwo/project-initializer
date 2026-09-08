@@ -265,7 +265,7 @@
       "codex-app-thread": {
         "enabled": false
       },
-      "tmux-cli-agent": {
+      "herdr-cli-agent": {
         "enabled": false
       }
     }

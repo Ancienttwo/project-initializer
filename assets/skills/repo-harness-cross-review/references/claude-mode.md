@@ -14,10 +14,10 @@ repo-harness claude-review round --contract tasks/contracts/<task>.contract.md -
 repo-harness claude-review status --contract tasks/contracts/<task>.contract.md --json
 ```
 
-`status` returns the attach command for the owned tmux session. The pane shows
+`status` returns the attach command for the owned herdr session. The pane shows
 streamed assistant/tool activity and findings; raw provider events, requests,
 results and receipt associations remain under `.ai/harness/runs/claude-review/`.
-This is a persistent stream-json Claude process supervised inside tmux, not the
+This is a persistent stream-json Claude process supervised inside herdr, not the
 native Claude terminal UI. Never paste arbitrary input directly into the host.
 
 A rejected review leaves the same provider PID and session alive. Fix the

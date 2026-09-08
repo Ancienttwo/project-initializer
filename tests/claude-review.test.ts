@@ -1,20 +1,35 @@
 import { afterEach, expect, test } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, realpathSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, realpathSync, symlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn, type ChildProcess } from 'child_process';
 import { createHash, randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { acquireExclusiveDirectoryLock } from '../src/effects/locking/exclusive-directory-lock';
 import { buildReviewSubject } from '../src/effects/review/diff-fingerprint';
 import { assessChange, buildReviewSelectionPacket } from '../src/core/review/change-assessment';
-import { claudeReviewStatus, closeClaudeReview, reviewSessionLocation, runClaudeReviewRound } from '../src/effects/review/claude-review-session';
+import { claudeReviewStatus, closeClaudeReview, reviewSessionLocation, runClaudeReviewRound, startReviewServer, herdr, type ReviewSession } from '../src/effects/review/claude-review-session';
+import { herdrCommand, herdrEnvironment, herdrResult } from '../src/effects/terminal/herdr';
 import { verifyAcceptance } from '../scripts/acceptance-receipt';
 import { emptyVerificationEvaluation, withEmptyVerificationPlan } from './helpers/verification-plan-fixture';
 import { reviewContextDigest, validateClaudeReviewResult, type ClaudeReviewRequest } from '../src/core/review/claude-review';
 
 const fixtures: { root: string; home: string }[] = [];
-const sentinels: string[] = [];
+const sentinels: {name:string; process:ChildProcess; root:string; configPath:string}[] = [];
+async function sentinelServer() {
+  const root=mkdtempSync(join(tmpdir(),'rh-herdr-sentinel-'));
+  const name='sentinel-'+randomUUID();
+  const configPath=join(root,'herdr.toml');
+  writeFileSync(configPath,'onboarding = false\n[terminal]\ndefault_shell = "/bin/sh"\nshell_mode = "non_login"\n[update]\nversion_check = false\nmanifest_check = false\n');
+  const endpoint={session:name,configPath};
+  const child=spawn('herdr',['--session',name,'server'],{env:herdrEnvironment(endpoint),stdio:'ignore'});
+  sentinels.push({name,process:child,root,configPath});
+  const call=(args:string[])=>herdrResult(herdrCommand(endpoint,args));
+  for(let i=0;;i++) { try{call(['workspace','list']);break;}catch(e){if(i===50)throw e;await Bun.sleep(100);} }
+  const pane=call(['workspace','create','--cwd',root,'--no-focus']).root_pane.pane_id;
+  const identity=()=>call(['pane','process-info','--pane',pane]).process_info;
+  return {call,pane,identity,endpoint};
+}
 const contract = 'tasks/contracts/review.contract.md';
 afterEach(async () => {
   for (const fixture of fixtures.splice(0)) {
@@ -22,7 +37,7 @@ afterEach(async () => {
     rmSync(fixture.root, { recursive: true, force: true });
     rmSync(fixture.home, { recursive: true, force: true });
   }
-  for (const name of sentinels.splice(0)) execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'kill-session', '-t', name]);
+  for (const item of sentinels.splice(0)) { herdrCommand({session:item.name,configPath:item.configPath},['server','stop']); await new Promise<void>(resolve => item.process.exitCode !== null ? resolve() : item.process.once('exit',()=>resolve())); rmSync(item.root,{recursive:true,force:true}); }
 });
 
 function git(root: string, ...args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
@@ -76,9 +91,8 @@ function fixture(mode = 'normal') {
 
 test('same child/session performs two rounds, records real receipt, rejects stale/duplicate subjects and closes precisely', async () => {
   const f = fixture();
-  const sentinel = `sentinel-${Date.now()}`;
-  execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
-  const before = execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'list-panes', '-a', '-F', '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
+  const sentinel = await sentinelServer();
+  const before = sentinel.identity();
   const first = await runClaudeReviewRound(f.options);
   expect(first.status).toBe('rejected');
   await expect(closeClaudeReview(f.options)).rejects.toThrow();
@@ -96,8 +110,7 @@ test('same child/session performs two rounds, records real receipt, rejects stal
   for (let i = 0; i < 30; i++) { try { process.kill(second.child_pid, 0); await Bun.sleep(100); } catch { break; } }
   expect(() => process.kill(second.child_pid, 0)).toThrow();
   expect(claudeReviewStatus(f.root, contract).status).toBe('closed');
-  const after = execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'list-panes', '-a', '-F', '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
-  for (const line of before.trim().split('\n')) expect(after).toContain(line);
+  expect(sentinel.identity()).toEqual(before);
 }, 30_000);
 
 test('stale source while reviewer runs cannot write an acceptance receipt or trigger replay', async () => {
@@ -205,18 +218,17 @@ function unstartedSession() {
   const f = fixture();
   const location = reviewSessionLocation(f.root, contract);
   const id = randomUUID();
-  const session = { protocol: 1, startup_protocol: 1, repo_root: location.root, contract_file: contract,
-    contract_sha256: 'contract', goal_sha256: 'goal', session_id: id, tmux_session: `review-${id}`,
-    tmux_bin: Bun.which('tmux')!, provider_bin: realpathSync(f.options.providerCommand) };
+  const session: ReviewSession = { protocol: 2, startup_protocol: 1, repo_root: location.root, contract_file: contract,
+    contract_sha256: 'contract', goal_sha256: 'goal', session_id: id, herdr_session: `review-${id}`,
+    herdr_bin: Bun.which('herdr')!, herdr_config: join(location.dir, 'herdr.toml'), provider_bin: realpathSync(f.options.providerCommand) };
   writeFileSync(join(location.dir, 'session.json'), JSON.stringify(session));
   return { ...f, ...location, session };
 }
 
-test('pre-spawn cancel fences a delayed real tmux host and preserves a sentinel', async () => {
+test('pre-spawn cancel fences a delayed host under real herdr and preserves a sentinel', async () => {
   const f = unstartedSession();
-  const sentinel = `sentinel-${randomUUID()}`;
-  execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'new-session', '-d', '-s', sentinel, 'sleep 120']); sentinels.push(sentinel);
-  const before = execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' });
+  const sentinel = await sentinelServer();
+  const before = sentinel.identity();
   const lock = acquireExclusiveDirectoryLock(f.root, join('.ai/harness/runs/claude-review', f.dir.split('/').at(-1)!, 'startup.lock'));
   try { await expect(closeClaudeReview(f.options, true)).rejects.toThrow('exclusive lock'); }
   finally { lock.release(); }
@@ -224,18 +236,40 @@ test('pre-spawn cancel fences a delayed real tmux host and preserves a sentinel'
   await closeClaudeReview(f.options, true);
   const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
   const host = fileURLToPath(new URL('../src/effects/review/claude-review-host.ts', import.meta.url));
-  execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'new-session', '-d', '-s', f.session.tmux_session,
-    [process.execPath, host, f.dir].map(quote).join(' ')]);
-  const live = () => { try { execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'has-session', '-t', f.session.tmux_session], { stdio: 'ignore' }); return true; } catch { return false; } };
-  try {
-    for (let i = 0; i < 30 && live(); i++) await Bun.sleep(100);
-    expect(live()).toBe(false);
-    expect(existsSync(join(f.dir, 'spawn-intent.json'))).toBe(false);
-    expect(existsSync(join(f.dir, 'processes.json'))).toBe(false);
-    expect(existsSync(join(f.dir, 'accepted-1.json'))).toBe(false);
-    expect(execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'display-message', '-p', '-t', sentinel, '#{pane_id} #{pane_pid}'], { encoding: 'utf8' })).toBe(before);
-  } finally { if (live()) execFileSync('tmux', ['-L', 'repo-harness-claude-review', 'kill-session', '-t', f.session.tmux_session]); }
+  const delayed=await sentinelServer();
+  const marker=join(f.root,'delayed-host-returned');
+  const submitted=herdrCommand(delayed.endpoint,['pane','run',delayed.pane,[process.execPath,host,f.dir].map(quote).join(' ')+'; printf done > '+quote(marker)]);
+  expect(submitted.status).toBe(0);
+  for(let i=0;i<50&&!existsSync(marker);i++)await Bun.sleep(100);
+  expect(existsSync(marker)).toBe(true);
+  expect(existsSync(join(f.dir, 'spawn-intent.json'))).toBe(false);
+  expect(existsSync(join(f.dir, 'processes.json'))).toBe(false);
+  expect(existsSync(join(f.dir, 'accepted-1.json'))).toBe(false);
+  expect(sentinel.identity()).toEqual(before);
 }, 10_000);
+
+test('failed server metadata publication reaps its owned herdr child', async () => {
+  const f = unstartedSession();
+  // A dangling entry survives existsSync but refuses immutable publication.
+  symlinkSync(join(f.dir, 'absent-target'), join(f.dir, 'server.json'));
+  await expect(startReviewServer(f.session, f.dir)).rejects.toThrow();
+  expect(existsSync(join(f.dir, 'server-start-intent.json'))).toBe(true);
+  expect(JSON.parse(readFileSync(join(f.dir, 'server-closed.json'), 'utf8')).session_id).toBe(f.session.session_id);
+  expect(herdrCommand({ session: f.session.herdr_session }, ['workspace', 'list']).status).not.toBe(0);
+  await closeClaudeReview(f.options, true);
+  expect(claudeReviewStatus(f.root, contract).status).toBe('closed');
+});
+
+test('ambiguous server startup cannot report successful closure', async () => {
+  const f = unstartedSession();
+  writeFileSync(join(f.dir, 'server-start-intent.json'), JSON.stringify({ session_id: f.session.session_id }));
+  await expect(closeClaudeReview(f.options, true)).rejects.toThrow('server_startup_ownership_unknown');
+  expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
+  expect(claudeReviewStatus(f.root, contract).status).toBe('cleanup_pending');
+  writeFileSync(join(f.dir, 'closed.json'), JSON.stringify({ session_id: f.session.session_id, cancelled: true }));
+  await expect(closeClaudeReview(f.options, true)).rejects.toThrow('server_startup_ownership_unknown');
+  expect(claudeReviewStatus(f.root, contract).status).toBe('cleanup_pending');
+});
 
 test('pre-metadata cancel refuses ambiguous spawn intent and mismatched no-child proof', async () => {
   const f = unstartedSession();
@@ -254,4 +288,34 @@ test('pre-metadata cancel refuses sessions without recorded startup serializatio
   writeFileSync(join(f.dir, 'session.json'), JSON.stringify(unrecorded));
   await expect(closeClaudeReview(f.options, true)).rejects.toThrow('startup_ownership_unknown');
   expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
+});
+
+test('server identity mismatch cannot submit another round or signal a replacement server', async () => {
+  const f = fixture();
+  await runClaudeReviewRound(f.options);
+  const dir = reviewSessionLocation(f.root, contract).dir;
+  const path = join(dir, 'server.json');
+  const original = readFileSync(path, 'utf8');
+  const server = JSON.parse(original);
+  writeFileSync(path, JSON.stringify({ ...server, identity: server.identity + ' changed' }));
+  try {
+    writeFileSync(join(f.root, 'source.ts'), 'export const value = 2;\n'); prepare(f.root);
+    await expect(runClaudeReviewRound(f.options)).rejects.toThrow('server_identity_lost');
+    expect(existsSync(join(dir, 'request-2.json'))).toBe(false);
+    await expect(closeClaudeReview(f.options, true)).rejects.toThrow('server_identity_lost');
+    expect(() => process.kill(server.pid, 0)).not.toThrow();
+    expect(claudeReviewStatus(f.root, contract).status).toBe('interrupted');
+  } finally { writeFileSync(path, original); }
+}, 20_000);
+
+test('old tmux session metadata is rejected without translation or cleanup', async () => {
+  const f = unstartedSession();
+  const path = join(f.dir, 'session.json');
+  const original = readFileSync(path, 'utf8');
+  writeFileSync(path, JSON.stringify({ ...f.session, protocol: 1, tmux_session: f.session.herdr_session }));
+  try {
+    expect(() => claudeReviewStatus(f.root, contract)).toThrow('session_identity_mismatch');
+    await expect(closeClaudeReview(f.options, true)).rejects.toThrow('session_identity_mismatch');
+    expect(existsSync(join(f.dir, 'closed.json'))).toBe(false);
+  } finally { writeFileSync(path, original); }
 });

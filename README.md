@@ -41,7 +41,7 @@ with a tasks-first agent contract that keeps Claude and Codex aligned.
 
 ### 1. Install the CLI
 
-Prerequisites: a Git working tree, `bun`, and usable `tmux` for host readiness; macOS/Linux also require `bash`,
+Prerequisites: a Git working tree, `bun`, and usable `herdr` >=0.9.0 for host readiness; macOS/Linux also require `bash`,
 while Windows requires Git for Windows (including its Bash and `usr/bin`
 tools). `jq` is optional. No Node.js required — the installer uses Bun >=
 1.4.0 as the runtime, installing or upgrading Bun first when needed.
@@ -65,9 +65,11 @@ repo-harness install
 npx -y repo-harness@latest install   # npx fallback; the CLI still runs on Bun
 ```
 
-Install tmux with `brew install tmux` (macOS) or your Linux package manager.
-Persistent Claude review uses POSIX process groups; Windows users run this
-workflow within WSL. Missing tmux blocks host readiness.
+Install herdr from [herdr.dev](https://herdr.dev/) and verify `herdr --version`.
+Persistent review hosting requires POSIX process groups; on Windows use WSL.
+Missing or unusable herdr blocks host readiness. Before upgrading from tmux,
+drain existing reviewers using the previous version and explicitly rebind terminal
+endpoints. See [runtime cutover](docs/researches/20260909-herdr-runtime-cutover.md).
 
 ### 2. Bootstrap the host runtime
 

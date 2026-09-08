@@ -1,13 +1,13 @@
 # runtime-harness/agent-runtime-effects 架構文檔
 
-<!-- BEGIN ARCHCONTEXT:generated target="projection_target.entity.capability-runtime-harness-agent-runtime-effects" sourceDigest="sha256:3517aa5a8e203deb277bb407d8b87ee2ab2308d600f8bb56727e80173e14771c" rendererVersion="archcontext.docs-renderer/v4" outputDigest="sha256:092926bb2c8e9046f5a381a749e9a8214e496687c1b43f90c82359a390b37c53" -->
+<!-- BEGIN ARCHCONTEXT:generated target="projection_target.entity.capability-runtime-harness-agent-runtime-effects" sourceDigest="sha256:db8da263beff4735f851a015c0616de22f34fe1698e4ea62047644dbed269619" rendererVersion="archcontext.docs-renderer/v4" outputDigest="sha256:4d5538edaea6cbd11f8bb81dfd525c116a0c74264f5adc9c1c10a7cb79afecfb" -->
 > **狀態**:`active`
 > **Capability ID**:`capability.runtime-harness.agent-runtime-effects`(kind `capability`)
 > **Matched Prefixes**:`src/core/engineers/agent-runtime-effect.ts`、`src/effects/engineers/agent-runtime-effect-store.ts`、`src/effects/engineers/agent-runtime-feature.ts`、`src/effects/engineers/agent-runtime-adapters/**`
 > **Local Contracts**:`src/core/engineers/AGENTS.md`、`src/core/engineers/CLAUDE.md`
 > **事實優先級**:倉庫當前狀態 > 本文檔機器區 > 本文檔人工區。機器區(引言、§1、§2)由 ArchContext 從架構模型與源碼度量投影生成,手改會在下次投影被覆蓋。本文檔不記錄出處;本次投影所驗證的 commit 見 `docs/architecture/.projection-manifest.json`。
 
-Owns the provider-neutral, at-most-once Agent Runtime Effect V2 boundary for closed Codex App Thread and tmux CLI Agent adapters, covering inbox notification and durable task-offer wake.
+Owns the provider-neutral, at-most-once Agent Runtime Effect V2 boundary for closed Codex App Thread and Herdr CLI Agent adapters, covering inbox notification and durable task-offer wake.
 
 ## 1. P1:能力架構地圖
 

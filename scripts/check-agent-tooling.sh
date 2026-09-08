@@ -795,16 +795,15 @@ function detectWaza() {
 }
 
 function detectRuntimeCapabilities(waza) {
-  const tmux = commandCapability("tmux", "persistent observable agent processes and task-scoped Claude acceptance review", "platform-runtime", true);
-  const herdr = commandCapability("herdr", "optional peer-harness collaboration panes (terminal multiplexer for coding agents)", "platform-runtime", false);
-  if (tmux.path) {
+  const herdr = commandCapability("herdr", "persistent agent terminals, peer collaboration and task-scoped Claude acceptance review", "platform-runtime", true);
+  if (herdr.path) {
     try {
-      tmux.version = execFileSync(tmux.path, ["-V"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
-      if (!/^tmux \S+$/.test(tmux.version)) tmux.status = "unavailable";
-    } catch (_) { tmux.status = "unavailable"; }
+      herdr.version = execFileSync(herdr.path, ["--version"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
+      const version = /^herdr (\d+)\.(\d+)\.(\d+)$/.exec(herdr.version);
+      if (!version || (Number(version[1]) === 0 && Number(version[2]) < 9)) herdr.status = "unavailable";
+    } catch (_) { herdr.status = "unavailable"; }
   }
   return {
-    tmux,
     herdr,
     bun: commandCapability(
       "bun",
@@ -1977,8 +1976,8 @@ const report = {
 };
 
 const strictFailures = [];
-if (strictReadiness && report.runtime_capabilities.tmux.status !== "present") {
-  strictFailures.push(`tmux runtime is ${report.runtime_capabilities.tmux.status}; install tmux and verify tmux -V`);
+if (strictReadiness && report.runtime_capabilities.herdr.status !== "present") {
+  strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install herdr >=0.9.0 and verify herdr --version`);
 }
 if (strictReadiness && ["missing", "partial"].includes(report.tools.codegraph.status)) {
   strictFailures.push(`CodeGraph readiness is ${report.tools.codegraph.status}: ${report.tools.codegraph.reason}`);

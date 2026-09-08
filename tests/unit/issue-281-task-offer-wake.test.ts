@@ -35,7 +35,7 @@ import {
 } from '../../src/core/engineers/scheduling';
 import type { EngineerPrincipalV1 } from '../../src/core/engineers/principal-claim';
 import { CODEX_APP_THREAD_OPERATIONS, executeCodexAppThreadAction } from '../../src/effects/engineers/agent-runtime-adapters/codex-app-thread';
-import { TMUX_CLI_AGENT_OPERATIONS, executeTmuxCliAgentAction } from '../../src/effects/engineers/agent-runtime-adapters/tmux-cli-agent';
+import { HERDR_CLI_AGENT_OPERATIONS, executeHerdrCliAgentAction } from '../../src/effects/engineers/agent-runtime-adapters/herdr-cli-agent';
 import { bindEngineer, readEngineerBindingStatus } from '../../src/effects/engineers/binding-store';
 import { collectEngineeringBoard } from '../../src/effects/engineers/engineering-overlay';
 import { loadEngineerProfile } from '../../src/effects/engineers/profile-store';
@@ -136,7 +136,7 @@ function fixture(
   cpSync(join(sourceRoot, '.archcontext/model/nodes'), join(repoRoot, '.archcontext/model/nodes'), { recursive: true });
   cpSync(join(sourceRoot, 'agents/engineers'), join(repoRoot, 'agents/engineers'), { recursive: true });
   writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({
-    agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'tmux-cli-agent': { enabled: true } } },
+    agent_runtime: { mode: 'active', adapters: { 'codex-app-thread': { enabled: true }, 'herdr-cli-agent': { enabled: true } } },
   })}\n`);
   execFileSync('git', ['add', '.'], { cwd: repoRoot });
   execFileSync('git', ['commit', '-qm', 'fixture'], { cwd: repoRoot });
@@ -294,7 +294,7 @@ afterEach(() => {
 describe('issue #281 durable task-offer wake protocol', () => {
   test('the capability matrix and the operation union carry both runtime operations', () => {
     const observation = buildAgentRuntimeCapabilityObservation({
-      adapter_kind: 'tmux-cli-agent',
+      adapter_kind: 'herdr-cli-agent',
       host_id: 'local',
       operations: { notify_inbox: 'supported', wake_for_offer: 'unsupported' },
       evidence_refs: [],
@@ -302,7 +302,7 @@ describe('issue #281 durable task-offer wake protocol', () => {
     });
     expect(observation.operations.wake_for_offer).toBe('unsupported');
     expect(() => buildAgentRuntimeCapabilityObservation({
-      adapter_kind: 'tmux-cli-agent',
+      adapter_kind: 'herdr-cli-agent',
       host_id: 'local',
       operations: { notify_inbox: 'supported' } as never,
       evidence_refs: [],
@@ -317,7 +317,7 @@ describe('issue #281 durable task-offer wake protocol', () => {
       wake_ref: { repository_id: 'repo_0123456789abcdef', authorization_revision: 4, snapshot_revision: digest, wake_reason: 'new_eligible_offer' },
       endpoint_fence: {
         engineer_id: engineerId, binding_id: bindingOne, binding_generation: 1, engineer_contract_revision: digest,
-        adapter_kind: 'tmux-cli-agent', host_id: 'local', endpoint_id: 'opaque-endpoint',
+        adapter_kind: 'herdr-cli-agent', host_id: 'local', endpoint_id: 'opaque-endpoint',
       },
       capability_sha256: digest,
       created_at: '2026-09-03T10:00:00.000Z',
@@ -332,7 +332,7 @@ describe('issue #281 durable task-offer wake protocol', () => {
       wake_ref: { repository_id: 'repo_0123456789abcdef', authorization_revision: 4, snapshot_revision: digest, wake_reason: 'because' as never },
       endpoint_fence: {
         engineer_id: engineerId, binding_id: bindingOne, binding_generation: 1, engineer_contract_revision: digest,
-        adapter_kind: 'tmux-cli-agent', host_id: 'local', endpoint_id: 'opaque-endpoint',
+        adapter_kind: 'herdr-cli-agent', host_id: 'local', endpoint_id: 'opaque-endpoint',
       },
       capability_sha256: digest,
       created_at: '2026-09-03T10:00:00.000Z',
@@ -555,11 +555,11 @@ describe('issue #281 durable wake store', () => {
   });
 
   test('an adapter without wake support fails closed unless the controller policy allows scheduled polling', () => {
-    const strict = fixture('tmux-cli-agent', 'unsupported');
+    const strict = fixture('herdr-cli-agent', 'unsupported');
     record(strict, emptyOffers(strict), '2026-09-03T10:03:00.000Z');
     expect(() => record(strict, offers(strict), '2026-09-03T10:04:00.000Z')).toThrow(AgentRuntimeEffectStoreError);
 
-    const permitted = fixture('tmux-cli-agent', 'unavailable');
+    const permitted = fixture('herdr-cli-agent', 'unavailable');
     record(permitted, emptyOffers(permitted), '2026-09-03T10:03:00.000Z', { polling_fallback_enabled: true });
     const result = record(permitted, offers(permitted), '2026-09-03T10:04:00.000Z', { polling_fallback_enabled: true });
     expect(result).toMatchObject({ outcome: 'polling_fallback', cause: 'wake_unsupported', status: null });
@@ -681,26 +681,26 @@ describe('issue #281 adapters invoke exactly one bounded controller step', () =>
     expect(calls).toEqual([{ host_id: 'local', thread_id: 'endpoint-1111', operation: 'wake_for_offer', control_ref: action.control_ref }]);
   });
 
-  test('the tmux adapter sends exactly one bounded wake control reference and never a command', () => {
-    const fx = fixture('tmux-cli-agent');
+  test('the herdr adapter sends exactly one bounded wake control reference and never a command', () => {
+    const fx = fixture('herdr-cli-agent');
     const action = wakeAction(fx);
     const calls: string[][] = [];
-    const observation = executeTmuxCliAgentAction(action, ({ endpoint_id }) => `%resolved-${endpoint_id}`, (command, args) => {
+    const observation = executeHerdrCliAgentAction(action, () => ({ session: 'rh-test', agentName: 'bound-agent' }), (command, args) => {
       calls.push([command, ...args]);
-      return { status: 0, signal: null, error: undefined, output: [], pid: 1, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
+      return { status: 0, signal: null, error: undefined, output: [], pid: 1, stdout: Buffer.from(JSON.stringify({id:"fixture",result:{type:'agent_prompted',agent:{name:'bound-agent'}}})), stderr: Buffer.alloc(0) };
     });
-    expect(observation).toMatchObject({ adapter_kind: 'tmux-cli-agent', outcome: 'accepted', process_exit_code: 0 });
-    expect(calls).toEqual([['tmux', 'send-keys', '-t', '%resolved-endpoint-1111', '--', action.control_ref, 'Enter']]);
+    expect(observation).toMatchObject({ adapter_kind: 'herdr-cli-agent', outcome: 'accepted', process_exit_code: 0 });
+    expect(calls).toEqual([['herdr', '--session', 'rh-test', 'agent', 'prompt', 'bound-agent', action.control_ref]]);
   });
 
   test('both adapters declare the same operation contract and report unsupported for anything else', () => {
     expect([...CODEX_APP_THREAD_OPERATIONS]).toEqual(['notify_inbox', 'wake_for_offer']);
-    expect([...TMUX_CLI_AGENT_OPERATIONS]).toEqual(['notify_inbox', 'wake_for_offer']);
+    expect([...HERDR_CLI_AGENT_OPERATIONS]).toEqual(['notify_inbox', 'wake_for_offer']);
     const fx = fixture('codex-app-thread');
     const action = wakeAction(fx);
     const foreign = { ...action, operation: 'stop_agent' } as unknown as typeof action;
     expect(() => executeCodexAppThreadAction(foreign, () => { throw new Error('must not run'); })).toThrow();
-    expect(() => executeTmuxCliAgentAction(foreign as never, () => '%pane', () => { throw new Error('must not run'); })).toThrow();
+    expect(() => executeHerdrCliAgentAction(foreign as never, () => ({ session: 'rh-test', agentName: 'bound-agent' }), () => { throw new Error('must not run'); })).toThrow();
   });
 });
 
