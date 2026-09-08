@@ -11,3 +11,11 @@ Owner narrowed this round to integration and bounded failure closeout. BRC6a and
 Full PR integration binding against main cfb26baa:
 
 > **Substantive Change SHA256**: `sha256:8834b4d41c05f13294883d24a88e4b4aa8f213aed9a8b089358e0b15d1762334`
+
+## Final CI delta
+
+CI 34199753915 finished with two stale test expectations: campaign command enumeration omitted observe-revision, and the loop characterization retained two digests of the old readiness golden files. Updated only the command list and those two fixture hashes. All 18 affected CLI/state tests pass; repository integrity checks pass. No production behavior changed.
+
+> **Substantive Change SHA256**: `sha256:c925689f594146d003d1cd34eedf36e70e3cc2eb9a5cfb0b331ec080252b862d`
+
+> **Substantive Change SHA256**: `sha256:ca529db4ad9248d04f7616314900ea5591571ddc97f07982b4de458d1c3c64f3`
