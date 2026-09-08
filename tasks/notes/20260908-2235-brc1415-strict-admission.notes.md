@@ -79,3 +79,14 @@ Owner subsequently accepted Connector/account availability based on manual testi
 ## Actual BRC14 request boundary
 
 Public BYOK SDK read succeeded. The observed fetch_commit response was truncated, exposing that the request did not name the raw resources required by the existing decoder. Correct both observation and fresh audit requests together; share their exact URL derivation with the decoder, preserve all verification conditions. Development evidence: two caller assertions red, then 43 observation/audit cases and 17 decoder cases green, with typecheck. The remaining live result and acceptance stay separate.
+
+
+## BYOK active stop boundary (2026-09-08 23:50 HKT)
+
+Ancienttwo/byok-sdk shadow-raw-ready and active exact revision observations both verified through the canonical provider-history decoder. Active target is 5156c9ce0f67c991747f8539fe63e68667f9b7be on refs/heads/codex/brc1415-canary. Oracle f694ab63 preserves current model selection and passed 32 focused browser cases, typecheck and build. Web authoring created Issues #177 and #178; independent readback confirms both OPEN with the campaign markers. No task acquisition, worker, PR or merge occurred in BYOK.
+
+Canonical step failed reading the Issue collection: `spawnSync gh ENOBUFS (stdout or stderr buffer reached maxBuffer size limit)`. The active budget reached its configured runner_invocations limit 4 after revision observation, authoring, repository read and failed collection read. It is budget_exhausted with stop receipt 2b2b33b73dec631190d70c35acf1b1f4ddc0ea8d6a9d1d70b5a7a5c4c7a273d9, zero open reservations, four consumed provider calls and zero acquisitions. Five prior reserved calls plus these four equal nine against the original forty-call envelope, but that remaining envelope does not reactivate a stopped grant. Adoption refused before effects.
+
+Evidence remains in /Users/ancienttwo/Projects/byok-brc1415-canary/.canary-scratch/{authoring.log,group-1-step.json,adoption.log,active-budget-readback.json} and immutable automation run 7d92c1c725ee65b51a2ec132f1f385ccb5233315616dbdf986b816accd9ba8d4. The new collection-read failure is a further scope discovery; stop under the existing scope boundary instead of silently repairing or increasing the grant. Resume must handle bounded complete Issue collection reads and a canonical authorization recovery, retaining the original deadline and total budget unless Owner changes them.
+
+Source local acceptance is bound to final 14/14 run run-20260908T234051-54153-20260908-2235-brc1415-strict-admission.json, subject sha256:70cf8fda24ddaada2ad9e693b84743a9b09342c31f14aeac955431651dc3948a, including 60 focused cases. Earlier 86 cases remain baseline evidence. No full-suite rerun and no live BRC14/BRC15 completion claim.
