@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 18:47
+> **Related Plan**: plans/archive/plan-20260908-1826-brc354-preparation-recovery.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1847
+> **Archive Projection V1**: `plans/plan-20260908-1826-brc354-preparation-recovery.md` => `plans/archive/plan-20260908-1826-brc354-preparation-recovery.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1826-brc354-preparation-recovery.notes.md` => `tasks/archive/notes-20260908-1847-brc354-preparation-recovery.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1826-brc354-preparation-recovery.contract.md` => `tasks/archive/contract-20260908-1847-brc354-preparation-recovery.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1826-brc354-preparation-recovery.review.md` => `tasks/archive/review-20260908-1847-brc354-preparation-recovery.md`
+
 # Implementation Notes: brc354-preparation-recovery
 
 > **Status**: Active
-> **Plan**: plans/plan-20260908-1826-brc354-preparation-recovery.md
-> **Contract**: tasks/contracts/20260908-1826-brc354-preparation-recovery.contract.md
-> **Review**: tasks/reviews/20260908-1826-brc354-preparation-recovery.review.md
+> **Plan**: plans/archive/plan-20260908-1826-brc354-preparation-recovery.md
+> **Contract**: tasks/archive/contract-20260908-1847-brc354-preparation-recovery.md
+> **Review**: tasks/archive/review-20260908-1847-brc354-preparation-recovery.md
 > **Last Updated**: 2026-09-08 18:26
 > **Lifecycle**: notes
 
