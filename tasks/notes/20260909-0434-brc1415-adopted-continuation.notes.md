@@ -13,3 +13,9 @@ Verification stays at the affected authoring/adoption boundary plus required int
 Development regression:47 pass,0 fail across continuation, existing authoring and adoption; typecheck passes.
 
 > **Substantive Change SHA256**: `sha256:877511f3194bda9ffba05f538d2b96e4dbb69fbd5d896332df6a0a0d43d783d0`
+
+Review disposition: source completeness and successor delivery completeness are distinct. The source must bind every original Issue; successor authoring_exhausted may retain legal unfilled slots, per Owner scope. Full-set successor enforcement was independently refuted. Broad GitHub connector permissions are the unchanged PhaseA provider trust boundary, not a new capability; controller checks do not claim to undo malicious remote writes. A competing losing successor can leave nondispatched immutable history, intentionally without authority to change source.
+
+Confirmed crash gap: initial retry resampled created_at after an immutable continuation was written. Reuse only persisted creation time, recompute all grant/baseline/prompt fields and enforce immutable byte equality. Existing authoring budget reservation replay still refuses repeated I/O. A crash injected after the real continuation write reproduced the conflict in /tmp/brc-resume-crash-red.log; /tmp/brc-resume-crash-green.log passes the same retry and prevents a second provider dispatch.
+
+> **Substantive Change SHA256**: `sha256:aaf8ce52e3652ed00cf038ae29b6ece7e4d8d23f80ef951c1f3a2cbf737c9246`

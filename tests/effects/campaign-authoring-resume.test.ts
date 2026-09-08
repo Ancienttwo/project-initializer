@@ -1,5 +1,6 @@
+import * as issueStore from '../../src/effects/automation/issue-batch-store';
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, expect, test, spyOn } from 'bun:test';
 import { execFileSync } from 'child_process';
 import { readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -54,7 +55,7 @@ async function fixture(stop = true, usage: 'none' | 'open' | 'acquired' = 'none'
   return { ...f, adopted, resume, successor, readBinding };
 }
 
-test.each(['exact', 'replacement'] as const)('stopped adopted source enforces %s Issue identities through real admission', async mode => {
+test.each(['exact', 'replacement', 'partial'] as const)('stopped adopted source enforces %s Issue identities through real admission', async mode => {
   const f = await fixture();
   const sourcePath = join(issueBatchGroupStoreRoot(f.root, f.intent.campaign_id, 1), 'intent.json');
   const original = readFileSync(sourcePath, 'utf8');
@@ -75,8 +76,8 @@ test.each(['exact', 'replacement'] as const)('stopped adopted source enforces %s
   const intent = started.intent;
   const adoption = adoptIssueBatch({ ...f.input, campaign_id: intent.campaign_id, intent_sha256: intent.intent_sha256 }, {
     ...f.deps, observe: () => {
-      const snapshot = makeSnapshot(intent);
-      if (mode === 'exact') return snapshot;
+      const snapshot = makeSnapshot(intent, mode === 'partial' ? ['01'] : intent.slots);
+      if (mode !== 'replacement') return snapshot;
       const observations = snapshot.observations.map((o, n) => {
         if (n !== 0) return o;
         const { protocol, kind, source_revision, observation_sha256, ...basis } = o;
@@ -100,7 +101,8 @@ test.each(['exact', 'replacement'] as const)('stopped adopted source enforces %s
     return;
   }
   const result = await adoption;
-  expect(result.receipt.issues.map(i=>i.provider_issue_id)).toEqual(f.adopted.receipt.issues.map(i=>i.provider_issue_id));
+  expect(result.receipt.issues.map(i=>i.provider_issue_id)).toEqual(f.adopted.receipt.issues.filter(i=>mode!=='partial'||i.slot==='01').map(i=>i.provider_issue_id));
+  expect(result.receipt.unfilled_slots).toEqual(mode==='partial'?['02']:[]);
   expect(result.publication!.materialized_commit).not.toBe(f.adopted.publication!.materialized_commit);
   expect(readFileSync(sourcePath,'utf8')).toBe(original);
   expect(readDevelopmentCampaignStatus(f.root,f.intent.campaign_id,f.env).current.current_sha256).toBe(oldCurrent);
@@ -117,4 +119,26 @@ for (const mode of ['active','open','acquired','wrong-issue','tampered-manifest'
   await expect(startIssueBatchAuthoring(next,{readBinding:f.readBinding,consult:async()=>{calls++;throw Error('unexpected provider');}})).rejects.toThrow();
   expect(calls).toBe(0);
   expect(readIssueBatchAdoptionArtifact(f.root,f.intent,'continuation')).toBeNull();
+});
+
+test('pre-dispatch crash after continuation binding retries the same persisted intent once', async () => {
+  const f = await fixture(); const next = await f.successor('campaign-2'); let calls = 0;
+  const persist = issueStore.persistIssueBatchAdoptionArtifact;
+  const crash = spyOn(issueStore, 'persistIssueBatchAdoptionArtifact').mockImplementation((...args) => {
+    persist(...args);
+    if (args[2] === 'continuation') throw Error('crash after binding before reservation');
+  });
+  const deps = { readBinding:f.readBinding, consult:async () => { calls++; return { sessionId:'resumed-after-crash',status:'completed' as const,
+    meta:campaignBrowserMetadata({sessionId:'resumed-after-crash',repoRoot:f.root,profileDir:f.home,profileDirectory:'Profile 1'}) }; } };
+  try {
+    await expect(startIssueBatchAuthoring(next,{...deps,now:()=> '2026-09-09T00:00:00.000Z'})).rejects.toThrow('crash after binding');
+  } finally { crash.mockRestore(); }
+  expect(calls).toBe(0);
+  const path=join(issueBatchGroupStoreRoot(f.root,'campaign-2',1),'intent.json');
+  const original=readFileSync(path,'utf8');
+  const resumed=await startIssueBatchAuthoring(next,{...deps,now:()=> '2026-09-09T00:01:00.000Z'});
+  expect(calls).toBe(1);expect(readFileSync(path,'utf8')).toBe(original);
+  expect(resumed.intent.created_at).toBe('2026-09-09T00:00:00.000Z');
+  await expect(startIssueBatchAuthoring(next,{...deps,now:()=> '2026-09-09T00:02:00.000Z'})).rejects.toThrow('reconcile');
+  expect(calls).toBe(1);
 });

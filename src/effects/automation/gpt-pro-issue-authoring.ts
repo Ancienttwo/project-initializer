@@ -23,7 +23,7 @@ import {
 import { assertAuthorityBinding, readDevelopmentCampaignStatus, readExactAuthorityBinding } from './development-campaign-store';
 import { readDevelopmentCampaignPolicyAtRevision, readCampaignExternalSourcesPolicyAtRevision } from './development-campaign-policy';
 import { requireManualGithubPolicy } from '../external-sources/policy';
-import { assertIssueAuthoringSourceSession, readIssueBatchAdoptionArtifact, persistIssueAuthoringSession, persistIssueBatchIntent, readIssueBatchIntent } from './issue-batch-store';
+import { assertIssueAuthoringSourceSession, readExistingIssueBatchIntent, readIssueBatchAdoptionArtifact, persistIssueAuthoringSession, persistIssueBatchIntent, readIssueBatchIntent } from './issue-batch-store';
 
 export class GptProIssueAuthoringError extends Error {
   constructor(readonly code: 'issue_authoring_invalid' | 'issue_authoring_state_invalid' | 'issue_authoring_profile_mismatch' | 'issue_authoring_reconciliation_required', message: string) {
@@ -263,7 +263,9 @@ function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: read
 
 export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrowserResult>(input: StartIssueBatchAuthoringInput, deps: Pick<IssueAuthoringDependencies<Result>, 'readBinding' | 'consult' | 'now'>) {
   const value = context(input, deps.readBinding);
-  const createdAt = (deps.now ?? (() => new Date().toISOString()))();
+  const existing = input.resume_from === undefined ? null : readExistingIssueBatchIntent(value.repoRoot, input.campaign_id, input.group_number);
+  // Recompute all authority and prompt fields; only the immutable creation time is reused.
+  const createdAt = existing?.created_at ?? (deps.now ?? (() => new Date().toISOString()))();
   const slots = Object.freeze(Array.from({ length: value.authorization.campaign!.issues_per_group }, (_, index) => String(index + 1).padStart(2, '0') as IssueBatchSlot));
   const draft = {
     campaign_id: input.campaign_id, group_number: input.group_number,

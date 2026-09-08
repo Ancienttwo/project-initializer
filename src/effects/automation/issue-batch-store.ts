@@ -91,12 +91,18 @@ export function persistIssueBatchIntent(repoRoot: string, intentInput: IssueBatc
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
-export function readIssueBatchIntent(repoRoot: string, campaignId: string, groupNumber: number, intentSha256: string): IssueBatchIntentV1 {
+export function readExistingIssueBatchIntent(repoRoot: string, campaignId: string, groupNumber: number): IssueBatchIntentV1 | null {
   const value = paths(repoRoot, campaignId, groupNumber);
-  if (!/^sha256:[0-9a-f]{64}$/u.test(intentSha256)) fail('issue_batch_unsafe', 'intent digest is invalid');
+  if (!existsSync(value.intent)) return null;
   const intent = parse(value.intent, validateIssueBatchIntent, canonicalIssueBatchIntentBytes);
   if (intent.campaign_id !== campaignId || intent.group_number !== groupNumber) fail('issue_batch_not_found', 'issue batch intent is stored under another campaign group');
-  if (intent.intent_sha256 !== intentSha256) fail('issue_batch_not_found', 'issue batch intent digest does not name the group intent');
+  return intent;
+}
+
+export function readIssueBatchIntent(repoRoot: string, campaignId: string, groupNumber: number, intentSha256: string): IssueBatchIntentV1 {
+  if (!/^sha256:[0-9a-f]{64}$/u.test(intentSha256)) fail('issue_batch_unsafe', 'intent digest is invalid');
+  const intent = readExistingIssueBatchIntent(repoRoot, campaignId, groupNumber);
+  if (!intent || intent.intent_sha256 !== intentSha256) fail('issue_batch_not_found', 'issue batch intent digest does not name the group intent');
   return intent;
 }
 
