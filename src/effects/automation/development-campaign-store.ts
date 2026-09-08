@@ -340,6 +340,8 @@ export function createDevelopmentCampaign(input: {
   requireMutationPolicy(repoRoot, requestedCampaign, env);
   return withExclusiveDirectoryLock(value.common, value.lock, () => {
     prepare(value);
+    const observationRequest = readCampaignRevisionRecord<{ authorization_sha256: string }>(repoRoot, requestedCampaign.campaign_id, 'request');
+    if (observationRequest && observationRequest.authorization_sha256 !== requestedCampaign.authorization_sha256) fail('campaign_conflict', 'campaign revision observation belongs to another authorization');
     const storedCampaign = existsSync(value.definition)
       ? parse(value.definition, validateDevelopmentCampaignDefinition, canonicalDevelopmentCampaignDefinitionBytes)
       : null;
@@ -399,9 +401,23 @@ export function readCampaignRevisionRecord<T>(repoRoot: string, campaignId: stri
 }
 export function persistCampaignRevisionRecord(repoRoot: string, campaignId: string, name: 'request' | 'result', record: unknown): void {
   const value = paths(repoRoot, campaignId);
-  if (!existsSync(value.definition)) fail('campaign_not_found', 'revision observation requires existing campaign');
   withExclusiveDirectoryLock(value.common, value.lock, () => {
+    ensureDirectoryChain(value.common, value.campaign);
     const basis = { campaign_id: campaignId, record };
     immutable(join(value.campaign, `revision-${name}.json`), Buffer.from(`${canonicalMessageBytes({ ...basis, record_sha256: canonicalMessageDigest(basis) })}\n`));
+  });
+}
+
+/** Serialize provider admission with stop/start, without holding the lock across provider await. */
+export function withCampaignRevisionAdmission<T>(repoRoot: string, campaignId: string, authorizationSha256: string, action: () => T): T {
+  const value = paths(repoRoot, campaignId);
+  return withExclusiveDirectoryLock(value.common, value.lock, () => {
+    if (existsSync(value.definition)) {
+      const status = readDevelopmentCampaignStatus(repoRoot, campaignId);
+      if (status.campaign.authorization_sha256 !== authorizationSha256
+        || !['authorized', 'group_preparing'].includes(status.current.state)
+        || status.events.some(event => event.operation === 'start_group')) fail('campaign_conflict', 'revision observation requires the first pre-active campaign under the same grant');
+    }
+    return action();
   });
 }

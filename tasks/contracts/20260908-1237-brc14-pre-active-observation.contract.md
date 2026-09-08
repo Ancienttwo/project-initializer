@@ -33,7 +33,7 @@ Provide one budgeted fresh GitHub transport observation before initial authoring
 
 ## Falsifier
 
-If an observation needs a published adoption or synthetic issue intent, this approach fails. A fixture in authorized state with no group directory must admit exactly one fake provider call.
+If an observation needs a published adoption or synthetic issue intent, this approach fails. A fixture with only a stored grant and no campaign definition must admit exactly one fake provider call.
 
 ## Root Cause Evidence
 
@@ -71,22 +71,17 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
-  - src/core/automation/budget.ts
-  - src/effects/automation/budget-store.ts
-  - src/effects/automation/development-campaign-store.ts
-  - src/effects/automation/campaign-revision-observation.ts
+  - src/cli/chatgpt-browser/
   - src/cli/commands/campaign.ts
-  - tests/effects/campaign-revision-observation.test.ts
-  - tests/unit/issue-282-automation-budget-store.test.ts
-  - tests/unit/campaign-authoring-budget-prerequisite.test.ts
-  - tests/cli/development-campaign.test.ts
-  - docs/researches/20260908-brc14-fresh-audit-runtime.md
+  - src/core/automation/
+  - src/effects/automation/
+  - tests/
+  - docs/
+  - .archcontext/
+  - AGENTS.md
+  - CLAUDE.md
   - plans/
-  - tasks/todos.md
-  - tasks/contracts/20260908-1237-brc14-pre-active-observation.contract.md
-  - tasks/reviews/20260908-1237-brc14-pre-active-observation.review.md
-  - tasks/notes/20260908-1237-brc14-pre-active-observation.notes.md
-  - .ai/harness/architecture-projection.manifest.json
+  - tasks/
 ```
 
 ## Evidence Requirements

@@ -243,11 +243,11 @@ export function buildCampaignCommand(): Command {
   command.command('observe-revision')
     .description('Collect a budgeted pre-active revision observation without authoring or group acceptance')
     .option('--repo <path>', 'Repository root', '.')
-    .requiredOption('--campaign-id <id>', 'Development campaign id')
+    .requiredOption('--authorization-sha256 <digest>', 'Exact stored campaign authorization')
     .option('--gitleaks-bin <path>', 'Mandatory prompt scanner')
     .action(async raw => {
       try {
-        output(await runCampaignRevisionObservation({ repo_root: resolve(raw.repo), campaign_id: required(raw.campaignId, '--campaign-id'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult }));
+        output(await runCampaignRevisionObservation({ repo_root: resolve(raw.repo), authorization_sha256: required(raw.authorizationSha256, '--authorization-sha256'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult }));
         process.exitCode = 1;
       } catch (error) { outputError(error); }
     });

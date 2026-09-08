@@ -131,3 +131,8 @@ Archive this bounded package with contract-worktree finish --no-merge; main has 
 ## Task Breakdown
 - [ ] Implement pre-active revision observation with existing campaign budget and immutable request/result.
 - [ ] Verify refusal, replay, budget and default-session boundaries; document actual scope and pass independent acceptance.
+
+
+## Observed entrypoint correction
+
+The authorized fixed canary commit uses finite issue-number selection, so campaign start correctly refuses its incomplete Issue snapshot. Revision observation reads no Issue list. Its sole input authority is therefore the anchored ProgramAuthorization digest (`--authorization-sha256`), even before campaign creation; any existing campaign is only an additional state/ownership constraint. This preserves the existing campaign-start guard and fixed remote commit. Request/result persistence may precede campaign definition, and subsequent creation must use the same grant. The campaign mutation lock serializes final state validation, reservation and initiation of the provider promise; no lock spans the await. Budget reservation is the in-flight boundary for a later stop.

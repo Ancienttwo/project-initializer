@@ -17,28 +17,28 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const SPRINT = 'plans/sprints/repair.sprint.md';
-function fixture(maxCalls = 4) {
+function fixture(maxCalls = 4, create = true, finiteSelection = false) {
   const mode = 'shadow', capability = CAP, rounds = 1;
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-adoption-'))); const home = realpathSync(mkdtempSync(join(tmpdir(), 'brc6-home-')));
   git(root, ['init', '-q', '-b', 'main']); git(root, ['config', 'user.name', 'Test']); git(root, ['config', 'user.email', 'test@example.invalid']);
   for (const path of ['.ai/harness', '.archcontext/model/nodes', 'src', 'plans/sprints', 'plans/policies']) mkdirSync(join(root, path), { recursive: true });
   writeFileSync(join(root, 'src/index.ts'), 'export {};\n');
   writeFileSync(join(root, '.archcontext/model/nodes/capability.yaml'), JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: capability, kind: 'capability', name: 'Campaign', status: 'active', summary: 'Fixture capability', responsibilities: ['Own fixture'], source: { include: ['src/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } }));
-  writeFileSync(join(root, '.ai/harness/policy.json'), JSON.stringify({ development_campaign: { version: 1, mode, limits: { maximum_group_count: 1, maximum_issues_per_group: 2, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: 20, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } } }));
+  writeFileSync(join(root, '.ai/harness/policy.json'), JSON.stringify({ development_campaign: { version: 1, mode, limits: { maximum_group_count: 1, maximum_issues_per_group: 2, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: finiteSelection ? { kind: 'issue_numbers', issue_numbers: [1] } : { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 2, max_issues: 20, max_body_bytes: 8192, max_total_bytes: 65536, deadline_ms: 1000 } } } }));
   writeFileSync(join(root, 'plans/policies/repair.json'), 'repair');
   writeFileSync(join(root, 'plans/policies/publication.json'), JSON.stringify(policy));
   const repository = repoHarnessRepoIdFor(root);
   writeFileSync(join(root, SPRINT), '# Sprint: repair\n\n> **Status**: Approved\n> **Backlog Schema**: 2\n\n## Backlog\n\n| # | ID | Status | Task | Mode | Acceptance | Plan |\n|---|----|---|---|---|---|---|\n\n## Execution Log\n');
   writeFileSync(join(root, 'plans/sprints/repair.work-graph.v1.json'), JSON.stringify({ protocol: 1, kind: 'repo-harness-work-graph', repository_id: repository, sprint_path: SPRINT, lane: 'generic-v1', work_packages: [] }));
-  
+
   git(root, ['add', '.']); git(root, ['commit', '-qm', 'base']); const revision = git(root, ['rev-parse', 'HEAD']);
   const authorization = sealProgramAuthorization({ authorization_id: 'auth-1', repository_id: repository, target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: 'a'.repeat(64), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: { max_agent_turns: 10, max_successful_acquisitions: 2, max_runner_invocations: 10, max_provider_failures: 2, max_consecutive_no_progress_steps: 2, max_repair_cycles: 2, max_wall_clock_seconds: 3600, max_input_tokens: null, max_output_tokens: null, max_cost_micros: null }, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: 1, issues_per_group: 2, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 1', max_authoring_rounds_per_group: rounds, max_controller_steps: 100, max_provider_calls: maxCalls, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: AT, expires_at: '2027-09-05T00:00:00.000Z' });
   const env = { ...process.env, REPO_HARNESS_HOME: home };
   mintProgramAuthorization({ repo_root: root, authorization, env });
   const campaign = buildDevelopmentCampaignDefinition({ campaign_id: 'campaign-1', authorization_id: authorization.authorization_id, authorization_sha256: authorization.authorization_sha256, repository_id: repository, target_ref: authorization.target_ref, target_revision: revision, created_at: AT });
-  const created = createDevelopmentCampaign({ repo_root: root, campaign, idempotency_key: 'start', env });
+  if (create) createDevelopmentCampaign({ repo_root: root, campaign, idempotency_key: 'start', env });
   roots.push(root, home);
-  const input = { repo_root: root, campaign_id: campaign.campaign_id, env };
+  const input = { repo_root: root, authorization_sha256: authorization.authorization_sha256, env };
   const binding = { profileDir: home, profileDirectory: 'Profile 1' };
   const readBinding = () => ({ path: 'binding', binding });
   const browser = (status: 'completed' | 'failed' | 'recoverable' = 'completed') => ({ sessionId: 'observation', status, output: 'No provider-resolved revision returned.', meta: { ...campaignBrowserMetadata({ sessionId: 'observation', repoRoot: root, profileDir: home, profileDirectory: 'Profile 1' }), oracle: { ...campaignBrowserMetadata({ sessionId: 'observation', repoRoot: root, profileDir: home, profileDirectory: 'Profile 1' }).oracle, networkCapture: { status: 'captured', path: '/private/test/stream.jsonl', sha256: 'a'.repeat(64), bytes: 100 } } } });
@@ -144,4 +144,40 @@ test('observation context refuses invented intent, later group, active step and 
   for (const change of [{ intent_sha256: 'sha256:' + 'b'.repeat(64) }, { group_number: 2 }, { step_admission_sha256: 'a'.repeat(64) }, { extra: true }]) {
     expect(() => validateCampaignAutomationReservationContext({ ...base, ...change } as any)).toThrow();
   }
+});
+
+test('stop between preflight and reservation prevents provider I/O', async () => {
+  const f = fixture(); let calls = 0;
+  await expect(runCampaignRevisionObservation(f.input, { readBinding: () => {
+    const state = readDevelopmentCampaignStatus(f.root, f.campaign.campaign_id, f.env);
+    appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: f.campaign.campaign_id, expected_current_sha256: state.current.current_sha256, operation: 'stop', idempotency_key: 'stop-interleaving', observed_at: new Date().toISOString(), env: f.env });
+    return f.readBinding();
+  }, consult: async () => { calls++; return f.browser(); } })).rejects.toThrow();
+  expect(calls).toBe(0);
+});
+
+test('stored grant can collect before campaign creation without altering Issue selection policy', async () => {
+  const f = fixture(4, false);
+  const result = await runCampaignRevisionObservation(f.input, { readBinding: f.readBinding, consult: async () => f.browser() });
+  expect(result.revision_evidence).toBe('unavailable');
+  expect(() => readDevelopmentCampaignStatus(f.root, f.campaign.campaign_id, f.env)).toThrow('missing');
+  const created = createDevelopmentCampaign({ repo_root: f.root, campaign: f.campaign, idempotency_key: 'create-after-observation', env: f.env });
+  expect(created.current.state).toBe('authorized');
+  expect((await runCampaignRevisionObservation(f.input, { readBinding: f.readBinding, consult: async () => { throw new Error('must replay'); } })).replayed).toBe(true);
+});
+
+test('readonly observation does not require an Issue snapshot or weaken campaign start policy', async () => {
+  const f = fixture(4, false, true);
+  const result = await runCampaignRevisionObservation(f.input, { readBinding: f.readBinding, consult: async () => f.browser() });
+  expect(result.revision_evidence).toBe('unavailable');
+  expect(() => createDevelopmentCampaign({ repo_root: f.root, campaign: f.campaign, idempotency_key: 'forbidden-start', env: f.env })).toThrow('complete repository Issue snapshot');
+});
+
+test('campaign creation cannot replace the grant that owns the pre-creation observation', async () => {
+  const f = fixture(4, false);
+  await runCampaignRevisionObservation(f.input, { readBinding: f.readBinding, consult: async () => f.browser() });
+  const other = sealProgramAuthorization({ ...f.authorization, authorization_id: 'other-grant' });
+  mintProgramAuthorization({ repo_root: f.root, authorization: other, env: f.env });
+  const campaign = buildDevelopmentCampaignDefinition({ ...f.campaign, authorization_id: other.authorization_id, authorization_sha256: other.authorization_sha256 });
+  expect(() => createDevelopmentCampaign({ repo_root: f.root, campaign, idempotency_key: 'other-grant-create', env: f.env })).toThrow('another authorization');
 });

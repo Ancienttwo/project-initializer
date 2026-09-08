@@ -112,9 +112,9 @@ describe('development campaign CLI', () => {
 
 test('revision observation CLI exposes readonly entry and rejects missing campaign without provider access', () => {
   const help = run(['campaign', 'observe-revision', '--help']);
-  expect(help.status).toBe(0); expect(help.stdout).toContain('--campaign-id');
+  expect(help.status).toBe(0); expect(help.stdout).toContain('--authorization-sha256');
   expect(help.stdout).not.toContain('--model'); expect(help.stdout).not.toContain('--group-number');
-  const f = fixture(); const missing = run(['campaign', 'observe-revision', '--repo', f.root, '--campaign-id', 'absent'], f.env);
-  expect(missing.status).toBe(1); expect(JSON.parse(missing.stderr).error).toBe('campaign_not_found');
+  const f = fixture(); const missing = run(['campaign', 'observe-revision', '--repo', f.root, '--authorization-sha256', 'a'.repeat(64)], f.env);
+  expect(missing.status).toBe(1); expect(JSON.parse(missing.stderr).error).toBe('campaign_unavailable');
   expect(missing.stdout).toBe('');
 });
