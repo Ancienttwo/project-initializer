@@ -14,7 +14,7 @@ trace, review, and handoff.
 
 The same authority model may support persistent logical Module Engineers. The
 engineer is a repo-defined role with a reviewed SOP and repo-grounded knowledge;
-a Codex App Thread or tmux CLI Agent is only its replaceable runtime binding,
+a Codex App Thread or Herdr CLI Agent is only its replaceable runtime binding,
 while native Subagents remain bounded workers under one canonical task claim.
 
 ## Primary Users
@@ -184,8 +184,8 @@ repos.
   workstreams, and task-local notes, with any engineer memory kept as a
   rebuildable index.
 - Agent Runtime adapters are a closed set (`codex-app-thread`,
-  `tmux-cli-agent`). They cannot create endpoints, carry message bodies, execute
-  generic tmux commands, infer receipt state, or change Task, Lease,
+  `herdr-cli-agent`). They cannot create endpoints, carry message bodies, execute
+  generic terminal commands, infer receipt state, or change Task, Lease,
   Collaboration, Publication, Acceptance, or Fleet column authority.
 
 ## Human Review Expectations
@@ -369,9 +369,10 @@ Only Human authority may accept or reject a submitted demand. Acceptance freezes
 
 `repo-harness claude-review round/status/close/cancel` owns one reviewer session
 per canonical task contract and worktree. Both host profiles require usable
-tmux in readiness. A dedicated `repo-harness-claude-review` tmux server hosts a readable
-activity pane and one persistent Claude stream-json child; it does not parse a
-terminal screen or change user tmux configuration.
+herdr >=0.9.0 in readiness. Each review owns a dedicated named headless herdr
+server, a readable activity pane and one persistent Claude stream-json child.
+A private config and launcher isolate the host from user shell startup and restore.
+It does not parse terminal text or change user configuration.
 
 The existing acceptance context owns contract/goal identity, current Git subject,
 target revision and prepared verification fingerprint. Each numbered request
@@ -391,8 +392,8 @@ fails closed without replay or automatic recovery.
 After verification passes, explicit `close` checks the current passing receipt
 against the session's final recorded round, shuts down the child and its host,
 and retains evidence. `cancel` permits owned cleanup after failure without
-acceptance. PID/group/start-time/executable and tmux server/session/pane/host
+acceptance. PID/group/start-time/executable and herdr server/session/pane/host
 identity fence operations; a reused pane is never a cleanup target. Run close
 before `contract-worktree finish` removes the workspace. This reviewer does not
-create scheduler Tasks, Claims, Leases or Engineer Bindings; tmux notification
+create scheduler Tasks, Claims, Leases or Engineer Bindings; Herdr notification
 adapters and the provider-free merge gate keep their existing authority.

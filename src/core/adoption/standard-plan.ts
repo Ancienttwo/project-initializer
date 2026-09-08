@@ -356,7 +356,7 @@ export function defaultPolicy(documentationProfile: string, documentationLanguag
       mode: "off",
       adapters: {
         "codex-app-thread": { enabled: false },
-        "tmux-cli-agent": { enabled: false },
+        "herdr-cli-agent": { enabled: false },
       },
     },
     development_campaign: {

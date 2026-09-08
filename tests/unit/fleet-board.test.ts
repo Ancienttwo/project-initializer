@@ -288,7 +288,7 @@ test('delivery observations affect the digest without changing classification', 
     registry_revision: 'sha256:registry', sequence: 1, observed_at: '2026-09-07T00:00:00.000Z',
     repositories: [{ repository_id: 'repo-a', repo_root: '/fixtures/a', access_mode: 'read_write', status: 'ok', snapshot_consistency: 'stable', error: null,
       cards: [card({ inbox: { ...card().inbox, delivery_evidence: { candidate_count: 1, latest: {
-        adapter_kind: 'tmux-cli-agent', effect_state: 'stopped', receipt_kind: null,
+        adapter_kind: 'herdr-cli-agent', effect_state: 'stopped', receipt_kind: null,
         observed_at: '2026-09-07T00:00:00.000Z', observation_sequence: observationSequence, observation_sha256: `sha256:${'e'.repeat(64)}`,
       } } } })],
     }],

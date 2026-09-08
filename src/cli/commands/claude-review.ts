@@ -3,7 +3,7 @@ import { claudeReviewStatus, closeClaudeReview, reviewSessionLocation, runClaude
 import { recordCircuitAttempt } from '../hook/circuit-breaker';
 
 export function buildClaudeReviewCommand(): Command {
-  const command = new Command('claude-review').description('Persistent read-only Claude acceptance review in an owned tmux session');
+  const command = new Command('claude-review').description('Persistent read-only Claude acceptance review in an owned herdr session');
   for (const operation of ['round', 'status', 'close', 'cancel'] as const) {
     const child = command.command(operation)
       .description({ round: 'Review prepared evidence; reuse the same reviewer for up to three repair rounds',
