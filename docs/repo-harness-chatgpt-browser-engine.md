@@ -34,7 +34,7 @@ repo-harness remains a Bun-first CLI package. The Oracle CLI package currently r
 
 `browser-doctor --provider oracle --json` is the authority for this boundary. It probes the resolved binary with `--help` and `--version` and reports `nodeCompatible` plus the capabilities repo-harness may use. If the doctor reports `nodeCompatible:false`, fix or reinstall Oracle's Node runtime before changing repo-harness' `package.json` engines or CI runtime.
 
-When Oracle is missing, too old, or selected through a broken explicit source, the same doctor JSON includes explicit source-aware `agent_actions` such as `chatgpt-oracle-install-pinned`, `chatgpt-oracle-upgrade-pinned`, or `chatgpt-oracle-fix-configured-source`. These actions are for the opt-in GPT Pro setup/repair lane only. Default `repo-harness install`, ordinary setup checks, and dry-run consults still do not install, upgrade, or re-point Oracle automatically.
+When Oracle is missing, too old, or selected through a broken explicit source, the same doctor JSON includes explicit source-aware `agent_actions` such as `chatgpt-oracle-install-pinned`, `chatgpt-oracle-upgrade-pinned`, `chatgpt-oracle-fix-configured-source`, or `chatgpt-oracle-select-fork-build` (emitted instead of an install/upgrade action when only the repo-harness fork flags are missing, because no published release carries them). These actions are for the opt-in GPT Pro setup/repair lane only. Default `repo-harness install`, ordinary setup checks, and dry-run consults still do not install, upgrade, or re-point Oracle automatically.
 
 ## First-Time Setup
 

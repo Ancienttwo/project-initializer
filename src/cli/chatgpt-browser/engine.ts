@@ -10,7 +10,7 @@ import {
 } from './binding';
 import { resolveBrowserOutputPath } from './file-policy';
 import { checkNativeChatgptSession, nativeDebuggingBlockedByDefaultProfile, nativeProviderAvailable, runNativeProvider } from './native-provider';
-import { buildOracleCommand, probeOracle, REQUIRED_ORACLE_VERSION, resolveOracleBin, runOracleProvider, supportsBrowserAppPreselect, validateOracleProfileBinding, validateOracleVersion } from './oracle-provider';
+import { buildOracleCommand, ORACLE_FORK_FLAG_RECOVERY, ORACLE_RUNTIME_PROBE_CAPABILITIES, probeOracle, REQUIRED_ORACLE_VERSION, resolveOracleBin, runOracleProvider, supportsBrowserAppPreselect, validateOracleProfileBinding, validateOracleVersion } from './oracle-provider';
 import { assemblePromptBundle } from './prompt-assembler';
 import { scanPromptBundle } from './secret-scan';
 import {
@@ -38,7 +38,7 @@ export interface BrowserDoctorOptions {
 export type BrowserDoctorStatus = 'ready' | 'unavailable' | 'action_required' | 'deprecated';
 
 export interface BrowserDoctorAgentAction {
-  id: 'chatgpt-oracle-install-pinned' | 'chatgpt-oracle-upgrade-pinned' | 'chatgpt-oracle-fix-configured-source';
+  id: 'chatgpt-oracle-install-pinned' | 'chatgpt-oracle-upgrade-pinned' | 'chatgpt-oracle-fix-configured-source' | 'chatgpt-oracle-select-fork-build';
   status: 'needs_agent';
   requires_agent: true;
   reason: string;
@@ -62,6 +62,9 @@ const EMPTY_ORACLE_CAPABILITIES = {
   copyProfile: false,
   browserChromeProfile: false,
   browserThinkingTime: false,
+  writeSession: false,
+  networkEvidence: false,
+  conversationEvidence: false,
   chatgptUrl: false,
   heartbeat: false,
 };
@@ -101,6 +104,8 @@ function buildOracleAgentActions(input: {
   oracleCapabilitiesReady: boolean;
   oracleVersionCompatible: boolean;
   missingOracleCapabilities: string[];
+  forkFlagGap: boolean;
+  missingForkFlags: string[];
   oracleSource?: string;
 }): BrowserDoctorAgentAction[] {
   if (input.provider !== 'oracle') return [];
@@ -148,6 +153,24 @@ function buildOracleAgentActions(input: {
     }];
   }
   if (!input.oracleCapabilitiesReady) {
+    // Upstream Oracle releases never carry the fork flags, so an install/upgrade
+    // action here would loop forever: the only recovery is selecting the fork build.
+    if (input.forkFlagGap) {
+      return [{
+        id: 'chatgpt-oracle-select-fork-build',
+        status: 'needs_agent',
+        requires_agent: true,
+        reason: `Resolved Oracle reports version ${REQUIRED_ORACLE_VERSION} but rejects the repo-harness fork flags (${input.missingForkFlags.join(', ')}). ${ORACLE_FORK_FLAG_RECOVERY}`,
+        risk: 'Repoints GPT Pro browser consults at a different Oracle binary; verify the selected fork build before any real run.',
+        command: 'REPO_HARNESS_ORACLE_BIN=<path-to-fork-oracle> repo-harness chatgpt browser-doctor --repo <repo> --provider oracle --json',
+        alternatives: [
+          'Pass --oracle-bin <path-to-fork-oracle> for this command.',
+          'Build the repo-harness Oracle fork and point REPO_HARNESS_ORACLE_BIN at its CLI entrypoint.',
+        ],
+        verification,
+        automatic: false,
+      }];
+    }
     const missingRequirements = input.oracleVersionCompatible
       ? input.missingOracleCapabilities.join(', ') || 'nodeCompatible'
       : `exact version ${REQUIRED_ORACLE_VERSION}`;
@@ -266,6 +289,17 @@ export async function browserDoctor(
     .map(([capability]) => capability);
   const oracleVersionCompatible = oracleProbe?.versionCompatible === true;
   const oracleVersionError = oracleProbe ? validateOracleVersion(oracleProbe.version).error : undefined;
+  const missingForkCapabilities = ORACLE_RUNTIME_PROBE_CAPABILITIES
+    .filter(({ capability }) => oracleCapabilities[capability] !== true)
+    .map(({ flag }) => flag);
+  const forkCapabilityNames = new Set<string>(ORACLE_RUNTIME_PROBE_CAPABILITIES.map(({ capability }) => capability));
+  // A fork-flag gap is the narrow case where the resolved binary satisfies every
+  // published requirement and only the fork-only flags are missing. A binary that
+  // also lacks upstream `--help` capabilities is an ordinary version/source problem.
+  const forkFlagGap = oraclePresent
+    && oracleVersionCompatible
+    && missingForkCapabilities.length > 0
+    && missingOracleCapabilities.every((capability) => forkCapabilityNames.has(capability));
   const oracleCapabilitiesReady = Boolean(oracleProbe?.nodeCompatible && oracleVersionCompatible && missingOracleCapabilities.length === 0);
   const nativePresent = await nativeProviderAvailable();
   const bindingResult = readBrowserBinding(repoRoot);
@@ -311,7 +345,9 @@ export async function browserDoctor(
     } else if (!oracleVersionCompatible) {
       next.push(oracleVersionError?.message ?? `Resolved oracle must report exactly version ${REQUIRED_ORACLE_VERSION}.`);
     } else if (!oracleCapabilitiesReady) {
-      next.push('Resolved oracle binary did not report the required browser-mode flags; upgrade oracle or check `oracle --help`.');
+      next.push(forkFlagGap
+        ? 'Resolved oracle does not accept the repo-harness fork flags; the fork build is required. Point REPO_HARNESS_ORACLE_BIN=<path-to-fork-oracle> or --oracle-bin <path-to-fork-oracle> at it.'
+        : 'Resolved oracle binary did not report the required browser-mode flags; upgrade oracle or check `oracle --help`.');
     } else {
       next.push('repo-harness chatgpt browser-consult --provider oracle --prompt "Reply exactly OK"');
     }
@@ -338,7 +374,9 @@ export async function browserDoctor(
     ? oracleResolution.error ?? (!oracleCapabilitiesReady && oraclePresent ? oracleVersionError ?? {
       code: 'ORACLE_INCOMPATIBLE',
       message: `oracle binary did not report required browser-mode capabilities: ${missingOracleCapabilities.join(', ')}`,
-      recovery: 'Upgrade oracle or check `oracle --help`; repo-harness requires every flag it may send at runtime.',
+      recovery: forkFlagGap
+        ? ORACLE_FORK_FLAG_RECOVERY
+        : 'Upgrade oracle or check `oracle --help`; repo-harness requires every flag it may send at runtime.',
     } : undefined)
     : undefined;
   const agentActions = buildOracleAgentActions({
@@ -347,6 +385,8 @@ export async function browserDoctor(
     oracleCapabilitiesReady,
     oracleVersionCompatible,
     missingOracleCapabilities,
+    forkFlagGap,
+    missingForkFlags: missingForkCapabilities,
     oracleSource: oracleResolution.source,
   });
   const json = {
