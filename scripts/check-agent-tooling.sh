@@ -796,6 +796,7 @@ function detectWaza() {
 
 function detectRuntimeCapabilities(waza) {
   const tmux = commandCapability("tmux", "persistent observable agent processes and task-scoped Claude acceptance review", "platform-runtime", true);
+  const herdr = commandCapability("herdr", "optional peer-harness collaboration panes (terminal multiplexer for coding agents)", "platform-runtime", false);
   if (tmux.path) {
     try {
       tmux.version = execFileSync(tmux.path, ["-V"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -804,6 +805,7 @@ function detectRuntimeCapabilities(waza) {
   }
   return {
     tmux,
+    herdr,
     bun: commandCapability(
       "bun",
       "repo-harness-owned global installs, local package dependency install, and test/runtime execution",

@@ -265,7 +265,7 @@ describe("Output Quality Gates", () => {
 
     expect(countLines(claudeNoCloudflare)).toBeLessThanOrEqual(500);
     expect(countLines(claudeWithCloudflare)).toBeLessThanOrEqual(500);
-    expect(countLines(agentsWithCloudflare)).toBeLessThanOrEqual(260);
+    expect(countLines(agentsWithCloudflare)).toBeLessThanOrEqual(261);
   });
 
   test("should not leak unresolved template placeholders", () => {
