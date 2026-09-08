@@ -1,16 +1,16 @@
 # Task Review: brc354-independent-supervision
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260908-1627-brc354-independent-supervision.md
 > **Contract**: tasks/contracts/20260908-1627-brc354-independent-supervision.contract.md
 > **Notes File**: tasks/notes/20260908-1627-brc354-independent-supervision.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 16:27
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:8ede1562683d1151cd494f51dc187e0233f00b967cee3fe9693f7a7bc4f7c4a7
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:8ede1562683d1151cd494f51dc187e0233f00b967cee3fe9693f7a7bc4f7c4a7
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: d4852017f6fc5d9a5167bdf5b64eaf48f9b442c1
+> **Verification Evidence SHA256**: sha256:07f3ff7d5bea56e4d20b5058dd95b4dca3163b9de63e2ba4bc5eed3269af751f
+> **Issued At**: 2026-09-08T09:10:07.470Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Local source review and frozen verification pass for host-isolated Docker supervision, exact identity, post-exit tamper refusal and no-restart recovery. The directly blocking typed-path redaction regression also passes. Active remains closed; no BRC14/BRC15 live acceptance is claimed.
 - Findings: none
 
 ## Behavior Diff Notes
