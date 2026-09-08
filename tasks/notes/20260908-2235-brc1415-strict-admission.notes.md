@@ -71,3 +71,6 @@ The single permitted blocking scope expansion was the capability registry correc
 ## Oracle repair scope resolution
 
 Owner approved the newly discovered Oracle selector slice. It is fixed locally at Oracle 2bb2acb7 with a red-green regression, 31 passing browser cases, typecheck/build and real successful prompt submission. The second shadow attempt completed but both GitHub resource calls returned 404; no exact revision evidence was produced. All shadow reservations are settled, the two-call shadow allocation is consumed, and no active grant was minted. Durable details are in docs/researches/20260908-brc14-provider-history-evidence.md under the authorized Oracle repair result. Owner subsequently confirmed intentional local/Web GPT account separation. Resolve a target already accessible to the Web GPT account before any new budgeted observation; preserve both account isolation and current-model selection.
+
+
+Owner subsequently accepted Connector/account availability based on manual testing and directed skipping this investigation. No further availability probe or account configuration change is required. Publish the locally verified source candidate; keep active/manual execution and exact-revision results separate and leave BRC14/BRC15 live acceptance incomplete.

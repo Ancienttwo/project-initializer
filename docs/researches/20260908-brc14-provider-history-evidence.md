@@ -93,3 +93,8 @@ Owner clarified that the ChatGPT default was manually set to GPT 6 Medium for fa
 ### Owner clarification: intentional GitHub account separation
 
 Owner confirmed that the local Git account and Web GPT GitHub account intentionally differ; Connector operation itself is not the fault. Target selection incorrectly treated local repository access as sufficient readiness for the Web GPT account. GitHub REST readback through the local account confirms the canonical owner/name, commit and ref, but cannot establish the other account's access. Preserve account isolation: do not reconnect, switch accounts or expand repository permissions. The next canary must name a repository already accessible to the Web GPT account; if AiphaBee is not shared with that account, select another explicit target. Any new run requires a fresh target-bound grant and finite scope; neither failed observation may be reused as revision acceptance.
+
+
+### Owner acceptance of Connector availability
+
+Owner stated that Connector/account availability was already manually tested and explicitly directed skipping that part. Treat the availability investigation as closed by Owner acceptance; do not require another account probe or connection change. The original unavailable exact-revision observation remains historical evidence with its actual scope. This decision does not rewrite its payload, synthesize a revision receipt or mark the unexecuted active/manual worker, merge, cleanup and final audit as completed. Continue publishing the verified source repairs independently of the live canary acceptance.
