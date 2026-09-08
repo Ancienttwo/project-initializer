@@ -181,3 +181,18 @@ test('campaign creation cannot replace the grant that owns the pre-creation obse
   const campaign = buildDevelopmentCampaignDefinition({ ...f.campaign, authorization_id: other.authorization_id, authorization_sha256: other.authorization_sha256 });
   expect(() => createDevelopmentCampaign({ repo_root: f.root, campaign, idempotency_key: 'other-grant-create', env: f.env })).toThrow('another authorization');
 });
+
+test('competing grant creation cannot be poisoned by the earlier observation preflight', async () => {
+  const f = fixture(4, false); let calls = 0;
+  const other = sealProgramAuthorization({ ...f.authorization, authorization_id: 'competing-grant' });
+  mintProgramAuthorization({ repo_root: f.root, authorization: other, env: f.env });
+  const campaign = buildDevelopmentCampaignDefinition({ ...f.campaign, authorization_id: other.authorization_id, authorization_sha256: other.authorization_sha256 });
+  await expect(runCampaignRevisionObservation(f.input, { readBinding: () => {
+    createDevelopmentCampaign({ repo_root: f.root, campaign, idempotency_key: 'competing-create', env: f.env });
+    return f.readBinding();
+  }, consult: async () => { calls++; return f.browser(); } })).rejects.toThrow();
+  expect(calls).toBe(0);
+  expect(readCampaignRevisionRecord(f.root, f.campaign.campaign_id, 'request')).toBeNull();
+  const result = await runCampaignRevisionObservation({ ...f.input, authorization_sha256: other.authorization_sha256 }, { readBinding: f.readBinding, consult: async () => f.browser() });
+  expect(result.revision_evidence).toBe('unavailable');
+});

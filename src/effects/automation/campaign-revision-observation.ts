@@ -68,7 +68,7 @@ export async function runCampaignRevisionObservation(input: {
   };
   const requestDigest = automationDigest(request);
   // The fixed immutable request also rejects a changed binding under the same campaign.
-  persistCampaignRevisionRecord(root, campaignId, 'request', request);
+  persistCampaignRevisionRecord(root, campaignId, 'request', request, authority.authorization_sha256);
   const settle = (record: RevisionResult, replayed: boolean) => {
     if (record.request_sha256 !== requestDigest) refuse('revision observation request differs from saved result');
     if (record.browser_status !== 'completed') refuse('revision observation is unresolved; reservation retained without repeat provider I/O');
@@ -104,6 +104,6 @@ export async function runCampaignRevisionObservation(input: {
       sourceSessionId: null, parentProviderSessionId: null }),
     network_capture: result.meta.oracle?.networkCapture ?? null, answer_sha256: messageSha256(raw),
     output: raw.length <= 2 * 1024 * 1024 ? raw : null, revision_evidence: 'unavailable' };
-  persistCampaignRevisionRecord(root, campaignId, 'result', record);
+  persistCampaignRevisionRecord(root, campaignId, 'result', record, authority.authorization_sha256);
   return settle(record, false);
 }
