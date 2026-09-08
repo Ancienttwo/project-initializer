@@ -231,7 +231,7 @@ async function authoringIntent(f: ReturnType<typeof fixture>) {
   appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:status.current.current_sha256,operation:'prepare_group',idempotency_key:'prepare-active',observed_at:new Date().toISOString(),env:f.env});
   return (await startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.campaign.campaign_id,group_number:1,dry_run:true,env:f.env},{readBinding:f.readBinding,consult:async()=>({...f.browser(),sessionId:'authoring'})})).intent;
 }
-test('formal history plus observed ledger still rejects active preparation without independent supervision', async () => {
+test('formal history plus observed ledger admits without mutating authority', async () => {
   const f=fixture(4,true,false,'active'); let calls=0;
   const deps={readBinding:f.readBinding,consult:async(input:any)=>{calls++;expect(input.captureConversationEvidence).toBe(true);return historyBrowser(f,input.prompt);}};
   expect((await runCampaignRevisionObservation(f.input,deps)).revision_evidence).toBe('verified');
@@ -239,17 +239,19 @@ test('formal history plus observed ledger still rejects active preparation witho
   expect(replay.exitCode, replay.stderr.toString()).toBe(0);
   expect(JSON.parse(replay.stdout.toString())).toMatchObject({ revision_evidence: 'verified', replayed: true });
   const intent=await authoringIntent(f);
-  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('independent supervision unavailable');
   const before = JSON.stringify(f.budget().current);
   const beforeGit = git(f.root, ['status', '--porcelain', '--untracked-files=all']);
-  let externalCalls = 0;
-  const forbidden = () => { externalCalls++; throw new Error('active side effect reached'); };
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();
+  expect(JSON.stringify(f.budget().current)).toBe(before);
+  expect(git(f.root, ['status', '--porcelain', '--untracked-files=all'])).toBe(beforeGit);
+  let boundaryCalls = 0;
+  const stopAtBinding = () => { boundaryCalls++; throw new Error('adoption binding boundary reached'); };
   await expect(adoptIssueBatch({ repo_root: f.root, campaign_id: intent.campaign_id,
     group_number: intent.group_number, intent_sha256: intent.intent_sha256,
     sprint_path: SPRINT, publication_policy_path: 'plans/policies/publication.json', env: f.env },
-    { readBinding: forbidden, followup: forbidden, readSession: forbidden, runner: forbidden }))
-    .rejects.toThrow('independent supervision unavailable');
-  expect(externalCalls).toBe(0);
+    { readBinding: stopAtBinding, followup: stopAtBinding, readSession: stopAtBinding, runner: stopAtBinding }))
+    .rejects.toThrow('issue authoring session is unverified and cannot be adopted');
+  expect(boundaryCalls).toBe(0);
   expect(JSON.stringify(f.budget().current)).toBe(before);
   expect(git(f.root, ['status', '--porcelain', '--untracked-files=all'])).toBe(beforeGit);
   expect((await runCampaignRevisionObservation(f.input,deps)).replayed).toBe(true);expect(calls).toBe(1);
@@ -270,7 +272,7 @@ test('history without observed settlement cannot admit; crash replay settles wit
   const intent=await authoringIntent(f);
   expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');
   await runCampaignRevisionObservation(f.input,deps);
-  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('independent supervision unavailable');expect(calls).toBe(1);
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();expect(calls).toBe(1);
 });
 test('successful history does not reopen an exhausted budget or stopped campaign', async () => {
   for(const stopped of [false,true]) {
@@ -291,7 +293,7 @@ test('active offer admission reads a lagging budget projection without repairing
   }});
   const intent=await authoringIntent(f);
   writeFileSync(path,before);
-  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('independent supervision unavailable');
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();
   expect(readFileSync(path,'utf8')).toBe(before);
 });
 test('self-consistent changed history cannot borrow the original ledger settlement', async () => {

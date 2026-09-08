@@ -54,3 +54,10 @@ Owner directed integration of existing work and an end to open-ended evidence ex
 The integration review found that revision and budget proof could admit the host worker before #354 independent supervision was connected. The final guard now explicitly rejects new active preparation/launch even when revision and settlement are valid. There is no configuration override. Existing recorded final settlement and legitimate recovery retain their separate paths. A valid stored intent/history/ledger combination reaches the specific supervision refusal without external calls or budget/materialization changes.
 
 The observation CLI separately returns success for settled verified observations and their replay; unavailable evidence and errors remain nonzero. This success does not authorize active execution. The no-argument production-closed test is removed; 48 focused observation/CLI/finalization/worker tests pass. #354 and BRC14/BRC15 live acceptance remain unfulfilled.
+
+
+## Prepared strict-admission restoration after runtime acceptance
+
+The temporary unconditional refusal was introduced before independent supervision was connected. The later accepted Docker runtime, preparation recovery, retained-journal cleanup and actual-role/probe tests now own that containment boundary. The prepared restoration removes only that unconditional refusal; all exact-history, original settlement, grant, policy, profile, group-baseline and deadline checks remain. A real-store fixture verifies successful read-only admission and reachability of adoption's independent authoring-session guard; it is not a live provider or worker execution.
+
+Current main baseline aa3cb452 passed 63 focused audit, revision and reconciliation tests in 94.32 seconds. The baseline retains its original scope. This restoration remains a local candidate pending the live activation decision. Repository policy stays off. BRC14 and BRC15 remain incomplete until a new authorized disposable-target run demonstrates active adoption, actual worker execution, manual merge, exact cleanup and fresh verified audit. No historical failed observation or stopped budget may be upgraded or reused.
