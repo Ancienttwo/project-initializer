@@ -89,6 +89,7 @@ allowed_paths:
   - assets/templates/helpers/contract-run.ts
   - plans/
   - tasks/todos.md
+  - tasks/archive/todo-20260908-1711-brc354-independent-supervision.md
   - tasks/archive/contract-20260908-1711-brc354-independent-supervision.md
   - tasks/archive/review-20260908-1711-brc354-independent-supervision.md
   - tasks/archive/notes-20260908-1711-brc354-independent-supervision.md
@@ -168,7 +169,7 @@ exit_criteria:
       "phase": "verification",
       "cost": "expensive",
       "evidence_policy": "baseline_with_delta",
-      "necessity": "Sixteen actual Docker checks passed on d2e311f4. Subsequent changes only bind workflow metadata; compare all implementation and test inputs byte-for-byte instead of repeating Docker.",
+      "necessity": "Retain the sixteen image-enabled Docker checks at d2e311f4. Neither Docker suite imports historical-campaign-lifecycle or campaign-adoption-repository; source-unchanged covers their unchanged production/test inputs. Evidence redaction and historical fixture placement have separate current delta checks.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
@@ -190,7 +191,7 @@ exit_criteria:
       "phase": "verification",
       "cost": "expensive",
       "evidence_policy": "baseline_with_delta",
-      "necessity": "Retain passing lifecycle/closeout/settlement baseline at db261e16. The only production delta changes cleanup kill exit handling to consume fresh inactivity; current real Docker tests cover this race and recovery. No lifecycle consumer changes.",
+      "necessity": "Retain the original macOS lifecycle baseline; current cleanup-race and redaction checks cover prior production deltas. Linux CI at cb0967fe exposed reserved /tmp fixture mounts; linux-lifecycle reruns the three affected files with both fixture repository and home under the isolated container home. This does not assert a new full baseline pass.",
       "inputs": {
         "env": [
           "BRC_TEST_CONTAINER_IMAGE"
@@ -203,7 +204,8 @@ exit_criteria:
       "delta_checks": [
         "cleanup-race",
         "typecheck",
-        "evidence-redaction"
+        "evidence-redaction",
+        "linux-lifecycle"
       ]
     },
     {
@@ -313,7 +315,7 @@ exit_criteria:
     {
       "id": "source-unchanged",
       "kind": "command",
-      "command": "git diff --exit-code d2e311f4 -- src/core/automation/ src/effects/automation/ scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ tests/effects/brc10-lifecycle.test.ts tests/effects/campaign-closeout.test.ts tests/effects/campaign-container-live.test.ts tests/effects/campaign-containment.test.ts tests/effects/campaign-runtime-container.test.ts tests/fixtures/brc-audit/finish-failure.ts tests/fixtures/campaign-container-readback/ tests/helpers/historical-campaign-lifecycle.ts tests/unit/brc10-lifecycle.test.ts",
+      "command": "git diff --exit-code d2e311f4 -- src/core/automation/ src/effects/automation/ scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ tests/effects/brc10-lifecycle.test.ts tests/effects/campaign-closeout.test.ts tests/effects/campaign-container-live.test.ts tests/effects/campaign-containment.test.ts tests/effects/campaign-runtime-container.test.ts tests/fixtures/brc-audit/finish-failure.ts tests/fixtures/campaign-container-readback/ tests/unit/brc10-lifecycle.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
@@ -344,7 +346,20 @@ exit_criteria:
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Single directly blocking evidence projection fix: typed extensionless path arrays remain fingerprint-consistent while secret/traversal/free-text redaction remains enforced.",
+      "necessity": "The same directly blocking evidence fix: preserve Dockerfile while rejecting unknown high-entropy extensionless path segments; exercise actual ledger persistence and projection fingerprints.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "linux-lifecycle",
+      "kind": "command",
+      "command": "docker run --rm --network none --entrypoint /usr/local/bin/bun --mount type=bind,src=\"$(pwd -P)\",dst=/workspace,readonly --mount type=bind,src=\"$(realpath node_modules)\",dst=/workspace/node_modules,readonly --workdir /workspace sha256:1e82cee11ec7b4bfd4c9f97e744b57ad2400381426677db281fd71f263cf0f99 test tests/campaign-finish-failure-audit.test.ts tests/effects/brc10-lifecycle.test.ts tests/effects/campaign-closeout.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Reproduce the Linux path boundary that macOS /private/tmp masked. Offline Linux arm64 test image adds jq to the unchanged campaign image; no Docker socket or provider credentials are mounted. Its one nested-Docker test is skipped here and remains covered by the original image-enabled lifecycle baseline. GitHub CI supplies independent Linux x64 validation.",
       "inputs": {
         "env": []
       }

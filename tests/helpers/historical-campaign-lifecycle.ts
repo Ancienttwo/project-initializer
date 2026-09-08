@@ -46,6 +46,7 @@ import { resolveEngineerPrincipal } from '../../src/effects/engineers/principal'
 import { execFileSync } from 'child_process';
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { createAdoptionRepository } from '../helpers/campaign-adoption-repository';
 import { projectCanonicalTasks } from '../../src/core/state/coordination-identity';
 import { resolveRepoIdentity } from '../../src/effects/state/coordination-canonical-source';
@@ -65,8 +66,9 @@ export async function historicalPlanningFixture(twoEngineers = false, requiredRe
     files['src/second/index.ts'] = 'export {};';
     files['.archcontext/model/nodes/second.yaml'] = JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: otherCapability, kind: 'capability', name: 'Second', status: 'active', summary: 'Second fixture capability', responsibilities: ['Own second fixture'], source: { include: ['src/second/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } });
   }
+  // These fixtures build same-path container mounts; /tmp is reserved for the container runtime.
   const f = await createAdoptionRepository('active', 1, capability, {}, files, { ...budgetLimits, max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
-    ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) });
+    ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) }, homedir());
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {
     const observations = snapshot.observations.map((o, index) => {
