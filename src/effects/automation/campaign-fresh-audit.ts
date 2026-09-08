@@ -287,19 +287,21 @@ export async function runCampaignFreshAudit(
     dryRun: false,
   };
   const result = await deps.consult(browserInput);
-  if (result.status !== 'completed')
-    throw new CampaignFreshAuditError(
-      'campaign_audit_reconciliation_required',
-      'audit provider is not terminal-completed; reservation retained',
-    );
   const raw = result.output ?? '';
   const rawRecord = {
     session_ref: result.sessionId,
+    provider_session_ref: result.meta.providerSessionId ?? null,
+    browser_status: result.status,
     answer_sha256: messageSha256(raw),
     network_capture: result.meta.oracle?.networkCapture ?? null,
     output: raw.length <= 2 * 1024 * 1024 ? raw : null,
   };
   withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, key('audit-answer', attemptKey), rawRecord));
+  if (result.status !== 'completed')
+    throw new CampaignFreshAuditError(
+      'campaign_audit_reconciliation_required',
+      'audit provider is not terminal-completed; reservation retained',
+    );
   let observation: CampaignFreshAuditObservationV1;
   try {
     if (raw.length > 2 * 1024 * 1024) auditInvalid('audit answer exceeds bound');

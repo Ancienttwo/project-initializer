@@ -202,3 +202,19 @@ test('stale stored snapshot and opaque audit references cannot change lifecycle'
   expect(() => appendDevelopmentCampaignEvent({ ...request, evidence_refs: ['opaque'] })).toThrow('snapshot reference');
   expect(readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env).current).toEqual(status.current);
 }, 60000);
+
+test.each(['failed', 'recoverable'] as const)('audit retains exact %s attempt capture without new provider I/O', async status => {
+  const f = await fixture(); let calls = 0;
+  const capture = { status: 'incomplete', path: 'private-original-trace', sha256: 'sha256:' + 'c'.repeat(64), bytes: 200, sessionId: 'provider-partial' };
+  const deps = { readBinding: f.binding, consult: async () => {
+    calls++;
+    return { sessionId: 'local-partial', status, output: 'partial', meta: { model: { verified: false }, providerSessionId: 'provider-partial', oracle: { networkCapture: capture } } };
+  } };
+  await expect(runCampaignFreshAudit(f.input, deps)).rejects.toThrow('not terminal-completed');
+  const attempt = canonicalMessageDigest({ kind: 'fresh-audit-attempt', value: f.input.idempotency_key }).slice(7);
+  const answerKey = canonicalMessageDigest({ kind: 'audit-answer', value: attempt }).slice(7);
+  const record = readPlanningRecord(f.root, f.intent, answerKey);
+  expect(record).toMatchObject({ session_ref: 'local-partial', provider_session_ref: 'provider-partial', browser_status: status, network_capture: capture });
+  await expect(runCampaignFreshAudit(f.input, deps)).rejects.toThrow('do not repeat provider I/O');
+  expect(calls).toBe(1); expect(JSON.stringify(readPlanningRecord(f.root, f.intent, answerKey))).toBe(JSON.stringify(record));
+}, 60000);
