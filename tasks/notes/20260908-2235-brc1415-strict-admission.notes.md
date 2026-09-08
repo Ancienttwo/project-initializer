@@ -74,3 +74,8 @@ Owner approved the newly discovered Oracle selector slice. It is fixed locally a
 
 
 Owner subsequently accepted Connector/account availability based on manual testing and directed skipping this investigation. No further availability probe or account configuration change is required. Publish the locally verified source candidate; keep active/manual execution and exact-revision results separate and leave BRC14/BRC15 live acceptance incomplete.
+
+
+## Actual BRC14 request boundary
+
+Public BYOK SDK read succeeded. The observed fetch_commit response was truncated, exposing that the request did not name the raw resources required by the existing decoder. Correct both observation and fresh audit requests together; share their exact URL derivation with the decoder, preserve all verification conditions. Development evidence: two caller assertions red, then 43 observation/audit cases and 17 decoder cases green, with typecheck. The remaining live result and acceptance stay separate.

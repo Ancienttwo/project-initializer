@@ -1,5 +1,5 @@
 # Plan: BRC14 BRC15 strict admission restoration
-> **Substantive Change SHA256**: `sha256:e483a8dc08858dcaea7fd83f2c125836004eb8e497c2a772ec19e7fd90468efa`
+> **Substantive Change SHA256**: `sha256:7e04c9f754f4b14a3c68539aeb00a3275496cb2c69ba6a92d979b31257c8621b`
 
 > **Status**: Executing
 > **Created**: 20260908-2235

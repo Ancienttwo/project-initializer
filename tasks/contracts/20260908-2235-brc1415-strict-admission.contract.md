@@ -178,7 +178,7 @@ exit_criteria:
     {
       "id": "runtime-unchanged",
       "kind": "command",
-      "command": "git diff --exit-code cc2fbc48 -- src/core/automation/ src/effects/automation/campaign-runtime.ts src/effects/automation/campaign-container.ts scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ .codex/agents/ tests/effects/campaign-runtime-container.test.ts",
+      "command": "git diff --exit-code cc2fbc48 -- src/core/automation/ ':(exclude)src/core/automation/campaign-revision-evidence.ts' src/effects/automation/campaign-runtime.ts src/effects/automation/campaign-container.ts scripts/contract-run.ts assets/templates/helpers/contract-run.ts deploy/campaign-container/ .codex/agents/ tests/effects/campaign-runtime-container.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
@@ -276,6 +276,7 @@ the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
 
+- Runtime scope: the source-equality check excludes campaign-revision-evidence.ts because its shared URL derivation is this tested delta, not the Docker containment implementation. Docker runtime, launch inputs and every other core automation file remain compared to cc2fbc48.
 - Baseline: run-20260908T230034-3349 retains its original 86-case source subject. The subsequent delta changes only revision-resource prompt construction and its two callers. Final coverage names observation, fresh audit and evidence decoder suites; no full-suite trigger.
 - Functional behavior:
 - Edge cases:
