@@ -1,16 +1,16 @@
 # Task Review: brc1415-adopted-continuation
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260909-0434-brc1415-adopted-continuation.md
 > **Contract**: tasks/contracts/20260909-0434-brc1415-adopted-continuation.contract.md
 > **Notes File**: tasks/notes/20260909-0434-brc1415-adopted-continuation.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-09 04:34
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:9d94365b2fdba91410914dd3da5d3fbf74c50f12c03f74971822630f6dd5c791
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: dece01a1cbda0f304db7b7e38687d316a2cd8b19
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:9d94365b2fdba91410914dd3da5d3fbf74c50f12c03f74971822630f6dd5c791
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: dece01a1cbda0f304db7b7e38687d316a2cd8b19
+> **Verification Evidence SHA256**: sha256:d8af831007fc0db48cabdc2b5b3af034a788872b0aaa870ced4d9a85790288c9
+> **Issued At**: 2026-09-08T20:58:06.178Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Frozen e2d876ce passed all 13 acceptance criteria; architecture, security and adversarial review passed. Real continuation and final audit remain pending.
 - Findings: none
 
 ## Behavior Diff Notes
