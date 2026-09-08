@@ -39,6 +39,17 @@ export interface RevisionExpectation {
   readonly answer: string;
 }
 
+/** These exact raw resources are the request and decoder's shared authority. */
+export function campaignRevisionResourceUrls(repository: string, ref: string, commit: string) {
+  const base = 'https://api.github.com/repos/' + repository;
+  return { commitUrl: base + '/git/commits/' + commit, refUrl: base + '/git/ref/' + ref.slice(5) };
+}
+
+export function buildCampaignRevisionReadInstruction(repository: string, ref: string, commit: string): string {
+  const { commitUrl, refUrl } = campaignRevisionResourceUrls(repository, ref, commit);
+  return `Use the GitHub fetch action to read both exact JSON resources: ${commitUrl} and ${refUrl}. Preserve the complete tool returns. Do not use fetch_commit or a diff summary: they are different resources and may truncate. If either resource is unavailable or truncated, report observed_main_sha as null.`;
+}
+
 /** Decode the provider's complete numbered JSON wrapper; never scan answer text for an OID. */
 function toolObject(message: ObjectValue, connector: string, turn: string, url: string): ObjectValue | null {
   const author=object(message.author), meta=object(message.metadata);
@@ -82,7 +93,7 @@ export function readCampaignRevisionEvidence(capture: unknown, expected: Revisio
     const users=messages.filter(m=>object(m.author).role==='user'); requireThat(users.length===1);
     const user=users[0]!, userMeta=object(user.metadata), content=object(user.content);
     requireThat(content.content_type==='text' && Array.isArray(content.parts) && content.parts.length===1
-      && content.parts[0]==='@GitHub '+expected.prompt && Array.isArray(userMeta.system_hints) && userMeta.system_hints.includes('plugin:'+expected.connectorId)
+      && content.parts[0]==='@GitHub '+expected.prompt
       && typeof userMeta.turn_exchange_id==='string');
     const turn=userMeta.turn_exchange_id as string;
     requireThat(turn.length>0 && userMeta.working_turn_id===turn);
@@ -92,7 +103,7 @@ export function readCampaignRevisionEvidence(capture: unknown, expected: Revisio
       && typeof finalContent.parts[0]==='string' && finalContent.parts[0].trim()===expected.answer.trim());
     requireThat(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(expected.repository) && expected.ref.startsWith('refs/heads/') && /^[a-f0-9]{40}$/.test(expected.commit));
     const base='https://api.github.com/repos/'+expected.repository;
-    const commitUrl=base+'/git/commits/'+expected.commit, refUrl=base+'/git/ref/'+expected.ref.slice(5);
+    const { commitUrl, refUrl } = campaignRevisionResourceUrls(expected.repository, expected.ref, expected.commit);
     const toolMessages=messages.filter(m=>object(m.author).role==='tool' && object(m.author).name==='api_tool.call_tool');
     const commits=toolMessages.map(m=>({m,value:toolObject(m,expected.connectorId,turn,commitUrl)})).filter(e=>e.value);
     const refs=toolMessages.map(m=>({m,value:toolObject(m,expected.connectorId,turn,refUrl)})).filter(e=>e.value);

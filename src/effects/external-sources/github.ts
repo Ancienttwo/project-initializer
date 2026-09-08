@@ -193,7 +193,7 @@ export function fetchGithubIssues(
       return Object.freeze({ repository: identity, issues: Object.freeze(all), pages_fetched: 0, issues_seen: issuesSeen });
     }
     for (let page = 1; page <= limits.max_pages; page += 1) {
-      const result = run(['api', '--method', 'GET', `repos/${repository}/issues`, '-f', 'state=all', '-f', 'per_page=100', '-f', `page=${page}`]);
+      const result = run(['api', '--method', 'GET', `repos/${repository}/issues`, '-f', 'state=all', '-f', `labels=${policy.github.selection.labels_all.join(',')}`, '-f', 'per_page=100', '-f', `page=${page}`]);
       totalBytes += Buffer.byteLength(result.stdout, 'utf8');
       if (totalBytes > limits.max_total_bytes) throw new GithubAdapterError('payload_limit', 'GitHub responses exceed max_total_bytes', 'incomplete', identity, pagesFetched, issuesSeen);
       const pageItems = parseJson(result.stdout, `GitHub issues page ${page}`);

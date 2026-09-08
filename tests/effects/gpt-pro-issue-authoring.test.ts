@@ -20,7 +20,7 @@ const hex = (seed: string): string => new Bun.CryptoHasher('sha256').update(seed
 const observedAt = '2026-09-05T00:00:00.000Z';
 const limits: ProgramBudgetLimitV1 = { max_agent_turns: 10, max_successful_acquisitions: 2, max_runner_invocations: 10, max_provider_failures: 2, max_consecutive_no_progress_steps: 2, max_repair_cycles: 2, max_wall_clock_seconds: 3600, max_input_tokens: null, max_output_tokens: null, max_cost_micros: null };
 
-function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5, validRegistry = true) {
+function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5, validRegistry = true, runnerLimit = limits.max_runner_invocations) {
   const root = mkdtempSync(join(tmpdir(), 'gpt-pro-authoring-'));
   const home = mkdtempSync(join(tmpdir(), 'gpt-pro-authoring-home-'));
   const profile = mkdtempSync(join(tmpdir(), 'gpt-pro-profile-'));
@@ -29,7 +29,7 @@ function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5, validRegistry = tru
   execFileSync('git', ['config', 'user.email', 'fixture@example.com'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
   mkdirSync(join(root, '.ai', 'harness'), { recursive: true });
-  writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({ development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: groupCount, maximum_issues_per_group: 10, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 1, max_issues: 10, max_body_bytes: 4096, max_total_bytes: 65536, deadline_ms: 1000 } } } })}\n`);
+  writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({ context: { capability_source: 'archcontext' }, development_campaign: { version: 1, mode: 'shadow', limits: { maximum_group_count: groupCount, maximum_issues_per_group: 10, maximum_parallel_tasks: 2 } }, external_sources: { version: 1, mode: 'manual', github: { enabled: true, repository: 'acme/widgets', selection: { kind: 'labels', labels_all: ['campaign'], assignees_any: [] }, limits: { max_pages: 1, max_issues: 10, max_body_bytes: 4096, max_total_bytes: 65536, deadline_ms: 1000 } } } })}\n`);
   mkdirSync(join(root, '.repo-harness'), { recursive: true });
   writeFileSync(join(root, '.repo-harness', 'chatgpt-browser.local.json'), `${JSON.stringify({ version: 1, product: 'chatgpt', profileDir: profile, profileDirectory: 'Profile 13', selectedProfilePath: join(profile, 'Profile 13'), browserChannel: 'chrome', chatgptUrl: 'https://chatgpt.com/', updatedAt: observedAt })}\n`);
   mkdirSync(join(root, '.archcontext/model/nodes'), { recursive: true });
@@ -40,13 +40,13 @@ function fixture(groupCount: 1 | 2 = 1, authoringRounds = 5, validRegistry = tru
   execFileSync('git', ['add', '.archcontext', 'src'], { cwd: root });
   execFileSync('git', ['add', '.ai'], { cwd: root }); execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: root });
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-  const authorization = sealProgramAuthorization({ authorization_id: 'authorization-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: limits, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: groupCount, issues_per_group: 10, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 13', max_authoring_rounds_per_group: authoringRounds, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: observedAt, expires_at: '2027-09-05T00:00:00.000Z' });
+  const authorization = sealProgramAuthorization({ authorization_id: 'authorization-1', repository_id: 'repo-1', target_ref: 'refs/heads/main', target_revision: revision, work_graph_revision: hex('work'), allowed_work_package_ids: ['campaign-1'], allowed_risk_tiers: ['low'], merge_mode: 'manual', allowed_merge_method: 'squash', max_repair_cycles: 2, budget: { ...limits, max_runner_invocations: runnerLimit }, contract_scope: 'contract_less', contract_path: null, campaign: { campaign_id: 'campaign-1', group_count: groupCount, issues_per_group: 10, allowed_issue_kinds: ['bugfix', 'test_gap'], max_parallel_tasks: 2, transient_retry: { max_consecutive_failures: 3, initial_backoff_ms: 1, maximum_backoff_ms: 4 }, issue_author: 'gpt_pro', local_parent_host: 'codex', chrome_profile_directory: 'Profile 13', max_authoring_rounds_per_group: authoringRounds, max_controller_steps: 100, max_provider_calls: 100, require_fresh_main_audit: true }, issued_by: 'owner', issued_at: observedAt, expires_at: '2027-09-05T00:00:00.000Z' });
   const env = { ...process.env, REPO_HARNESS_HOME: home };
   mintProgramAuthorization({ repo_root: root, authorization, env });
   const campaign = buildDevelopmentCampaignDefinition({ campaign_id: 'campaign-1', authorization_id: authorization.authorization_id, authorization_sha256: authorization.authorization_sha256, repository_id: authorization.repository_id, target_ref: authorization.target_ref, target_revision: authorization.target_revision, created_at: observedAt });
   const created = createDevelopmentCampaign({ repo_root: root, campaign, idempotency_key: 'start', env });
   appendDevelopmentCampaignEvent({ repo_root: root, campaign_id: 'campaign-1', expected_current_sha256: created.current.current_sha256, idempotency_key: 'prepare', operation: 'prepare_group', observed_at: observedAt, env });
-  return { root, env, revision };
+  return { root, env, revision, authorization };
 }
 
 function result(input: BrowserConsultInput & { sessionId?: string }, sessionId: string, status: BrowserConsultResult['status'] = 'completed', verified = false): BrowserConsultResult {
@@ -57,6 +57,65 @@ function result(input: BrowserConsultInput & { sessionId?: string }, sessionId: 
 }
 
 describe('GPT Pro issue batch authoring effect', () => {
+  test('resumes stopped authoring into a new run without recreating Issues or rewriting source evidence', async () => {
+    const f = fixture(1, 5, true, 1);
+    const deps = { readBinding: readBrowserBinding, now: () => observedAt,
+      consult: async (input: BrowserConsultInput) => result(input, 'source-session', 'completed', true) };
+    const old = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, deps);
+    await expect(continueIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env,
+      intent_sha256: old.intent.intent_sha256, source_session_ref: old.session.session_ref, operation: 'fill_missing', requested_slots: ['01'] },
+      { ...deps, followup: async () => { throw new Error('exhausted source must not invoke provider'); } })).rejects.toThrow();
+    const next = sealProgramAuthorization({ ...f.authorization, authorization_id: 'authorization-2', allowed_work_package_ids: ['campaign-2'],
+      campaign: { ...f.authorization.campaign!, campaign_id: 'campaign-2' }, budget: limits });
+    mintProgramAuthorization({ repo_root: f.root, authorization: next, env: f.env });
+    const created = createDevelopmentCampaign({ repo_root: f.root, env: f.env, idempotency_key: 'start-2', campaign: buildDevelopmentCampaignDefinition({
+      campaign_id: 'campaign-2', authorization_id: next.authorization_id, authorization_sha256: next.authorization_sha256,
+      repository_id: next.repository_id, target_ref: next.target_ref, target_revision: next.target_revision, created_at: observedAt }) });
+    appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: 'campaign-2', expected_current_sha256: created.current.current_sha256,
+      idempotency_key: 'prepare-2', operation: 'prepare_group', observed_at: observedAt, env: f.env });
+    const resume = { campaign_id: 'campaign-1', group_number: 1, intent_sha256: old.intent.intent_sha256,
+      source_session_ref: old.session.session_ref, issues: old.intent.slots.map((slot, index) => ({ slot, provider_issue_id: String(1000 + index), provider_issue_url: `https://github.com/acme/widgets/issues/${index + 1}` })) };
+    const sourcePath = join(issueBatchGroupStoreRoot(f.root, 'campaign-1', 1), 'intent.json');
+    const before = readFileSync(sourcePath, 'utf8');
+    let calls = 0;
+    for (const invalid of [
+      { ...resume, issues: resume.issues.slice(1) },
+      { ...resume, issues: resume.issues.map((issue, index) => index === 0 ? { ...issue, provider_issue_url: 'https://github.com/another/repo/issues/1' } : issue) },
+      { ...resume, issues: resume.issues.map(issue => ({ ...issue, provider_issue_id: 'duplicate' })) },
+    ]) {
+      await expect(startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-2', group_number: 1, env: f.env, resume_from: invalid }, {
+        ...deps, consult: async () => { calls++; throw new Error('invalid resume dispatched'); },
+      })).rejects.toThrow();
+    }
+    expect(calls).toBe(0);
+    const continued = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-2', group_number: 1, env: f.env, resume_from: resume }, {
+      ...deps, consult: async input => {
+        calls++;
+        expect(input.prompt).toContain('Do not create any Issue');
+        expect(input.prompt).not.toContain('Create exactly one GitHub Issue');
+        expect(input.prompt).toContain('Before any edit, read every exact URL');
+        expect(input.prompt).toContain('campaign_id=campaign-1');
+        expect(input.prompt).toContain('campaign_id=campaign-2');
+        return result(input, 'resumed-session', 'completed', true);
+      },
+    });
+    expect(calls).toBe(1);
+    expect(continued.session.verification).toBe('verified');
+    expect(continued.session.source_session_ref).toBeNull();
+    expect(continued.intent.intent_sha256).not.toBe(old.intent.intent_sha256);
+    expect(readFileSync(sourcePath, 'utf8')).toBe(before);
+  });
+
+  test('rejects malformed resume sources before browser submission', async () => {
+    const f = fixture(); let calls = 0;
+    for (const resume_from of [null, [], {}, { campaign_id: 'campaign-1', group_number: 1, intent_sha256: 'bad', issues: [], source_session_ref: 'missing' }]) {
+      await expect(startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env, resume_from }, {
+        readBinding: readBrowserBinding, now: () => observedAt, consult: async input => { calls++; return result(input, 'unexpected'); },
+      })).rejects.toThrow();
+    }
+    expect(calls).toBe(0);
+  });
+
   test('admits the user default model from completed Oracle session and GitHub evidence', async () => {
     const f = fixture();
     const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, {
