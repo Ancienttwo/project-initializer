@@ -216,7 +216,7 @@ export function campaignGroupProgress(events: readonly DevelopmentCampaignEventV
         throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'group acceptance is out of order');
       accepted++;
     }
-    if (event.operation === 'complete' && accepted !== groupCount)
+    if (['complete', 'complete_with_followups'].includes(event.operation) && accepted !== groupCount)
       throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'campaign completed before all authorized groups');
   }
   return { group_number: prepared, accepted_groups: accepted, group_count: groupCount };

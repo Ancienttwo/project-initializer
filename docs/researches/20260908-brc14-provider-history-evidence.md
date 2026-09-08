@@ -26,3 +26,9 @@ Fresh audit protocol 2 includes the prompt and answer digests and either a revis
 ## Acceptance limit
 
 The real run above is a pre-active revision observation, not a completed-group audit. Its historical raw result stays unchanged and is not upgraded into a new receipt. BRC6a remains Owner-closed; BRC14 still needs its full group-audit acceptance and BRC15 still needs the active/manual closed loop. No new GPT invocation or active campaign is part of this implementation package.
+
+## Follow-up sequencing implementation
+
+The original group-loop design (plans/sprints/20260902-GPT-issues-loop.md:1168) permits accepted_with_followups to feed the next authorized group. The authoring context now reads the previous accepted observation and passes its findings verbatim into both initial and continuation prompts before the prompt digest and provider admission. Planning and observer callers retain their SHA-only baseline projection. Findings do not create extra slots, change allowed issue kinds or authorize a fourth group.
+
+The canonical campaign lifecycle records complete_with_followups -> completed_with_followups separately from complete -> completed. Both completion paths require all authorized groups and the matching final verified audit disposition; findings length never substitutes for that disposition. Historical status stays a pure event projection, and prior recorded completed outcomes are not reinterpreted. This is model-free implementation evidence, not full live BRC14 or BRC15 acceptance.

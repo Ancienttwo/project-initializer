@@ -111,17 +111,19 @@ export function requireCampaignGroupTransition(
   refs: readonly string[],
   env?: NodeJS.ProcessEnv,
 ): void {
-  if (!['prepare_group', 'begin_group_audit', 'accept_group', 'complete'].includes(operation)) return;
+  if (!['prepare_group', 'begin_group_audit', 'accept_group', 'complete', 'complete_with_followups'].includes(operation)) return;
   const authority = grant(root, campaign, env),
     progress = campaignGroupProgress(events, authority.campaign!.group_count);
   if (operation === 'prepare_group') {
     if (progress.group_number !== progress.accepted_groups || progress.group_number >= progress.group_count)
       throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'next group is not authorized');
     if (progress.group_number > 0) requireAcceptedCampaignGroup(root, campaign, events, progress.group_number, env);
-  } else if (operation === 'complete') {
+  } else if (['complete', 'complete_with_followups'].includes(operation)) {
     if (progress.accepted_groups !== progress.group_count)
       throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'all authorized groups must be accepted before complete');
-    requireAcceptedCampaignGroup(root, campaign, events, progress.group_number, env);
+    const { observation } = requireAcceptedCampaignGroup(root, campaign, events, progress.group_number, env);
+    const expected = observation.disposition === 'accepted_with_followups' ? 'complete_with_followups' : 'complete';
+    if (operation !== expected) auditInvalid('completion operation differs from final audit disposition');
   } else {
     const intent = oneIntent(root, campaign.campaign_id, progress.group_number);
     if (refs.length !== 1) auditInvalid('audit transition requires one exact group evidence reference');
@@ -146,7 +148,7 @@ function requireAcceptedCampaignGroup(
   events: readonly DevelopmentCampaignEventV1[],
   group: number,
   env?: NodeJS.ProcessEnv,
-): CampaignGroupSnapshotV1 {
+): { snapshot: CampaignGroupSnapshotV1; observation: CampaignFreshAuditObservationV2 } {
   grant(root, campaign, env);
   const accepted = events.filter((e) => e.operation === 'accept_group')[group - 1];
   if (!accepted || accepted.evidence_refs.length !== 1) auditInvalid('previous accepted group has no exact audit reference');
@@ -160,7 +162,7 @@ function requireAcceptedCampaignGroup(
   if (observation.observation_sha256 !== reference) auditInvalid('previous group audit digest differs');
   if (!campaignAuditAccepted(observation))
     throw new CampaignFreshAuditError('campaign_audit_unverified', 'previous group has no trusted fresh-audit revision evidence');
-  return snapshot;
+  return { snapshot, observation };
 }
 
 export function resolveCampaignAuthorizedTarget(
@@ -172,7 +174,7 @@ export function resolveCampaignAuthorizedTarget(
   const authority = grant(root, campaign, env),
     progress = campaignGroupProgress(events, authority.campaign!.group_count);
   if (progress.accepted_groups === 0) return campaign.target_revision;
-  return requireAcceptedCampaignGroup(root, campaign, events, progress.accepted_groups, env).expected_final_main_sha;
+  return requireAcceptedCampaignGroup(root, campaign, events, progress.accepted_groups, env).snapshot.expected_final_main_sha;
 }
 export function resolveCampaignGroupBaseline(
   root: string,
@@ -186,7 +188,18 @@ export function resolveCampaignGroupBaseline(
   if (group !== progress.group_number || group < 1 || group > progress.group_count)
     throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'authoring must use the current lifecycle group');
   if (group === 1) return campaign.target_revision;
-  return requireAcceptedCampaignGroup(root, campaign, events, group - 1, env).expected_final_main_sha;
+  return requireAcceptedCampaignGroup(root, campaign, events, group - 1, env).snapshot.expected_final_main_sha;
+}
+
+/** Authoring projects only the previous accepted audit; the observation remains authoritative. */
+export function resolveCampaignGroupAuthoringContext(
+  root: string, campaign: DevelopmentCampaignDefinitionV1, events: readonly DevelopmentCampaignEventV1[],
+  group: number, env?: NodeJS.ProcessEnv,
+): { baseMain: string; followups: readonly string[] } {
+  const baseMain = resolveCampaignGroupBaseline(root, campaign, events, group, env);
+  if (group === 1) return { baseMain, followups: [] };
+  const { observation } = requireAcceptedCampaignGroup(root, campaign, events, group - 1, env);
+  return { baseMain, followups: observation.disposition === 'accepted_with_followups' ? observation.recommendation.findings : [] };
 }
 
 export interface RunCampaignFreshAuditInput {

@@ -370,7 +370,7 @@ export function appendDevelopmentCampaignEvent(input: AppendDevelopmentCampaignE
   return withExclusiveDirectoryLock(value.common, value.lock, () => {
     if (!existsSync(value.definition)) fail('campaign_not_found', 'development campaign is missing');
     const campaign = parse(value.definition, validateDevelopmentCampaignDefinition, canonicalDevelopmentCampaignDefinitionBytes);
-    if (['begin_group_audit', 'prepare_group', 'complete'].includes(input.operation)) requireCampaignCleanupComplete(repoRoot, input.campaign_id);
+    if (['begin_group_audit', 'prepare_group', 'complete', 'complete_with_followups'].includes(input.operation)) requireCampaignCleanupComplete(repoRoot, input.campaign_id);
     return Object.freeze({ campaign, ...appendLocked(value, campaign, { ...input, repo_root: repoRoot }) });
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }

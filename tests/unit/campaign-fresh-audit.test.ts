@@ -100,3 +100,10 @@ test('audit JSON cannot omit unfilled slots or add semantic fields', () => {
   for (const raw of ['```json\n{}\n```', JSON.stringify({ ...answer, slots: ['01'] }), JSON.stringify({ ...answer, verified: true })])
     expect(() => parseCampaignAuditAnswer(raw, s)).toThrow();
 });
+
+test.each([1,2,3])('follow-up completion requires exactly %s accepted groups', groupCount => {
+  const ops=Array.from({length:groupCount},()=>['prepare_group','accept_group']).flat();
+  expect(campaignGroupProgress(events([...ops,'complete_with_followups']),groupCount).accepted_groups).toBe(groupCount);
+  expect(()=>campaignGroupProgress(events([...ops.slice(0,-1),'complete_with_followups']),groupCount)).toThrow('before all authorized groups');
+  expect(()=>campaignGroupProgress(events([...ops,'complete_with_followups','prepare_group']),groupCount)).toThrow();
+});

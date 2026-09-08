@@ -1,3 +1,5 @@
+import { campaignBrowserMetadata } from '../helpers/campaign-browser-session';
+import { startIssueBatchAuthoring, continueIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
 import { createHash } from 'crypto';
 import historyFixture from '../fixtures/campaign-revision-evidence/history.json';
 import { test, expect, afterEach } from 'bun:test';
@@ -15,7 +17,7 @@ import {
 } from '../../src/effects/automation/campaign-fresh-audit';
 import { withCampaignPlanningLock, persistPlanningRecord, readPlanningRecord } from '../../src/effects/automation/campaign-planning-store';
 import { campaignCloseoutKey } from '../../src/core/automation/campaign-closeout';
-import { canonicalMessageDigest } from '../../src/core/messages/mechanics';
+import { canonicalMessageDigest, messageSha256 } from '../../src/core/messages/mechanics';
 import { ensureCampaignAuthoringBudget, readCampaignBudgetLedger } from '../../src/effects/automation/budget-store';
 import { listIssueAuthoringSessions } from '../../src/effects/automation/issue-batch-store';
 const roots: string[] = [];
@@ -24,14 +26,14 @@ afterEach(() => {
 });
 const git = (root: string, args: string[]) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-async function fixture(cleanup = true) {
+async function fixture(cleanup = true, groupCount: 1 | 2 | 3 = 1) {
   const f = await createAdoptionRepository(
     'active',
     1,
     undefined,
     {},
     {},
-    { max_provider_calls: 20, max_provider_failures: 10, max_agent_turns: 30, max_runner_invocations: 30 },
+    { group_count: groupCount, max_provider_calls: 20, max_provider_failures: 10, max_agent_turns: 30, max_runner_invocations: 30 },
   );
   roots.push(f.root, f.home);
   const status = readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env);
@@ -221,11 +223,11 @@ test.each(['failed', 'recoverable'] as const)('audit retains exact %s attempt ca
   expect(calls).toBe(1); expect(JSON.stringify(readPlanningRecord(f.root, f.intent, answerKey))).toBe(JSON.stringify(record));
 }, 60000);
 
-test.each(['accepted','accepted_with_followups','rejected'])('verified provider history gates %s recommendation', async disposition => {
-  const f=await fixture(); const snapshot=buildCampaignGroupSnapshot(f.root,f.intent,f.env);
+test.each([1,2,3].flatMap(groupCount => (['accepted','accepted_with_followups','rejected'] as const).map(disposition => [groupCount,disposition] as const)))('verified provider history gates %s groups / %s recommendation', async (groupCount,disposition) => {
+  const f=await fixture(true, groupCount as 1 | 2 | 3); const snapshot=buildCampaignGroupSnapshot(f.root,f.intent,f.env);
   const result=await runCampaignFreshAudit(f.input,{readBinding:f.binding,consult:async input=>{
     expect(input.captureConversationEvidence).toBe(true);
-    const output=JSON.stringify({protocol:1,disposition,observed_main_sha:snapshot.expected_final_main_sha,slots:['01','02'],findings:[]});
+    const output=JSON.stringify({protocol:1,disposition,observed_main_sha:snapshot.expected_final_main_sha,slots:['01','02'],findings:['Preserve exact upstream finding: \"retry boundary\"']});
     const history=structuredClone(historyFixture);
     const body=JSON.parse(history.response.body.replaceAll('example/canary',snapshot.provider_repository).replaceAll('a'.repeat(40),snapshot.expected_final_main_sha));
     body.messages[0].content.parts=['@GitHub '+input.prompt];body.messages[3].content.parts=[output];history.response.body=JSON.stringify(body);
@@ -238,5 +240,34 @@ test.each(['accepted','accepted_with_followups','rejected'])('verified provider 
   expect(result.observation.disposition).toBe(disposition);
   const status=readDevelopmentCampaignStatus(f.root,f.intent.campaign_id,f.env);
   const accept=()=>appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.intent.campaign_id,operation:'accept_group',expected_current_sha256:status.current.current_sha256,idempotency_key:'verified-accept',evidence_refs:[result.observation.observation_sha256],observed_at:new Date().toISOString(),env:f.env});
-  if(disposition==='rejected')expect(accept).toThrow('rejected');else expect(accept).not.toThrow();
+  if(disposition==='rejected') { expect(accept).toThrow('rejected'); return; }
+  accept();
+  const transition = (operation: 'complete' | 'complete_with_followups' | 'prepare_group', id = operation) => {
+    const current = readDevelopmentCampaignStatus(f.root,f.intent.campaign_id,f.env).current;
+    return appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.intent.campaign_id,operation,expected_current_sha256:current.current_sha256,idempotency_key:id,observed_at:new Date().toISOString(),env:f.env});
+  };
+  if (groupCount === 1) {
+    const correct = disposition === 'accepted_with_followups' ? 'complete_with_followups' : 'complete';
+    expect(() => transition(correct === 'complete' ? 'complete_with_followups' : 'complete')).toThrow('differs from final audit');
+    const terminal = transition(correct);
+    expect(terminal.current.state).toBe(disposition === 'accepted_with_followups' ? 'completed_with_followups' : 'completed');
+    expect(() => transition('prepare_group')).toThrow();
+    expect(readDevelopmentCampaignStatus(f.root,f.intent.campaign_id,{}).current).toEqual(terminal.current);
+    return;
+  }
+  expect(() => transition('complete_with_followups')).toThrow('all authorized groups');
+  transition('prepare_group');
+  let prompt = '';
+  const consult = async (input: any) => {
+    prompt=input.prompt;
+    if(disposition==='accepted_with_followups') expect(prompt).toContain(JSON.stringify(result.observation.recommendation.findings));
+    else expect(prompt).not.toContain('Preserve exact upstream finding');
+    expect(prompt).toContain(snapshot.expected_final_main_sha);
+    const sessionId=input.sessionId ? 'group2-continuation' : 'group2-initial';
+    return {sessionId,status:'completed' as const,meta:campaignBrowserMetadata({repoRoot:f.root,sessionId,profileDir:input.profileDir,profileDirectory:input.profileDirectory,sourceSessionId:input.sessionId})};
+  };
+  const started=await startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.intent.campaign_id,group_number:2,dry_run:true,env:f.env},{readBinding:f.binding,consult});
+  expect(started.intent.prompt_sha256).toBe(messageSha256(prompt));
+  await continueIssueBatchAuthoring({repo_root:f.root,campaign_id:f.intent.campaign_id,group_number:2,intent_sha256:started.intent.intent_sha256,source_session_ref:started.session.session_ref,operation:'fill_missing',requested_slots:['02'],dry_run:true,env:f.env},{readBinding:f.binding,followup:consult});
+  expect(prompt).toContain('only for these missing slots: 02');
 },60000);
