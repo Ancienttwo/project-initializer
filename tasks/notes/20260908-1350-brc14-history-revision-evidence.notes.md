@@ -32,6 +32,13 @@ Security review proved final/user working_turn_id contradictions were not checke
 
 - None.
 
+## Accepted implementation evidence
+
+- Oracle producer is committed at a33e5edb, built successfully. 74 focused tests across conversation capture, session storage/forwarding and CLI route rejection passed; typecheck and changed-file lint passed. No provider was invoked by these checks.
+- Harness final correction 037abfb4 passed canonical run-20260908T141032-91552: 14/14, including focused protocol/effect/provider tests, typecheck and six integrity checks.
+- Independent architecture/composition, security/assumption and cascade/abuse reviews passed. One security finding was fixed and independently rechecked.
+- Earlier integration packages retain their accepted bfb1c105 baseline; this review covers this package delta and its current composition. No old acceptance is relabelled as a new complete BRC run.
+
 ## Evidence Links
 
 - Checks: `.ai/harness/checks/latest.json`

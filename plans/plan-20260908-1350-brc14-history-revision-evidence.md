@@ -131,7 +131,7 @@ Fragile assumption: provider history preserves the observed typed tool response 
 - [x] Add same-page history collection and exact provider-session export to Oracle; preserve its destination through the worker; focused capture/CLI/session tests.
 - [x] Add bounded private history transport validation and strict commit/ref evidence decoder to repo-harness, with redacted structural fixtures from the real response.
 - [x] Connect verified revision evidence to fresh-audit acceptance and group transitions; retain rejected/unverified and active admission guards.
-- [ ] Freeze implementation; run named focused tests, TypeScript and six repository integrity checks. Consume evidence once for semantic acceptance and archive/finish without merging dirty main.
+- [x] Freeze implementation and pass named focused tests, TypeScript and six repository integrity checks; independent semantic review has passed. Closure uses this evidence and finishes without merging dirty main.
 
 ## Verification
 
@@ -147,4 +147,4 @@ Positive: complete captured commit/ref and current session/turn/connector; exact
 - [x] Add same-page history collection and exact provider-session export to Oracle; preserve its destination through the worker; focused capture/CLI/session tests.
 - [x] Add bounded private history transport validation and strict commit/ref evidence decoder to repo-harness, with redacted structural fixtures from the real response.
 - [x] Connect verified revision evidence to fresh-audit acceptance and group transitions; retain rejected/unverified and active admission guards.
-- [ ] Freeze implementation; run named focused tests, TypeScript and six repository integrity checks. Consume evidence once for semantic acceptance and archive/finish without merging dirty main.
+- [x] Freeze implementation and pass named focused tests, TypeScript and six repository integrity checks; independent semantic review has passed. Closure uses this evidence and finishes without merging dirty main.
