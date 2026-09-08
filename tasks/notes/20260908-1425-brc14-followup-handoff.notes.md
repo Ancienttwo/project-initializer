@@ -44,3 +44,7 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 - Promote to `tasks/lessons.md` only after a repeated correction or failure pattern.
 - Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
 - Promote to harness asset files only after verification across more than one task or fixture.
+
+## Verification and review
+
+Run run-20260908T142957-14290 passed all 13 declared criteria, including focused tests, TypeScript and six integrity checks; initial aggregate failed because the generated Change Assessment had no oracle. Corrected its deterministic-test declaration before final evidence. Architecture/composition and security/assumption native reviews passed. No additional live model calls. Group-count=3 effect tests reach Group 2; only core sequencing covers the full count bound, so this is not full three-group live acceptance.

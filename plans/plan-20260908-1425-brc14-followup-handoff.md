@@ -112,10 +112,10 @@ This adds one canonical operation/state because the existing design requires a d
 src/core/automation/{development-campaign,campaign-fresh-audit}.ts; src/effects/automation/{campaign-fresh-audit,gpt-pro-issue-authoring,development-campaign-store}.ts; focused tests, architecture projections, durable research and workflow artifacts. Worktree remains isolated. Do not change active admission, invoke models, create Issues, reset budgets, merge main, release or mark BRC14/BRC15 complete.
 
 ## Task Breakdown
-- [ ] Bind next-group authoring prompt to previous verified accepted audit findings, preserving baseline-only callers.
-- [ ] Persist distinct completion operation/state with exact final disposition and group-count guards.
-- [ ] Test provider-bound prompt text/hash, last-group completion mismatch, replay/terminal refusal and unchanged read-only status.
-- [ ] Freeze, run focused tests/typecheck and six integrity checks, independent delta review, archive without completing sprint row or merging main.
+- [x] Bind next-group authoring prompt to previous verified accepted audit findings, preserving baseline-only callers.
+- [x] Persist distinct completion operation/state with exact final disposition and group-count guards.
+- [x] Test provider-bound prompt text/hash, last-group completion mismatch, replay/terminal refusal and unchanged read-only status.
+- [x] Freeze, run focused tests/typecheck and six integrity checks, independent delta review, archive without completing sprint row or merging main.
 
 ## Verification
 Focused campaign-fresh-audit, gpt-pro-issue-authoring, development-campaign-core/store/CLI tests; TypeScript; SQL order, architecture sync, task sync, strict workflow, inspect-project-state and init dry-run. No full suite: named boundaries cover changed event enum, consumer prompts, state folding and completion guard. No real provider tests. Baseline 01c28fee retains prior evidence; this package verifies only its delta.
@@ -124,7 +124,7 @@ Focused campaign-fresh-audit, gpt-pro-issue-authoring, development-campaign-core
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Bind next-group authoring prompt to previous verified accepted audit findings, preserving baseline-only callers.
-- [ ] Persist distinct completion operation/state with exact final disposition and group-count guards.
-- [ ] Test provider-bound prompt text/hash, last-group completion mismatch, replay/terminal refusal and unchanged read-only status.
-- [ ] Freeze, run focused tests/typecheck and six integrity checks, independent delta review, archive without completing sprint row or merging main.
+- [x] Bind next-group authoring prompt to previous verified accepted audit findings, preserving baseline-only callers.
+- [x] Persist distinct completion operation/state with exact final disposition and group-count guards.
+- [x] Test provider-bound prompt text/hash, last-group completion mismatch, replay/terminal refusal and unchanged read-only status.
+- [x] Freeze, run focused tests/typecheck and six integrity checks, independent delta review, archive without completing sprint row or merging main.
