@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-08 17:11
+> **Related Plan**: plans/archive/plan-20260908-1627-brc354-independent-supervision.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260908-1711
+> **Archive Projection V1**: `plans/plan-20260908-1627-brc354-independent-supervision.md` => `plans/archive/plan-20260908-1627-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1627-brc354-independent-supervision.notes.md` => `tasks/archive/notes-20260908-1711-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1627-brc354-independent-supervision.contract.md` => `tasks/archive/contract-20260908-1711-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1627-brc354-independent-supervision.review.md` => `tasks/archive/review-20260908-1711-brc354-independent-supervision.md`
+
 # Task Contract: brc354-independent-supervision
 
-> **Status**: Active
-> **Plan**: plans/plan-20260908-1627-brc354-independent-supervision.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260908-1627-brc354-independent-supervision.md
 > **Task Profile**: code-change
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-08 16:27
-> **Review File**: `tasks/reviews/20260908-1627-brc354-independent-supervision.review.md`
-> **Notes File**: `tasks/notes/20260908-1627-brc354-independent-supervision.notes.md`
+> **Review File**: `tasks/archive/review-20260908-1711-brc354-independent-supervision.md`
+> **Notes File**: `tasks/archive/notes-20260908-1711-brc354-independent-supervision.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -46,10 +56,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260908-1627-brc354-independent-supervision.md`
+- Source plan: `plans/archive/plan-20260908-1627-brc354-independent-supervision.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260908-1627-brc354-independent-supervision.review.md`
-- Notes file: `tasks/notes/20260908-1627-brc354-independent-supervision.notes.md`
+- Review file: `tasks/archive/review-20260908-1711-brc354-independent-supervision.md`
+- Notes file: `tasks/archive/notes-20260908-1711-brc354-independent-supervision.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -79,9 +89,9 @@ allowed_paths:
   - assets/templates/helpers/contract-run.ts
   - plans/
   - tasks/todos.md
-  - tasks/contracts/20260908-1627-brc354-independent-supervision.contract.md
-  - tasks/reviews/20260908-1627-brc354-independent-supervision.review.md
-  - tasks/notes/20260908-1627-brc354-independent-supervision.notes.md
+  - tasks/archive/contract-20260908-1711-brc354-independent-supervision.md
+  - tasks/archive/review-20260908-1711-brc354-independent-supervision.md
+  - tasks/archive/notes-20260908-1711-brc354-independent-supervision.md
   - .ai/context/capabilities.json
   - .claude/templates/
   - src/
@@ -141,7 +151,7 @@ exit_criteria:
     - src/effects/automation/campaign-container.ts
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260908-1627-brc354-independent-supervision.notes.md
+    - tasks/archive/notes-20260908-1711-brc354-independent-supervision.md
 ```
 
 ## Verification Plan

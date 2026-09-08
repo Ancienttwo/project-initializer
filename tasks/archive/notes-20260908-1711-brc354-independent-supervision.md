@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-08 17:11
+> **Related Plan**: plans/archive/plan-20260908-1627-brc354-independent-supervision.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260908-1711
+> **Archive Projection V1**: `plans/plan-20260908-1627-brc354-independent-supervision.md` => `plans/archive/plan-20260908-1627-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1627-brc354-independent-supervision.notes.md` => `tasks/archive/notes-20260908-1711-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1627-brc354-independent-supervision.contract.md` => `tasks/archive/contract-20260908-1711-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1627-brc354-independent-supervision.review.md` => `tasks/archive/review-20260908-1711-brc354-independent-supervision.md`
+
 # Independent supervision integration decisions
 
 - Reuse `1d0c65a7` production containment components, not its old workflow state. Integrate on `d4852017` and retain the later finalization/FIFO/cancellation fixes.

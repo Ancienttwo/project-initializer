@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-08 17:11
+> **Related Plan**: plans/archive/plan-20260908-1627-brc354-independent-supervision.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260908-1711
+> **Archive Projection V1**: `plans/plan-20260908-1627-brc354-independent-supervision.md` => `plans/archive/plan-20260908-1627-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/notes/20260908-1627-brc354-independent-supervision.notes.md` => `tasks/archive/notes-20260908-1711-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/contracts/20260908-1627-brc354-independent-supervision.contract.md` => `tasks/archive/contract-20260908-1711-brc354-independent-supervision.md`
+> **Archive Projection V1**: `tasks/reviews/20260908-1627-brc354-independent-supervision.review.md` => `tasks/archive/review-20260908-1711-brc354-independent-supervision.md`
+
 # Task Review: brc354-independent-supervision
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260908-1627-brc354-independent-supervision.md
-> **Contract**: tasks/contracts/20260908-1627-brc354-independent-supervision.contract.md
-> **Notes File**: tasks/notes/20260908-1627-brc354-independent-supervision.notes.md
+> **Plan**: plans/archive/plan-20260908-1627-brc354-independent-supervision.md
+> **Contract**: tasks/archive/contract-20260908-1711-brc354-independent-supervision.md
+> **Notes File**: tasks/archive/notes-20260908-1711-brc354-independent-supervision.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-08 16:27
 > **Recommendation**: pass
