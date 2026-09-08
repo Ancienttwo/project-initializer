@@ -58,7 +58,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"runtime-docker","kind":"runtime_readback","paths":["*"]},{"id":"lifecycle-regression","kind":"deterministic_test","paths":["*"]}]}
 ```
 
 ## Acceptance Policy
