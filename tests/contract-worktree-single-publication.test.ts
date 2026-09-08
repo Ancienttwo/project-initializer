@@ -215,6 +215,34 @@ function installFixture(container: string): { primary: string; linked: string } 
 }
 
 describe("contract-worktree single publication commit", () => {
+  test("cleanup-closeout reports refusal after publication and recovers without merging again", () => {
+    const container = realpathSync(mkdtempSync(join(tmpdir(), "cleanup-closeout-finish-")));
+    try {
+      const { primary, linked } = installFixture(container);
+      writeFileSync(join(linked, "feature.txt"), "published feature\n");
+      commitAll(linked, "feature");
+      expect(run("git", ["worktree", "lock", linked, "--reason", "still in use"], primary).status).toBe(0);
+      const finish = run("bash", ["scripts/contract-worktree.sh", "finish", "--merge"], linked);
+      const published = run("git", ["rev-parse", "main"], primary).stdout.trim();
+      expect(readFileSync(join(primary, "feature.txt"), "utf-8")).toBe("published feature\n");
+      expect(finishAttempts(primary).at(-1)?.outcome).toBe("merged");
+      expect(existsSync(linked)).toBe(true);
+      expect(finish.status, finish.stdout + finish.stderr).toBe(1);
+      expect(finish.stderr).toContain("merged; cleanup incomplete");
+      expect(finish.stderr).toContain(published);
+      expect(finish.stderr).toContain("cleanup --slug demo --target main");
+      expect(run("git", ["worktree", "unlock", linked], primary).status).toBe(0);
+      const cleanup = run("bash", ["scripts/contract-worktree.sh", "cleanup", "--slug", "demo", "--target", "main"], primary);
+      expect(cleanup.status, cleanup.stdout + cleanup.stderr).toBe(0);
+      expect(run("git", ["rev-parse", "main"], primary).stdout.trim()).toBe(published);
+      expect(existsSync(linked)).toBe(false);
+      expect(run("git", ["worktree", "list", "--porcelain"], primary).stdout).not.toContain(linked);
+      expect(run("git", ["show-ref", "--verify", "--quiet", "refs/heads/codex/demo"], primary).status).toBe(1);
+    } finally {
+      rmSync(container, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   test("finish --merge publishes all checkpoints and lifecycle output as one target commit", () => {
     const container = realpathSync(mkdtempSync(join(tmpdir(), "contract-worktree-single-publication-")));
     try {
@@ -525,7 +553,7 @@ describe("contract-worktree finish cleans up the merged worktree", () => {
     }
   }, 30_000);
 
-  test("a refused cleanup keeps the publication and still exits 0", () => {
+  test("a refused cleanup keeps the publication and reports incomplete closeout", () => {
     const container = realpathSync(mkdtempSync(join(tmpdir(), "contract-worktree-cleanup-refused-")));
     try {
       const { primary, linked } = installFixture(container);
@@ -553,10 +581,10 @@ describe("contract-worktree finish cleans up the merged worktree", () => {
         REPO_HARNESS_GIT_BIN: fakeGit,
       });
 
-      // finish already succeeded before cleanup was attempted; a cleanup
-      // refusal must not be reported back to the caller as a failed finish.
-      expect(finish.status, `${finish.stdout}\n${finish.stderr}`).toBe(0);
-      expect(finish.stderr).toContain("automatic worktree cleanup refused");
+      // The publication is durable, but the requested closeout is incomplete.
+      expect(finish.status, `${finish.stdout}\n${finish.stderr}`).toBe(1);
+      expect(finish.stderr).toContain("merged; cleanup incomplete");
+      expect(finish.stderr).toContain(run("git", ["rev-parse", "main"], primary).stdout.trim());
       expect(finish.stderr).toContain("cleanup --slug demo --target main");
       expect(existsSync(linked)).toBe(true);
       expect(

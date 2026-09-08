@@ -25,3 +25,7 @@ Remote publication diff (merge-base:origin/main..HEAD, after workflow archival):
 > **Substantive Change SHA256**: `sha256:e1b61573cf62bcb56d2094d7329823c45fc46f925a61671aa8eeb5c687a5a847`
 
 This binds the remote diff projection; it does not replace the original runtime execution identity or expand acceptance to new source.
+
+## Integration with parallel main update
+
+Main advanced from ba09b548 to c17b004a with the separately accepted worktree-cleanup-closeout slice. The only merge conflict was generated docs/architecture/.projection-manifest.json; it was regenerated against the combined source and current CodeGraph. All four cleanup production/test paths are byte-identical to accepted f2a36aea, and the preparation/runtime/recovery/core sources are unchanged by that main update. The original Docker execution and AcceptanceReceipt retain their original subject and target. Current combined evidence is the required integrity/type/helper delta checks and new PR CI; no old receipt is relabeled as covering c17b004a.

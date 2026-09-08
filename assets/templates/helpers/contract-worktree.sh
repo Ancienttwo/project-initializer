@@ -2199,8 +2199,9 @@ finish_worktree() {
       bash "$helper_dir/contract-worktree.sh" cleanup --slug "$slug" --target "$target_branch"); then
     echo "[ContractWorktree] Worktree removed after merge; this shell's directory is gone -- cd $target_worktree"
   else
-    echo "[ContractWorktree] Warning: automatic worktree cleanup refused; the worktree and branch remain on disk" >&2
-    echo "[ContractWorktree] run from $target_worktree: repo-harness run contract-worktree cleanup --slug $slug --target $target_branch" >&2
+    echo "[ContractWorktree] merged; cleanup incomplete: publication=$publication_sha worktree=$REPO_ROOT branch=$current_branch" >&2
+    echo "[ContractWorktree] Do not repeat merge; run from $target_worktree: repo-harness run contract-worktree cleanup --slug $slug --target $target_branch" >&2
+    return 1
   fi
 }
 
@@ -2379,6 +2380,14 @@ cleanup_worktree() {
       else
         echo "contract-worktree: linked worktree status unavailable after repair attempt, refusing cleanup: $worktree_path" >&2
         echo "contract-worktree: run git worktree repair '$worktree_path' and retry, or inspect the directory manually before removing it" >&2
+        exit 1
+      fi
+    fi
+    if [[ "$repair_needed" -eq 0 ]]; then
+      local lock_path
+      lock_path="$(git -C "$worktree_path" rev-parse --git-path locked)"
+      if [[ -e "$lock_path" ]]; then
+        echo "contract-worktree: linked worktree is locked, refusing cleanup: $worktree_path" >&2
         exit 1
       fi
     fi
