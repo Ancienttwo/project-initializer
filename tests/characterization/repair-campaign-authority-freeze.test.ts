@@ -892,7 +892,7 @@ describe('BRC0 negative freeze and BRC3 campaign boundary transition', () => {
 });
 
 describe('BRC0 protected capabilities', () => {
-  const PROTECTED = JSON.parse(readFileSync(join(FIXTURES, 'protected-capabilities.json'), 'utf-8')) as {
+  const PROTECTED = JSON.parse(readFileSync(join(REPO_ROOT, '.ai/harness/campaign-protection.json'), 'utf-8')) as {
     readonly capabilities: readonly { readonly capability_id: string; readonly reason: string }[];
     readonly unmapped_surfaces: readonly { readonly paths: readonly string[]; readonly reason: string }[];
     readonly unmapped_closure: { readonly roots: readonly string[]; readonly exempt_paths: readonly string[] };

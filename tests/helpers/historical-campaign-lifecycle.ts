@@ -58,9 +58,9 @@ const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 export async function historicalPlanningFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number; max_provider_failures?: number } = {}, nonReproducible = false, planningOnly = false, verifiedRevision = false) {
   const capability = 'capability.runtime-harness.fixture';
-  const inventory = readFileSync(join(import.meta.dir, '../fixtures/repair-campaign/protected-capabilities.json'), 'utf8');
+  const inventory = readFileSync(join(import.meta.dir, '../../.ai/harness/campaign-protection.json'), 'utf8');
   const otherCapability = 'capability.runtime-harness.second';
-  const files: Record<string, string> = { 'tests/fixtures/repair-campaign/protected-capabilities.json': inventory };
+  const files: Record<string, string> = { '.ai/harness/campaign-protection.json': inventory };
   if (retryPolicy) files['plans/policies/publication.json'] = JSON.stringify({ ...publicationPolicy, retry_policy: retryPolicy });
   if (twoEngineers) {
     files['src/second/index.ts'] = 'export {};';
@@ -68,6 +68,7 @@ export async function historicalPlanningFixture(twoEngineers = false, requiredRe
   }
   const f = await createAdoptionRepository('active', 1, capability, {}, files, { ...budgetLimits, verified_revision: verifiedRevision, max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
     ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) }, process.platform === 'linux' ? '/var/tmp' : tmpdir());
+  mkdirSync(join(f.root, 'tests'), {recursive:true});
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {
     const observations = snapshot.observations.map((o, index) => {

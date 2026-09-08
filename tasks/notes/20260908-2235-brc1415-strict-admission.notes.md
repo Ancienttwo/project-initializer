@@ -183,3 +183,13 @@ Development regression: 63 tests, 260 assertions passed across revision decoding
 Integrated main e9794576 (architecture recovery and its locked archctx 0.5.8) after the first 14/14 run. Source transport delta remains unchanged; the generated projection conflict is resolved from main and regenerated through the canonical apply command. No Oracle files changed.
 
 > **Substantive Change SHA256**: `sha256:4d6709c9fea4824f69d2b69b1231005f768d5d546c06fcd2acd27f30e0f95589`
+
+
+## Target protection authority correction
+
+P1/P2: transport canary completed exact revision, authoring, challenge and adoption, but `rejectProtectedPlanning` reads a repo-harness test fixture in the target. BYOK materialization15d3c598 lacks that file. The planner also ignores configured registry authority when computing ownership and protection digest.
+P3: use one target-owned `.ai/harness/campaign-protection.json`; share the frozen selected registry result and its input paths with authoring and planning. No inferred empty inventory or fallback. Active observation validates both before request persistence, budget reservation or provider I/O. Target owners author their own inventory; init/off does not invent it. Existing self-host inventory bytes move unchanged, and characterization consumes that authority directly. At10x capability nodes, Git reads grow linearly as before; no second registry cache or authority is introduced.
+
+Regression evidence: /tmp/brc-target-protection-red.log fails against the original planner with the exact missing fixture error. Updated five-file focused run:98 pass,0 fail,892 assertions. The new target-owned guard was tested without ArchContext or repo-harness test directories.
+
+> **Substantive Change SHA256**: `sha256:3bd97974262cf98b408fbbea321f73b3146315172b7d838872d0a6a61af7034a`

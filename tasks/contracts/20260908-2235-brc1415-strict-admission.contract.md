@@ -71,6 +71,10 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - .ai/harness/campaign-protection.json
+  - tests/fixtures/repair-campaign/protected-capabilities.json
+  - tests/characterization/repair-campaign-authority-freeze.test.ts
+  - src/effects/automation/
   - tests/state/fixtures/loop-semantics/characterization.json
   - tests/unit/campaign-revision-evidence.test.ts
   - src/effects/automation/gpt-pro-issue-authoring.ts
@@ -153,18 +157,19 @@ exit_criteria:
 ## Verification Plan
 
 ```json
+
 {
   "protocol": 1,
   "checks": [
     {
-      "id": "revision-prompt-transport-delta",
+      "id": "target-protection-regression",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/unit/campaign-revision-evidence.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/campaign-fresh-audit.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-capability-registry.test.ts tests/effects/campaign-planning.test.ts tests/effects/campaign-revision-observation.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/campaign-acquisition.test.ts tests/effects/campaign-fresh-audit.test.ts tests/characterization/repair-campaign-authority-freeze.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Merged PR 367 and successful CI 34256529308 are the baseline. Verify lossless prompt transport, unchanged exact evidence rejection, real observation admission and fresh audit including complete three-group sequencing. No local full-suite rerun is needed.",
+      "necessity": "Covers selected registry portability, protection authority and fingerprint refusal, pre-provider active validation, moved fixture composition through adoption/acquisition and fresh audits, and unchanged self-host protected surfaces. Prior PR369 CI is baseline; no local full-suite trigger.",
       "inputs": {
         "env": []
       }
@@ -224,7 +229,7 @@ exit_criteria:
     {
       "id": "task-sync",
       "kind": "command",
-      "command": "REPO_HARNESS_DIFF_BASE=e9794576 REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh",
+      "command": "REPO_HARNESS_DIFF_BASE=0b0c0a60 REPO_HARNESS_DIFF_MODE=merge-base bash scripts/check-task-sync.sh",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",

@@ -146,3 +146,8 @@ This matrix incorporates the Owner-supplied GPT review. The review inspected aa3
 Before B, freeze source candidate, target SHA, Oracle binary, profile, image and finite budgets. Derive counts from observe-revision, initial authoring/at-most-one allowed repair, challenge, all observation/adoption reads, acquisition, worker/verifier, closeout and final audit. `adopt --dry-run` is not a free preflight. Unknown requests reconcile before any retry; stopped grants and failed evidence stay immutable. No mid-run version/profile/budget changes or automatic fresh batch. Read only the selected campaign label scope, never the repository-wide Issue collection.
 
 Excluded: auto-merge, auto-low-risk, Canary 4/5, refactor expansion, TTL/GC, new Docker foundations and repository-wide quality audits. The existing #354/#342/#346/BRC6a/BRC15a closure boundaries are retained. No new closing requirements may be added after the final acceptance matrix is frozen; newly observed failures are reported against their existing boundary.
+
+
+## Approved target protection correction
+
+Owner approved after real adoption reached a missing hardcoded fixture. Move the self-host protection inventory to `.ai/harness/campaign-protection.json` as the sole target-owned authority; no legacy read. Share the configured frozen registry with planning and fingerprint its exact input objects. Validate protection and selected registry before active revision observation; retain default off and shadow semantics. Add registry-target positive planning and fail-before-provider regressions. No Oracle, Docker, recovery migration or stopped-grant changes in this slice.

@@ -75,11 +75,11 @@ test('historical protection rejects directory scope, authority inputs and remove
   const f = await fixture();
   const reject = (capability: string, paths: string[]) => rejectProtectedPlanning(f.root, 'main', capability, paths);
   expect(() => reject('capability.runtime-harness.fixture', ['src'])).toThrow('directory scope');
-  for (const path of ['tests/fixtures/repair-campaign/protected-capabilities.json', '.archcontext/model/nodes/capability.yaml']) {
+  for (const path of ['.ai/harness/campaign-protection.json', '.archcontext/model/nodes/capability.yaml']) {
     expect(() => reject('capability.runtime-harness.fixture', [path])).toThrow('guard authority input');
   }
   expect(() => reject('capability.runtime-harness.removed', ['src/index.ts'])).toThrow('no longer registered');
-  const path = 'tests/fixtures/repair-campaign/protected-capabilities.json';
+  const path = '.ai/harness/campaign-protection.json';
   const inventory = JSON.parse(readFileSync(join(f.root, path), 'utf8')); inventory.capabilities = [];
   writeFileSync(join(f.root, path), JSON.stringify(inventory));
   execFileSync('git', ['add', path], { cwd: f.root }); execFileSync('git', ['commit', '-qm', 'changed protection'], { cwd: f.root });
