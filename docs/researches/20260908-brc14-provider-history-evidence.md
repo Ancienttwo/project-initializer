@@ -48,3 +48,9 @@ The Owner-approved R4 observation on 2026-09-08 stopped before submission: Oracl
 A no-send Profile 13 reproduction exposed an actual GitHub inline pill restored while the selector waited for menu candidates. Oracle 14cfbfc6 rechecks the same strict pill identity during that wait. Its regression failed before the fix and passed afterward; 26 browser tests, typecheck and real no-send UI verification pass. This is a local selector repair, not a new BRC6a probe or live BRC14 acceptance.
 
 Owner directed integration of existing work and an end to open-ended evidence experiments. This round ends with BRC6a/BRC15a closures preserved, BRC14/BRC15 live acceptance unfulfilled, and active/manual unstarted. Existing runtime gates and budgets remain enforced. No further GPT call is scheduled by this closeout.
+
+## Conservative active boundary after integration review
+
+The integration review found that revision and budget proof could admit the host worker before #354 independent supervision was connected. The final guard now explicitly rejects new active preparation/launch even when revision and settlement are valid. There is no configuration override. Existing recorded final settlement and legitimate recovery retain their separate paths. A valid stored intent/history/ledger combination reaches the specific supervision refusal without external calls or budget/materialization changes.
+
+The observation CLI separately returns success for settled verified observations and their replay; unavailable evidence and errors remain nonzero. This success does not authorize active execution. The no-argument production-closed test is removed; 48 focused observation/CLI/finalization/worker tests pass. #354 and BRC14/BRC15 live acceptance remain unfulfilled.

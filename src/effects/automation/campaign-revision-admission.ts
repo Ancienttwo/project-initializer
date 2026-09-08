@@ -18,8 +18,8 @@ export function requireCampaignActiveAdmission(repoRoot: string, candidate: Issu
     const intent = readIssueBatchIntent(root,candidate.campaign_id,candidate.group_number,candidate.intent_sha256);
     const status = readDevelopmentCampaignStatus(root, intent.campaign_id, env);
     const grant = readExactAuthorityBinding(root, status.campaign, env);
-    const requireThat = (ok: unknown) => { if (!ok) throw new Error('campaign revision admission binding differs'); };
-    requireThat(['group_preparing','group_running'].includes(status.current.state));
+    const requireThat = (ok: unknown, reason = 'campaign revision admission binding differs') => { if (!ok) throw new Error(reason); };
+    requireThat(['group_preparing','group_running'].includes(status.current.state), 'campaign is not preparing or running');
     requireThat(intent.repository_id === grant.repository_id && intent.target_ref === grant.target_ref
       && intent.chrome_profile_directory === grant.campaign!.chrome_profile_directory
       && intent.base_main_sha === resolveCampaignGroupBaseline(root,status.campaign,status.events,intent.group_number,env));
@@ -30,23 +30,28 @@ export function requireCampaignActiveAdmission(repoRoot: string, candidate: Issu
     requireThat(request.authorization_sha256 === grant.authorization_sha256 && request.campaign_id === intent.campaign_id
       && request.repository_id === grant.repository_id && request.target_ref === grant.target_ref && request.target_revision === grant.target_revision
       && request.provider_repository === policy.github.repository && request.provider_repository === intent.provider_repository
-      && request.profile_directory === grant.campaign!.chrome_profile_directory && result.browser_session?.repo_root === root
-      && result.revision_evidence === 'verified');
+      && request.profile_directory === grant.campaign!.chrome_profile_directory && result.browser_session?.repo_root === root);
+    requireThat(result.revision_evidence === 'verified', 'revision evidence is unavailable');
     const reservation = result.reservation;
     const original = readAutomationBudget(root,reservation.budget_sha256,env);
     requireThat(original.authorization.authorization_sha256 === grant.authorization_sha256
       && original.automation_run_id === reservation.automation_run_id && original.repository_id === grant.repository_id);
     const usage = readAutomationUsageForResult({repo_root:root,reservation,read_only:true,
       evidence_refs:[{ref:`revision-observation:${result.request_sha256}`,sha256:automationDigest(result)}],env});
-    requireThat(usage?.outcome === 'progress');
+    requireThat(usage?.outcome === 'progress', 'revision observation lacks settled progress');
     const current = readAutomationBudgetStatus(root,reservation.automation_run_id,env);
     const now = Date.now();
-    requireThat(now < Date.parse(grant.expires_at) && now < Date.parse(current.budget.deadline_at));
+    requireThat(now < Date.parse(grant.expires_at), 'campaign authorization expired');
+    requireThat(now < Date.parse(current.budget.deadline_at), 'campaign budget deadline elapsed');
     requireThat(current.budget.authorization.authorization_sha256 === grant.authorization_sha256
-      && current.current.state === 'active' && current.stop_receipt === null
       && !current.current.open_reservation_sha256s.includes(reservation.reservation_sha256));
+    requireThat(current.current.state === 'active' && current.stop_receipt === null, 'campaign budget is not active');
   } catch (error) {
     throw new CampaignPlanningError('human_attention_required',
       `trusted exact revision readback cannot admit active work: ${(error as Error).message}`);
   }
+  // The live worker still consumes worker-writable supervisor files (#354).
+  // Revision proof cannot authorize that execution path; terminal recovery bypasses this new-work gate.
+  throw new CampaignPlanningError('human_attention_required',
+    'independent supervision unavailable: active preparation and launch remain disabled');
 }

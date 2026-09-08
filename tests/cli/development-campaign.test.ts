@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test, spyOn } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -117,4 +117,27 @@ test('revision observation CLI exposes readonly entry and rejects missing campai
   const f = fixture(); const missing = run(['campaign', 'observe-revision', '--repo', f.root, '--authorization-sha256', 'a'.repeat(64)], f.env);
   expect(missing.status).toBe(1); expect(JSON.parse(missing.stderr).error).toBe('campaign_unavailable');
   expect(missing.stdout).toBe('');
+});
+
+for (const outcome of ['verified', 'unavailable', 'error', 'replay'] as const) test(`revision observation CLI exit status: ${outcome}`, async () => {
+  const effect = await import('../../src/effects/automation/campaign-revision-observation');
+  const { buildCampaignCommand } = await import('../../src/cli/commands/campaign');
+  const expected = { revision_evidence: outcome === 'unavailable' ? 'unavailable' : 'verified', replayed: outcome === 'replay' };
+  const observe = spyOn(effect, 'runCampaignRevisionObservation').mockImplementation(async input => {
+    expect(input.authorization_sha256).toBe('a'.repeat(64));
+    if (outcome === 'error') throw new Error('provider observation failed');
+    return expected as Awaited<ReturnType<typeof effect.runCampaignRevisionObservation>>;
+  });
+  let stdout = '', stderr = '';
+  const out = spyOn(process.stdout, 'write').mockImplementation(value => { stdout += String(value); return true; });
+  const err = spyOn(process.stderr, 'write').mockImplementation(value => { stderr += String(value); return true; });
+  const prior = process.exitCode;
+  try {
+    process.exitCode = 0;
+    await buildCampaignCommand().parseAsync(['observe-revision', '--repo', '.', '--authorization-sha256', 'a'.repeat(64)], { from: 'user' });
+    expect(process.exitCode).toBe(outcome === 'unavailable' || outcome === 'error' ? 1 : 0);
+    expect(observe).toHaveBeenCalledTimes(1);
+    if (outcome === 'error') { expect(stdout).toBe(''); expect(JSON.parse(stderr).message).toBe('provider observation failed'); }
+    else { expect(JSON.parse(stdout)).toEqual(expected); expect(stderr).toBe(''); }
+  } finally { process.exitCode = prior; observe.mockRestore(); out.mockRestore(); err.mockRestore(); }
 });

@@ -1,6 +1,7 @@
 import historyFixture from '../fixtures/campaign-revision-evidence/history.json';
 import { createHash } from 'crypto';
 import { requireCampaignActiveAdmission } from '../../src/effects/automation/campaign-revision-admission';
+import { adoptIssueBatch } from '../../src/effects/automation/issue-batch-adoption';
 import { startIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
 import { validateCampaignRevisionRequest, validateCampaignRevisionResult } from '../../src/core/automation/campaign-revision-observation';
 import * as campaignStore from '../../src/effects/automation/development-campaign-store';
@@ -230,12 +231,27 @@ async function authoringIntent(f: ReturnType<typeof fixture>) {
   appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:status.current.current_sha256,operation:'prepare_group',idempotency_key:'prepare-active',observed_at:new Date().toISOString(),env:f.env});
   return (await startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.campaign.campaign_id,group_number:1,dry_run:true,env:f.env},{readBinding:f.readBinding,consult:async()=>({...f.browser(),sessionId:'authoring'})})).intent;
 }
-test('formal history plus observed ledger admits the exact active intent and never another profile or campaign', async () => {
+test('formal history plus observed ledger still rejects active preparation without independent supervision', async () => {
   const f=fixture(4,true,false,'active'); let calls=0;
   const deps={readBinding:f.readBinding,consult:async(input:any)=>{calls++;expect(input.captureConversationEvidence).toBe(true);return historyBrowser(f,input.prompt);}};
   expect((await runCampaignRevisionObservation(f.input,deps)).revision_evidence).toBe('verified');
+  const replay = Bun.spawnSync([process.execPath, join(import.meta.dir, '../../src/cli/index.ts'), 'campaign', 'observe-revision', '--repo', f.root, '--authorization-sha256', f.authorization.authorization_sha256], { env: f.env, stdout: 'pipe', stderr: 'pipe' });
+  expect(replay.exitCode, replay.stderr.toString()).toBe(0);
+  expect(JSON.parse(replay.stdout.toString())).toMatchObject({ revision_evidence: 'verified', replayed: true });
   const intent=await authoringIntent(f);
-  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('independent supervision unavailable');
+  const before = JSON.stringify(f.budget().current);
+  const beforeGit = git(f.root, ['status', '--porcelain', '--untracked-files=all']);
+  let externalCalls = 0;
+  const forbidden = () => { externalCalls++; throw new Error('active side effect reached'); };
+  await expect(adoptIssueBatch({ repo_root: f.root, campaign_id: intent.campaign_id,
+    group_number: intent.group_number, intent_sha256: intent.intent_sha256,
+    sprint_path: SPRINT, publication_policy_path: 'plans/policies/publication.json', env: f.env },
+    { readBinding: forbidden, followup: forbidden, readSession: forbidden, runner: forbidden }))
+    .rejects.toThrow('independent supervision unavailable');
+  expect(externalCalls).toBe(0);
+  expect(JSON.stringify(f.budget().current)).toBe(before);
+  expect(git(f.root, ['status', '--porcelain', '--untracked-files=all'])).toBe(beforeGit);
   expect((await runCampaignRevisionObservation(f.input,deps)).replayed).toBe(true);expect(calls).toBe(1);
   expect(()=>requireCampaignActiveAdmission(f.root,{...intent,campaign_id:'other'},f.env)).toThrow();
   expect(()=>requireCampaignActiveAdmission(f.root,{...intent,chrome_profile_directory:'Profile 2'},f.env)).toThrow();
@@ -254,7 +270,7 @@ test('history without observed settlement cannot admit; crash replay settles wit
   const intent=await authoringIntent(f);
   expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');
   await runCampaignRevisionObservation(f.input,deps);
-  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();expect(calls).toBe(1);
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('independent supervision unavailable');expect(calls).toBe(1);
 });
 test('successful history does not reopen an exhausted budget or stopped campaign', async () => {
   for(const stopped of [false,true]) {
@@ -263,7 +279,7 @@ test('successful history does not reopen an exhausted budget or stopped campaign
     const intent=await authoringIntent(f);
     if(!stopped) { const b=f.budget(); expect(()=>reserveCampaignAuthoringBudget({repo_root:f.root,automation_run_id:b.budget.automation_run_id,expected_budget_sha256:b.budget.budget_sha256,campaign_id:f.campaign.campaign_id,group_number:1,intent_sha256:intent.intent_sha256,operation:'initial',idempotency_key:'exhaust',env:f.env})).toThrow(); }
     if(stopped) {const s=readDevelopmentCampaignStatus(f.root,f.campaign.campaign_id,f.env);appendDevelopmentCampaignEvent({repo_root:f.root,campaign_id:f.campaign.campaign_id,expected_current_sha256:s.current.current_sha256,operation:'stop',idempotency_key:'stop-active',observed_at:new Date().toISOString(),env:f.env});}
-    expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');
+    expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow(stopped ? 'campaign is not preparing or running' : 'campaign budget is not active');
   }
 });
 
@@ -275,7 +291,7 @@ test('active offer admission reads a lagging budget projection without repairing
   }});
   const intent=await authoringIntent(f);
   writeFileSync(path,before);
-  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).not.toThrow();
+  expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('independent supervision unavailable');
   expect(readFileSync(path,'utf8')).toBe(before);
 });
 test('self-consistent changed history cannot borrow the original ledger settlement', async () => {
@@ -299,5 +315,12 @@ test('active revision admission rejects elapsed budget deadline before a stop re
   const now=Date.parse(budget.budget.deadline_at)+1;
   expect(now).toBeLessThan(Date.parse(f.authorization.expires_at));
   const clock=spyOn(Date,'now').mockReturnValue(now);
-  try {expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('trusted exact revision readback');} finally {clock.mockRestore();}
+  try {expect(()=>requireCampaignActiveAdmission(f.root,intent,f.env)).toThrow('campaign budget deadline elapsed');} finally {clock.mockRestore();}
+});
+
+test('complete active intent rejects unavailable revision before the supervision boundary', async () => {
+  const f = fixture(4, true, false, 'active');
+  await runCampaignRevisionObservation(f.input, { readBinding: f.readBinding, consult: async () => f.browser() });
+  const intent = await authoringIntent(f);
+  expect(() => requireCampaignActiveAdmission(f.root, intent, f.env)).toThrow('revision evidence is unavailable');
 });

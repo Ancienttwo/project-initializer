@@ -247,8 +247,9 @@ export function buildCampaignCommand(): Command {
     .option('--gitleaks-bin <path>', 'Mandatory prompt scanner')
     .action(async raw => {
       try {
-        output(await runCampaignRevisionObservation({ repo_root: resolve(raw.repo), authorization_sha256: required(raw.authorizationSha256, '--authorization-sha256'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult }));
-        process.exitCode = 1;
+        const result = await runCampaignRevisionObservation({ repo_root: resolve(raw.repo), authorization_sha256: required(raw.authorizationSha256, '--authorization-sha256'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult });
+        output(result);
+        process.exitCode = result.revision_evidence === 'verified' ? 0 : 1;
       } catch (error) { outputError(error); }
     });
   command.command('audit')
