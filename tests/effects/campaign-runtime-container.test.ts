@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { createHash, randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
-import { prepareCampaignCodexInvocation, executeCampaignCodexInvocation, observeCampaignCodexTerminal } from '../../src/effects/automation/campaign-runtime';
+import { prepareCampaignCodexInvocation, executeCampaignCodexInvocation, observeCampaignCodexTerminal, parseCampaignVerifierResponse } from '../../src/effects/automation/campaign-runtime';
 import { runChild } from '../../scripts/contract-run';
 import { validateCampaignCodexInvocation } from '../../src/core/automation/campaign-runtime';
 
@@ -59,11 +59,16 @@ if(process.argv.includes('--version')){
 }
 const git=args=>cp.execFileSync('/usr/bin/git',['-c','safe.directory='+process.cwd(),...args],{encoding:'utf8'});
 git(['status','--short','--branch','-uall']);const head=git(['rev-parse','HEAD']).trim();
-cp.execFileSync(process.execPath,['--test','command-fixture.test.cjs'],{stdio:'pipe'});
+const role=JSON.parse(fs.readFileSync('probe-fixture.json','utf8')).role;
+if(role==='worker'){
+  cp.execFileSync(process.execPath,['--test','command-fixture.test.cjs'],{stdio:'pipe'});
+  fs.writeFileSync('prepared.json',JSON.stringify({head,passed:true}));
+}else{require('node:assert/strict').deepEqual(JSON.parse(fs.readFileSync('prepared.json','utf8')),{head,passed:true})}
 let writable=true;try{fs.writeFileSync('runtime-marker','x')}catch(e){if(e.code!=='EROFS')throw e;writable=false}
 if(process.argv.at(-1)==='attack-symlink'){fs.renameSync('logs','old-logs');fs.symlinkSync(process.cwd()+'/.git/host-only','logs')}
 if(process.argv.at(-1)==='attack-fifo'){fs.unlinkSync('logs/worker.stdout.log');cp.execFileSync('/usr/bin/mkfifo',['logs/worker.stdout.log'])}
-const text=JSON.stringify({writable,head,controlVisible:fs.existsSync(${JSON.stringify(campaignContainerJournalRoot())})});
+const facts=JSON.stringify({writable,head,controlVisible:fs.existsSync(${JSON.stringify(campaignContainerJournalRoot())})});
+const text=role==='verifier'?JSON.stringify({verdict:'pass',review:facts}):facts;
 const operation=process.argv.at(-1)==='unknown-operation'?'unmanaged_fixture_operation':'command_execution';
 for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.completed',item:{id:'git',type:operation,status:'completed',exit_code:0}}, {type:'item.completed',item:{id:'message',type:'agent_message',text}}, {type:'turn.completed',usage:{input_tokens:0,cached_input_tokens:0,output_tokens:0}}])console.log(JSON.stringify(event));
 `);
@@ -75,12 +80,15 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
   function fixture(role: 'worker' | 'verifier', image = modelFreeImage) {
     const root = realpathSync(mkdtempSync(join(process.platform === 'linux' ? '/var/tmp' : tmpdir(), 'brc-runtime-'))); roots.push(root);
     git(root, 'init', '-q'); mkdirSync(join(root, '.codex/agents'), { recursive: true });
-    const profile = `.codex/agents/${role === 'worker' ? 'fast-worker' : 'gatekeeper'}.toml`;
-    writeFileSync(join(root, profile), readFileSync(join(import.meta.dir, '../..', profile)));
+    for (const name of ['fast-worker', 'gatekeeper']) {
+      const path = `.codex/agents/${name}.toml`;
+      writeFileSync(join(root, path), readFileSync(join(import.meta.dir, '../..', path)));
+    }
     writeFileSync(join(root, 'command-fixture.test.cjs'), "require('node:test')('arithmetic',()=>require('node:assert/strict').equal(2+2,4));");
-    writeFileSync(join(root, 'probe-fixture.json'), JSON.stringify({ mode: 'normal' }));
-    git(root, 'add', profile, 'command-fixture.test.cjs');
+    writeFileSync(join(root, 'probe-fixture.json'), JSON.stringify({ mode: 'normal', role }));
+    git(root, 'add', '.codex/agents', 'command-fixture.test.cjs');
     git(root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'tracked actual role profile');
+    if (role === 'verifier') writeFileSync(join(root, 'prepared.json'), JSON.stringify({ head: git(root, 'rev-parse', 'HEAD').toString().trim(), passed: true }));
     writeFileSync(join(root, 'prompt'), 'No model fixture');
     return { root, input: { repo_root: root, worktree: root, prompt_path: 'prompt', deadline_ms: Date.now() + 20000,
       env: { BRC_CAMPAIGN_IMAGE: image }, identity: { dispatch_id: 'sha256:' + 'a'.repeat(64), role, task_id: 'task', task_revision: 'revision', claim_id: 'claim', lease_generation: 1, binding_generation: 1 } } };
@@ -99,7 +107,7 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
   for (const role of ['worker', 'verifier'] as const) test(`${role} Git command completes with exact mount permissions and inactive receipt`, async () => {
     const f = fixture(role); const invocation = await prepareCampaignCodexInvocation(f.input);
     const profileBytes = readFileSync(join(f.root, invocation.profile_ref), 'utf8');
-    const profile = Bun.TOML.parse(profileBytes) as Record<string, unknown>;
+    const profile = Bun.TOML.parse(profileBytes) as Record<string, string>;
     expect(invocation.profile_sha256).toBe(sha(profileBytes));
     expect(invocation.model).toBe(profile.model);
     expect(invocation.argv).toContain(`model_reasoning_effort=${JSON.stringify(profile.model_reasoning_effort)}`);
@@ -114,27 +122,37 @@ for(const event of [{type:'thread.started',thread_id:'model-free'}, {type:'item.
       output_sha256: { stdout: sha(result.stdout), stderr: sha(result.stderr) }, container_receipt_sha256: result.receipt_sha256 };
     const observed = observeCampaignCodexTerminal(input);
     expect(observed.state).toBe('terminal'); expect(observed.runtime_effect_inactive).toBe(true);
-    expect(JSON.parse(observed.final_response!).writable).toBe(role === 'worker');
-    expect(JSON.parse(observed.final_response!).controlVisible).toBe(false);
-    expect(JSON.parse(observed.final_response!).head).toBe(git(f.root, 'rev-parse', 'HEAD').toString().trim());
+    const facts = JSON.parse(role === 'worker' ? observed.final_response! : parseCampaignVerifierResponse(observed.final_response!).review);
+    expect(facts.writable).toBe(role === 'worker');
+    expect(facts.controlVisible).toBe(false);
+    expect(facts.head).toBe(git(f.root, 'rev-parse', 'HEAD').toString().trim());
     expect(observeCampaignCodexTerminal({ ...input, container_receipt_sha256: sha('forged') }).runtime_effect_inactive).toBeNull();
     expect(observeCampaignCodexTerminal({ ...input, termination_cause: 'cancelled' }).runtime_effect_inactive).toBeNull();
     await expect(executeCampaignCodexInvocation(invocation, f.root)).rejects.toThrow('already been admitted');
   }, 30000);
-  for (const role of ['worker', 'verifier'] as const) test(`${role} actual terminal consumer retains identical authority after both containers are removed`, async () => {
-    const f = fixture(role); f.input.deadline_ms = Date.now() + 10000;
-    const invocation = await prepareCampaignCodexInvocation(f.input);
-    const child = await runChild(role,'codex-exec:'+role,f.root,f.root,{REPO_HARNESS_PACKAGE_ROOT:join(import.meta.dir,'../..')},f.input.deadline_ms,undefined,invocation);
-    const input = { invocation,worktree:f.root,...child };
-    const before = observeCampaignCodexTerminal(input);
-    expect(before.state).toBe('terminal');
-    while (Date.now()<invocation.deadline_ms) await Bun.sleep(20);
-    for (const handle of [invocation.container,invocation.probe.container]) {
-      await cleanupCampaignContainer(handle.directory);
-      expect((await reconcileCampaignContainer(handle)).inactive).toBe(true);
+  test('actual worker then gatekeeper consumes prepared evidence and retains both terminals after cleanup', async () => {
+    const f = fixture('worker');
+    const completed = [];
+    for (const role of ['worker', 'verifier'] as const) {
+      writeFileSync(join(f.root, 'probe-fixture.json'), JSON.stringify({ mode: 'normal', role }));
+      const invocation = await prepareCampaignCodexInvocation({ ...f.input, identity: { ...f.input.identity, role } });
+      const child = await runChild(role, 'codex-exec:' + role, f.root, f.root,
+        { REPO_HARNESS_PACKAGE_ROOT: join(import.meta.dir, '../..') }, f.input.deadline_ms, undefined, invocation);
+      const input = { invocation, worktree: f.root, ...child };
+      const terminal = observeCampaignCodexTerminal(input);
+      expect(terminal.state).toBe('terminal'); expect(terminal.runtime_effect_inactive).toBe(true);
+      if (role === 'verifier') expect(parseCampaignVerifierResponse(terminal.final_response!).verdict).toBe('pass');
+      completed.push({ input, terminal });
     }
-    expect(observeCampaignCodexTerminal(input)).toEqual(before);
-  },20000);
+    while (Date.now() < f.input.deadline_ms) await Bun.sleep(20);
+    for (const { input, terminal } of completed) {
+      for (const handle of [input.invocation.container, input.invocation.probe.container]) {
+        await cleanupCampaignContainer(handle.directory);
+        expect((await reconcileCampaignContainer(handle)).inactive).toBe(true);
+      }
+      expect(observeCampaignCodexTerminal(input)).toEqual(terminal);
+    }
+  }, 30000);
   test('actual command output with an unknown provider operation cannot authorize inactivity', async () => {
     const f = fixture('worker'); writeFileSync(join(f.root, 'prompt'), 'unknown-operation');
     const invocation = await prepareCampaignCodexInvocation(f.input);
