@@ -18,7 +18,7 @@ import { AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, appendAutomationUsage, reconcile
 import { makeSnapshot, AT, CAP, policy } from './issue-batch-adoption-fixture';
 const SPRINT = 'plans/sprints/repair.sprint.md';
 function git(root: string, args: string[]) { return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim(); }
-export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'active', rounds = 1, capability = CAP, metadata: Record<string, unknown> = {}, files: Record<string, string> = {}, limits: { max_provider_failures?: number; max_agent_turns?: number; max_runner_invocations?: number; max_parallel_tasks?: 1 | 2 | 3; group_count?: 1 | 2 | 3; max_provider_calls?: number; max_successful_acquisitions?: number; liveness_policy?: LeaseLivenessPolicyV1 } = {}, temporaryRoot = tmpdir()) {
+export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'active', rounds = 1, capability = CAP, metadata: Record<string, unknown> = {}, files: Record<string, string> = {}, limits: { verified_revision?: boolean; max_provider_failures?: number; max_agent_turns?: number; max_runner_invocations?: number; max_parallel_tasks?: 1 | 2 | 3; group_count?: 1 | 2 | 3; max_provider_calls?: number; max_successful_acquisitions?: number; liveness_policy?: LeaseLivenessPolicyV1 } = {}, temporaryRoot = tmpdir()) {
   const root = realpathSync(mkdtempSync(join(temporaryRoot, 'brc6-adoption-'))); const home = realpathSync(mkdtempSync(join(temporaryRoot, 'brc6-home-')));
   git(root, ['init', '-q', '-b', 'main']); git(root, ['config', 'user.name', 'Test']); git(root, ['config', 'user.email', 'test@example.invalid']);
   for (const path of ['.ai/harness', '.archcontext/model/nodes', 'src', 'plans/sprints', 'plans/policies']) mkdirSync(join(root, path), { recursive: true });
@@ -39,6 +39,7 @@ export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'acti
   const created = createDevelopmentCampaign({ repo_root: root, campaign, idempotency_key: 'start', env });
   appendDevelopmentCampaignEvent({ repo_root: root, campaign_id: campaign.campaign_id, expected_current_sha256: created.current.current_sha256, idempotency_key: 'prepare', operation: 'prepare_group', observed_at: AT, env });
   const readBinding = () => ({ path: 'binding', binding: { profileDir: home, profileDirectory: 'Profile 1' } });
+  const revisionObservation = limits.verified_revision ? await observeVerifiedFixtureRevision({ root, authorization, env, readBinding }) : undefined;
   const started = await startIssueBatchAuthoring({ repo_root: root, campaign_id: campaign.campaign_id, group_number: 1, env }, { readBinding, now: () => AT, consult: async () => ({ sessionId: 'initial', status: 'completed', meta: campaignBrowserMetadata({ sessionId: 'initial', repoRoot: root, profileDir: home, profileDirectory: 'Profile 1' }) }) });
   const input = { repo_root: root, campaign_id: campaign.campaign_id, group_number: 1, intent_sha256: started.intent.intent_sha256, sprint_path: SPRINT, publication_policy_path: 'plans/policies/publication.json', env };
   let calls = 0;
@@ -51,5 +52,27 @@ export async function createAdoptionRepository(mode: 'shadow' | 'active' = 'acti
       : createHash('sha256').update(execFileSync('git', ['show', `${revision}:${t.path}`], { cwd: root })).digest('hex'));
     return { sessionId: 'challenge', status: 'completed', output: JSON.stringify({ base_main_sha: revision, answers }), meta: campaignBrowserMetadata({ sessionId: 'challenge', sourceSessionId: 'initial', repoRoot: root, profileDir: home, profileDirectory: 'Profile 1' }) };
   } };
-  return { root, home, env, intent: started.intent, authorization, input, deps, calls: () => calls };
+  return { root, home, env, revisionObservation, intent: started.intent, authorization, input, deps, calls: () => calls };
+}
+
+/** Fake transport only; production observation decoder, reservation and settlement stay real. */
+async function observeVerifiedFixtureRevision(f: { root: string; authorization: ReturnType<typeof sealProgramAuthorization>; env: NodeJS.ProcessEnv; readBinding: NonNullable<IssueBatchAdoptionDependencies['readBinding']> }) {
+  const { runCampaignRevisionObservation } = await import('../../src/effects/automation/campaign-revision-observation');
+  const historyFixture = (await import('../fixtures/campaign-revision-evidence/history.json')).default;
+  return runCampaignRevisionObservation({ repo_root: f.root, authorization_sha256: f.authorization.authorization_sha256, env: f.env }, {
+    readBinding: f.readBinding,
+    consult: async input => {
+      const sessionId = 'positive-revision', providerSessionId = 'positive-revision-provider';
+      const output = 'Read the frozen fixture revision.';
+      const history = structuredClone(historyFixture);
+      const body = JSON.parse(history.response.body.replaceAll('example/canary', 'acme/widgets').replaceAll('a'.repeat(40), f.authorization.target_revision));
+      body.messages[0].content.parts = ['@GitHub ' + input.prompt]; body.messages[3].content.parts = [output];
+      history.response.body = JSON.stringify(body); history.response.decodedBodySha256 = createHash('sha256').update(history.response.body).digest('hex');
+      const meta = campaignBrowserMetadata({ repoRoot: f.root, sessionId, profileDir: input.profileDir, profileDirectory: input.profileDirectory });
+      return { sessionId, status: 'completed' as const, output, meta: { ...meta, providerSessionId,
+        oracle: { observation: { source: 'oracle-session-metadata', sessionId: providerSessionId, parentSessionId: null,
+          appSelection: { status: 'selected', app: 'GitHub', source: 'chatgpt-composer-pill', pluginId: 'plugin:connector_76869538009648d5b282a4bb21c3d157', capturedAt: new Date().toISOString() } },
+          conversationCapture: { status: 'captured', sessionId: providerSessionId, conversationId: history.conversationId, sha256: 'sha256:' + 'f'.repeat(64), history } } } };
+    },
+  });
 }

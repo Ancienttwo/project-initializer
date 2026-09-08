@@ -133,3 +133,14 @@ New campaign byok-brc1415-20260909-resume-ready uses grant 023f24116e033256189ba
 Adoption with --repo . first failed the pre-existing exact repo_root string comparison; the absolute root passed that check. The challenge followup then failed with `Failed to focus prompt textarea`. Oracle read-github-repository-ancienttwo-byok metadata records status:error and promptSubmitted:false. ReconcileAutomationReservation charged the full reserved call as provider_failure. Run 2192456aa8095baf3d2d081097c21f02a5c6bb349409dff0a306da634772e7da has provider_calls=3, no open reservations and no active controller step. Immutable response remains failed; no adoption, worker, merge or BRC completion claim. Evidence is in the BYOK clone .canary-scratch/resume-author.log, resume-adoption-absolute.log and resume-challenge-reconciliation.json.
 
 After the single directly blocking UI-hint correction, the new Oracle editor-focus fault reaches the second out-of-scope stop boundary. No retry is scheduled. A subsequent slice must prove and fix followup editor readiness, then reconcile the failed immutable challenge response through a canonical recovery path; never overwrite it or reuse the old call as success.
+
+
+## Positive composition and full group sequence
+
+The model-free fixture now obtains canonical revision evidence before the first authoring call, as required by the production budget store. Fake provider transport retains the real observation decoder, grant, reservation and settlement. Actual adoption publishes a materialization commit. A separate planned fixture traverses real acquisition, validates the persisted envelope and ClaimActorReceipt, replays acquisition without creating a second dispatch, and binds the actual worker. Missing BRC_CAMPAIGN_IMAGE rejects preparation; beforeChild cannot start without an invocation. This composition proves admission and identity binding, not a newly executed Docker workload. Existing Docker runtime inputs are byte-identical to cc2fbc48 under the contract comparison.
+
+The complete three-group test uses real campaign stores, authoring and fresh-audit effects with synthetic provider history. Each next authoring prompt uses the prior accepted final SHA; Group 3 terminates and Group 4 is refused. Historical adoption and not-planned cleanup fixture records intentionally isolate sequencing. This is not evidence of three live groups or Canary 3 delivery. No new dependency, product file or production abstraction is introduced.
+
+> **Substantive Change SHA256**: `sha256:fb7228cc03258029e62bda7e94536f0a6cb8412b4cc11dac4e4e4bfefb886434`
+
+Development validation: 54 focused cases passed across adoption, acquisition, worker recovery and fresh audit (280 assertions); TypeScript passed. Final candidate acceptance and CI remain pending.

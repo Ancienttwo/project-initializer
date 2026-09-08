@@ -193,3 +193,12 @@ test('interrupted shadow observation remains unsealed and cannot repeat I/O', as
   const resumed = await adoptIssueBatch(f.input, f.deps);
   expect(resumed.receipt.connector_evidence).toBe('challenge_verified'); expect(f.calls()).toBe(1);
  });
+
+test('valid production revision guard permits actual adoption and publication with fake provider I/O', async () => {
+ const f = await createAdoptionRepository('active', 1, undefined, {}, {}, { verified_revision: true });
+ try {
+  expect(f.revisionObservation?.revision_evidence).toBe('verified');
+  const adopted = await adoptIssueBatch(f.input, f.deps);
+  expect(adopted.publication?.materialized_commit).toMatch(/^[a-f0-9]{40}$/);
+ } finally { rmSync(f.root,{recursive:true,force:true}); rmSync(f.home,{recursive:true,force:true}); }
+},60000);

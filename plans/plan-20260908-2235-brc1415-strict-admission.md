@@ -123,7 +123,7 @@ Current baseline: 63 tests pass at aa3cb452, /tmp/brc1415-current-baseline.log, 
 - [x] Correct selected capability authority, raw-resource request binding and label-scoped Issue reads; preserve old observations.
 - [x] Add explicit stopped-authoring continuation; verify existing BYOK #177/#178 updated in place under a fresh run.
 - [ ] A: prove the real admission -> existing Docker carrier composition and required negative/read-only boundaries with model-free evidence; reuse unchanged #363/#366 inputs.
-- [ ] A: add the complete Group 1 -> Group 2 -> Group 3 -> terminal effect regression, binding each next group to the previous final SHA and refusing Group 4.
+- [x] A: add the complete Group 1 -> Group 2 -> Group 3 -> terminal effect regression, binding each next group to the previous final SHA and refusing Group 4.
 - [ ] A: freeze the final candidate against the live target main, bind delta acceptance and pass required CI for that head.
 - [ ] B preflight: resolve the observed Oracle followup editor-focus failure and canonical recovery of its failed challenge before another live call.
 - [ ] B: complete one two-slot active/manual delivery using the existing real BYOK Issues, including at least one worker/verifier repair, automatic PR, Owner merge, Issue closure and exact cleanup.

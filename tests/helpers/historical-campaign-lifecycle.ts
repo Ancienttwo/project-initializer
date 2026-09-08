@@ -56,7 +56,7 @@ import { buildLeaseLivenessPolicy } from '../../src/core/state/lease-liveness';
 
 const sprint = 'plans/sprints/repair.sprint.md';
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-export async function historicalPlanningFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number; max_provider_failures?: number } = {}, nonReproducible = false, planningOnly = false) {
+export async function historicalPlanningFixture(twoEngineers = false, requiredReview = false, retryPolicy?: WorkPackageRetryPolicyV1, grantLiveness = true, budgetLimits: { max_agent_turns?: number; max_runner_invocations?: number; max_provider_failures?: number } = {}, nonReproducible = false, planningOnly = false, verifiedRevision = false) {
   const capability = 'capability.runtime-harness.fixture';
   const inventory = readFileSync(join(import.meta.dir, '../fixtures/repair-campaign/protected-capabilities.json'), 'utf8');
   const otherCapability = 'capability.runtime-harness.second';
@@ -66,7 +66,7 @@ export async function historicalPlanningFixture(twoEngineers = false, requiredRe
     files['src/second/index.ts'] = 'export {};';
     files['.archcontext/model/nodes/second.yaml'] = JSON.stringify({ schemaVersion: 'archcontext.node/v2', id: otherCapability, kind: 'capability', name: 'Second', status: 'active', summary: 'Second fixture capability', responsibilities: ['Own second fixture'], source: { include: ['src/second/**'] }, extensions: { contractFiles: { agents: 'AGENTS.md', claude: 'CLAUDE.md' }, lspProfile: 'typescript-lsp', verification: [] } });
   }
-  const f = await createAdoptionRepository('active', 1, capability, {}, files, { ...budgetLimits, max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
+  const f = await createAdoptionRepository('active', 1, capability, {}, files, { ...budgetLimits, verified_revision: verifiedRevision, max_parallel_tasks: twoEngineers ? 1 : 2, ...(retryPolicy ? { max_successful_acquisitions: 3 } : {}),
     ...(grantLiveness ? { liveness_policy: buildLeaseLivenessPolicy({ renewal_interval_ms: 1000, maximum_ttl_ms: 6000, renewal_actor_kind: 'controller', required_evidence_sources: ['controller', 'runtime_effect', 'publication', 'binding'], unproven_behavior: 'require_attention' }) } : {}) }, process.platform === 'linux' ? '/var/tmp' : tmpdir());
   let snapshot = makeSnapshot(f.intent, undefined, { primary_capability: capability });
   if (twoEngineers) {

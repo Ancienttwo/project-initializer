@@ -157,12 +157,12 @@ exit_criteria:
     {
       "id": "revision-admission",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/effects/campaign-fresh-audit.test.ts tests/unit/campaign-revision-evidence.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/effects/campaign-fresh-audit.test.ts tests/unit/campaign-revision-evidence.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/campaign-acquisition.test.ts tests/effects/campaign-worker.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Covers changed admission behavior.",
+      "necessity": "Covers real positive admission, acquisition and worker identity binding, missing-image refusal, recovery, and complete three-group sequencing with synthetic provider I/O.",
       "inputs": {
         "env": []
       }
