@@ -1,3 +1,4 @@
+import { assertResumedAdoption } from './campaign-authoring-resume';
 import { readCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from '../../core/automation/campaign-browser-session';
 import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { observeShadowAdoption } from './issue-batch-shadow-adoption';
@@ -193,6 +194,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
       if (!outcome || outcome.outcome !== 'progress' || canonicalMessageBytes(outcome.final_snapshot as Record<string, unknown>) !== canonicalMessageBytes({ receipt: stored.input.snapshot.snapshot_receipt, observations: stored.input.snapshot.observations })) fail('shadow adoption observation evidence differs');
     }
     const adopted = buildIssueBatchAdoption(stored.input);
+    assertResumedAdoption(input.repo_root, intent, adopted.receipt);
     const publication = readIssueBatchAdoptionArtifact(input.repo_root, intent, 'publication');
     let visible = false;
     if (publication && typeof publication.candidate_ref === 'string') {
@@ -274,6 +276,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
       capability_ids: capabilities, authorization_sha256: authorization.authorization_sha256, terminal: observed.terminal, challenge,
       challenge_response: response.response, response_session_ref: response.response_session_ref, response_session_evidence: response.response_session_evidence };
     const adopted = buildIssueBatchAdoption(adoptionInput);
+  assertResumedAdoption(input.repo_root, intent, adopted.receipt);
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy, shadow_budget_artifact: observed.artifact });
     return { ...adopted, publication: null };
   }
@@ -297,6 +300,7 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   const adoptionInput: IssueBatchAdoptionInput = { intent, session, snapshot: { snapshot_receipt: finalSnapshot.receipt, observations: finalSnapshot.observations, prior_observations: snapshot.observations, repair_exhausted_slots: prior.repair_exhausted_slots }, capability_ids: capabilities,
     authorization_sha256: authorization.authorization_sha256, terminal, challenge, challenge_response: response.response, response_session_ref: response.response_session_ref, response_session_evidence: response.response_session_evidence };
   const adopted = buildIssueBatchAdoption(adoptionInput);
+  assertResumedAdoption(input.repo_root, intent, adopted.receipt);
   persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'adoption', { input: adoptionInput, sprint_path: input.sprint_path, publication_policy: publicationPolicy,
     readonly_continuation: readonlyContinuation });
   return { ...adopted, publication: input.dry_run ? null : publishIssueBatch({ ...input, intent, receipt: adopted.receipt, policy: publicationPolicy,
