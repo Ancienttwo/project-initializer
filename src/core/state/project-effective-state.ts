@@ -338,11 +338,11 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
           satisfiedRequirements.push('fresh_checks', 'subject_bound_targeted_evidence');
         }
         if (input.reviewSubject.available) satisfiedRequirements.push('candidate_revision_precondition');
-        if (
-          input.planPath &&
-          (input.planStatus === 'approved' || input.planStatus === 'executing') &&
-          firstOpenTask(input.planText) === null
-        ) {
+        const approvedWorkPackage = Boolean(
+          input.planPath && input.planText?.trim() &&
+          (input.planStatus === 'approved' || input.planStatus === 'executing'),
+        );
+        if (approvedWorkPackage && firstOpenTask(input.planText) === null) {
           satisfiedRequirements.push('complete_approved_work_package');
         }
         // The handoff/resume checkpoint pair is the durable recovery state
@@ -363,6 +363,7 @@ export function projectEffectiveState(input: EffectiveStateInputs): EffectiveSta
             ship: resolveArtifactRequirement({ profile: workflowProfile, operation: 'ship' }),
           },
           evidence: {
+            approvedWorkPackage,
             satisfiedRequirements,
             hardBlockers: blockers,
             checksFailedRepairAuthorized,

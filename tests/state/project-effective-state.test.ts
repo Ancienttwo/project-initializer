@@ -91,6 +91,36 @@ function input(overrides: Partial<EffectiveStateInputs> = {}): EffectiveStateInp
 }
 
 describe('pure Effective State projection', () => {
+  test('approved work can be edited before tasks finish, but cannot ship', () => {
+    for (const planStatus of ['approved', 'executing'] as const) {
+      const state = projectEffectiveState(input({ planStatus }));
+      expect(state.readiness?.ok && state.readiness.allowedToEdit.decision).toBe('allow');
+      expect(state.readiness?.ok && state.readiness.readyToShip.decision).toBe('block');
+      if (state.readiness?.ok) {
+        expect(state.readiness.requirements.ship.find(r => r.key === 'complete_approved_work_package')?.satisfied).toBe(false);
+      }
+    }
+  });
+
+  test('missing plan content or approval never authorizes editing', () => {
+    for (const overrides of [{ planStatus: 'draft' as const }, { planText: null }, { planText: '' }]) {
+      const state = projectEffectiveState(input(overrides));
+      expect(state.readiness?.ok && state.readiness.allowedToEdit.decision).toBe('block');
+    }
+  });
+
+  test('ship requires completed tasks even with fresh evidence', () => {
+    const evidence = {
+      reviewSubject: { available: true, reviewSubjectSha256: SUBJECT, targetRevision: TARGET, targetOverlapCount: 0 },
+      checksText: JSON.stringify({ status: 'pass', active_plan: PLAN, review_subject_sha256: SUBJECT }),
+    };
+    for (const [planText, expected] of [['# Plan\n- [ ] implement\n', 'block'], ['# Plan\n- [x] implement\n', 'allow']] as const) {
+      const state = projectEffectiveState(input({ ...evidence, planText }));
+      expect(state.readiness?.ok && state.readiness.allowedToEdit.decision).toBe('allow');
+      expect(state.readiness?.ok && state.readiness.readyToShip.decision).toBe(expected);
+    }
+  });
+
   test('projects phase, profile, contract, and first open task without I/O', () => {
     const state = projectEffectiveState(input());
     expect(state.phase).toBe('executing');

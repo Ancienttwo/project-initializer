@@ -1,0 +1,9 @@
+# BRC final integration closeout
+
+Integrates the already accepted BRC packages with main cfb26baa and audit PR #358. The authoring conflict retains the frozen-revision capability schema together with the parser-valid example and all exact metadata constraints. The audit test receives the now-required capability argument. Architecture projection provenance remains its original baseline and is not relabeled as new evidence.
+
+> **Substantive Change SHA256**: `sha256:41c4587a65f9c05d513d2e2349be75321fcd4c1b1546b4b5ac3b8573364e4a77`
+
+Validation: 113 focused tests across eight files pass, metadata-specific rerun passes, typecheck passes, SQL/architecture/workflow/state/adoption checks pass. Original package acceptance remains evidence only for its original revision. Remote CI is still required for the integrated candidate.
+
+Owner narrowed this round to integration and bounded failure closeout. BRC6a and BRC15a remain closed; BRC14 and BRC15 have unfulfilled live acceptance and must not be marked passed. No active campaign started. R4 failed before prompt submission; reservation reconciled conservatively with no open reservation, not evidence of a model turn. Oracle 14cfbfc6 fixes the reproduced hydration race; 26 browser tests and a no-send Profile 13 real UI check pass. No new model probe is part of this closeout.

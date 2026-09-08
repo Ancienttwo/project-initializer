@@ -50,8 +50,8 @@ export interface OperationReadinessRequirementStatus {
   readonly key: ArtifactRequirementKey;
   /** `status` from `resolve()`, i.e. post risk/policy raise. */
   readonly status: ArtifactRequirementStatus;
-  /** `not_required` entries are always `satisfied`; `required` entries are
-   * satisfied only when `evidence.satisfiedRequirements` names the key. */
+  /** Observed requirement satisfaction for this operation. Editing accepts
+   * an approved planning artifact before its execution tasks are complete. */
   readonly satisfied: boolean;
 }
 
@@ -147,6 +147,8 @@ export type OperationReadinessDecision = OperationReadinessAllow | OperationRead
  * to satisfied.
  */
 export interface OperationReadinessEvidence {
+  /** Approved planning artifact exists; open execution tasks do not prevent editing. */
+  readonly approvedWorkPackage?: boolean;
   readonly satisfiedRequirements: readonly ArtifactRequirementKey[];
   /** Non-empty forces `block` on every gate (edit/stop/ship alike). */
   readonly hardBlockers?: readonly string[];
@@ -297,7 +299,11 @@ export function evaluateReadiness(input: EvaluateReadinessInput): EvaluateReadin
       : blocker !== 'checks_failed' || input.evidence.checksFailedRepairAuthorized !== true
   ));
 
-  const editStatuses = statusesFor(edit.requirements, satisfied);
+  const editSatisfied = new Set(satisfied);
+  if (input.evidence.approvedWorkPackage === true) {
+    editSatisfied.add('complete_approved_work_package');
+  }
+  const editStatuses = statusesFor(edit.requirements, editSatisfied);
   const stopStatuses = statusesFor(stop.requirements, satisfied);
   const shipStatuses = statusesFor(ship.requirements, satisfied);
 
