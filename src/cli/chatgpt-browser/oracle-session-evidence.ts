@@ -80,9 +80,13 @@ export function readOracleNetworkCapture(path: string, sessionId: string | undef
   try {
     if (!sessionId) throw new Error('descriptor unavailable');
     const lines = bytes.toString('utf8').trimEnd().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
-    if (lines.length < 2 || lines.some((line, index) => !line || Array.isArray(line) || line.sequence !== index + 1)) throw new Error('invalid capture sequence');
-    const first = lines[0]!, last = lines.at(-1)!;
-    if (first.event !== 'capture_start' || first.protocol !== 1 || first.kind !== 'oracle-page-response-streams'
+    const first = lines[0], last = lines.at(-1);
+    // The exporter assigns a sequence before dropping the single over-limit record.
+    const byteLimited = last?.event === 'capture_end' && last.status === 'incomplete'
+      && Array.isArray(last.reasons) && last.reasons.includes('byte_limit');
+    if (lines.length < 2 || lines.some((line, index) => !line || Array.isArray(line)
+      || line.sequence !== index + 1 + (byteLimited && index === lines.length - 1 ? 1 : 0))) throw new Error('invalid capture sequence');
+    if (!first || !last || first.event !== 'capture_start' || first.protocol !== 1 || first.kind !== 'oracle-page-response-streams'
       || first.sessionId !== sessionId || first.origin !== origin
       || last.event !== 'capture_end' || !['captured', 'empty', 'incomplete'].includes(last.status as string)
       || !Number.isInteger(last.streams) || (last.streams as number) < 0 || (last.streams as number) > 256

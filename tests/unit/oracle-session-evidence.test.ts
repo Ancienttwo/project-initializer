@@ -61,3 +61,16 @@ test('capture rejects foreign or absent descriptor, malformed bytes, symlink and
   truncateSync(f.path, 64 * 1024 * 1024 + 1); expect(readOracleNetworkCapture(f.path, 'allocated-2', 'https://chatgpt.com').sha256).toBeNull();
   expect(readOracleNetworkCapture(join(f.root, 'missing'), 'allocated-2', 'https://chatgpt.com').status).toBe('missing');
 });
+
+test('preserves the actual Oracle exporter byte-limit terminal observation', () => {
+  // Oracle fbc9ed38 startNetworkEvidence, maxBytes=4096, synthetic CDP oversized chunk.
+  const path = join(import.meta.dir, '../fixtures/oracle-response-byte-limit.jsonl');
+  expect(readOracleNetworkCapture(path, 'allocated-2', 'https://chatgpt.com').status).toBe('incomplete');
+});
+
+test('unexplained sequence gaps cannot use the byte-limit exception', () => {
+  const f = traceFixture();
+  const records = [{ sequence: 1, event: 'capture_start', protocol: 1, kind: 'oracle-page-response-streams', sessionId: 'allocated-2', origin: 'https://chatgpt.com' }, { sequence: 3, event: 'capture_end', status: 'captured', streams: 1, reasons: [] }];
+  writeFileSync(f.path, records.map(r => JSON.stringify(r)).join('\n'));
+  expect(readOracleNetworkCapture(f.path, 'allocated-2', 'https://chatgpt.com').status).toBe('invalid');
+});
