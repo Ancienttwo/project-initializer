@@ -137,6 +137,7 @@ export function bindCampaignWorker(input: {
   const priorFinal = read<CampaignWorkerFinal>('final');
   if (priorLaunch && !priorFinal) throw new Error('campaign worker launch requires reconciliation; replay cannot spawn again');
   if (!priorFinal) requireCampaignActiveAdmission(root, intent, input.env);
+  if (!priorFinal && input.provider !== 'codex-exec') throw new Error('campaign launch requires the supervised codex-exec provider');
   if (!priorFinal && (!livenessPolicy || livenessPolicy.renewal_actor_kind !== 'controller')) throw new Error('campaign dispatch requires an explicit controller liveness policy');
   const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env: input.env }).budget;
   const settleFinal = (final: CampaignWorkerFinal) => settleCampaignFinal({ root, selector, handoff, final, env: input.env });

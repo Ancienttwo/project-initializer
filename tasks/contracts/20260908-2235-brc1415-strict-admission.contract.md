@@ -79,6 +79,7 @@ allowed_paths:
   - src/core/automation/campaign-revision-evidence.ts
   - src/effects/automation/campaign-revision-observation.ts
   - src/effects/automation/campaign-fresh-audit.ts
+  - src/effects/automation/campaign-worker.ts
   - src/effects/automation/campaign-revision-admission.ts
   - src/effects/automation/campaign-capability-registry.ts
   - tests/effects/

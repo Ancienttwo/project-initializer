@@ -144,3 +144,12 @@ The complete three-group test uses real campaign stores, authoring and fresh-aud
 > **Substantive Change SHA256**: `sha256:fb7228cc03258029e62bda7e94536f0a6cb8412b4cc11dac4e4e4bfefb886434`
 
 Development validation: 54 focused cases passed across adoption, acquisition, worker recovery and fresh audit (280 assertions); TypeScript passed. Final candidate acceptance and CI remain pending.
+
+
+## Carrier-only launch correction
+
+P1/P2: contract-run accepts an optional campaign provider; bindCampaignWorker previously allowed an admitted new dispatch with provider omitted, and beforeChild then skipped invocation validation. With valid canonical revision evidence the regression returned a live worker binding instead of rejecting (tests/effects/campaign-acquisition.test.ts, pre-fix /tmp/brc-carrier-bypass-red.log, 0 pass / 1 fail). P3: require codex-exec for every new launch at bindCampaignWorker after revision admission, before budget initialization. Historical final replay remains available for exact settlement and cannot spawn. Existing CLI callers converge here, so no second parser authority or runtime carrier changes are needed. This is within work-package A's unique-carrier invariant. The interrupted preparation run is not final evidence; freeze again after this correction.
+
+> **Substantive Change SHA256**: `sha256:6f702316a4f5de3159ed0eb6d4a5de7456576b9bded144aa4cac1a42e6ce323a`
+
+> **Substantive Change SHA256**: `sha256:91930f7fef3b66d87ca2673e2fa0f1a71ca6b45a22b717dff1dc3662d3e9f4c7`

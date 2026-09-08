@@ -104,6 +104,12 @@ test('verified revision admits a real acquisition and worker binding while missi
   expect(() => validateClaimActorReceiptLive(f.root, result.receipt, result.envelope)).not.toThrow();
   expect(runCampaignAcquisition(f.executeInput)).toEqual(result);
   const { bindCampaignWorker } = await import('../../src/effects/automation/campaign-worker');
+  const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
+  const before = readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env);
+  expect(() => bindCampaignWorker({ selector: result.worker_handoff, worktree: result.envelope.worktree_path,
+    contract: result.envelope.plan.contract_path, worker_command: 'touch forbidden-worker', verifier_command: 'true', env: f.env }))
+    .toThrow('requires the supervised codex-exec provider');
+  expect(readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env)).toEqual(before);
   const bound = bindCampaignWorker({ selector: result.worker_handoff, worktree: result.envelope.worktree_path,
     contract: result.envelope.plan.contract_path, worker_command: 'worker', verifier_command: 'verifier', provider: 'codex-exec',
     env: { ...f.env, BRC_CAMPAIGN_IMAGE: '' } });
