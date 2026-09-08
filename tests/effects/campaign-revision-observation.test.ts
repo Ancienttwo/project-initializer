@@ -196,3 +196,16 @@ test('competing grant creation cannot be poisoned by the earlier observation pre
   const result = await runCampaignRevisionObservation({ ...f.input, authorization_sha256: other.authorization_sha256 }, { readBinding: f.readBinding, consult: async () => f.browser() });
   expect(result.revision_evidence).toBe('unavailable');
 });
+
+test('durable result settles after stop and target movement without re-admission', async () => {
+  const f = fixture(); let calls = 0;
+  const deps = { readBinding: f.readBinding, consult: async () => { calls++; return f.browser(); } };
+  const crash = spyOn(budgetStore, 'appendAutomationUsage').mockImplementationOnce(() => { throw new Error('settlement interrupted'); });
+  try { await expect(runCampaignRevisionObservation(f.input, deps)).rejects.toThrow('settlement interrupted'); }
+  finally { crash.mockRestore(); }
+  const state = readDevelopmentCampaignStatus(f.root, f.campaign.campaign_id, f.env);
+  appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: f.campaign.campaign_id, expected_current_sha256: state.current.current_sha256, operation: 'stop', idempotency_key: 'post-result-stop', observed_at: new Date().toISOString(), env: f.env });
+  git(f.root, ['commit', '--allow-empty', '-qm', 'post-result target movement']);
+  expect((await runCampaignRevisionObservation(f.input, deps)).replayed).toBe(true);
+  expect(calls).toBe(1); expect(f.budget().current.open_reservation_sha256s).toHaveLength(0);
+});

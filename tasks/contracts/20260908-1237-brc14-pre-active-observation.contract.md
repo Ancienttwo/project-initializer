@@ -149,12 +149,12 @@ exit_criteria:
     {
       "id": "focused",
       "kind": "command",
-      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/unit/issue-282-automation-budget-store.test.ts tests/unit/campaign-authoring-budget-prerequisite.test.ts tests/effects/gpt-pro-issue-authoring.test.ts tests/effects/campaign-fresh-audit.test.ts tests/cli/development-campaign.test.ts",
+      "command": "bun test --timeout 60000 tests/effects/campaign-revision-observation.test.ts tests/unit/campaign-authoring-budget-prerequisite.test.ts",
       "cwd": ".",
       "phase": "verification",
       "cost": "normal",
       "evidence_policy": "current_exact",
-      "necessity": "Covers observation, budget union and existing authoring/audit callers.",
+      "necessity": "Covers final observation replay delta and shared budget prerequisites; unchanged authoring/audit/CLI and generic budget paths passed baseline run-20260908T125847-13298.",
       "inputs": {
         "env": []
       }

@@ -39,6 +39,24 @@ export async function runCampaignRevisionObservation(input: {
   const authority = readStoredProgramAuthorization(root, input.authorization_sha256, input.env);
   if (!authority.campaign || authority.merge_mode !== 'manual') refuse('revision observation requires a manual campaign grant');
   const campaignId = authority.campaign.campaign_id;
+  const settle = (record: RevisionResult, requestDigest: string, replayed: boolean) => {
+    if (record.request_sha256 !== requestDigest) refuse('revision observation request differs from saved result');
+    if (record.browser_status !== 'completed') refuse('revision observation is unresolved; reservation retained without repeat provider I/O');
+    appendAutomationUsage({ repo_root: root, reservation: record.reservation,
+      outcome: record.browser_session && record.output !== null ? 'no_progress' : 'provider_failure',
+      evidence_refs: [{ ref: `revision-observation:${requestDigest}`, sha256: automationDigest(record) }], env: input.env });
+    return { request_sha256: requestDigest, observation_sha256: canonicalMessageDigest({ ...record }),
+      session_ref: record.session_ref, provider_session_ref: record.provider_session_ref,
+      browser_session: record.browser_session, network_capture: record.network_capture,
+      revision_evidence: 'unavailable' as const, replayed };
+  };
+  const savedRequest = readCampaignRevisionRecord<Record<string, unknown>>(root, campaignId, 'request');
+  const savedResult = readCampaignRevisionRecord<RevisionResult>(root, campaignId, 'result');
+  if (savedResult) {
+    if (!savedRequest || savedRequest.authorization_sha256 !== authority.authorization_sha256 || savedRequest.campaign_id !== campaignId)
+      refuse('saved revision observation belongs to another authorization');
+    return settle(savedResult, automationDigest(savedRequest), true);
+  }
   const assertCurrentTarget = () => {
     if (Date.parse(authority.expires_at) <= Date.now()) refuse('revision observation authorization expired');
     const target = execFileSync('git', ['rev-parse', '--verify', `${authority.target_ref}^{commit}`], { cwd: root, encoding: 'utf8' }).trim();
@@ -69,19 +87,6 @@ export async function runCampaignRevisionObservation(input: {
   const requestDigest = automationDigest(request);
   // The fixed immutable request also rejects a changed binding under the same campaign.
   persistCampaignRevisionRecord(root, campaignId, 'request', request, authority.authorization_sha256);
-  const settle = (record: RevisionResult, replayed: boolean) => {
-    if (record.request_sha256 !== requestDigest) refuse('revision observation request differs from saved result');
-    if (record.browser_status !== 'completed') refuse('revision observation is unresolved; reservation retained without repeat provider I/O');
-    appendAutomationUsage({ repo_root: root, reservation: record.reservation,
-      outcome: record.browser_session && record.output !== null ? 'no_progress' : 'provider_failure',
-      evidence_refs: [{ ref: `revision-observation:${requestDigest}`, sha256: automationDigest(record) }], env: input.env });
-    return { request_sha256: requestDigest, observation_sha256: canonicalMessageDigest({ ...record }),
-      session_ref: record.session_ref, provider_session_ref: record.provider_session_ref,
-      browser_session: record.browser_session, network_capture: record.network_capture,
-      revision_evidence: record.revision_evidence, replayed };
-  };
-  const saved = readCampaignRevisionRecord<RevisionResult>(root, campaignId, 'result');
-  if (saved) return settle(saved, true);
   const started = withCampaignRevisionAdmission(root, campaignId, authority.authorization_sha256, () => {
     assertCurrentTarget();
     const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority, env: input.env });
@@ -105,5 +110,5 @@ export async function runCampaignRevisionObservation(input: {
     network_capture: result.meta.oracle?.networkCapture ?? null, answer_sha256: messageSha256(raw),
     output: raw.length <= 2 * 1024 * 1024 ? raw : null, revision_evidence: 'unavailable' };
   persistCampaignRevisionRecord(root, campaignId, 'result', record, authority.authorization_sha256);
-  return settle(record, false);
+  return settle(record, requestDigest, false);
 }
