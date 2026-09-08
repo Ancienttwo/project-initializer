@@ -82,6 +82,24 @@ verify_repo_harness() {
   log "repo-harness ${version} installed."
 }
 
+
+cat <<'BANNER'
+
+           _____________
+          /             |
+     /\  /|            \|/
+    /  \/ |             V
+   ( o    \            / \
+    \   __/           /___\
+    /  /
+   /  /____
+  /        \        repo-harness
+ /|        |        installer
+  | |  | | |        repoharness.com
+  |_|  |_|_|
+
+BANNER
+
 if [ "${REPO_HARNESS_DRY_RUN:-0}" = "1" ]; then
   log "DRY RUN: would ensure Bun >= ${MIN_BUN_VERSION}, install ${PACKAGE_NAME}@${PACKAGE_VERSION}, and verify repo-harness --version."
   exit 0
