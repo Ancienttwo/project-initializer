@@ -27,7 +27,10 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Install shell dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq rsync
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
+          sudo apt-get update
+          sudo apt-get install -y jq rsync
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -82,7 +85,10 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Install shell dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq rsync
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
+          sudo apt-get update
+          sudo apt-get install -y jq rsync
 
       - name: Install pinned Herdr runtime
         run: |
