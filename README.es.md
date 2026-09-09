@@ -2,7 +2,7 @@
 
 # repo-harness
 
-### Un flujo de trabajo repetible y basado en archivos para sesiones de programación con Claude y Codex
+### Un flujo de trabajo basado en archivos para Claude y Codex, y un runtime autorizado para los programas construidos sobre él
 
 <img src="docs/images/repo-harness-hook-carrot.png" alt="hooks de repo-harness guiando a Codex y Claude hacia adelante con estado de workflow repo-local" width="900">
 
@@ -22,14 +22,22 @@ proyecto, de modo que la siguiente sesión de agente continúa desde archivos en
 lugar del historial de chat. Adopta un repositorio existente con un contract
 de agente tasks-first que mantiene alineados a Claude y Codex.
 
+Sobre ese contract ejecuta **programas autorizados**: trabajo de larga duración
+que sostiene su propia autorización, presupuesto, task offers y leases, de modo
+que un Sprint puede avanzar a través de sesiones sin que un humano conduzca
+cada paso.
+
 ## Índice
 
 - [Primeros pasos](#primeros-pasos)
 - [Por qué usar repo-harness](#por-qué-usar-repo-harness)
+- [Dos capas](#dos-capas)
 - [Características clave](#características-clave)
 - [Cómo funciona](#cómo-funciona)
 - [Flujo de trabajo de tareas](#flujo-de-trabajo-de-tareas)
+- [Programas autorizados](#programas-autorizados)
 - [Hooks](#hooks)
+- [Panel de control humano local](#panel-de-control-humano-local)
 - [Conector MCP](#conector-mcp)
 - [Revisión del trabajo](#revisión-del-trabajo)
 - [Skills](#skills)
@@ -42,9 +50,11 @@ de agente tasks-first que mantiene alineados a Claude y Codex.
 
 ### 1. Instalar el CLI
 
-Prerrequisitos: un Git working tree, `bash` y `bun`; `jq` es opcional. No se
-necesita Node.js — el instalador usa Bun >= 1.4.0 como runtime, instalando o
-actualizando Bun primero si hace falta.
+Prerrequisitos: un Git working tree, `bun` y un `herdr` >=0.9.0 utilizable para
+la readiness del host; macOS/Linux también requieren `bash`, mientras que
+Windows requiere Git for Windows (incluidos su Bash y sus herramientas de
+`usr/bin`). `jq` es opcional. No se necesita Node.js — el instalador usa Bun >=
+1.4.0 como runtime, instalando o actualizando Bun primero si hace falta.
 
 ```bash
 # macOS / Linux
@@ -67,19 +77,36 @@ repo-harness install
 npx -y repo-harness@latest install   # npx fallback; the CLI still runs on Bun
 ```
 
+Instala herdr desde [herdr.dev](https://herdr.dev/) y verifica
+`herdr --version`. El hosting persistente de review requiere process groups
+POSIX; en Windows usa WSL. Un herdr ausente o inutilizable bloquea la readiness
+del host. Antes de actualizar desde tmux, drena los reviewers existentes con la
+versión anterior y vuelve a enlazar explícitamente los endpoints de terminal.
+Ver [runtime cutover](docs/researches/20260909-herdr-runtime-cutover.md).
+
 ### 2. Bootstrap del runtime del host
 
 ```bash
 repo-harness install
 ```
 
+En Windows, mantén Git for Windows en el `PATH` de instalación/actualización.
+Esa ceremonia explícita valida y fija `git.exe`, su `bash.exe`/`usr/bin`
+correspondiente, y el directorio `TEMP` absoluto de la cuenta de instalación
+más las herramientas nativas de `System32` en el
+`~/.repo-harness/config.json#protectedHelperRuntime` de la cuenta del sistema
+operativo. Los helpers de workflow protegidos no redescubren herramientas desde
+el `PATH` de quien los invoca; vuelve a ejecutar `repo-harness update` después
+de mover o reemplazar Git for Windows.
+
 El bootstrap global: instala el paquete npm como CLI global, refresca los
 alias de skill de repo-harness, instala los hook adapters a nivel de usuario,
 y registra un profile de instalación explícito. Es idempotente y no aplica
 archivos de workflow repo-local al directorio actual. `--dry-run --json` lista
-primero los componentes a instalar, omitir y eliminar. Profiles, modo de
-delegación, comandos de refresco, y la auditoría de solo lectura
-`setup check`: [`install-profiles.md`](docs/reference-configs/install-profiles.md).
+primero los componentes a instalar, omitir y eliminar. Profiles, autoridad de
+delegación nativa de Codex, comandos de refresco, y la auditoría de solo
+lectura `setup check`:
+[`install-profiles.md`](docs/reference-configs/install-profiles.md).
 
 ### 3. Vista previa del contract repo-local
 
@@ -116,9 +143,12 @@ detente y lee primero
 ### Actualizar y desinstalar
 
 ```bash
-repo-harness update          # refresh user-level CLI and runtime pieces
+repo-harness update          # reconcile CLI, mandatory deps, profile tooling, and CodeGraph
 repo-harness update --check  # read-only repair guidance, no writes
-repo-harness uninstall       # remove managed host adapters only
+repo-harness uninstall --dry-run # preview owned user configuration cleanup
+repo-harness uninstall           # remove owned configuration; preserve user changes/history
+repo-harness mcp uninstall --dry-run # preview independent MCP setup cleanup
+repo-harness mcp uninstall --services-stopped # after stopping all MCP HTTP services
 ```
 
 ## Por qué usar repo-harness
@@ -142,6 +172,11 @@ repo-harness uninstall       # remove managed host adapters only
   decisión humana cabe en una sola pantalla — verdict, archivos previstos vs
   reales, comandos que pasaron, riesgo residual, rollback — en lugar de una
   reconstrucción de lo que el agente afirma haber hecho.
+- **El trabajo desatendido sigue siendo responsable.** Un programa no puede
+  arrancar sin una autorización almacenada, no puede exceder su budget ledger,
+  no puede retener una tarea más allá de su lease, y no puede reclamar
+  aceptación sin un receipt. La autonomía está acotada por artefactos, no por
+  confianza.
 
 En un repositorio adoptado, la superficie se mantiene intencionalmente
 pequeña:
@@ -153,6 +188,38 @@ pequeña:
 | `tasks/contracts/`, `tasks/reviews/`, y `.ai/harness/checks/` | Alcance, verificación y evidencia de review para demostrar que el trabajo está terminado. |
 | `.ai/harness/handoff/` y `tasks/current.md` | Bitácora de la sesión y estado resumible, derivados de artefactos de workflow en lugar de historial de chat. |
 
+## Dos capas
+
+El producto se lee como dos capas que comparten un mismo conjunto de archivos.
+
+**Capa 1 — el contract de sesión.** Un humano, una sesión de agente, una tarea
+a la vez. Plans, contracts, checks, reviews y handoffs son la autoridad
+durable; los hooks mantienen la sesión dentro de ellos. Esto es el producto
+completo para un repositorio en solitario, y todo lo que está en
+[Flujo de trabajo de tareas](#flujo-de-trabajo-de-tareas) pertenece aquí. Nada
+de lo que sigue es necesario para usarlo.
+
+**Capa 2 — programas autorizados.** Trabajo de larga duración que sobrevive a
+una sesión: un controller desatendido que avanza un Sprint, una campaña de
+reparación que redacta y adopta GitHub Issues, un programa de refactor guiado
+por el modelo de arquitectura, un plano de colaboración donde varios Module
+Engineers intercambian señales y handoffs. Cada programa está condicionado a
+una autorización emitida por un operador, consume de un budget ledger por goal,
+y retiene el trabajo mediante leases renovables. Ver
+[Programas autorizados](#programas-autorizados).
+
+| | Capa 1 | Capa 2 |
+| --- | --- | --- |
+| Unidad de trabajo | Un task contract | Un programa autorizado |
+| Quién lo conduce | Un humano en una sesión | Un controller, bajo topes |
+| Autoridad | Plan, contract, review, checks | Lo anterior, más authorization, budget, lease, receipts |
+| Punto de entrada | `repo-harness init` | `repo-harness automation grant mint` |
+| Condición de parada | Closeout de la tarea | Budget agotado, lease perdido, o un receipt terminal |
+
+La capa 2 no reemplaza a la capa 1: cada paso de un programa sigue
+proyectándose en los mismos artefactos de plan, contract y review que habría
+escrito un humano.
+
 ## Características clave
 
 | | |
@@ -160,6 +227,8 @@ pequeña:
 | **Sesiones respaldadas por archivos** | Plans, contracts, checks y handoffs viven en el repositorio, de modo que una sesión nueva retoma desde artefactos en vez de un hilo de chat |
 | **Typed hook runtime** | Ocho managed routes compartidas, más tres delegation routes exclusivas de Codex, cada una atada a exactamente un typed handler in-process, con guards fail-closed en el límite de edición |
 | **Plan → Contract → Review** | Un solo ciclo de vida desde el plan aprobado hasta el contract proyectado, el worktree aislado, la evidencia estructurada y un closeout revisable |
+| **Programas autorizados** | Programas de campaign, refactor, automation y collaboration que sostienen su propia authorization, budget ledger, task offers y leases renovables |
+| **Controller desatendido acotado** | Un bucle de dispatch de Engineer bajo topes duros de pasos, duración y reintentos, que reserva budget antes de cada intento |
 | **Carga de contexto progresiva** | Un root context estable de ~12KB más capability contracts de ~1KB que solo se cargan para los archivos que realmente se están tocando |
 | **Integración con CodeGraph** | Consultas estructurales (callers, callees, definitions) respondidas desde un índice pre-construido en vez de pasadas repetidas de grep-and-read |
 | **MCP planner sidecar** | ChatGPT lee el estado real del repositorio y escribe artefactos de PRD/Sprint/Goal; Codex los ejecuta, sin acceso de escritura al código fuente por defecto |
@@ -271,13 +340,155 @@ sesión de Goal reanudada nunca reinterpreta el chat original. Ver
 [`agentic-development-flow.md`](docs/reference-configs/agentic-development-flow.md)
 y [`workflow-orchestration.md`](docs/reference-configs/workflow-orchestration.md).
 
+## Programas autorizados
+
+Un programa es trabajo que sobrevive a una sesión. Todos ellos parten de las
+mismas tres primitivas, y ninguno puede arrancar sin la primera.
+
+```bash
+repo-harness automation grant mint   # store one operator ProgramAuthorizationV1
+repo-harness automation grant list   # digests held for this repository
+repo-harness automation budget show          # the enforceable per-goal ledger
+repo-harness automation budget repair        # seal a stopped or expired run's exhaustion receipt
+```
+
+- **Authorization.** Un `ProgramAuthorizationV1` emitido por un operador vive
+  en el gate store del home del harness. No existe una ruta de arranque sin
+  autenticar, y un programa nunca deriva su propio actor — el autor de cada
+  registro se resuelve desde `--authorization-id`.
+- **Budget.** Las llamadas al provider, los pasos de campaign, las
+  observaciones de adopción, la ejecución de heartbeat y la adquisición de
+  worker reservan todas contra un ledger por goal antes de que el trabajo
+  quede registrado. `budget repair` solo vuelve a ejecutar una reconciliación
+  bloqueada; nunca reserva, cobra ni cambia un tope.
+- **Lease.** El trabajo retenido lleva un lease renovable con un intervalo de
+  renovación, un TTL máximo y un conjunto cerrado de fuentes de evidencia. Un
+  estado de liveness no probado exige atención en lugar de reclamarse en
+  silencio.
+
+### Controller desatendido
+
+```bash
+repo-harness automation controller start --maximum-steps 20 --maximum-duration-ms 300000
+repo-harness automation controller step
+repo-harness automation controller status
+repo-harness automation controller stop
+```
+
+Un bucle de dispatch de Engineer bajo topes duros, con backoff determinista y
+un ledger acotado de reintentos por intento. Cada intento reserva budget antes
+de quedar registrado, y un resultado proyectado fuera del enum cerrado no puede
+contarse como satisfecho.
+
+### Scheduling de Engineer
+
+```bash
+repo-harness engineer principal enroll        # map an OAuth authorization to a Binding
+repo-harness engineer acquire-next --authorization-id <id> --idempotency-key <key>
+repo-harness engineer work-demand propose|transition|materialize|status
+repo-harness engineer message send|receive|ack
+repo-harness engineer board                   # read-only organization attention
+```
+
+`acquire-next` selecciona y reclama la primera offer canónica para un principal
+inscrito. Las aristas de dependencia se resuelven desde autoridades de receipt,
+no por inferencia, y los IDs de tarea de Sprint son identidades inmutables bajo
+el backlog schema v2 — ejecuta `repo-harness sprint migrate-schema` una vez
+sobre un backlog más antiguo.
+
+### Campaña de desarrollo
+
+```bash
+repo-harness campaign audit          # budgeted read-only group audit
+repo-harness campaign author         # persist an IssueBatchIntentV1, open the GPT Pro authoring lane
+repo-harness campaign adopt          # exact-SHA readback, seal authoring, publish a repair batch
+repo-harness campaign step           # hand one adopted task to its local planning session
+repo-harness campaign prepare-resume # zero-provider resume request from stored evidence
+```
+
+Un programa de reparación sembrado: audita un grupo, redacta sus Issues a
+través del lane de GPT Pro, adóptalos contra un readback de SHA exacto, y luego
+haz avanzar cada tarea adoptada al ciclo de vida ordinario de plan → contract →
+review. `prepare-resume` reconstruye una resume request a partir de la
+evidencia almacenada de adopción, continuación y budget sin contactar a un
+provider.
+
+### Refactor Mode
+
+```bash
+repo-harness refactor discover        # bounded shadow scan of one local proposal
+repo-harness refactor materialize     # one recommendation into N Work Packages
+repo-harness refactor verify-candidate
+repo-harness refactor board
+```
+
+Un programa respaldado por ArchContext que convierte una recomendación de
+arquitectura en work packages contra una única autoridad canónica de tarea de
+Sprint. Su activación está condicionada: el canary set y la evidencia de
+rung-promotion deben refrescarse contra el provider instalado antes de que se
+active.
+
+### Plano de colaboración
+
+```bash
+repo-harness collaboration exchange              # one Work Exchange snapshot
+repo-harness collaboration threads               # lanes, hotspot scores, opportunities
+repo-harness collaboration post                  # append one CoordinationSignalV1
+repo-harness collaboration handoff publish|list|adopt
+repo-harness collaboration packet build|read
+```
+
+Varios Module Engineers leen un mismo Work Exchange y publican registros de
+coordinación acotados. La adopción de handoff es deliberadamente no exclusiva:
+no otorga ninguna Task, Claim ni Lease.
+
+El sustrato mantiene un solo Module Engineer y un solo writer mientras Workers
+acotados de solo lectura intercambian señales no confiables y handoffs
+explícitos. Ejecuta el live gate del source checkout con
+`bun scripts/c9-collaboration-canary.ts --live`; crea repositorios desechables
+aislados para tres trazas emparejadas de baseline/treatment y registra el uso de
+tokens de Codex autoritativo del provider, el tamaño de contexto, la reutilización
+de señales, la adopción de handoff, el conteo de writers y los digests del plano
+de entrega. El resultado C9 aceptado es deliberadamente una decisión negativa
+sobre multi-seat: el treatment de tres lectores preservó la autoridad y reutilizó
+estado, pero no produjo más que el baseline de un solo lector. El
+`EngineerSeatV2` persistente de misma capability, un marketplace de Review
+independiente y el Merge desatendido siguen inactivos. Ver
+[`20260830-c9-real-multi-agent-canary.md`](docs/researches/20260830-c9-real-multi-agent-canary.md).
+
+### Intake de fuentes externas
+
+```bash
+repo-harness external-source refresh   # one bounded, explicitly enabled GitHub observation
+repo-harness external-source bind      # one immutable revision to one pending canonical task
+repo-harness external-source bindings  # binding edges and current drift attention
+```
+
+El intake es inerte por diseño. Un Issue observado no acuña ninguna autoridad de
+ejecución y no se convierte por sí solo en una tarea ejecutable; el binding
+adjunta una revisión de fuente inmutable a una tarea que ya tiene plan aprobado
+y contract.
+
+### Review de aceptación persistente
+
+```bash
+repo-harness claude-review round --timeout-ms 1800000
+repo-harness claude-review status
+repo-harness claude-review close
+```
+
+Un reviewer de Claude de solo lectura, alojado en una sesión de herdr propia que
+sobrevive hasta tres rondas de reparación contra evidencia de `verify-sprint`
+preparada. Una sesión repetida más allá del budget de rondas se rechaza con
+`claude_review_session_budget_exhausted`.
+
 ## Hooks
 
 El adapter instalado posee ocho managed hook routes compartidas. El route
 tuple `event + routeId + matcher` es el contract estable; cada tuple ata
 exactamente un typed handler in-process.
 
-| Route | Matcher | Handler | Function |
+| Route | Matcher | Handler | Función |
 | --- | --- | --- | --- |
 | `SessionStart.default` | all sessions | `src/cli/hook/session-context.ts` (in-process builder) | Inyecta el handoff anterior, el estado del sprint, guía de minimal-change y hallazgos de config-security de solo lectura antes de que empiece el trabajo. |
 | `PreToolUse.edit` | `Edit\|Write` | `src/cli/hook/mutation-guard.ts` (in-process handler) | Aplica la worktree policy y la readiness de plan/contract antes de las ediciones de implementación. |
@@ -310,6 +521,22 @@ el contract scaffold, o se afirma completion antes de que el contract
 pasara), y `WorktreeGuard` (escrituras desde el worktree equivocado).
 Playbook completo:
 [`docs/reference-configs/hook-operations.md`](docs/reference-configs/hook-operations.md).
+
+## Panel de control humano local
+
+Ejecuta la vista de operador de solo observación en la misma máquina que los
+repositorios adoptados:
+
+```bash
+repo-harness operator serve
+```
+
+El comando se enlaza únicamente a loopback e imprime la URL local. El navegador
+muestra el resumen canónico de Fleet, una worklist ordenada por atención, un
+panel residente de detalle de tarea y estados de snapshot degradados. El
+refresco es explícito; el panel lleva exactamente una acción de escritura —
+enviar un mensaje dirigido a una tarea — y no adquiere tareas, ni muta el
+estado del workflow, ni lanza agentes, ni expone rutas del repositorio.
 
 ## Conector MCP
 
@@ -353,6 +580,10 @@ archivos modificados. Acepta solo cuando la review recomiende pass, el
 verdict de la card sea pass, y el external acceptance sea pass,
 `not_required`, o un override explícito.
 
+Los hechos de ejecución y la aceptación son autoridades separadas: una
+ejecución exitosa de `verify-contract` prueba que un comando corrió, no que el
+trabajo esté aceptado. La aceptación es su propio receipt tipado.
+
 Los agentes leen los artefactos fuente antes que los resúmenes derivados:
 
 | El agente lee primero | El humano revisa primero |
@@ -363,9 +594,9 @@ Los agentes leen los artefactos fuente antes que los resúmenes derivados:
 | Contract activo en `tasks/contracts/` | `.ai/harness/checks/latest.json` y el run trace |
 | Último handoff en `.ai/harness/handoff/` | Riesgos residuales y rollback |
 
-`tasks/current.md` es solo un snapshot de orientación. Si discrepa del plan
-activo, el contract, la review, los checks o el handoff, ganan los
-artefactos fuente.
+`tasks/current.md` es un snapshot local de orientación ignorado por git, no un
+archivo trackeado. Si discrepa del plan activo, el contract, la review, los
+checks o el handoff, ganan los artefactos fuente.
 
 Los validadores runtime-heavy (Unity, browser E2E, simuladores móviles,
 hardware rigs, staging smoke tests) pueden publicar manifiestos de external
@@ -388,7 +619,7 @@ host mientras el CLI y los hooks poseen la ejecución.
 | `repo-harness-check` | Checks de workflow y release, más una referencia de deploy-readiness |
 | `repo-harness-ship` | Valida worktrees terminados, hace push de branches y abre PRs |
 | `repo-harness-architecture` | Docs de architecture, drift requests y diagramas sin un refresh completo del harness |
-| `repo-harness-cross-review` | Cross-model review independiente Claude/Codex, host-aware |
+| `repo-harness-cross-review` | Review externo independiente: los hosts Claude usan Codex directo; los hosts Codex usan el runtime app-server del plugin oficial de OpenAI `codex@openai-codex` |
 | `claude-plan` | Provider skill del lado Codex: consulta independiente en Claude plan mode para un design fork o una decisión de alto riesgo; no es un entrypoint directo de usuario |
 | `repo-harness-chatgpt` | Consultas de Oracle browser/GPT Pro, setup del MCP Connector y bridge handoff; solo setup explícito |
 | `merge-gate` (externo) | Gate final de exact-candidate; repo-harness no distribuye ningún Skill de merge-gate — ver [external tooling](docs/reference-configs/external-tooling.md) |
@@ -421,10 +652,13 @@ reconstruidos por `scripts/sync-codex-installed-copies.sh`.
 
 `bun run check:ci` es el único gate equivalente a CI; `bun run check:release`
 solo añade el preflight de unpublished-version de npm antes de delegar a ese
-mismo gate.
+mismo gate. Los checks de governance y funcionales corren como jobs de CI
+independientes, y `bun run check:route-eval` sostiene un piso de cobertura
+fijado sobre cada intent y action de prompt-guard.
 
 ```bash
 bun run check:ci                    # the whole gate
+bun run check:context-map           # .ai/context drift against ArchContext nodes
 repo-harness docs list              # runtime reference docs, resolved from the package
 repo-harness docs show harness-overview
 bun scripts/assemble-template.ts --plan C --name "MyProject"
@@ -446,7 +680,8 @@ son dependencias empaquetadas ordinarias.
 | --- | --- | --- |
 | [Hylarucoder](https://x.com/hylarucoder) / Geju | El método de due diligence P1/P2/P3 y la práctica Geju que dieron forma a la disciplina de planning, tracing y decision-rationale de este workflow | Contribución metodológica y agradecimiento; no es una dependencia empaquetada |
 | Waza de [TW93](https://x.com/HiTw93), incluyendo `think`, `hunt`, `check` y `health` | Planning diario, bug hunts, verificación, health checks y sync de skill Codex-first | Instalado a través del skills CLI en los host skill roots |
-| `mermaid` | Soporte de authoring y review para bloques Mermaid fenced dentro de la documentación de arquitectura | Skill externo runtime-referenced, no vendored en los repos generados y sin generar HTML standalone |
+| `mermaid` | Authoring y review de legibilidad para el source Mermaid de arquitectura y system-flow | Skill de review runtime-referenced, no vendored en los repos generados y nunca un generador de artefactos HTML |
+| [herdr](https://herdr.dev/) | Runtime obligatorio de peer-terminal: despacho de notificaciones, colaboración entre peers y hosting del reviewer de aceptación persistente | Binario instalado externamente, con checksum fijado en `.ai/harness/policy.json`; reemplaza al runtime tmux retirado |
 | [`reverse-skill-router`](https://github.com/zhaoxuya520/reverse-skill) | Enruta tareas de ingeniería inversa y seguridad a playbooks especializados | Skill recomendado pero solo explícito (`--with-reverse-skill`); queda fuera de los perfiles porque la suposición upstream «objetivo mencionado = autorizado» exige una revisión independiente del scope |
 | CodeGraph (`@colbymchenry/codegraph`) | Navegación symbol-aware, impact tracing y readiness checks para este repo self-host | Dev dependency en este repo; los repos generados se mantienen global-MCP-first salvo que la policy haga opt-in |
 | [Oracle](https://github.com/steipete/oracle) de [Peter Steinberger](https://x.com/steipete) (`@steipete/oracle`, MIT) | Motor de consulta de navegador GPT Pro / ChatGPT Web por defecto, al que el Oracle provider `chatgpt-browser` invoca externamente (shell out) para las consultas `gptpro` | Binario resuelto externamente (`--oracle-bin`, `REPO_HARNESS_ORACLE_BIN`, `node_modules/.bin`, o `PATH`); nunca se descarga automáticamente, y un binario ausente es un fallo duro de `ORACLE_NOT_INSTALLED` |
@@ -467,8 +702,8 @@ repositorio adopte la misma política.
 
 ## Versión actual
 
-- Paquete npm: `repo-harness@0.18.0`
-- Sello de workflow generado: `repo-harness@0.18.0+template@0.18.0`
+- Paquete npm: `repo-harness@0.19.0`
+- Sello de workflow generado: `repo-harness@0.19.0+template@0.19.0`
 - Repositorio de GitHub: `Ancienttwo/repo-harness`
 - Notas de versión e historial: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
