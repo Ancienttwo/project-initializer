@@ -1,16 +1,16 @@
 # Task Review: campaign-worker-record-scope
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260910-0301-campaign-worker-record-scope.md
 > **Contract**: tasks/contracts/20260910-0301-campaign-worker-record-scope.contract.md
 > **Notes File**: tasks/notes/20260910-0301-campaign-worker-record-scope.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 03:01
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:e7205e4b2283c59a67b381e68a27ef924d176de6594b9212c22319a2ab7918f3
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 4f8d3b8a231e1d3f5df8a8648e0b92de779a4fe2
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:e7205e4b2283c59a67b381e68a27ef924d176de6594b9212c22319a2ab7918f3
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 4f8d3b8a231e1d3f5df8a8648e0b92de779a4fe2
+> **Verification Evidence SHA256**: sha256:d24df9efe0b082b733aa629e202e8ff7f40e77bcb59caab2a50ef4747a8e89d6
+> **Issued At**: 2026-09-09T19:19:24.627Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Quick review passed: the worker retains its business allowlist, receives explicit authority for only the exact attempt result file, and reports Notes to the parent when unwritable. Script and shipped helper match. Nine executable checks and all contract criteria passed; CodeGraph proof-only candidate reconciled through a ready empty noop.
 - Findings: none
 
 ## Behavior Diff Notes
