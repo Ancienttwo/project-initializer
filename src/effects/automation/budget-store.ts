@@ -1400,6 +1400,9 @@ function exhaustionRefusal(
     if (limit === null) continue;
     const consumed = current.consumed[counted] ?? 0;
     if (consumed < limit) continue;
+    // Campaign acquisitions admit work whose dispatch and completion have
+    // separate budgets. Reaching this cap must not stop that admitted work.
+    if (budget.authorization.campaign !== null && counted === 'successful_acquisitions' && consumed === limit) continue;
     return Object.freeze({
       ...base,
       refusal_code: 'budget_limit_exceeded' as const,
@@ -1717,7 +1720,10 @@ function reserveAutomationBudgetAdmission(input: ReservationAdmissionInput): Aut
         const stored = replay();
         if (stored !== null) return Object.freeze({ reservation: stored, disposition: 'replayed' as const });
       }
-      if (code === 'budget_limit_exceeded' || code === 'budget_expired') {
+      const acquisitionOnlyRefusal = status.budget.authorization.campaign !== null
+        && code === 'budget_limit_exceeded'
+        && decision.refusal.metric === 'successful_acquisitions';
+      if ((code === 'budget_limit_exceeded' && !acquisitionOnlyRefusal) || code === 'budget_expired') {
         persistStopReceipt(
           paths,
           status.budget,
