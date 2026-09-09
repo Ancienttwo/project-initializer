@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { execFileSync } from 'child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { runCampaignPlanningPreflight } from '../../src/cli/commands/campaign';
@@ -11,7 +11,7 @@ function fixture(metadata = evidence, invalidPlan = false) {
   const repo = mkdtempSync(join(tmpdir(), 'campaign-acceptance-preflight-'));
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
   const text = [
-    '# Contract', '> **Status**: Active', '> **Task Profile**: code-change',
+    '# Contract', '> **Status**: Active', '> **Task Profile**: code-change', '> **Review File**: task.review.md',
     '## Goal', 'Reject incomplete verification metadata before dispatch.',
     '## Why', 'Dispatch must not spend a worker on metadata canonical acceptance rejects.',
     '## Scope', '- In scope: src validation.', '- Out of scope: unrelated files.',
@@ -24,6 +24,7 @@ function fixture(metadata = evidence, invalidPlan = false) {
     }] }), '```', '',
   ].join('\n\n');
   writeFileSync(join(repo, 'task.contract.md'), text);
+  writeFileSync(join(repo, 'task.review.md'), '# Authored review\n');
   return { repo, text, cleanup: () => rmSync(repo, { recursive: true, force: true }) };
 }
 function helper(repo: string, args: string[] = []) {
@@ -75,3 +76,23 @@ for (const args of [['--report-file', 'acceptance.json'], ['--force-expensive-re
       expect(existsSync(join(f.repo, 'command-ran'))).toBe(false);
     } finally { f.cleanup(); }
   });
+
+for (const missing of ['file', 'declaration']) test(`campaign admission rejects a missing review ${missing}`, () => {
+  const f = fixture();
+  try {
+    if (missing === 'file') rmSync(join(f.repo, 'task.review.md'));
+    else writeFileSync(join(f.repo, 'task.contract.md'), f.text.replace('> **Review File**: task.review.md', ''));
+    expect(() => runCampaignPlanningPreflight(f.repo, 'task.contract.md')).toThrow(/review artifact/);
+    expect(existsSync(join(f.repo, 'command-ran'))).toBe(false);
+  } finally { f.cleanup(); }
+});
+
+test('metadata preflight rejects a symlinked review artifact outside the repository', () => {
+  const f = fixture(), other = fixture();
+  try {
+    rmSync(join(f.repo, 'task.review.md'));
+    symlinkSync(join(other.repo, 'task.review.md'), join(f.repo, 'task.review.md'));
+    expect(() => runCampaignPlanningPreflight(f.repo, 'task.contract.md')).toThrow(/review artifact/);
+    expect(existsSync(join(f.repo, 'command-ran'))).toBe(false);
+  } finally { f.cleanup(); other.cleanup(); }
+});

@@ -908,8 +908,8 @@
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
         "branch": "codex/campaign-acceptance-preflight",
-        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
-        "committedAt": "2026-09-10T04:21:51+08:00"
+        "commit": "ae213adafb172255a00d2bcb410390f346b21460",
+        "committedAt": "2026-09-10T04:50:27+08:00"
       }
     },
     {
@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/campaign-acceptance-preflight",
-        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
-        "committedAt": "2026-09-10T04:21:51+08:00"
+        "commit": "ae213adafb172255a00d2bcb410390f346b21460",
+        "committedAt": "2026-09-10T04:50:27+08:00"
       }
     },
     {
@@ -1248,8 +1248,8 @@
       "outputDigest": "sha256:beaaa466d51cbd8f929fd6acd6645c6f5136cccf539f09b63a273e5ab38519fa",
       "verifiedAgainst": {
         "branch": "codex/campaign-acceptance-preflight",
-        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
-        "committedAt": "2026-09-10T04:21:51+08:00"
+        "commit": "ae213adafb172255a00d2bcb410390f346b21460",
+        "committedAt": "2026-09-10T04:50:27+08:00"
       }
     },
     {

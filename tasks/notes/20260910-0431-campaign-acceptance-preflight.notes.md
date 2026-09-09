@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md
 > **Last Updated**: 2026-09-10 04:31
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:9f62ca85180788771850a7ed03b08d2091075dbb9ddc2040072febe002ee2e53`
+> **Substantive Change SHA256**: `sha256:4afb3f6b0923193aa34543771f2da85c27300aa36e628651c2672a57b0bd6ca1`
 
 ## Design Decisions
 
@@ -14,7 +14,7 @@
 
 ## Deviations From Plan Or Spec
 
-- None recorded.
+- Final codex-plugin review identified removal of review initialization without an availability check. Reproduced against ae213ada, then added canonical metadata preflight before claim and in the fresh worktree, plus missing and uncommitted-only review regression cases. This is the same admission/activation boundary; no second provider review is requested.
 
 ## Tradeoffs Considered
 
@@ -38,4 +38,5 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 
 ## Promotion Candidates
 
+- Original semantic reviewer P2 is resolved by the named regressions; original transcript is retained in the runtime cross-review result.
 - Promoted boundary and evidence to docs/researches/20260910-campaign-acceptance-preflight.md.

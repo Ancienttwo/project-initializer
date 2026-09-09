@@ -456,3 +456,27 @@ describe('fleet offers CLI', () => {
     }
   }, 60_000);
 });
+
+for (const state of ['missing', 'uncommitted-only'] as const) test(`acquire refuses ${state} review artifact without returning a dispatch envelope`, () => {
+  const fixture = acquireFixture();
+  try {
+    const review = 'tasks/reviews/20260823-0202-cli-acquire.review.md';
+    git(fixture.repo, ['rm', ...(state === 'uncommitted-only' ? ['--cached'] : []), review]);
+    git(fixture.repo, ['commit', '-m', 'remove review from acquisition base']);
+    const env = acquireEnvironment(fixture.home);
+    const offers = runCli(['fleet', 'offers', '--json', '--repo-id', fixture.repoId], env);
+    expect(offers.status, offers.stderr).toBe(0);
+    const document = JSON.parse(offers.stdout);
+    const offer = document.offers[0];
+    const result = runCli(['fleet', 'acquire', '--json', '--repo-id', fixture.repoId, '--task-id', offer.task_id, '--authorization-revision', String(document.authorization_revision)], env);
+    expect(result.status, result.stdout + result.stderr).toBe(1);
+    const refused = JSON.parse(result.stdout);
+    expect(refused).toMatchObject({ ok: false, error: state === 'missing' ? 'offer_stale' : 'provision_failed' });
+    expect(refused.message).toContain('review artifact');
+    expect(result.stdout).not.toContain('repo-harness-work-envelope');
+    const lease = readLease(fixture.repo, offer.task_id).record;
+    expect(lease).toBeNull();
+    const topology = spawnSync('git', ['worktree', 'list', '--porcelain'], { cwd: fixture.repo, encoding: 'utf8' });
+    expect(topology.stdout.match(/^worktree /gm)).toHaveLength(state === 'missing' ? 1 : 2);
+  } finally { fixture.cleanup(); }
+});

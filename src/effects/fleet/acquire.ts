@@ -396,6 +396,7 @@ export interface FleetAcquireDependencies {
   readonly bind: typeof bindSprintCommand;
   readonly release: typeof releaseSprintCommand;
   readonly sprintDependencies: typeof processSprintDependencies;
+  readonly preflight: (repoPath: string, contractPath: string) => void;
   readonly start: (repo: RepoHarnessRegisteredRepo, offer: TaskOfferV1) => ContractWorktreeStartV1;
   readonly topology: typeof readWorktreeTopology;
   readonly writeToken: (cwd: string, input: ClaimTokenWriteInput) => ClaimTokenV1;
@@ -437,6 +438,12 @@ function defaultStart(repo: RepoHarnessRegisteredRepo, offer: TaskOfferV1): Cont
   return parseStartResult(result.stdout ?? '');
 }
 
+function defaultPreflight(repoPath: string, contractPath: string): void {
+  const result = runHelper({ helper: 'verify-contract', args: ['--contract', contractPath, '--preflight'],
+    cwd: repoPath, trustedPackage: true, stdio: 'pipe' });
+  if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || 'contract metadata preflight failed');
+}
+
 function defaultProject(worktreePath: string, planPath: string): void {
   const result = runHelper({
     helper: 'switch-plan',
@@ -457,6 +464,7 @@ function acquisitionDependencies(overrides: Partial<FleetAcquireDependencies> = 
     bind: bindSprintCommand,
     release: releaseSprintCommand,
     sprintDependencies: processSprintDependencies,
+    preflight: defaultPreflight,
     start: defaultStart,
     topology: readWorktreeTopology,
     writeToken: writeClaimTokenForBoundLease,
@@ -782,6 +790,11 @@ export function acquireFleetTask(options: FleetAcquireOptions = {}): FleetAcquir
     const claimCurrentOffer = () => {
       const revalidated = revalidateOffer(offer, originalRepo, options, deps);
       if (!revalidated.ok) return { failure: revalidated.result };
+      try {
+        deps.preflight(revalidated.repo.path, offer.plan!.contract_path);
+      } catch (error) {
+        return { failure: failure('offer_stale', error instanceof Error ? error.message : String(error)) };
+      }
       const claim = deps.claim({
         taskId: offer.task_id,
         expectedTaskRevision: offer.task_revision,
@@ -848,6 +861,14 @@ export function acquireFleetTask(options: FleetAcquireOptions = {}): FleetAcquir
     if (!authority.ok) {
       if (authority.result.error === 'rollback_failed') return authority.result;
       return compensate(authority.result.error, authority.result.message, revalidated.repo, record.claim_id, deps);
+    }
+
+    // The canonical base must carry acceptance artifacts into the fresh tree;
+    // files present only in the parent working tree cannot arm a dispatch.
+    try {
+      deps.preflight(start.worktree_path, offer.plan.contract_path);
+    } catch (error) {
+      return compensate('provision_failed', error instanceof Error ? error.message : String(error), revalidated.repo, record.claim_id, deps);
     }
 
     const bound = deps.bind({

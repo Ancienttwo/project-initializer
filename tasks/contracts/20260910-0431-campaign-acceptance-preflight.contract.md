@@ -76,6 +76,8 @@ allowed_paths:
   - tests/cli/campaign-acceptance-preflight.test.ts
   - tests/cli/campaign-planning.test.ts
   - tests/cli/fleet-offer-acquire.test.ts
+  - tests/fleet-acquire-concurrency.test.ts
+  - tasks/evidence/campaign-review-artifact-pre-fix.log
   - docs/researches/20260910-campaign-acceptance-preflight.md
   - plans/plan-20260910-0431-campaign-acceptance-preflight.md
   - tasks/todos.md
@@ -213,6 +215,19 @@ exit_criteria:
       }
     },
     {
+      "id": "campaign-authority-freeze",
+      "kind": "package_test",
+      "path": "tests/characterization/repair-campaign-authority-freeze.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "The added pre-claim metadata gate must preserve the campaign authority and capacity refusal boundary.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
       "id": "typecheck",
       "kind": "command",
       "command": "bun run check:type",
@@ -326,9 +341,9 @@ the intended coverage; do not infer that choice from paths or command text.
 
 ## Acceptance Notes (Human Review)
 
-- Functional behavior:
-- Edge cases:
-- Regression risks:
+- Functional behavior: canonical metadata and authored review availability are checked before claim and again in the fresh worktree; activation preserves frozen workflow bytes.
+- Edge cases: missing/duplicate metadata, missing review declaration/file, outside symlink, and parent-only uncommitted review are rejected without dispatch.
+- Regression risks: final codex-plugin P2 review-artifact finding is reproduced and fixed; final delta validation includes the actual acquisition and campaign authority guards. Initial acceptance run run-20260910T045053-88650 remains evidence only for ae213ada before this bounded review fix.
 
 ## Rollback Point
 

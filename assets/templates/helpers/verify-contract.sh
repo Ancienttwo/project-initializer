@@ -1039,7 +1039,7 @@ bun_bin="$(resolve_bun_bin || true)"
 plan_validation="$tmp_dir/verification-plan.json"
 contract_plan_path="$contract_file"
 if [[ "$contract_file" == /* && -n "$bun_bin" ]]; then
-  contract_plan_path="$("$bun_bin" -e 'const fs=require("fs"),p=require("path"); const file=process.argv[2]; if(fs.lstatSync(file).isSymbolicLink()) throw Error("contract must not be a symlink"); const rel=p.relative(fs.realpathSync(process.argv[1]),fs.realpathSync(file)); if(!rel || rel===".." || rel.startsWith("../") || p.isAbsolute(rel)) throw Error("contract escapes repository"); process.stdout.write(rel);' "$repository_root" "$contract_file" 2> "$tmp_dir/plan-error")" || contract_plan_path=""
+  contract_plan_path="$("$bun_bin" -e 'const fs=require("fs"),p=require("path"); const file=process.argv[2]; if(fs.lstatSync(file).isSymbolicLink()) throw Error("contract must not be a symlink"); const rel=p.relative(fs.realpathSync(process.argv[1]),fs.realpathSync(file)); if(!rel || rel===".." || rel.startsWith(".." + p.sep) || p.isAbsolute(rel)) throw Error("contract escapes repository"); process.stdout.write(rel);' "$repository_root" "$contract_file" 2> "$tmp_dir/plan-error")" || contract_plan_path=""
 fi
 if [[ -z "$bun_bin" ]]; then
   fail "verification_plan" "$contract_file" "Bun runtime is unavailable"
@@ -1090,6 +1090,16 @@ fi
 # Admission shares canonical metadata validation but does not evaluate future
 # outputs or publish evidence that could be mistaken for completed acceptance.
 if [[ "$metadata_preflight" -eq 1 ]]; then
+  if [[ -z "$review_file" || -z "$bun_bin" ]] || ! "$bun_bin" -e '
+    const fs = require("fs"), p = require("path");
+    const root = fs.realpathSync(process.argv[1]), file = p.resolve(root, process.argv[2]);
+    const rel = p.relative(root, fs.realpathSync(file));
+    if (!rel || rel === ".." || rel.startsWith(".." + p.sep) || p.isAbsolute(rel) || !fs.lstatSync(file).isFile()) process.exit(1);
+  ' "$repository_root" "$review_file" >/dev/null 2>&1; then
+    fail "review_artifact" "$review_file" "authored review artifact must be declared and available inside the repository before dispatch"
+  else
+    pass "review_artifact" "$review_file" "authored review artifact is available: $review_file"
+  fi
   echo "[ContractPreflight] metadata checks: $total; failed: $failed"
   if ((failed > 0)); then exit 1; fi
   exit 0

@@ -130,6 +130,7 @@ function raceContract(planPath: string): string {
     '# Task Contract: Fleet Acquire Race Fixture',
     '',
     `> **Plan**: ${planPath}`,
+    '> **Review File**: tasks/reviews/acquire.review.md',
     '',
     '## Allowed Paths',
     '',
@@ -138,6 +139,8 @@ function raceContract(planPath: string): string {
     '  - src/',
     '```',
     '',
+    '## Evidence Requirements', '```yaml', 'evidence_requirements:', '  benchmark: not_applicable', '```', '',
+    '## Exit Criteria', '```yaml', 'exit_criteria:', '  files_exist:', '    - future-output.txt', '```', '',
     '## Verification Plan',
     '',
     '```json',
@@ -193,6 +196,8 @@ function createFleetRaceFixture(): FleetRaceFixture {
   ].join('\n'));
   writeFileSync(join(repo, planPath), racePlan(sprintPath, task, planPath, contractPath));
   writeFileSync(join(repo, contractPath), raceContract(planPath));
+  mkdirSync(join(repo, 'tasks/reviews'), { recursive: true });
+  writeFileSync(join(repo, 'tasks/reviews/acquire.review.md'), '# Authored review\n');
   git(repo, ['init', '-b', 'main']);
   git(repo, ['config', 'user.name', 'Fleet Race Test']);
   git(repo, ['config', 'user.email', 'fleet-race@test.local']);
@@ -559,6 +564,7 @@ function buildEffectDependencies(
   let registryReads = 0;
   let campaignReads = 0;
   const dependencies: Partial<FleetAcquireDependencies> = {
+    preflight: (repoPath) => { calls.push(repoPath === EFFECT_WORKTREE ? 'worktree-preflight' : 'preflight'); },
     collectOffers: (() => {
       calls.push('collect');
       return fixture.document;
@@ -667,8 +673,8 @@ describe('fleet acquire mutation orchestration', () => {
       },
     });
     expect(fixture.calls).toEqual([
-      'registry', 'collect', 'registry', 'collect', 'claim', 'start', 'topology',
-      'registry', 'canonical', 'identity', 'proof', 'bind', 'token',
+      'registry', 'collect', 'registry', 'collect', 'preflight', 'claim', 'start', 'topology',
+      'registry', 'canonical', 'identity', 'proof', 'worktree-preflight', 'bind', 'token',
       'registry', 'canonical', 'identity', 'proof', 'project', 'topology', 'registry', 'lease',
     ]);
     expect(fixture.released).toEqual([]);
