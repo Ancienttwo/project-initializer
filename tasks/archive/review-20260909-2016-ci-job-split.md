@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-09 20:16
+> **Related Plan**: plans/archive/plan-20260909-1943-ci-job-split.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260909-2016
+> **Archive Projection V1**: `plans/plan-20260909-1943-ci-job-split.md` => `plans/archive/plan-20260909-1943-ci-job-split.md`
+> **Archive Projection V1**: `tasks/notes/20260909-1943-ci-job-split.notes.md` => `tasks/archive/notes-20260909-2016-ci-job-split.md`
+> **Archive Projection V1**: `tasks/contracts/20260909-1943-ci-job-split.contract.md` => `tasks/archive/contract-20260909-2016-ci-job-split.md`
+> **Archive Projection V1**: `tasks/reviews/20260909-1943-ci-job-split.review.md` => `tasks/archive/review-20260909-2016-ci-job-split.md`
+
 # Task Review: ci-job-split
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260909-1943-ci-job-split.md
-> **Contract**: tasks/contracts/20260909-1943-ci-job-split.contract.md
-> **Notes File**: tasks/notes/20260909-1943-ci-job-split.notes.md
+> **Plan**: plans/archive/plan-20260909-1943-ci-job-split.md
+> **Contract**: tasks/archive/contract-20260909-2016-ci-job-split.md
+> **Notes File**: tasks/archive/notes-20260909-2016-ci-job-split.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-09 19:43
 > **Recommendation**: pass

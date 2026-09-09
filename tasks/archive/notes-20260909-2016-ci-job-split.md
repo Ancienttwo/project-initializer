@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-09 20:16
+> **Related Plan**: plans/archive/plan-20260909-1943-ci-job-split.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260909-2016
+> **Archive Projection V1**: `plans/plan-20260909-1943-ci-job-split.md` => `plans/archive/plan-20260909-1943-ci-job-split.md`
+> **Archive Projection V1**: `tasks/notes/20260909-1943-ci-job-split.notes.md` => `tasks/archive/notes-20260909-2016-ci-job-split.md`
+> **Archive Projection V1**: `tasks/contracts/20260909-1943-ci-job-split.contract.md` => `tasks/archive/contract-20260909-2016-ci-job-split.md`
+> **Archive Projection V1**: `tasks/reviews/20260909-1943-ci-job-split.review.md` => `tasks/archive/review-20260909-2016-ci-job-split.md`
+
 # CI job split decisions
 
 - Keep the no-argument script as the complete local/release gate; hosted jobs select governance or functional explicitly. This avoids duplicating the command inventory.
