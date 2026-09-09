@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/ci-job-split",
-        "commit": "d48d2eeee8e71e7014a6bee6dc36c7ae9fab1d72",
-        "committedAt": "2026-09-09T19:51:49+08:00"
+        "commit": "b674ebe4cbe8fd98c4ce787712371d999ea01144",
+        "committedAt": "2026-09-09T20:13:28+08:00"
       }
     },
     {
