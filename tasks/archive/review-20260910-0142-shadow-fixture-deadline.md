@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 01:42
+> **Related Plan**: plans/archive/plan-20260910-0138-shadow-fixture-deadline.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260910-0142
+> **Archive Projection V1**: `plans/plan-20260910-0138-shadow-fixture-deadline.md` => `plans/archive/plan-20260910-0138-shadow-fixture-deadline.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0138-shadow-fixture-deadline.notes.md` => `tasks/archive/notes-20260910-0142-shadow-fixture-deadline.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0138-shadow-fixture-deadline.contract.md` => `tasks/archive/contract-20260910-0142-shadow-fixture-deadline.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0138-shadow-fixture-deadline.review.md` => `tasks/archive/review-20260910-0142-shadow-fixture-deadline.md`
+
 # Task Review: shadow-fixture-deadline
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260910-0138-shadow-fixture-deadline.md
-> **Contract**: tasks/contracts/20260910-0138-shadow-fixture-deadline.contract.md
-> **Notes File**: tasks/notes/20260910-0138-shadow-fixture-deadline.notes.md
+> **Plan**: plans/archive/plan-20260910-0138-shadow-fixture-deadline.md
+> **Contract**: tasks/archive/contract-20260910-0142-shadow-fixture-deadline.md
+> **Notes File**: tasks/archive/notes-20260910-0142-shadow-fixture-deadline.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 01:38
 > **Recommendation**: pass

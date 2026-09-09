@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-10 01:42
+> **Related Plan**: plans/archive/plan-20260910-0138-shadow-fixture-deadline.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260910-0142
+> **Archive Projection V1**: `plans/plan-20260910-0138-shadow-fixture-deadline.md` => `plans/archive/plan-20260910-0138-shadow-fixture-deadline.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0138-shadow-fixture-deadline.notes.md` => `tasks/archive/notes-20260910-0142-shadow-fixture-deadline.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0138-shadow-fixture-deadline.contract.md` => `tasks/archive/contract-20260910-0142-shadow-fixture-deadline.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0138-shadow-fixture-deadline.review.md` => `tasks/archive/review-20260910-0142-shadow-fixture-deadline.md`
+
 # Task Contract: shadow-fixture-deadline
 
-> **Status**: Active
-> **Plan**: plans/plan-20260910-0138-shadow-fixture-deadline.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260910-0138-shadow-fixture-deadline.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-10 01:38
-> **Review File**: `tasks/reviews/20260910-0138-shadow-fixture-deadline.review.md`
-> **Notes File**: `tasks/notes/20260910-0138-shadow-fixture-deadline.notes.md`
+> **Review File**: `tasks/archive/review-20260910-0142-shadow-fixture-deadline.md`
+> **Notes File**: `tasks/archive/notes-20260910-0142-shadow-fixture-deadline.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -43,10 +53,10 @@ The stale-terminal regression fails before reaching its assertions under a 1100m
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260910-0138-shadow-fixture-deadline.md`
+- Source plan: `plans/archive/plan-20260910-0138-shadow-fixture-deadline.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260910-0138-shadow-fixture-deadline.review.md`
-- Notes file: `tasks/notes/20260910-0138-shadow-fixture-deadline.notes.md`
+- Review file: `tasks/archive/review-20260910-0142-shadow-fixture-deadline.md`
+- Notes file: `tasks/archive/notes-20260910-0142-shadow-fixture-deadline.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
