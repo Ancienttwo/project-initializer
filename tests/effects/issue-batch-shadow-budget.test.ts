@@ -13,8 +13,8 @@ import {
 import { GithubAdapterError, type GithubCommandRunner } from '../../src/effects/external-sources/github';
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
-async function fixture(rounds = 1, cap = 100) {
-  const f = await createAdoptionRepository('shadow', rounds, undefined, {}, {}, { max_provider_calls: cap }); roots.push(f.root, f.home);
+async function fixture(rounds = 1, cap = 100, firstReadDelayMs = 0) {
+  const f = await createAdoptionRepository('shadow', rounds, undefined, {}, {}, { max_provider_calls: cap, github_deadline_ms: 20000 }); roots.push(f.root, f.home);
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
   const binding = { repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
     campaign_id: f.intent.campaign_id, group_number: 1 as const, intent_sha256: f.intent.intent_sha256, env: f.env };
@@ -24,6 +24,7 @@ async function fixture(rounds = 1, cap = 100) {
   const runner: GithubCommandRunner = args => {
     expect(status().current.open_reservation_sha256s).toHaveLength(1);
     calls++;
+    if (calls === 1 && firstReadDelayMs) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, firstReadDelayMs);
     if (failure) throw failure;
     if (args.includes('repos/acme/widgets')) return { stdout: JSON.stringify({ id: 100, full_name: 'acme/widgets', html_url: 'https://github.com/acme/widgets' }) };
     return { stdout: JSON.stringify(makeSnapshot(f.intent, slots).observations.map((o, i) => ({ id: i + 1, number: i + 1, html_url: o.url,
@@ -44,7 +45,8 @@ test('shadow real observer reserves every identity/page call and seals the final
   expect(await f.run()).toEqual(result); expect(f.githubCalls()).toBe(4); expect(f.status().current.ledger_sha256).toBe(before);
 }, 20000);
 test('shadow rejects its old terminal after a completed same-group GitHub read', async () => {
-  const f = await fixture();
+  // This ledger assertion must survive a modeled read beyond the old one-second fixture window.
+  const f = await fixture(1, 100, 1100);
   await f.run();
   const terminal = f.terminal()!;
   const binding = { repo_root: f.root, automation_run_id: terminal.automation_run_id, expected_budget_sha256: terminal.budget_sha256,
