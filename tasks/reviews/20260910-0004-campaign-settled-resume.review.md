@@ -1,16 +1,16 @@
 # Task Review: campaign-settled-resume
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260910-0004-campaign-settled-resume.md
 > **Contract**: tasks/contracts/20260910-0004-campaign-settled-resume.contract.md
 > **Notes File**: tasks/notes/20260910-0004-campaign-settled-resume.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 00:04
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:440b4c60514892c5ddefc75a828f574773705e359824f067549a80f7ca5678a5
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: fd675687533bef764ec5bd9a9b4b85617fc9214b
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:440b4c60514892c5ddefc75a828f574773705e359824f067549a80f7ca5678a5
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: fd675687533bef764ec5bd9a9b4b85617fc9214b
+> **Verification Evidence SHA256**: sha256:bc86826fe7cc460c0071a950faf87abc0737c56a59112eae9790528cacd11415
+> **Issued At**: 2026-09-09T16:28:11.454Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Standard review covers canonical inventory, stopped-source admission, exact failed settlement and inactive native effects. Ten executable checks and fifteen contract checks pass. Deadline read-only finding fixed with red-green regression and specialist closure; original Issue identities and predecessor spending retained.
 - Findings: none
 
 ## Behavior Diff Notes
