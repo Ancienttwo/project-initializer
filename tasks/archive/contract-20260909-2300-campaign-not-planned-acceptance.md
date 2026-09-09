@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-09 23:00
+> **Related Plan**: plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260909-2300
+> **Archive Projection V1**: `plans/plan-20260909-2241-campaign-not-planned-acceptance.md` => `plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md`
+> **Archive Projection V1**: `tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md` => `tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md`
+> **Archive Projection V1**: `tasks/contracts/20260909-2241-campaign-not-planned-acceptance.contract.md` => `tasks/archive/contract-20260909-2300-campaign-not-planned-acceptance.md`
+> **Archive Projection V1**: `tasks/reviews/20260909-2241-campaign-not-planned-acceptance.review.md` => `tasks/archive/review-20260909-2300-campaign-not-planned-acceptance.md`
+
 # Task Contract: campaign-not-planned-acceptance
 
-> **Status**: Active
-> **Plan**: plans/plan-20260909-2241-campaign-not-planned-acceptance.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-09 22:41
-> **Review File**: `tasks/reviews/20260909-2241-campaign-not-planned-acceptance.review.md`
-> **Notes File**: `tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md`
+> **Review File**: `tasks/archive/review-20260909-2300-campaign-not-planned-acceptance.md`
+> **Notes File**: `tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -45,10 +55,10 @@ What observable evidence would prove this task's direction wrong, and the cheape
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260909-2241-campaign-not-planned-acceptance.md`
+- Source plan: `plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260909-2241-campaign-not-planned-acceptance.review.md`
-- Notes file: `tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md`
+- Review file: `tasks/archive/review-20260909-2300-campaign-not-planned-acceptance.md`
+- Notes file: `tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -76,10 +86,10 @@ allowed_paths:
   - tasks/evidence/campaign-not-planned-acceptance-pre-fix.log
   - docs/architecture/.projection-manifest.json
   - tasks/todos.md
-  - plans/plan-20260909-2241-campaign-not-planned-acceptance.md
-  - tasks/contracts/20260909-2241-campaign-not-planned-acceptance.contract.md
-  - tasks/reviews/20260909-2241-campaign-not-planned-acceptance.review.md
-  - tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md
+  - plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md
+  - tasks/archive/contract-20260909-2300-campaign-not-planned-acceptance.md
+  - tasks/archive/review-20260909-2300-campaign-not-planned-acceptance.md
+  - tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md
 ```
 
 ## Evidence Requirements
@@ -135,7 +145,7 @@ exit_criteria:
     - docs/researches/20260909-campaign-not-planned-acceptance.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md
+    - tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md
 ```
 
 ## Verification Plan

@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-09 23:00
+> **Related Plan**: plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260909-2300
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-09 22:41
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.

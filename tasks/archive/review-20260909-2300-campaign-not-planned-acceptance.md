@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-09 23:00
+> **Related Plan**: plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260909-2300
+> **Archive Projection V1**: `plans/plan-20260909-2241-campaign-not-planned-acceptance.md` => `plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md`
+> **Archive Projection V1**: `tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md` => `tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md`
+> **Archive Projection V1**: `tasks/contracts/20260909-2241-campaign-not-planned-acceptance.contract.md` => `tasks/archive/contract-20260909-2300-campaign-not-planned-acceptance.md`
+> **Archive Projection V1**: `tasks/reviews/20260909-2241-campaign-not-planned-acceptance.review.md` => `tasks/archive/review-20260909-2300-campaign-not-planned-acceptance.md`
+
 # Task Review: campaign-not-planned-acceptance
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260909-2241-campaign-not-planned-acceptance.md
-> **Contract**: tasks/contracts/20260909-2241-campaign-not-planned-acceptance.contract.md
-> **Notes File**: tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md
+> **Plan**: plans/archive/plan-20260909-2241-campaign-not-planned-acceptance.md
+> **Contract**: tasks/archive/contract-20260909-2300-campaign-not-planned-acceptance.md
+> **Notes File**: tasks/archive/notes-20260909-2300-campaign-not-planned-acceptance.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-09 22:41
 > **Recommendation**: pass
