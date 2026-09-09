@@ -269,7 +269,7 @@ describe('architecture projection acceptance', () => {
     const jobId = architectureProjectionJobId(['event-1'], changedPaths);
     const f = fixture(jobId);
     enqueueArchitectureProjectionJob(f.repoRoot, ['event-1'], ['source-1'], changedPaths, new Date('2026-08-30T00:00:00.000Z'));
-    const claimed = claimNextArchitectureProjectionJob(f.repoRoot, new Date('2026-08-30T00:00:01.000Z'));
+    const claimed = claimNextArchitectureProjectionJob(f.repoRoot, 120_000, new Date('2026-08-30T00:00:01.000Z'));
     if (!claimed) throw new Error('fixture did not claim the durable projection job');
     failArchitectureProjectionJob(f.repoRoot, claimed, { kind: 'permanent', message: 'unresolved major change' }, new Date('2026-08-30T00:00:02.000Z'));
     expect(architectureProjectionJobState(f.repoRoot, jobId)).toBe('dead-letter');
@@ -378,7 +378,7 @@ describe('architecture projection acceptance', () => {
     const jobId = architectureProjectionJobId(['event-proof'], changedPaths);
     const f = fixture(jobId, ['verified-flow-proof-changed']);
     enqueueArchitectureProjectionJob(f.repoRoot, ['event-proof'], ['source-proof'], changedPaths, new Date('2026-08-30T00:00:00.000Z'));
-    const claimed = claimNextArchitectureProjectionJob(f.repoRoot, new Date('2026-08-30T00:00:01.000Z'));
+    const claimed = claimNextArchitectureProjectionJob(f.repoRoot, 120_000, new Date('2026-08-30T00:00:01.000Z'));
     if (!claimed) throw new Error('fixture did not claim a proof-only projection job');
     failArchitectureProjectionJob(f.repoRoot, claimed, { kind: 'permanent', message: 'proof unavailable' }, new Date('2026-08-30T00:00:02.000Z'));
     expect(architectureProjectionJobState(f.repoRoot, jobId)).toBe('dead-letter');
@@ -414,7 +414,7 @@ describe('architecture projection acceptance', () => {
     expect(providerCalls).toBe(1);
 
     enqueueArchitectureProjectionJob(f.repoRoot, ['event-proof-retry'], ['source-proof-retry'], changedPaths, new Date('2026-08-30T00:00:00.000Z'));
-    const claimed = claimNextArchitectureProjectionJob(f.repoRoot, new Date('2026-08-30T00:00:01.000Z'));
+    const claimed = claimNextArchitectureProjectionJob(f.repoRoot, 120_000, new Date('2026-08-30T00:00:01.000Z'));
     if (!claimed) throw new Error('fixture did not claim a retryable proof-only projection job');
     failArchitectureProjectionJob(f.repoRoot, claimed, { kind: 'permanent', message: 'proof unavailable' }, new Date('2026-08-30T00:00:02.000Z'));
 
