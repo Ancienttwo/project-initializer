@@ -15,6 +15,7 @@ import {
   enqueueArchitectureProjectionJob,
   failArchitectureProjectionJob,
   recoverAbandonedArchitectureProjectionJobs,
+  architectureProjectionRunningStaleMs,
   retryArchitectureProjectionDeadLetter,
 } from '../src/effects/architecture/projection-jobs';
 import type { ArchctxProcessResult, RunArchctxProcess } from '../src/effects/architecture/archctx-provider';
@@ -502,9 +503,9 @@ describe('durable architecture projection orchestration', () => {
     const runningPath = join(root, '.ai/harness/architecture-projection/running', `${running!.jobId}.json`);
     writeFileSync(runningPath, `${JSON.stringify({ ...running, ownerPid: 2_147_483_647 }, null, 2)}\n`);
 
-    expect(recoverAbandonedArchitectureProjectionJobs(root, new Date(running!.updatedAt))).toBe(0);
+    expect(recoverAbandonedArchitectureProjectionJobs(root, 120_000, new Date(running!.updatedAt))).toBe(0);
     expect(architectureProjectionJobState(root, running!.jobId)).toBe('running');
-    expect(recoverAbandonedArchitectureProjectionJobs(root, new Date(Date.parse(running!.updatedAt) + 150_001))).toBe(1);
+    expect(recoverAbandonedArchitectureProjectionJobs(root, 120_000, new Date(Date.parse(running!.updatedAt) + 150_001))).toBe(1);
     expect(architectureProjectionJobState(root, running!.jobId)).toBe('pending');
     expect(readPendingPostEditEvents(root).map((event) => event.event_id)).toEqual([source!.event_id]);
   });
@@ -516,8 +517,22 @@ describe('durable architecture projection orchestration', () => {
     const running = claimNextArchitectureProjectionJob(root, new Date('2026-01-01T00:00:01.000Z'));
     expect(running?.jobId).toBe(queued?.jobId);
     expect(running?.ownerPid).toBe(process.pid);
-    expect(recoverAbandonedArchitectureProjectionJobs(root, new Date('2026-01-01T00:16:00.000Z'))).toBe(1);
+    expect(recoverAbandonedArchitectureProjectionJobs(root, 120_000, new Date('2026-01-01T00:16:00.000Z'))).toBe(1);
     expect(architectureProjectionJobState(root, running!.jobId)).toBe('pending');
+  });
+
+  test('derives the running stale window from the resolved projection timeout', () => {
+    const f = fixture();
+    const root = realpathSync(f.repoRoot);
+    enqueueArchitectureProjectionJob(root, ['event-window'], ['source-window'], ['src/window.ts'], new Date('2026-01-01T00:00:00.000Z'));
+    const running = claimNextArchitectureProjectionJob(root, new Date('2026-01-01T00:00:00.000Z'))!;
+    const claimedAt = Date.parse(running.updatedAt);
+    const timeoutMs = 300_000;
+    expect(architectureProjectionRunningStaleMs(timeoutMs)).toBe(330_000);
+    expect(recoverAbandonedArchitectureProjectionJobs(root, timeoutMs, new Date(claimedAt + timeoutMs + 10_000))).toBe(0);
+    expect(architectureProjectionJobState(root, running.jobId)).toBe('running');
+    expect(recoverAbandonedArchitectureProjectionJobs(root, timeoutMs, new Date(claimedAt + timeoutMs + 40_000))).toBe(1);
+    expect(architectureProjectionJobState(root, running.jobId)).toBe('pending');
   });
 
   test('dead-letters an abandoned third attempt instead of retrying forever', () => {
@@ -527,7 +542,7 @@ describe('durable architecture projection orchestration', () => {
     const running = claimNextArchitectureProjectionJob(root)!;
     const runningPath = join(root, '.ai/harness/architecture-projection/running', `${running.jobId}.json`);
     writeFileSync(runningPath, `${JSON.stringify({ ...running, attempt: 3, ownerPid: 2_147_483_647 }, null, 2)}\n`);
-    expect(recoverAbandonedArchitectureProjectionJobs(root, new Date(Date.parse(running.updatedAt) + 150_001))).toBe(1);
+    expect(recoverAbandonedArchitectureProjectionJobs(root, 120_000, new Date(Date.parse(running.updatedAt) + 150_001))).toBe(1);
     expect(architectureProjectionJobState(root, running.jobId)).toBe('dead-letter');
   });
 
@@ -539,7 +554,7 @@ describe('durable architecture projection orchestration', () => {
     const receipts = join(root, '.ai/harness/architecture-projection/receipts');
     mkdirSync(receipts, { recursive: true });
     writeFileSync(join(receipts, `${running.jobId}.json`), '{}\n');
-    expect(recoverAbandonedArchitectureProjectionJobs(root)).toBe(1);
+    expect(recoverAbandonedArchitectureProjectionJobs(root, 120_000)).toBe(1);
     expect(architectureProjectionJobState(root, running.jobId)).toBe('receipt');
     expect(architectureProjectionQueueState(root).running).toBe(0);
   });

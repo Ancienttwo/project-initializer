@@ -8,9 +8,15 @@ import type { AcceptedArchitectureChangeReferenceV1 } from 'archctx-contracts';
 export const ARCHITECTURE_PROJECTION_RUNTIME_ROOT = '.ai/harness/architecture-projection';
 const LOCK_PATH = `${ARCHITECTURE_PROJECTION_RUNTIME_ROOT}/locks/store`;
 const MAX_ATTEMPTS = 3;
-/** Longer than the configured 120 second provider bound. A dead Stop owner
- * cannot be reclaimed while its orphaned provider may still be running. */
-const RUNNING_STALE_MS = 150_000;
+/** Reclaim margin past the provider bound. A dead Stop owner cannot be
+ * reclaimed while its orphaned provider may still be running, so the stale
+ * window derives from the same resolved policy timeout the provider runs
+ * under rather than a second constant. */
+const RUNNING_STALE_MARGIN_MS = 30_000;
+
+export function architectureProjectionRunningStaleMs(projectionTimeoutMs: number): number {
+  return projectionTimeoutMs + RUNNING_STALE_MARGIN_MS;
+}
 
 export type ProjectionJobFailureKind = 'preflight' | 'reconciliation' | 'host-budget' | 'process' | 'timeout' | 'stale-snapshot' | 'invalid-result' | 'refresh' | 'permanent';
 
@@ -219,7 +225,8 @@ export function enqueueArchitectureProjectionJob(
   });
 }
 
-export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, now = new Date()): number {
+export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, projectionTimeoutMs: number, now = new Date()): number {
+  const staleMs = architectureProjectionRunningStaleMs(projectionTimeoutMs);
   return withExclusiveDirectoryLock(repoRoot, LOCK_PATH, () => {
     let recovered = 0;
     for (const name of names(repoRoot, 'running')) {
@@ -231,7 +238,7 @@ export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, now
         continue;
       }
       const updatedAtMs = Date.parse(job.updatedAt);
-      const stale = !Number.isFinite(updatedAtMs) || now.getTime() - updatedAtMs >= RUNNING_STALE_MS;
+      const stale = !Number.isFinite(updatedAtMs) || now.getTime() - updatedAtMs >= staleMs;
       if (!stale) continue;
       if (job.attempt >= MAX_ATTEMPTS) {
         const failure = { kind: 'timeout' as const, message: `running job was abandoned after attempt ${job.attempt}` };

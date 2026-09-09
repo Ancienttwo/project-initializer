@@ -77,7 +77,7 @@ export function drainArchitectureProjectionJobs(
   if (policy.provider === 'disabled' || policy.applyMode !== 'automatic') return outcome(root, 'disabled', null, eventIds, null, null, true);
   const clock = options.nowMs ?? Date.now;
   const deadlineMs = Math.min(options.deadlineMs ?? Infinity, clock() + policy.timeoutMs);
-  recoverAbandonedArchitectureProjectionJobs(root, now);
+  recoverAbandonedArchitectureProjectionJobs(root, policy.timeoutMs, now);
   const blocked = architectureProjectionDeadLetterForSourceKeys(root, sourceKeys);
   if (blocked) return outcome(root, 'dead-letter', blocked.job.jobId, blocked.job.sourceEventIds, null, blocked.failure.message, false);
   let owned: string[];
