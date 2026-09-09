@@ -1090,6 +1090,24 @@ function lockedStatus(repoRoot: string, paths: RunPaths, runId: string, now: str
 }
 
 /**
+ * The operator repair verb: it runs only the reconciliation every mutating verb
+ * already performs under the run lock, so a stopped or expired run can seal the
+ * exhaustion receipt its records already prove without invoking a business verb
+ * that would reserve, charge or otherwise move the ledger.
+ */
+export function repairAutomationBudgetDrift(input: {
+  readonly repo_root: string;
+  readonly automation_run_id: string;
+  readonly env?: NodeJS.ProcessEnv;
+}): AutomationBudgetStatusV1 {
+  const repoRoot = resolve(input.repo_root);
+  const paths = runPaths(repoRoot, input.automation_run_id);
+  prepareRun(paths);
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () =>
+    lockedStatus(repoRoot, paths, input.automation_run_id, automationStoreNow(), input.env));
+}
+
+/**
  * An unattended run may not start without a concrete enforceable budget. There
  * is no unlimited default and no advisory mode.
  */

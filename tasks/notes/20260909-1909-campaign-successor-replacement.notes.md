@@ -20,4 +20,12 @@ The `previous_markers` chain is built idempotently: a retry after an interrupted
 
 No ESM import cycle appeared, so the design's fallback module split was not needed.
 
-> **Substantive Change SHA256**: `sha256:874b2e9e5630abdd0d154169709fe28417f400f8177de72bcbf2a8c507cf08ca`
+## The replaceable-successor gate needs an explicit repair verb
+
+`assertReplaceableStoppedSuccessor` requires `drift === 'none'`, and a stopped, never-adopted successor can sit on `unsealed_exhaustion` with nothing wrong with it: the counts agree, there is no open reservation, and the only thing missing is the stop receipt its passed deadline already proves (`src/effects/automation/budget-store.ts:961`). Every mutating verb repairs that on the way in through `lockedStatus`, but a run that is over has no business verb left to invoke, so the drift was unreachable and the replacement was permanently refused.
+
+`repairAutomationBudgetDrift` is that missing verb and nothing more: it takes the run lock and calls the same `lockedStatus` every other verb enters through, so it seals the receipt and never reserves, charges or changes a cap; on an already reconciled run it is a plain read.
+
+The gate stays strict. Drift is still a refusal, not a tolerated state -- the repair is an explicit operator act that leaves a receipt behind, so admitting the replacement afterwards rests on a sealed record rather than on silently reading "counts look fine" as quiescence.
+
+> **Substantive Change SHA256**: `sha256:e9eba1421a7a596dfc37ff30c5ecea5cb076ed61ec6760d5867ce6d6cbb24bc1`

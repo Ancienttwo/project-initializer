@@ -42,3 +42,16 @@ One deterministic budget run per campaign id. A replacement writes nothing to an
 ## Field state
 
 The packaged-delivery successor in the canary repository is the shape this closes: verified authoring and follow-up with remote markers already updated, no adoption, no publication, and a formal stop. Under the new `start_group` guard that shape can no longer reach `group_running`, so the reachable stopped-and-never-adopted successor always stops from `group_preparing`; the eligibility predicate is identical either way.
+
+## Repairing an expired superseded run before prepare-resume
+
+A successor that stopped while quiescent keeps aging: once its budget deadline passes, the run reports drift `unsealed_exhaustion` -- counts that agree, no open reservation, and no stop receipt for the expiry that already happened. `assertReplaceableStoppedSuccessor` requires `drift === 'none'`, and a run that is over has no business verb left to reconcile it, so the replacement is refused with "a replaceable successor must have no acquisition, no open reservation and no unadopted budget record".
+
+The operator step is to seal that receipt explicitly before preparing the replacement:
+
+```bash
+repo-harness automation budget repair --repo <path> --run <superseded-automation-run-id>
+repo-harness campaign prepare-resume --repo <path> ... --superseded-campaign-id <id> ...
+```
+
+`automation budget repair` takes the run lock and performs only the reconciliation every mutating verb already performs on entry: it seals the exhaustion receipt and reserves, charges and re-caps nothing, and on a run whose drift is already `none` it is a plain read. The eligibility gate stays strict -- drift remains a refusal, and the replacement is admitted only against a run whose stop is now a sealed record.

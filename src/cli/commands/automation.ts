@@ -7,6 +7,7 @@ import {
   AutomationBudgetStoreError,
   listAutomationBudgetRuns,
   readAutomationBudgetBoardSlice,
+  repairAutomationBudgetDrift,
 } from '../../effects/automation/budget-store';
 import {
   AutomationGrantStoreError,
@@ -62,6 +63,28 @@ export function runAutomationBudgetShow(raw: AutomationBudgetRawOptions): void {
   if (!run) throw new AutomationArgumentError('--run is required');
   const slice = readAutomationBudgetBoardSlice(repo, run);
   process.stdout.write(`${JSON.stringify(slice, null, 2)}\n`);
+}
+
+/**
+ * The one write an operator may ask of the budget store on its own: it re-runs
+ * the locked reconciliation so a stopped or expired run seals its exhaustion
+ * receipt. It never reserves, charges or changes a cap, and on a run that is
+ * already reconciled it is a plain read.
+ */
+export function runAutomationBudgetRepair(raw: AutomationBudgetRawOptions): void {
+  const repo = raw.repo?.trim() || process.cwd();
+  const run = raw.run?.trim();
+  if (!run) throw new AutomationArgumentError('--run is required');
+  const status = repairAutomationBudgetDrift({ repo_root: repo, automation_run_id: run });
+  process.stdout.write(`${JSON.stringify({
+    ok: true,
+    automation_run_id: run,
+    state: status.current.state,
+    drift: status.drift,
+    stop_receipt: status.stop_receipt,
+    consumed: status.current.consumed,
+    open_reservation_sha256s: status.current.open_reservation_sha256s,
+  }, null, 2)}\n`);
 }
 
 export function runAutomationBudgetList(raw: AutomationBudgetRawOptions): void {
@@ -124,6 +147,18 @@ export function buildAutomationCommand(): Command {
     .action((raw: AutomationBudgetRawOptions) => {
       try {
         runAutomationBudgetList(raw);
+      } catch (error) {
+        outputError(error);
+      }
+    });
+  budget
+    .command('repair')
+    .description('Re-run the locked reconciliation so a stopped or expired run seals its exhaustion receipt')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--run <automationRunId>', 'Automation run id (64-character hex digest)')
+    .action((raw: AutomationBudgetRawOptions) => {
+      try {
+        runAutomationBudgetRepair(raw);
       } catch (error) {
         outputError(error);
       }
