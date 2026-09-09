@@ -334,11 +334,15 @@ test('not_planned requires reviewed typed falsifier and all non-executing planni
       state: closed ? 'closed' : 'open', state_reason: closed ? 'not_planned' : null }) };
   };
   const acceptance = { protocol: 2, kind: 'repo-harness-acceptance-receipt', repository_root: f.root, contract_file: contract,
-    subject_sha256: `sha256:${'a'.repeat(64)}`, disposition: 'pass', reviewed_paths: [artifact, evidence] };
+    subject_sha256: `sha256:${'a'.repeat(64)}`, disposition: 'external_pass', reviewed_paths: [artifact, evidence] };
   const input = { root: f.root, artifact_path: artifact, contract_path: contract, host: 'codex' as const, session_id: 'parent', env: f.env, github_runner,
     verify_acceptance: () => acceptance };
   expect(() => runCampaignNotPlanned({ ...input, verify_acceptance: () => ({ ...acceptance, reviewed_paths: [artifact] }) })).toThrow('both evidence artifacts');
   expect(calls).toBe(0);
+  for (const disposition of ['pass', 'reject']) {
+    expect(() => runCampaignNotPlanned({ ...input, verify_acceptance: () => ({ ...acceptance, disposition }) })).toThrow('both evidence artifacts');
+    expect(calls).toBe(0);
+  }
   expect(runCampaignNotPlanned(input).disposition).toBe('complete'); expect(closed).toBe(true);
   const count = calls; expect(runCampaignNotPlanned(input).disposition).toBe('complete'); expect(calls).toBe(count);
   expect(comment).toContain('Disposition: not_planned'); expect(comment).toContain(issue.source_observation_sha256);
