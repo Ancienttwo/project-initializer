@@ -81,6 +81,7 @@ Required when Task Profile is `bugfix`; leave as-is otherwise.
 
 ```yaml
 allowed_paths:
+  - .ai/harness/policy.json
   - docs/spec.md
   - plans/
   - tasks/todos.md
@@ -192,6 +193,10 @@ the intended coverage; do not infer that choice from paths or command text.
   is `policy.timeoutMs + 30_000`.
 - Edge cases: a job updated `timeoutMs + 10s` ago is not reclaimed while `timeoutMs + 40s` is;
   the disabled-provider branch still returns the 120000 default without validating the value.
+- Reclaim latency: the stale window is a single upper bound over every path, so a Stop-hook job
+  clamped to its 20s host budget is reclaimed after 330s instead of 150s and an always-abandoned
+  job reaches dead-letter after roughly 16.5 minutes instead of 7.5; the hook itself returns idle,
+  so this is drain-progression latency, not a hook stall.
 - Regression risks: none for hook budgets — `deadlineMs` still clamps to the host deadline, so
   only an explicit `drain` without a host deadline gets the longer window.
 
