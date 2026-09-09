@@ -92,16 +92,21 @@ function capabilities(): ArchctxProcessResult {
 }
 
 const PRIOR_APPLY = {
-  applyId: 'apply.late-write-ca58d5a7',
-  lookupKey: 'lookup.late-write-ca58d5a7',
   changeSetId: 'changeset.late-write-ca58d5a7',
   committedAt: '2026-09-09T09:29:58.858Z',
 } as const;
+/** Only an accepted-semantic-change apply carries an identity; drift repair carries none. */
+const PRIOR_APPLY_IDENTITY = { applyId: digest('a'), lookupKey: digest('b') } as const;
 
-/** The provider's declaration of the ChangeSet the orphaned daemon already committed. */
-function priorCommittedApplies(request: ProjectionRequestV1): NonNullable<ProjectionResultV1['priorCommittedApplies']> {
+/**
+ * The provider's declaration of the ChangeSet the orphaned daemon already committed.
+ * The incident is a drift-repair apply, so by default the entry carries no
+ * ProjectionApplyIdentityV1 at all.
+ */
+function priorCommittedApplies(request: ProjectionRequestV1, identity?: typeof PRIOR_APPLY_IDENTITY): NonNullable<ProjectionResultV1['priorCommittedApplies']> {
   return [{
     ...PRIOR_APPLY,
+    ...(identity ?? {}),
     requestId: request.requestId,
     files: [{ path: MANIFEST_PATH, operation: 'write', hash: digest('7') }],
   }];
@@ -185,15 +190,15 @@ describe('architecture projection receipt declares late provider writes', () => 
     expect(receipt!.attempt).toBe(2);
     // The manifest written under this jobId must appear in the durable receipt.
     expect(receipt!.declaredWrites.map((write) => write.path)).toContain(MANIFEST_PATH);
-    // Provenance names the earlier apply; `lookupKey` stays in the verbatim result.
+    // Drift repair commits without an apply identity, so provenance is the ChangeSet.
     expect(receipt!.declaredWrites).toEqual([{
       source: 'prior-committed-apply',
       path: MANIFEST_PATH,
       operation: 'write',
-      applyId: PRIOR_APPLY.applyId,
       changeSetId: PRIOR_APPLY.changeSetId,
       committedAt: PRIOR_APPLY.committedAt,
     }]);
+    expect(receipt!.result.priorCommittedApplies?.[0]?.applyId).toBeUndefined();
     // `result` stays the provider's verbatim answer for the attempt that closed the job.
     expect(receipt!.result.files).toEqual([]);
     expect(receipt!.result.priorCommittedApplies?.[0]?.requestId).toBe(`repo-harness.projection.${second.jobId}`);
@@ -219,7 +224,7 @@ describe('architecture projection receipt declares late provider writes', () => 
       if (args[0] === 'capabilities') return capabilities();
       projectionCalls += 1;
       const request = JSON.parse(args[3]!) as ProjectionRequestV1;
-      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request, priorCommittedApplies(request))) };
+      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request, priorCommittedApplies(request, PRIOR_APPLY_IDENTITY))) };
     };
     const drained = drain(root, { consumerRoot: f.consumerRoot, policy, run });
     expect(drained).toMatchObject({ status: 'succeeded', resultStatus: 'noop' });
@@ -227,7 +232,15 @@ describe('architecture projection receipt declares late provider writes', () => 
 
     const receipt = readArchitectureProjectionReceipt(root, drained.jobId!);
     expect(receipt!.attempt).toBe(2);
-    expect(receipt!.declaredWrites.map((write) => write.path)).toContain(MANIFEST_PATH);
+    // An accepted-semantic-change apply does carry an identity; it is passed through.
+    expect(receipt!.declaredWrites).toEqual([{
+      source: 'prior-committed-apply',
+      path: MANIFEST_PATH,
+      operation: 'write',
+      changeSetId: PRIOR_APPLY.changeSetId,
+      committedAt: PRIOR_APPLY.committedAt,
+      applyId: PRIOR_APPLY_IDENTITY.applyId,
+    }]);
     expect(readdirSync(join(root, '.ai/harness/architecture-projection/receipts'))).toHaveLength(1);
   });
 
@@ -286,20 +299,36 @@ describe('architecture projection receipt declares late provider writes', () => 
 });
 
 describe('projection result decodes prior committed applies fail closed', () => {
-  test('accepts a well-formed declaration', () => {
-    const body = noopBody([{ applyId: 'apply.a', lookupKey: 'lookup.a', requestId: 'repo-harness.projection.job-000000000000000000000000', changeSetId: 'changeset.a', committedAt: '2026-09-09T09:29:58.858Z', files: [{ path: MANIFEST_PATH, operation: 'write', hash: digest('7') }] }]);
-    expect(assertProjectionResult(sealed(body)).priorCommittedApplies).toHaveLength(1);
+  const REQUEST_ID = 'repo-harness.projection.job-000000000000000000000000';
+  const base = { requestId: REQUEST_ID, changeSetId: 'changeset.a', committedAt: '2026-09-09T09:29:58.858Z', files: [{ path: MANIFEST_PATH, operation: 'write' as const, hash: digest('7') }] };
+
+  test('accepts a drift-repair apply with no identity', () => {
+    expect(assertProjectionResult(sealed(noopBody([base]))).priorCommittedApplies).toHaveLength(1);
   });
 
-  const base = { applyId: 'apply.a', lookupKey: 'lookup.a', requestId: 'repo-harness.projection.job-000000000000000000000000', changeSetId: 'changeset.a', committedAt: '2026-09-09T09:29:58.858Z', files: [{ path: MANIFEST_PATH, operation: 'write' as const, hash: digest('7') }] };
+  test('accepts an accepted-change apply carrying both identity fields', () => {
+    const applies = [{ ...base, applyId: digest('a'), lookupKey: digest('b') }];
+    expect(assertProjectionResult(sealed(noopBody(applies))).priorCommittedApplies?.[0]?.applyId).toBe(digest('a'));
+  });
+
   const cases: Array<[string, unknown, string]> = [
     ['a foreign requestId', [{ ...base, requestId: 'repo-harness.projection.job-111111111111111111111111' }], 'requestId must match'],
-    ['a duplicate applyId', [base, { ...base, changeSetId: 'changeset.b' }], 'unique by applyId'],
+    ['a duplicate changeSetId', [base, base], 'changeSetId must be sorted and unique'],
+    ['an unsorted changeSetId order', [{ ...base, changeSetId: 'changeset.b' }, base], 'changeSetId must be sorted and unique'],
+    ['an empty array instead of an omitted field', [], 'must be omitted instead of empty'],
+    ['only an applyId', [{ ...base, applyId: digest('a') }], 'applyId and lookupKey must be present together'],
+    ['only a lookupKey', [{ ...base, lookupKey: digest('b') }], 'applyId and lookupKey must be present together'],
+    ['a non-digest applyId', [{ ...base, applyId: 'apply.a', lookupKey: digest('b') }], 'applyId must be a SHA-256 digest'],
+    ['an apply naming no file', [{ ...base, files: [] }], 'must name at least one committed file'],
+    ['unsorted file paths', [{ ...base, files: [{ path: 'docs/architecture/z.md', operation: 'write', hash: digest('7') }, { path: 'docs/architecture/a.md', operation: 'write', hash: digest('7') }] }], 'files.path must be sorted and unique'],
     ['an unknown operation', [{ ...base, files: [{ ...base.files[0]!, operation: 'rename' }] }], 'operation invalid'],
     ['an escaping path', [{ ...base, files: [{ ...base.files[0]!, path: '../outside.json' }] }], 'path invalid'],
+    ['a delete whose hash is not "missing"', [{ ...base, files: [{ ...base.files[0]!, operation: 'delete' }] }], 'hash invalid for operation delete'],
+    ['a write whose hash is "missing"', [{ ...base, files: [{ ...base.files[0]!, hash: 'missing' }] }], 'hash invalid for operation write'],
+    ['a sub-second precision beyond the wire contract', [{ ...base, committedAt: '2026-09-09T09:29:58.858123Z' }], 'committedAt must be a UTC ISO-8601 instant'],
     ['a non-UTC committedAt', [{ ...base, committedAt: '2026-09-09 09:29:58 +0800' }], 'committedAt must be a UTC ISO-8601 instant'],
-    ['an empty applyId', [{ ...base, applyId: '  ' }], 'applyId invalid'],
-    ['a non-array payload', { applyId: 'apply.a' }, 'must be an array'],
+    ['an empty changeSetId', [{ ...base, changeSetId: '  ' }], 'changeSetId invalid'],
+    ['a non-array payload', { changeSetId: 'changeset.a' }, 'must be an array'],
   ];
   for (const [label, applies, message] of cases) {
     test(`rejects ${label}`, () => {

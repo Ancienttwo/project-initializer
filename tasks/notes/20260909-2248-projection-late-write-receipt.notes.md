@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260909-2248-projection-late-write-receipt.review.md
 > **Last Updated**: 2026-09-09 22:48
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:5faedad7b2318984bc16078b4dccf8dc49bb9fcba5a6382d07b4214835eab787`
+> **Substantive Change SHA256**: `sha256:73a194b372f2b0bf294731cd289209422443f120143e883689e459e109583240`
 
 ## Design Decisions
 
@@ -24,9 +24,17 @@
   among earlier applies the newest `committedAt` wins, because the latest statement about
   a path describes the current state. Output is sorted by path so the projection is
   deterministic regardless of the provider's array order.
-- The decoder imposes uniqueness (`applyId`, and path within one apply) but not sort
-  order: commit order inside one ChangeSet belongs to the provider, and the declared-write
-  projection sorts what consumers read.
+- The decoder mirrors the landed upstream contract (arch-context PR #151, head a411517:
+  `packages/contracts/src/projection.ts` and `schemas/runtime/projection-result.schema.json`)
+  exactly rather than approximating it: `applyId`/`lookupKey` are optional and
+  both-or-neither, uniqueness and canonical wire order are keyed by `changeSetId`, files
+  are sorted and unique by path, the field is omitted rather than `[]`, `committedAt`
+  allows at most millisecond precision, and `hash` is a SHA-256 body digest except for a
+  delete, which carries the literal `missing`.
+- Provenance on a declared write is `changeSetId` plus `committedAt`, with `applyId`
+  carried through only when present. A plain drift-repair apply -- the incident shape --
+  commits without a `ProjectionApplyIdentityV1`, so `applyId` cannot be the identity a
+  consumer keys on, and half an identity is rejected rather than filled in.
 - `src/effects/refactor/materialization.ts` fails closed rather than consulting declared
   writes: prior committed applies carry `hash`, not the `outputDigest` that transaction
   verifies bytes against, so it cannot faithfully reproduce them.
@@ -54,9 +62,9 @@ would fail every projection closed.
 
 ## Open Questions
 
-- The upstream `codex/projection-prior-committed-applies` branch is unpublished; this
-  consumer is built against the agreed shape. If the landed shape differs, the edit is
-  confined to `ProjectionPriorCommittedApplyV1`, its decoder, and `projectionDeclaredWrites`.
+- None. The upstream shape landed as arch-context PR #151 (head a411517) and this consumer
+  was realigned to it in the same branch; the divergence from the pre-landing sketch was
+  the optional both-or-neither apply identity, which the guard now covers on both shapes.
 
 ## Evidence Links
 

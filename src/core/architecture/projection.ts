@@ -124,11 +124,18 @@ export interface ProjectionApplyIdentityV1 {
  * is the provider's declaration of that earlier commit; repo-harness never re-derives it.
  */
 export interface ProjectionPriorCommittedApplyV1 {
-  applyId: string;
-  lookupKey: string;
+  /**
+   * Present together with `lookupKey` only when the committed ChangeSet also carried an
+   * apply receipt, which happens only for an accepted-semantic-change apply. A plain
+   * drift-repair apply -- the incident shape -- commits without one, and both fields are
+   * then absent rather than invented.
+   */
+  applyId?: Sha256Digest;
+  lookupKey?: Sha256Digest;
   requestId: string;
   changeSetId: string;
   committedAt: string;
+  /** `hash` is the digest of the written body, or the literal `missing` for a delete. */
   files: Array<{ path: string; operation: 'write' | 'delete'; hash: string }>;
 }
 
@@ -139,7 +146,7 @@ export interface ProjectionPriorCommittedApplyV1 {
  */
 export type ProjectionDeclaredWriteV1 =
   | { source: 'attempt-result'; path: string; operation: 'write' | 'delete'; attempt: number }
-  | { source: 'prior-committed-apply'; path: string; operation: 'write' | 'delete'; applyId: string; changeSetId: string; committedAt: string };
+  | { source: 'prior-committed-apply'; path: string; operation: 'write' | 'delete'; changeSetId: string; committedAt: string; applyId?: Sha256Digest };
 
 export interface ProjectionResultV1 {
   schemaVersion: typeof PROJECTION_RESULT_VERSION;
@@ -161,6 +168,7 @@ export interface ProjectionResultV1 {
   }>;
   refreshSignals: ArchitectureRefreshSignalV1[];
   applyReceipt?: ProjectionApplyIdentityV1;
+  /** Omitted, never `[]`, when no earlier attempt of this requestId committed. */
   priorCommittedApplies?: ProjectionPriorCommittedApplyV1[];
   receiptDigest: Sha256Digest;
 }
@@ -195,7 +203,7 @@ export interface ArchitectureProjectionReadinessV1 {
 
 type JsonRecord = Record<string, unknown>;
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
-const ISO_UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+const ISO_UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const HEAD = /^[a-f0-9]{40}$/;
 
 export function digestProjectionJson(value: unknown): Sha256Digest {
@@ -282,11 +290,13 @@ export function projectionDeclaredWrites(result: ProjectionResultV1, attempt: nu
     declared.set(file.path, { source: 'attempt-result', path: file.path, operation: file.action === 'delete' ? 'delete' : 'write', attempt });
   }
   const applies = [...(result.priorCommittedApplies ?? [])]
-    .sort((left, right) => right.committedAt.localeCompare(left.committedAt) || right.applyId.localeCompare(left.applyId));
+    .sort((left, right) => right.committedAt.localeCompare(left.committedAt) || right.changeSetId.localeCompare(left.changeSetId));
   for (const apply of applies) {
     for (const file of apply.files) {
       if (declared.has(file.path)) continue;
-      declared.set(file.path, { source: 'prior-committed-apply', path: file.path, operation: file.operation, applyId: apply.applyId, changeSetId: apply.changeSetId, committedAt: apply.committedAt });
+      // `changeSetId` is the apply's only always-present identity; `applyId` exists only
+      // for an accepted-semantic-change apply, so it is carried through when present.
+      declared.set(file.path, { source: 'prior-committed-apply', path: file.path, operation: file.operation, changeSetId: apply.changeSetId, committedAt: apply.committedAt, ...(apply.applyId === undefined ? {} : { applyId: apply.applyId }) });
     }
   }
   return [...declared.values()].sort((left, right) => left.path.localeCompare(right.path));
@@ -319,16 +329,20 @@ export function projectionResultIssues(input: ProjectionResultV1): string[] {
     if (input.refreshSignals.length > 0) issues.push('applied-reconcile-required cannot deliver refreshSignals');
   }
   if (input.priorCommittedApplies) {
-    const applyIds = input.priorCommittedApplies.map((apply) => apply.applyId);
-    if (new Set(applyIds).size !== applyIds.length) issues.push('priorCommittedApplies must be unique by applyId');
+    if (input.priorCommittedApplies.length === 0) issues.push('priorCommittedApplies must be omitted instead of empty');
+    if (!sortedUnique(input.priorCommittedApplies.map((apply) => apply.changeSetId))) issues.push('priorCommittedApplies.changeSetId must be sorted and unique');
     for (const [index, apply] of input.priorCommittedApplies.entries()) {
       // The provider only declares applies committed under this very request; an entry
       // carrying another requestId is attributing a foreign commit to this job.
       if (apply.requestId !== input.requestId) issues.push(`priorCommittedApplies[${index}].requestId must match the result requestId`);
-      const paths = apply.files.map((file) => file.path);
-      // Commit order inside one ChangeSet is the provider's; only uniqueness is an
-      // invariant, and projectionDeclaredWrites sorts what consumers read.
-      if (new Set(paths).size !== paths.length) issues.push(`priorCommittedApplies[${index}].files must be unique by path`);
+      if (apply.changeSetId.trim() === '') issues.push(`priorCommittedApplies[${index}].changeSetId must not be empty`);
+      if (apply.files.length === 0) issues.push(`priorCommittedApplies[${index}].files must name at least one committed file`);
+      if (!sortedUnique(apply.files.map((file) => file.path))) issues.push(`priorCommittedApplies[${index}].files.path must be sorted and unique`);
+      // A drift-repair apply carries no ProjectionApplyIdentityV1 at all; half an identity
+      // is a malformed declaration, not a partially known one.
+      if ((apply.applyId === undefined) !== (apply.lookupKey === undefined)) {
+        issues.push(`priorCommittedApplies[${index}].applyId and lookupKey must be present together or both absent`);
+      }
     }
   }
   if (input.applyReceipt) issues.push(...projectionApplyIdentityIssues(input.applyReceipt, input));
@@ -433,17 +447,20 @@ export function assertProjectionResult(value: unknown, expectedRequestId?: strin
 
 function assertProjectionPriorCommittedApply(value: unknown, label: string): void {
   const apply = record(value, label);
-  for (const field of ['applyId', 'lookupKey', 'requestId', 'changeSetId'] as const) {
+  for (const field of ['requestId', 'changeSetId'] as const) {
     if (typeof apply[field] !== 'string' || (apply[field] as string).trim() === '') throw new Error(`${label}.${field} invalid`);
   }
   if (!/^[a-zA-Z0-9_.:-]+$/.test(apply.requestId as string)) throw new Error(`${label}.requestId invalid`);
+  for (const field of ['applyId', 'lookupKey'] as const) {
+    if (apply[field] !== undefined && !isDigest(apply[field])) throw new Error(`${label}.${field} must be a SHA-256 digest`);
+  }
   if (typeof apply.committedAt !== 'string' || !ISO_UTC_INSTANT.test(apply.committedAt) || Number.isNaN(Date.parse(apply.committedAt))) throw new Error(`${label}.committedAt must be a UTC ISO-8601 instant`);
   if (!Array.isArray(apply.files)) throw new Error(`${label}.files must be an array`);
   for (const [index, value] of apply.files.entries()) {
     const file = record(value, `${label}.files[${index}]`);
     if (typeof file.path !== 'string' || !repoRelativePosix(file.path)) throw new Error(`${label}.files[${index}].path invalid`);
     if (file.operation !== 'write' && file.operation !== 'delete') throw new Error(`${label}.files[${index}].operation invalid`);
-    if (typeof file.hash !== 'string' || file.hash.trim() === '') throw new Error(`${label}.files[${index}].hash invalid`);
+    if (file.operation === 'delete' ? file.hash !== 'missing' : !isDigest(file.hash)) throw new Error(`${label}.files[${index}].hash invalid for operation ${file.operation}`);
   }
 }
 
