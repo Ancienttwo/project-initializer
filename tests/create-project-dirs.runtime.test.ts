@@ -5,6 +5,8 @@ import { join } from "path";
 import { spawnSync } from "child_process";
 import { defaultPolicy } from "../src/core/adoption/standard-plan";
 import { parseExternalSourcesPolicy } from "../src/effects/external-sources/policy";
+import { ARCHCTX_REQUIRED_VERSION, readArchitectureProjectionPolicy } from "../src/core/architecture/projection";
+import { REFACTOR_PROVIDER_VERSION, readRefactorPolicy } from "../src/core/refactor/policy";
 
 const ROOT = join(import.meta.dir, "..");
 const REFERENCE_STUB_MARKER = "<!-- repo-harness: reference-config-stub v1 -->";
@@ -1041,6 +1043,54 @@ describe("create-project-dirs runtime smoke", () => {
       expect(policy.documentation.profile).toBe("full");
       expect(policy.documentation.reference_source).toBe("user-level-runtime-docs");
       expect(policy.documentation.reference_configs).toContain("spa-day-protocol.md");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }, RUNTIME_SMOKE_TIMEOUT_MS);
+
+  /**
+   * `scripts/` ships inside the npm package, so a seeder that hardcodes a stale archctx pin
+   * reaches every generated repository. `readRefactorPolicy` fail-closes on an exact
+   * `provider_version` mismatch, so a stale seed makes the generated repo's own refactor
+   * stages unreadable rather than merely out of date. The guard runs the real seeders and
+   * feeds their output to the real readers instead of comparing version literals, so it
+   * fails on the behavior the consumer actually depends on.
+   */
+  test("every policy seeder emits an archctx pin the runtime readers accept", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "seeder-archctx-pin-parity-"));
+    const libPath = join(ROOT, "scripts/lib/project-init-lib.sh");
+
+    try {
+      const res = spawnSync(
+        "bash",
+        ["-lc", [`source '${libPath}'`, 'pi_write_harness_policy "$PWD" apply'].join("\n")],
+        { cwd, encoding: "utf-8" },
+      );
+      expect(res.status).toBe(0);
+
+      const seeders: Array<[string, Record<string, any>]> = [
+        ["scripts/lib/project-init-lib.sh", JSON.parse(readFileSync(join(cwd, ".ai/harness/policy.json"), "utf-8"))],
+        ["scripts/ensure-task-workflow.sh", ensureTaskWorkflowSeedPolicy()],
+        [".ai/harness/policy.json", JSON.parse(readFileSync(join(ROOT, ".ai/harness/policy.json"), "utf-8"))],
+      ];
+
+      for (const [source, seeded] of seeders) {
+        // readRefactorPolicy takes the whole policy and throws on an exact
+        // provider_version mismatch, so a stale seed surfaces here as the generated
+        // repo's real failure, not as a string diff.
+        const refactor = readRefactorPolicy(seeded);
+        expect([source, refactor.stages.scan.provider_version]).toEqual([source, REFACTOR_PROVIDER_VERSION]);
+        expect([source, refactor.stages.verify.provider_version]).toEqual([source, REFACTOR_PROVIDER_VERSION]);
+
+        // The seeded architecture block defaults to the disabled provider, whose reader
+        // short-circuits before reading projection_version. Flip it to archctx so the
+        // seeded pin is the value the reader actually resolves.
+        const architecture = { ...seeded.architecture, projection_provider: "archctx", projection_apply: "manual" };
+        const projection = readArchitectureProjectionPolicy({ ...seeded, architecture });
+        expect([source, projection.requiredVersion]).toEqual([source, ARCHCTX_REQUIRED_VERSION]);
+      }
+
+      expect(REFACTOR_PROVIDER_VERSION).toBe(ARCHCTX_REQUIRED_VERSION);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
