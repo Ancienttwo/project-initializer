@@ -1,0 +1,11 @@
+# Campaign admission and acquired workflow scope
+
+Campaign planning must reject metadata that canonical acceptance would reject before a worker is acquired. `runCampaignPlanningPreflight` invokes the trusted packaged `verify-contract --preflight` before brief validation. The preflight shares the canonical evidence-requirements parser, Verification Plan validator and profile constraints. It validates declarations and pre-fix evidence, but does not execute commands, test future output existence, change contract status or publish an acceptance report. Report and rerun options are rejected in this mode.
+
+Fleet acquisition already verifies the approved plan and exact contract proof before and after claim-token publication. Once that authority is frozen, acquisition selects the worktree's ignored active pointers through the existing trusted `switch-plan` helper. It must not rerun `plan-to-todo`, which is an authoring operation that changes plan status and regenerates review, notes and deferred-ledger metadata. Ordinary authoring still uses `plan-to-todo`.
+
+The motivating BRC run corrected the business README and passed its three regressions, then failed canonical acceptance because the admitted contract omitted `evidence_requirements.benchmark` and acquire had rewritten four workflow files outside the business allowlist. Its stopped dispatch and failed evidence remain immutable; this repair supplies no refund, budget increase or replay authority.
+
+Regression evidence is in `tasks/evidence/campaign-acceptance-preflight-pre-fix.log`. The new CLI preflight tests prove missing, malformed and duplicate benchmark declarations and malformed Verification Plans are rejected without commands or status changes. The actual Fleet CLI fixture acquires a fresh worktree with package-only helpers, compares authored workflow bytes, and runs canonical `verify-sprint --prepare-acceptance`: a business edit reaches its command, while a subsequent notes mutation fails scope before the command. No generic workflow-path exemption is introduced.
+
+At higher task volume, the added local metadata helper invocation is the first incremental cost. It creates no provider calls or new persistent authority. An admitted task still requires final verification and an AcceptanceReceipt after implementation; metadata preflight is not acceptance.

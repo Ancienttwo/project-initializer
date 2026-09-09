@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:64a698d3492730eadb231442dd57c97b563f9efc3638569aa4e657b9270b0594",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "c0c98f4b45d4eaa34e204d6859863c7781c2b3a2",
-    "worktreeDigest": "sha256:c9256f1c62c7a4a7fe92ba2edef43f915525050b17ad8747d533a86fb61a7872",
-    "sourceTreeDigest": "sha256:bffd1e59031945865c1301cbc6d54a77133310275b2e6ae77539e1fed9559d2c",
+    "baseHeadSha": "0da73e0f550d1a040c6509b12fccb1378807d703",
+    "worktreeDigest": "sha256:0807cd69bfaaf68b7d1509565de4db7d926a09fae4c58c63ca35780f60c310c8",
+    "sourceTreeDigest": "sha256:6541cf65a38dab7c46c093fe18d38429da9e8c4adefb55b499d4d51f2c6e5442",
     "modelDigest": "sha256:259799afc1e85d429fdb4c464bf7cae4d73d7e7553782fb76e659d21f8aa8624",
-    "codeGraphDigest": "sha256:70d261b10703f143208a0ad4bc396135ddfd260a5a758d8f04ce2059adbfa412",
-    "indexedWorktreeDigest": "sha256:10b7356f950604d9e921212d387c3f3537d85dd4ff6ea562f808c3e1ce62173c",
+    "codeGraphDigest": "sha256:8815f37755e405e5ee548f23a57bce6789515c1d1a1ef7c2ea8b542d15512daa",
+    "indexedWorktreeDigest": "sha256:9bdfb1ac0928d67eb88086f5229d41eccd79ee1df7d6865c6b085858a7992f6e",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:ac9d097fa6ea8340b65b17cde90d46bb2321cc3557dec5b2b8a211958d7bfaef"
+    "projectionInputDigest": "sha256:e7f9f4645708948b86827696c95a4cc88917172f9a3808781cdf85de37914afb"
   },
-  "projectionDigest": "sha256:1f4ae894889c2e144db3b4139fd5f53c47387d3628b78c1bc0b0cdd4cdd31547",
+  "projectionDigest": "sha256:701a53e603233c168d296145cf8106b9b770150e44be9f356bf43565a6c0f858",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:259799afc1e85d429fdb4c464bf7cae4d73d7e7553782fb76e659d21f8aa8624",
-      "sourceTreeDigest": "sha256:bffd1e59031945865c1301cbc6d54a77133310275b2e6ae77539e1fed9559d2c",
+      "sourceTreeDigest": "sha256:6541cf65a38dab7c46c093fe18d38429da9e8c4adefb55b499d4d51f2c6e5442",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:1f4ae894889c2e144db3b4139fd5f53c47387d3628b78c1bc0b0cdd4cdd31547"
+      "projectionDigest": "sha256:701a53e603233c168d296145cf8106b9b770150e44be9f356bf43565a6c0f858"
     }
   },
-  "receiptDigest": "sha256:05c97a43ffc9978d370eaa3002c332c8c539b1a37d33ad5368a2195915b106db",
+  "receiptDigest": "sha256:184cb458ac539a7951d654a4d3e544b65ce30988f1ebae578e28d4e1f10295bd",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -827,9 +827,9 @@
       "sourceDigest": "sha256:010ee9ce2c7935ad6ab2aa5d30e2e0225c98fb708e29c221e146ff45b6b21610",
       "outputDigest": "sha256:9deae9f17a3ad75c541b1b0ca258721b329b5a4d9521eedfab8186eb635af91a",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-record-scope",
-        "commit": "c0c98f4b45d4eaa34e204d6859863c7781c2b3a2",
-        "committedAt": "2026-09-10T03:28:27+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:e821c9e6e681ff519632fc2b3f385e0d78005fd6d46cf098f0657cf7fb6ae9cf",
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-record-scope",
-        "commit": "c0c98f4b45d4eaa34e204d6859863c7781c2b3a2",
-        "committedAt": "2026-09-10T03:28:27+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -1027,9 +1027,9 @@
       "sourceDigest": "sha256:183d7a9ef531bb200e573b337911d503eac0d86741a87b02d5d0b60896930782",
       "outputDigest": "sha256:2e93a1f59017a07da7860cf0073e6911d9f75032b5af8be503c56087f394466a",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-record-scope",
-        "commit": "e2737265b6a50a79201aa37ac558bf18808c1a1a",
-        "committedAt": "2026-09-10T03:05:04+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -1107,9 +1107,9 @@
       "sourceDigest": "sha256:98aca01f5972a801ccbed7b23063276724226233393bfd9d69dda2743eb9a26f",
       "outputDigest": "sha256:f77e33f1153051b1b06a584faf6bd25a8581694d6b6148650dc66c9160b0cf2c",
       "verifiedAgainst": {
-        "branch": "codex/fleet-packaged-helper",
-        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
-        "committedAt": "2026-09-09T15:43:05+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -1127,9 +1127,9 @@
       "sourceDigest": "sha256:e62d682d1acc2005b21ec95c10b7d564f58d7974b9190f8bd2352ae2f89574b9",
       "outputDigest": "sha256:281710e8acc1b2e7fa7a7e0521833566e98430f128f36147674832cef046126d",
       "verifiedAgainst": {
-        "branch": "codex/campaign-settled-resume",
-        "commit": "c44f2f7d933cd32029d9c994a3386857a7741e25",
-        "committedAt": "2026-09-10T00:23:28+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-record-scope",
-        "commit": "c0c98f4b45d4eaa34e204d6859863c7781c2b3a2",
-        "committedAt": "2026-09-10T03:28:27+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:6f1d8c7839dc83c16c80bee79ee8c6b3b3131e523928d2d0e957180fd0541c02",
       "outputDigest": "sha256:beaaa466d51cbd8f929fd6acd6645c6f5136cccf539f09b63a273e5ab38519fa",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-record-scope",
-        "commit": "e2737265b6a50a79201aa37ac558bf18808c1a1a",
-        "committedAt": "2026-09-10T03:05:04+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {
@@ -1267,9 +1267,9 @@
       "sourceDigest": "sha256:654f7236e2e51fd19e64129d48fe05f974f3172f6f69c671a78f31ba896198ae",
       "outputDigest": "sha256:a148fc8868cf1e59ce9fe25484555aff2c06e611ed559c709c045b9cde19ab0a",
       "verifiedAgainst": {
-        "branch": "codex/ci-job-split",
-        "commit": "3a30bd897b86818978b8d8a85f811299f5d35971",
-        "committedAt": "2026-09-09T18:43:25+08:00"
+        "branch": "codex/campaign-acceptance-preflight",
+        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
+        "committedAt": "2026-09-10T04:21:51+08:00"
       }
     },
     {

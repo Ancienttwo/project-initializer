@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -12,6 +13,7 @@ import {
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { spawnSync } from 'child_process';
+import { runHelper } from '../../src/effects/runtime/helper-runner';
 import { readLease } from '../../src/effects/state/coordination-lease-store';
 import { fixtureTaskId } from '../helpers/sprint-fixture';
 
@@ -71,6 +73,8 @@ function projectablePlan(sprintPath: string, task: string, planPath: string, con
     '> **Verification Boundary**: CLI acquisition proves bound worktree output.',
     '> **Rollback Surface**: Remove the fixture worktree and lease.',
     '> **Task Contract**: ' + contractPath,
+    '> **Task Review**: tasks/reviews/20260823-0202-cli-acquire.review.md',
+    '> **Implementation Notes**: tasks/notes/20260823-0202-cli-acquire.notes.md',
     '',
     '## Promotion Gate',
     '',
@@ -97,6 +101,9 @@ function projectableContract(planPath: string): string {
     '# Task Contract: CLI Fleet Acquire Fixture',
     '',
     '> **Plan**: ' + planPath,
+    '> **Task Profile**: code-change',
+    '> **Status**: Active',
+    '> **Review File**: tasks/reviews/20260823-0202-cli-acquire.review.md',
     '',
     '## Goal', '', 'Keep the authored acquisition contract unchanged.', '',
     '## Why', '', 'Dispatch must use the same authority admitted by the plan proof.', '',
@@ -109,10 +116,12 @@ function projectableContract(planPath: string): string {
     '  - src/',
     '```',
     '',
+    '## Evidence Requirements', '```yaml', 'evidence_requirements:', '  benchmark: not_applicable', '```', '',
+    '## Change Assessment', '```json', '{"protocol":1,"oracles":[{"id":"business","kind":"deterministic_test","paths":["*"]}]}', '```', '',
     '## Verification Plan',
     '',
     '```json',
-    '{"protocol":1,"checks":[]}',
+    JSON.stringify({ protocol: 1, checks: [{ id: 'business', kind: 'command', command: 'printf passed > .ai/harness/business-command-ran', cwd: '.', phase: 'verification', cost: 'normal', evidence_policy: 'current_exact', necessity: 'Business-only edits reach canonical execution after acquire.', inputs: { env: [] } }] }),
     '```',
     '',
   ].join('\n');
@@ -144,7 +153,7 @@ function acquireFixture(): AcquireFixture {
   mkdirSync(home, { recursive: true });
   cpSync(join(CWD, '.claude/templates/contract.template.md'), join(repo, '.claude/templates/contract.template.md'));
   writeFileSync(join(repo, '.ai/harness/policy.json'), JSON.stringify({
-    worktree_strategy: { merge_back: { target: 'main' }, branch_prefix: 'codex/' },
+    worktree_strategy: { merge_back: { target: 'main' }, review_base: 'main', branch_prefix: 'codex/' },
   }));
   writeFileSync(join(repo, '.ai/harness/sprint/active-sprint'), `${sprintPath}\n`);
   writeFileSync(join(repo, sprintPath), [
@@ -161,6 +170,12 @@ function acquireFixture(): AcquireFixture {
   ].join('\n'));
   writeFileSync(join(repo, planPath), projectablePlan(sprintPath, task, planPath, contractPath));
   writeFileSync(join(repo, contractPath), projectableContract(planPath));
+  for (const directory of ['tasks/reviews', 'tasks/notes', 'src']) mkdirSync(join(repo, directory), { recursive: true });
+  writeFileSync(join(repo, 'tasks/reviews/20260823-0202-cli-acquire.review.md'), '# Authored review\n');
+  writeFileSync(join(repo, 'tasks/notes/20260823-0202-cli-acquire.notes.md'), '# Authored notes\n');
+  writeFileSync(join(repo, 'tasks/todos.md'), '# Deferred goals\n');
+  writeFileSync(join(repo, 'src/index.ts'), 'export const business = false;\n');
+  writeFileSync(join(repo, '.gitignore'), '.ai/harness/*\n!.ai/harness/policy.json\n');
   git(repo, ['init', '-b', 'main']);
   git(repo, ['config', 'user.name', 'Fleet CLI Test']);
   git(repo, ['config', 'user.email', 'fleet-cli@test.local']);
@@ -365,6 +380,11 @@ describe('fleet offers CLI', () => {
       expect(existsSync(join(envelope.worktree_path, envelope.plan.contract_path))).toBe(true);
       const authored = readFileSync(join(fixture.repo, envelope.plan.contract_path), 'utf8');
       expect(readFileSync(join(envelope.worktree_path, envelope.plan.contract_path), 'utf8')).toBe(authored);
+      const workflowPaths = [envelope.plan.plan_path, envelope.plan.contract_path, 'tasks/reviews/20260823-0202-cli-acquire.review.md', 'tasks/notes/20260823-0202-cli-acquire.notes.md', 'tasks/todos.md'];
+      for (const path of workflowPaths) expect(readFileSync(join(envelope.worktree_path, path), 'utf8'), path).toBe(readFileSync(join(fixture.repo, path), 'utf8'));
+      expect(readFileSync(join(envelope.worktree_path, '.ai/harness/active-plan'), 'utf8').trim()).toBe(envelope.plan.plan_path);
+      expect(readFileSync(join(envelope.worktree_path, '.ai/harness/active-worktree'), 'utf8').trim()).toBe(envelope.worktree_path);
+
       const preflight = spawnSync(process.execPath, [join(CWD, 'scripts/contract-run.ts'), 'preflight',
         '--repo', envelope.worktree_path, '--contract', envelope.plan.contract_path, '--json'], { encoding: 'utf8' });
       expect(preflight.status, preflight.stdout + preflight.stderr).toBe(0);
@@ -377,6 +397,30 @@ describe('fleet offers CLI', () => {
       const token = readFileSync(join(envelope.worktree_path, envelope.claim_token.path), 'utf8');
       expect(token).toContain(`claim_id=${envelope.claim_id}\n`);
       expect(token).toContain(`task=${fixture.task}\n`);
+
+      writeFileSync(join(envelope.worktree_path, 'src/index.ts'), 'export const business = true;\n');
+      const verify = () => runHelper({ helper: 'verify-sprint', args: ['--prepare-acceptance'],
+        cwd: envelope.worktree_path, trustedPackage: true, stdio: 'pipe',
+      });
+      const snapshot = () => {
+        const runs = join(envelope.worktree_path, '.ai/harness/runs');
+        const files = readdirSync(runs).filter(path => path.startsWith('run-') && path.endsWith('.json')).sort();
+        return JSON.parse(readFileSync(join(runs, files.at(-1)!), 'utf8'));
+      };
+      const accepted = verify();
+      expect(accepted.exitCode, (accepted.stdout ?? "") + (accepted.stderr ?? "") + JSON.stringify(snapshot())).toBe(0);
+      expect(snapshot().allowed_paths_check.status).toBe('pass');
+      expect(snapshot().contract.status).toBe('pass');
+      const sentinel = join(envelope.worktree_path, '.ai/harness/business-command-ran');
+      expect(readFileSync(sentinel, 'utf8')).toBe('passed');
+      rmSync(sentinel);
+      const notesPath = 'tasks/notes/20260823-0202-cli-acquire.notes.md';
+      writeFileSync(join(envelope.worktree_path, notesPath), '# Out of scope workflow mutation\n');
+      const refused = verify();
+      expect(refused.exitCode, (refused.stdout ?? "") + (refused.stderr ?? "")).toBe(1);
+      expect(snapshot().allowed_paths_check.outside).toContain(notesPath);
+      expect(existsSync(sentinel)).toBe(false);
+      writeFileSync(join(envelope.worktree_path, notesPath), readFileSync(join(fixture.repo, notesPath)));
 
       // Missing contracts are initialized; replay must leave that template invalid
       // and byte-identical until an author supplies the actual task authority.

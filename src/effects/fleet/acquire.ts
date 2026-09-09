@@ -439,14 +439,14 @@ function defaultStart(repo: RepoHarnessRegisteredRepo, offer: TaskOfferV1): Cont
 
 function defaultProject(worktreePath: string, planPath: string): void {
   const result = runHelper({
-    helper: 'plan-to-todo',
+    helper: 'switch-plan',
     args: ['--plan', planPath],
     cwd: worktreePath,
     trustedPackage: true,
     stdio: 'pipe',
     maxOutputBytes: 16 * 1024 * 1024,
   });
-  if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || 'plan-to-todo projection failed');
+  if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || 'worktree plan activation failed');
 }
 
 function acquisitionDependencies(overrides: Partial<FleetAcquireDependencies> = {}): FleetAcquireDependencies {
@@ -875,8 +875,8 @@ export function acquireFleetTask(options: FleetAcquireOptions = {}): FleetAcquir
     }
 
     // Token publication is itself a side effect. Re-read the canonical task
-    // and proof immediately afterwards, while the plan is still Approved; the
-    // following projection intentionally changes plan lifecycle state.
+    // and proof immediately afterwards. Activation preserves the authored
+    // plan and contract; only worktree-local ignored pointers are selected.
     const tokenAuthority = revalidateClaimAuthority(offer, revalidated.repo, options, deps);
     if (!tokenAuthority.ok) {
       if (tokenAuthority.result.error === 'rollback_failed') return tokenAuthority.result;
