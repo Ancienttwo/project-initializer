@@ -20,4 +20,4 @@ The `previous_markers` chain is built idempotently: a retry after an interrupted
 
 No ESM import cycle appeared, so the design's fallback module split was not needed.
 
-> **Substantive Change SHA256**: `sha256:fca6d0dbf8c38f86fa3c133f72360a47b5f47a1e3bb86b0c5064adaeb8fb4534`
+> **Substantive Change SHA256**: `sha256:874b2e9e5630abdd0d154169709fe28417f400f8177de72bcbf2a8c507cf08ca`
