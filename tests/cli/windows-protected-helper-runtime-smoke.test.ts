@@ -3,8 +3,8 @@ import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, writeFileSync }
 import { userInfo } from 'os';
 import { join } from 'path';
 import { configureProtectedHelperPlatform } from '../../src/cli/commands/global-runtime';
-import { protectedChildEnv, runHelper } from '../../src/cli/runtime/helper-runner';
-import { resolveProtectedHelperPlatform } from '../../src/cli/runtime/protected-helper-platform';
+import { protectedChildEnv, runHelper } from '../../src/effects/runtime/helper-runner';
+import { resolveProtectedHelperPlatform } from '../../src/effects/runtime/protected-helper-platform';
 import { runProcess } from '../../src/effects/process-runner';
 
 const ROOT = join(import.meta.dir, '..', '..');

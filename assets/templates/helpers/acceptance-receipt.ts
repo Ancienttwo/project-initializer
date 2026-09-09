@@ -163,7 +163,7 @@ export function resolveProtectedGitRuntime(): ProtectedGitRuntime {
     return protectedGitRuntimeCache;
   }
   const protectedPlatform = requireFromHelper(
-    join(PACKAGE_ROOT, 'src', 'cli', 'runtime', 'protected-helper-platform.ts'),
+    join(PACKAGE_ROOT, 'src', 'effects', 'runtime', 'protected-helper-platform.ts'),
   ) as ProtectedPlatformModule;
   const runtime = protectedPlatform.resolveProtectedHelperPlatform();
   protectedGitRuntimeCache = {

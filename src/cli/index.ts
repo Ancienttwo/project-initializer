@@ -69,7 +69,7 @@ import {
   sha256,
   type CandidateReconciliationReceipt,
 } from './runtime/candidate-reconciliation';
-import { windowsProtectedHelperConfigPath } from './runtime/protected-helper-platform';
+import { windowsProtectedHelperConfigPath } from '../effects/runtime/protected-helper-platform';
 import {
   applyInstallProfile,
   beginInstallHostTransaction,

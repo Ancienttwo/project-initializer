@@ -10,7 +10,7 @@ import { canonicalMessageBytes } from '../../core/messages/mechanics';
  * an offer into authority without re-reading the owning stores.
  */
 
-import { runHelper } from '../../cli/runtime/helper-runner';
+import { runHelper } from '../runtime/helper-runner';
 import { randomUUID } from 'crypto';
 import { realpathSync } from 'fs';
 import { join } from 'path';

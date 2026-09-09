@@ -68,7 +68,7 @@ import { buildExternalSourceBindingReceipt } from '../../src/core/external-sourc
 import { listLeaseReads, readLease } from '../../src/effects/state/coordination-lease-store';
 import { renderAcceptanceProjection, type AcceptanceReceipt } from '../../scripts/acceptance-receipt';
 import { RUN_HELP_GROUPS } from '../../src/cli/commands/run';
-import { listHelperIds } from '../../src/cli/runtime/helper-runner';
+import { listHelperIds } from '../../src/effects/runtime/helper-runner';
 
 const REPO_ROOT = join(import.meta.dir, '../..');
 const FIXTURES = join(REPO_ROOT, 'tests/fixtures/repair-campaign');

@@ -25,7 +25,7 @@ import {
   discoverWindowsProtectedHelperContract,
   resolveProtectedHelperPlatform,
   writeWindowsProtectedHelperContract,
-} from "../runtime/protected-helper-platform";
+} from "../../effects/runtime/protected-helper-platform";
 import {
   CANDIDATE_RECONCILIATION_PROTOCOL,
   candidatePackageIdentity,

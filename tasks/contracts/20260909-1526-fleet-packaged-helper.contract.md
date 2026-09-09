@@ -18,7 +18,7 @@ Acquire and project real fleet worktrees using the existing trusted packaged hel
 
 ## Scope
 
-Only the two default helper calls, real CLI regression and their required evidence. Keep claims, budgets, admission, Docker and Oracle unchanged. No compatibility fallback or new configuration.
+The two default helper calls, relocation of the existing helper runner/platform into effects/runtime, direct caller and architecture path updates, real CLI regression and required evidence. Keep claims, budgets, admission, Docker and Oracle unchanged. No compatibility fallback or new configuration.
 
 ## Falsifier
 
@@ -35,6 +35,24 @@ A valid package-only target fails provisioning because a target-local helper is 
 
 ```yaml
 allowed_paths:
+  - .archcontext/model/nodes/capability.workflow-engine.contract-assets.yaml
+  - assets/templates/helpers/acceptance-receipt.ts
+  - scripts/acceptance-receipt.ts
+  - src/cli/commands/campaign.ts
+  - src/cli/commands/global-runtime.ts
+  - src/cli/commands/run.ts
+  - src/cli/index.ts
+  - src/cli/mcp/tools.ts
+  - src/cli/runtime/helper-runner.ts
+  - src/cli/runtime/protected-helper-platform.ts
+  - src/effects/runtime/node-candidates.ts
+  - tests/characterization/repair-campaign-authority-freeze.test.ts
+  - tests/cli/run.test.ts
+  - tests/cli/windows-protected-helper-runtime-smoke.test.ts
+  - tests/unit/closeout-runner-guardrails.test.ts
+  - tests/unit/windows-protected-helper-platform-contract.test.ts
+  - src/effects/runtime/helper-runner.ts
+  - src/effects/runtime/protected-helper-platform.ts
   - src/effects/fleet/acquire.ts
   - tests/cli/fleet-offer-acquire.test.ts
   - docs/researches/20260909-fleet-packaged-helper.md
@@ -55,7 +73,7 @@ allowed_paths:
 ## Change Assessment
 
 ```json
-{"protocol": 1, "oracles": [{"id": "package-only-acquire", "kind": "deterministic_test", "paths": ["src/effects/fleet/acquire.ts", "tests/cli/fleet-offer-acquire.test.ts", "docs/researches/20260909-fleet-packaged-helper.md", "tasks/evidence/fleet-packaged-helper-pre-fix.log", "docs/architecture/.projection-manifest.json"]}]}
+{"protocol": 1, "oracles": [{"id": "package-only-acquire", "kind": "deterministic_test", "paths": [".archcontext/model/nodes/capability.workflow-engine.contract-assets.yaml", "assets/templates/helpers/acceptance-receipt.ts", "docs/architecture/.projection-manifest.json", "docs/architecture/changelog.md", "docs/architecture/decisions/index.md", "docs/architecture/diagrams/architecture.likec4", "docs/architecture/diagrams/architecture.mmd", "docs/architecture/diagrams/architecture.structurizr.json", "docs/architecture/index.md", "docs/architecture/modules/workflow-engine/contract-assets.md", "docs/researches/20260909-fleet-packaged-helper.md", "scripts/acceptance-receipt.ts", "src/cli/commands/campaign.ts", "src/cli/commands/global-runtime.ts", "src/cli/commands/run.ts", "src/cli/index.ts", "src/cli/mcp/tools.ts", "src/cli/runtime/helper-runner.ts", "src/cli/runtime/protected-helper-platform.ts", "src/effects/fleet/acquire.ts", "src/effects/runtime/helper-runner.ts", "src/effects/runtime/node-candidates.ts", "src/effects/runtime/protected-helper-platform.ts", "tasks/evidence/fleet-packaged-helper-pre-fix.log", "tests/characterization/repair-campaign-authority-freeze.test.ts", "tests/cli/fleet-offer-acquire.test.ts", "tests/cli/run.test.ts", "tests/cli/windows-protected-helper-runtime-smoke.test.ts", "tests/unit/closeout-runner-guardrails.test.ts", "tests/unit/windows-protected-helper-platform-contract.test.ts"]}]}
 ```
 
 ## Evidence Requirements
@@ -104,6 +122,19 @@ exit_criteria:
         "env": []
       },
       "command": "bun test --timeout 60000 tests/unit/fleet-acquire-effect.test.ts tests/unit/fleet-offer-acquire.test.ts tests/fleet-acquire-concurrency.test.ts tests/fleet-acquire-state-boundary.test.ts"
+    },
+    {
+      "id": "trusted-helper-regression",
+      "kind": "command",
+      "command": "bun test --timeout 60000 tests/cli/run.test.ts tests/unit/closeout-runner-guardrails.test.ts tests/unit/windows-protected-helper-platform-contract.test.ts tests/cli/windows-protected-helper-runtime-smoke.test.ts tests/characterization/repair-campaign-authority-freeze.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Relocated runtime must preserve packaged resolution, protected environment and platform contracts.",
+      "inputs": {
+        "env": []
+      }
     },
     {
       "id": "typecheck",

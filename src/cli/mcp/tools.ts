@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { basename, dirname, isAbsolute, join, resolve } from 'path';
 import { isRegisteredRepoHarnessRoot, readRegisteredRepoHarnessRepos } from '../../effects/repo-registry';
 import { runProcess } from '../../effects/process-runner';
-import { runHelper } from '../runtime/helper-runner';
+import { runHelper } from '../../effects/runtime/helper-runner';
 import { listSessions, openSession, readSession, runBrowserConsult, runBrowserFollowup } from '../chatgpt-browser/engine';
 import type { BrowserProviderName, NativeBrowserChannel } from '../chatgpt-browser/types';
 import { hashMcpInput, tryWriteMcpAuditEntry } from './audit';

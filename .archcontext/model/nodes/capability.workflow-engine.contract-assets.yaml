@@ -22,7 +22,7 @@ source:
     - "scripts/ship-worktrees.sh"
     - "src/cli/commands/init.ts"
     - "src/cli/commands/capability-context.ts"
-    - "src/cli/runtime/helper-runner.ts"
+    - "src/effects/runtime/helper-runner.ts"
     - "assets/templates/**"
     - "assets/reference-configs/**"
     - "docs/reference-configs/**"
