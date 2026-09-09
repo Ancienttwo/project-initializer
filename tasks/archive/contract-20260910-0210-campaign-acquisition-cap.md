@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-10 02:10
+> **Related Plan**: plans/archive/plan-20260910-0159-campaign-acquisition-cap.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260910-0210
+> **Archive Projection V1**: `plans/plan-20260910-0159-campaign-acquisition-cap.md` => `plans/archive/plan-20260910-0159-campaign-acquisition-cap.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0159-campaign-acquisition-cap.notes.md` => `tasks/archive/notes-20260910-0210-campaign-acquisition-cap.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0159-campaign-acquisition-cap.contract.md` => `tasks/archive/contract-20260910-0210-campaign-acquisition-cap.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0159-campaign-acquisition-cap.review.md` => `tasks/archive/review-20260910-0210-campaign-acquisition-cap.md`
+
 # Task Contract: campaign-acquisition-cap
 
-> **Status**: Active
-> **Plan**: plans/plan-20260910-0159-campaign-acquisition-cap.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260910-0159-campaign-acquisition-cap.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-10 01:59
-> **Review File**: `tasks/reviews/20260910-0159-campaign-acquisition-cap.review.md`
-> **Notes File**: `tasks/notes/20260910-0159-campaign-acquisition-cap.notes.md`
+> **Review File**: `tasks/archive/review-20260910-0210-campaign-acquisition-cap.md`
+> **Notes File**: `tasks/archive/notes-20260910-0210-campaign-acquisition-cap.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -43,10 +53,10 @@ A cap1 campaign either admits a second acquisition or refuses its subsequent dis
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260910-0159-campaign-acquisition-cap.md`
+- Source plan: `plans/archive/plan-20260910-0159-campaign-acquisition-cap.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260910-0159-campaign-acquisition-cap.review.md`
-- Notes file: `tasks/notes/20260910-0159-campaign-acquisition-cap.notes.md`
+- Review file: `tasks/archive/review-20260910-0210-campaign-acquisition-cap.md`
+- Notes file: `tasks/archive/notes-20260910-0210-campaign-acquisition-cap.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
