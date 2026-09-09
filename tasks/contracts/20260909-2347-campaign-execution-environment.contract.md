@@ -58,7 +58,7 @@ Original frozen image failed the actual helper regression with exit 127.
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"campaign-image-runtime-readback","kind":"runtime_readback","paths":["*"]}]}
 ```
 
 ## Acceptance Policy

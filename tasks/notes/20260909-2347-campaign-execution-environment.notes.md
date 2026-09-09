@@ -24,6 +24,8 @@
 | Shared dependency mount | Rejected | Would expand containment authority and retain platform coupling. |
 | Explicit target cache | Selected | Uses the already authorized writable workspace and preserves tmpfs limits. |
 
+- Change Assessment routes the deploy surface to runtime_readback; the oracle is the declared environment test plus protected container results, not a manual waiver.
+
 ## Open Questions
 
 - None.
