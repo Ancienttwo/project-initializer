@@ -828,6 +828,10 @@ function writePrompt(path: string, title: string, lines: string[]) {
   writeFileSync(path, [`# ${title}`, "", ...lines, ""].join("\n"));
 }
 
+export function campaignAttemptResultInstruction(path: string): string {
+  return `Runner-owned output: this campaign invocation explicitly authorizes writing only ${path}, in addition to the contract's business Writable paths. This exact output is an execution record, not a repository implementation edit or acceptance verdict. Even when blocked, write this file before returning as exact JSON {"outcome":"completed|not_reproducible|user_blocked|external_blocked|transient_failure|permanent_failure|lease_lost|cancelled|reconciliation_required","evidence_paths":["repository-relative regular evidence file"]}. Select exactly one outcome supported by observed evidence. This authorizes no other file outside Writable paths.`;
+}
+
 async function buildRun(opts: Options) {
   const repo = resolve(opts.repo);
   const contractPath = repoPath(repo, opts.contract);
@@ -905,7 +909,7 @@ async function buildRun(opts: Options) {
     .map((line) => `  ${line}`);
   writePrompt(workerPrompt, "Contract Worker Task", [
     `Contract: ${repoRelative(repo, contractPath)}`,
-    ...(campaign ? [`Campaign attempt result: write ${repoRelative(repo, campaignResultPath)} as exact JSON {"outcome":"completed|not_reproducible|user_blocked|external_blocked|transient_failure|permanent_failure|lease_lost|cancelled|reconciliation_required","evidence_paths":["repository-relative regular evidence file"]}. Select exactly one outcome from the closed vocabulary. This reports execution only; it is not semantic acceptance.`] : []),
+    ...(campaign ? [campaignAttemptResultInstruction(repoRelative(repo, campaignResultPath))] : []),
     `Plan: ${plan || "(none)"}`,
     `Notes: ${notesFile || "(none)"}`,
     ...(exemplar ? [`Exemplar: ${exemplar}`] : []),
@@ -926,11 +930,11 @@ async function buildRun(opts: Options) {
     "",
     "## Record what you learned",
     "",
-    "Before finishing, append to the Notes file above: Design Decisions, Deviations From Plan Or Spec, Tradeoffs Considered, and Open Questions. List anything reusable beyond this task under Promotion Candidates.",
+    "Before finishing, report Design Decisions, Deviations From Plan Or Spec, Tradeoffs Considered, and Open Questions. Append them to the Notes file only if that file is within Writable paths. If the Notes file is outside Writable paths, report those observations in your final response for the parent to record; do not write that file.",
     "",
     "## Stop / escalate",
     "",
-    "Hand back to the parent (do not improvise) if the contract Goal, Scope, Allowed Paths, or Exit Criteria are missing or contradictory, if the work requires editing a path outside Allowed Paths, or if any condition under \"Stop Conditions\" in the contract triggers.",
+    "Hand back to the parent (do not improvise) if the contract Goal, Scope, Allowed Paths, or Exit Criteria are missing or contradictory, if repository implementation requires editing a path outside Allowed Paths (the exact runner-owned output explicitly authorized above is a separate execution obligation), or if any condition under \"Stop Conditions\" in the contract triggers.",
     ...stopCondLines,
     "",
     "## Execution boundary",
