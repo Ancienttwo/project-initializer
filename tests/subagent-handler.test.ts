@@ -816,7 +816,7 @@ describe('typed subagent hook handlers', () => {
       const home = tempRepo();
       try {
         const contract = seedActiveContract(repoRoot);
-        const stack = composedChildStack(repoRoot, 'fast-worker', 'gpt-5.6-terra', codexEnv({ HOME: home }));
+        const stack = composedChildStack(repoRoot, 'fast-worker', 'gpt-6-astra', codexEnv({ HOME: home }));
         expect(stack.startContext).toContain('[repo-harness:native-role-routing] verified');
         expect(occurrences(stack.composed, BOUNDARY_MARKER)).toBe(1);
         expect(occurrences(stack.composed, BOUNDARY_SENTENCE)).toBe(1);
@@ -852,7 +852,7 @@ describe('typed subagent hook handlers', () => {
       const repoRoot = tempRepo();
       const home = tempRepo();
       try {
-        const stack = composedChildStack(repoRoot, 'fast-worker', 'gpt-5.6-terra', codexEnv({ HOME: home }));
+        const stack = composedChildStack(repoRoot, 'fast-worker', 'gpt-6-astra', codexEnv({ HOME: home }));
         expect(stack.startContext).toContain('[repo-harness:native-role-routing] verified');
         expect(occurrences(stack.composed, BOUNDARY_MARKER)).toBe(0);
         expect(occurrences(stack.composed, BOUNDARY_SENTENCE)).toBe(0);
@@ -918,7 +918,7 @@ describe('typed subagent hook handlers', () => {
           turn_id: 'turn-sandbox-evidence',
           agent_id: 'agent-sandbox-evidence',
           agent_type: 'gatekeeper',
-          model: 'gpt-5.6-terra',
+          model: 'gpt-6-astra',
         }, codexEnv({ HOME: home }));
         expect(output.exitCode).toBe(0);
         expect(readRoutingObservations(repoRoot)[0]).toMatchObject({
