@@ -12,6 +12,12 @@
 
 ## Active Lessons
 
+- Date: 2026-09-09
+- Triggered by correction: a workflow-evidence digest failure in the combined CI gate suppressed the functional test run.
+- Mistake pattern: making functional failure visibility depend on unrelated governance checks passing first.
+- Prevention rule: run governance and functional/package checks in independent hosted jobs; keep `Required / CI` as an `always()` aggregate that accepts only success from every dependency. Preserve the complete local/release gate through `scripts/check-ci.sh` with no arguments.
+- Where to apply next time: `.github/workflows/ci.yml`; regression coverage in `tests/check-ci-job-split.test.ts` exercises failing lanes and all aggregate status combinations.
+
 - Date: 2026-09-08
 - Triggered by correction: a bounded Stop repeatedly replayed the first legacy architecture drift paths and never reached source files later in the backlog.
 - Mistake pattern: acknowledging only the whole range while doing unbounded per-path work inside a fixed deadline.

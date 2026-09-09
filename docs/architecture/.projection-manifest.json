@@ -5,12 +5,12 @@
   "sourceDigest": "sha256:64a698d3492730eadb231442dd57c97b563f9efc3638569aa4e657b9270b0594",
   "provenance": {
     "schemaVersion": "archcontext.architecture-docs-projection-provenance/v1",
-    "baseHeadSha": "cad8c94d61dc2fd76e9e657abc8d3db5fe381e96",
-    "worktreeDigest": "sha256:34c232d72f3d37f07b9c235eff0e706b22af01d6aad5cc218af678f6dd6e26a1",
-    "sourceTreeDigest": "sha256:d723851869b212576e0f4f81954ec12574ee5fbfa9c5da841b12ab67c58e729d",
+    "baseHeadSha": "d48d2eeee8e71e7014a6bee6dc36c7ae9fab1d72",
+    "worktreeDigest": "sha256:8828d597e10b17457cd8b96ef1dd7f93e2a1c93cd97a6cdb58ed7e441c2c946e",
+    "sourceTreeDigest": "sha256:b405dfb0ea670e6f9c65389ea092eb10705eb1cb7c420939a38c1f7c9dbedd6e",
     "modelDigest": "sha256:259799afc1e85d429fdb4c464bf7cae4d73d7e7553782fb76e659d21f8aa8624",
-    "codeGraphDigest": "sha256:13fb46c161ac7f43f6d36c6d5287be8e65d6b76ac71b402bc078e805e559e19a",
-    "indexedWorktreeDigest": "sha256:a983af4606db2e1ff8fa43eb4a439ef56761b2ceaefedb71984fcf60463fd9c0",
+    "codeGraphDigest": "sha256:c72f7f5bac145363cd437cfbb36660e4e1f63ab4756de7d68e0f371bc6c9e809",
+    "indexedWorktreeDigest": "sha256:c1cbb4818897f2919c1e9a5f8b2eee75f2932ab626a4a185cfa0d30ea999cfc2",
     "rendererVersion": "archcontext.docs-renderer/v4",
     "layoutVersion": "archcontext.docs-layout/v1",
     "generatedFrom": {
@@ -19,9 +19,9 @@
       "codeGraphBinaryDigest": "sha256:e4be48573fdf16196ca0d2867be2790aa161534e9973dcb89bc70465100ea537",
       "codeGraphStatus": "ready"
     },
-    "projectionInputDigest": "sha256:c59e23a57520894d60a482559742f69d01e15f4f4239e8615b50b1bd756d401b"
+    "projectionInputDigest": "sha256:4f7ddc1ca77b6ac681e721136e3d5987fa6c9fc77bfad52fd2da0aedb12b2350"
   },
-  "projectionDigest": "sha256:57193dbb657491b42d013c3c41f0df14ead48771e4aaa4c12265c08cb5bea54f",
+  "projectionDigest": "sha256:262953597702528096b2d1f64cece99acf59eb1366d66915864c612ab61fbb64",
   "semanticBaseline": {
     "semanticState": {
       "schemaVersion": "archcontext.architecture-semantic-state/v1",
@@ -709,12 +709,12 @@
     },
     "digests": {
       "modelDigest": "sha256:259799afc1e85d429fdb4c464bf7cae4d73d7e7553782fb76e659d21f8aa8624",
-      "sourceTreeDigest": "sha256:d723851869b212576e0f4f81954ec12574ee5fbfa9c5da841b12ab67c58e729d",
+      "sourceTreeDigest": "sha256:b405dfb0ea670e6f9c65389ea092eb10705eb1cb7c420939a38c1f7c9dbedd6e",
       "flowProofDigest": "sha256:abadd5396dfade2bde9e2ab2590def292ff5a8dcd0b662c4779b213a4aead6f4",
-      "projectionDigest": "sha256:57193dbb657491b42d013c3c41f0df14ead48771e4aaa4c12265c08cb5bea54f"
+      "projectionDigest": "sha256:262953597702528096b2d1f64cece99acf59eb1366d66915864c612ab61fbb64"
     }
   },
-  "receiptDigest": "sha256:e37bf9f5415433a59bcb9b6f41429c4e565aa1df4a664a22d1ab0bcb6515dd9a",
+  "receiptDigest": "sha256:896ad8d14fb7c4d301988c259bf1d355c43a393d280b89079503bf8e4c591604",
   "refreshSignalIds": [],
   "targetCount": 33,
   "fileCount": 33,
@@ -1027,9 +1027,9 @@
       "sourceDigest": "sha256:183d7a9ef531bb200e573b337911d503eac0d86741a87b02d5d0b60896930782",
       "outputDigest": "sha256:2e93a1f59017a07da7860cf0073e6911d9f75032b5af8be503c56087f394466a",
       "verifiedAgainst": {
-        "branch": "codex/fleet-packaged-helper",
-        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
-        "committedAt": "2026-09-09T15:43:05+08:00"
+        "branch": "codex/ci-job-split",
+        "commit": "d48d2eeee8e71e7014a6bee6dc36c7ae9fab1d72",
+        "committedAt": "2026-09-09T19:51:49+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/fleet-packaged-helper",
-        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
-        "committedAt": "2026-09-09T15:43:05+08:00"
+        "branch": "codex/ci-job-split",
+        "commit": "d48d2eeee8e71e7014a6bee6dc36c7ae9fab1d72",
+        "committedAt": "2026-09-09T19:51:49+08:00"
       }
     },
     {
@@ -1247,9 +1247,9 @@
       "sourceDigest": "sha256:6f1d8c7839dc83c16c80bee79ee8c6b3b3131e523928d2d0e957180fd0541c02",
       "outputDigest": "sha256:beaaa466d51cbd8f929fd6acd6645c6f5136cccf539f09b63a273e5ab38519fa",
       "verifiedAgainst": {
-        "branch": "codex/fleet-packaged-helper",
-        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
-        "committedAt": "2026-09-09T15:43:05+08:00"
+        "branch": "codex/ci-job-split",
+        "commit": "3a30bd897b86818978b8d8a85f811299f5d35971",
+        "committedAt": "2026-09-09T18:43:25+08:00"
       }
     },
     {
@@ -1267,9 +1267,9 @@
       "sourceDigest": "sha256:654f7236e2e51fd19e64129d48fe05f974f3172f6f69c671a78f31ba896198ae",
       "outputDigest": "sha256:a148fc8868cf1e59ce9fe25484555aff2c06e611ed559c709c045b9cde19ab0a",
       "verifiedAgainst": {
-        "branch": "codex/architecture-drift-recovery",
-        "commit": "822309dbd6fd0ed286cd7d0b297e1b26d991b6d0",
-        "committedAt": "2026-09-09T01:54:22+08:00"
+        "branch": "codex/ci-job-split",
+        "commit": "3a30bd897b86818978b8d8a85f811299f5d35971",
+        "committedAt": "2026-09-09T18:43:25+08:00"
       }
     },
     {
