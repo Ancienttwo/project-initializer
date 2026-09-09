@@ -1,16 +1,16 @@
 # Task Review: campaign-execution-environment
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260909-2347-campaign-execution-environment.md
 > **Contract**: tasks/contracts/20260909-2347-campaign-execution-environment.contract.md
 > **Notes File**: tasks/notes/20260909-2347-campaign-execution-environment.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-09 23:47
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:af38e5af040b9046d2fc4129a2c24662aa948cb0c40d8e717a4ec0bfb59ce71c
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 721d8f31be696ac1fb739070d226e7ae76c34e23
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:af38e5af040b9046d2fc4129a2c24662aa948cb0c40d8e717a4ec0bfb59ce71c
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 721d8f31be696ac1fb739070d226e7ae76c34e23
+> **Verification Evidence SHA256**: sha256:400a81800b8ddfe1de73322f91bfde22481780e167ef3c241c6549e8eea1ecda
+> **Issued At**: 2026-09-09T16:02:03.479Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Reviewed image supply and no-auth operator preflight. Nine executable checks and 22 contract checks pass; real Linux helper and native dependency proof, command failure propagation, containment unchanged; security specialist PASS.
 - Findings: none
 
 ## Behavior Diff Notes
