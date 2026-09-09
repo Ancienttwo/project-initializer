@@ -7,7 +7,7 @@
 > **Last Updated**: 2026-09-10 00:04
 > **Lifecycle**: notes
 
-> **Substantive Change SHA256**: `sha256:5d2080a52222cae87b4349bee2fc15660a171b38ce132f7c64aae6efbd8a55eb`
+> **Substantive Change SHA256**: `sha256:fbfde3cda45c49750a0abbc9ea4254886a3e0ff4eac4f6de3ada78c28217e1b1`
 
 ## Design Decisions
 
@@ -26,6 +26,7 @@
 ## Open Questions
 
 - None.
+- Security review required explicit read-only settlement lookup at the deadline boundary; focused regression passes and fails when the read-only argument is removed.
 
 ## Evidence Links
 
