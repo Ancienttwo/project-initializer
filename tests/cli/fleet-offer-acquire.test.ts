@@ -98,6 +98,10 @@ function projectableContract(planPath: string): string {
     '',
     '> **Plan**: ' + planPath,
     '',
+    '## Goal', '', 'Keep the authored acquisition contract unchanged.', '',
+    '## Why', '', 'Dispatch must use the same authority admitted by the plan proof.', '',
+    '## Scope', '', '- In scope: src fixture changes.', '- Out of scope: unrelated files.', '',
+    '## Exit Criteria', '', '```yaml', 'exit_criteria:', '  files_exist:', '    - src/index.ts', '```', '',
     '## Allowed Paths',
     '',
     '```yaml',
@@ -347,7 +351,7 @@ describe('fleet offers CLI', () => {
           task_id: string;
           worktree_path: string;
           branch: string;
-          plan: { contract_path: string };
+          plan: { plan_path: string; contract_path: string; contract_sha256: string };
           claim_token: { path: string; claim_id: string };
         };
       };
@@ -359,6 +363,11 @@ describe('fleet offers CLI', () => {
       const envelope = result.envelope!;
       expect(existsSync(envelope.worktree_path)).toBe(true);
       expect(existsSync(join(envelope.worktree_path, envelope.plan.contract_path))).toBe(true);
+      const authored = readFileSync(join(fixture.repo, envelope.plan.contract_path), 'utf8');
+      expect(readFileSync(join(envelope.worktree_path, envelope.plan.contract_path), 'utf8')).toBe(authored);
+      const preflight = spawnSync(process.execPath, [join(CWD, 'scripts/contract-run.ts'), 'preflight',
+        '--repo', envelope.worktree_path, '--contract', envelope.plan.contract_path, '--json'], { encoding: 'utf8' });
+      expect(preflight.status, preflight.stdout + preflight.stderr).toBe(0);
       expect(readLease(fixture.repo, envelope.task_id).record).toMatchObject({
         claim_id: envelope.claim_id,
         state: 'bound',
@@ -368,6 +377,30 @@ describe('fleet offers CLI', () => {
       const token = readFileSync(join(envelope.worktree_path, envelope.claim_token.path), 'utf8');
       expect(token).toContain(`claim_id=${envelope.claim_id}\n`);
       expect(token).toContain(`task=${fixture.task}\n`);
+
+      // Missing contracts are initialized; replay must leave that template invalid
+      // and byte-identical until an author supplies the actual task authority.
+      const contractFile = join(envelope.worktree_path, envelope.plan.contract_path);
+      rmSync(contractFile);
+      const project = () => {
+        const planFile = join(envelope.worktree_path, envelope.plan.plan_path);
+        writeFileSync(planFile, readFileSync(planFile, 'utf8').replace('**Status**: Executing', '**Status**: Approved'));
+        return spawnSync('bash', [join(CWD, 'scripts/plan-to-todo.sh'), '--plan', envelope.plan.plan_path], {
+        cwd: envelope.worktree_path, encoding: 'utf8',
+        env: { ...process.env, ...env, REPO_HARNESS_TARGET_REPO_ROOT: envelope.worktree_path },
+        });
+      };
+      const initialized = project();
+      expect(initialized.status, initialized.stdout + initialized.stderr).toBe(0);
+      const template = readFileSync(contractFile, 'utf8');
+      expect(template).toContain('Describe the exact outcome this task must deliver.');
+      const rejected = spawnSync(process.execPath, [join(CWD, 'scripts/contract-run.ts'), 'preflight',
+        '--repo', envelope.worktree_path, '--contract', envelope.plan.contract_path, '--json'], { encoding: 'utf8' });
+      expect(rejected.status).not.toBe(0);
+      expect(rejected.stdout).toContain('incomplete_brief');
+      const replayed = project();
+      expect(replayed.status, replayed.stdout + replayed.stderr).toBe(0);
+      expect(readFileSync(contractFile, 'utf8')).toBe(template);
 
       const repeated = runCli(args, env);
       expect(repeated.status).not.toBe(0);

@@ -216,8 +216,7 @@ export function installHistoricalBoundDispatch(f: Awaited<ReturnType<typeof hist
   const acquired={ok:true as const,offer:candidate.offer,envelope,receipt};
   const dispatch=canonicalMessageDigest({operation:'campaign-worker',intent:f.intent.intent_sha256,claim,generation:1});
   const selector={repo_root:f.root,campaign_id:f.intent.campaign_id,group_number:1,intent_sha256:f.intent.intent_sha256,dispatch_id:dispatch};
-  const handoff={selector,host:f.executeInput.host,session_id:f.executeInput.session_id,authorization_id:authorization,acquired,
-    contract_sha256:createHash('sha256').update(readFileSync(join(worktree,proof.proof.contract_path))).digest('hex')};
+  const handoff={selector,host:f.executeInput.host,session_id:f.executeInput.session_id,authorization_id:authorization,acquired};
   persistPlanningRecord(f.root,f.intent,canonicalMessageDigest({dispatch,part:'handoff'}).slice(7),handoff);
   const policy=f.authorization.campaign!.liveness_policy;
   if(policy) renewLeaseLiveness({repo_root:f.root,owner:readLease(f.root,task.task_id).record!,policy,owner_id:dispatch,observed_at:new Date().toISOString(),requested_ttl_ms:policy.maximum_ttl_ms,
@@ -228,7 +227,7 @@ export function installHistoricalBoundDispatch(f: Awaited<ReturnType<typeof hist
 export function installHistoricalAttempt(f: Pick<Awaited<ReturnType<typeof historicalPlanningFixture>>, 'root' | 'intent' | 'authorization' | 'env'>, d: ReturnType<typeof installHistoricalBoundDispatch>, provider: 'codex-exec' | null = 'codex-exec') {
   const {offer,envelope:work}=d.acquired; const selector=d.worker_handoff;
   const budget=ensureCampaignAuthoringBudget({repo_root:f.root,authorization:f.authorization,env:f.env}).budget;
-  const request={dispatch_id:selector.dispatch_id,contract_sha256:d.handoff.contract_sha256,worker_command:provider?'codex-exec:worker':'worker',verifier_command:provider?'codex-exec:verifier':'verifier',...(provider?{provider}:{})};
+  const request={dispatch_id:selector.dispatch_id,contract_sha256:d.envelope.plan.contract_sha256.slice(7),worker_command:provider?'codex-exec:worker':'worker',verifier_command:provider?'codex-exec:verifier':'verifier',...(provider?{provider}:{})};
   const started_at=new Date().toISOString();
   const reservation=reserveAutomationBudget({repo_root:f.root,automation_run_id:budget.automation_run_id,expected_budget_sha256:budget.budget_sha256,
     idempotency_key:canonicalMessageDigest({dispatch:selector.dispatch_id,part:'attempt'}).slice(7),operation:'dispatch_attempt',unit_kind:'execute',unit_id:offer.work_package_id,attempt:1,provider:provider?'codex':null,env:f.env});
