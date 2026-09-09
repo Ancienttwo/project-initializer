@@ -2,7 +2,7 @@
 
 # repo-harness
 
-### A file-backed, repeatable workflow for Claude and Codex coding sessions
+### A file-backed workflow for Claude and Codex, and an authorized runtime for the programs built on top of it
 
 <img src="docs/images/repo-harness-hook-carrot.png" alt="repo-harness hooks leading Codex and Claude forward with repo-local workflow state" width="900">
 
@@ -21,14 +21,21 @@ handoffs, checks, and review evidence back into the project, so the next agent
 session continues from files instead of chat memory. It adopts an existing repo
 with a tasks-first agent contract that keeps Claude and Codex aligned.
 
+On top of that contract it runs **authorized programs**: long-running work that
+holds its own authorization, budget, task offers, and leases, so a Sprint can
+advance across sessions without a human driving each step.
+
 ## Contents
 
 - [Get Started](#get-started)
 - [Why repo-harness](#why-repo-harness)
+- [Two Layers](#two-layers)
 - [Key Features](#key-features)
 - [How It Works](#how-it-works)
 - [Task Workflow](#task-workflow)
+- [Authorized Programs](#authorized-programs)
 - [Hooks](#hooks)
+- [Local Human Control Board](#local-human-control-board)
 - [MCP Connector](#mcp-connector)
 - [Reviewing Work](#reviewing-work)
 - [Skills](#skills)
@@ -149,6 +156,10 @@ repo-harness mcp uninstall --services-stopped # after stopping all MCP HTTP serv
   evidence, and a review card behind. The human decision surface is one screen —
   verdict, intended vs actual files, commands passed, residual risk, rollback —
   rather than a reconstruction of what the agent claims it did.
+- **Unattended work stays accountable.** A program cannot start without a stored
+  authorization, cannot exceed its budget ledger, cannot hold a task past its
+  lease, and cannot claim acceptance without a receipt. Autonomy is bounded by
+  artifacts, not by trust.
 
 In an adopted repo, the surface area is intentionally small:
 
@@ -159,6 +170,35 @@ In an adopted repo, the surface area is intentionally small:
 | `tasks/contracts/`, `tasks/reviews/`, and `.ai/harness/checks/` | Scope, verification, and review evidence for proving the work is done. |
 | `.ai/harness/handoff/` and `tasks/current.md` | Session journal and resumable status, derived from workflow artifacts instead of chat memory. |
 
+## Two Layers
+
+The product reads as two layers that share one set of files.
+
+**Layer 1 — the session contract.** One human, one agent session, one task at a
+time. Plans, contracts, checks, reviews, and handoffs are the durable authority;
+hooks keep the session inside them. This is the whole product for a solo repo,
+and everything in [Task Workflow](#task-workflow) belongs here. Nothing below is
+required to use it.
+
+**Layer 2 — authorized programs.** Long-running work that outlives a session:
+an unattended controller stepping a Sprint, a repair campaign that authors and
+adopts GitHub Issues, a refactor program driven off the architecture model, a
+collaboration plane where several Module Engineers exchange signals and
+handoffs. Each program is gated on an operator-minted authorization, draws on a
+per-goal budget ledger, and holds work through renewable leases. See
+[Authorized Programs](#authorized-programs).
+
+| | Layer 1 | Layer 2 |
+| --- | --- | --- |
+| Unit of work | One task contract | One authorized program |
+| Who drives it | A human in a session | A controller, under caps |
+| Authority | Plan, contract, review, checks | The above, plus authorization, budget, lease, receipts |
+| Entry point | `repo-harness init` | `repo-harness automation grant mint` |
+| Stop condition | Task closeout | Budget exhausted, lease lost, or a terminal receipt |
+
+Layer 2 does not replace layer 1: a program's every step still projects into the
+same plan, contract, and review artifacts a human would have written.
+
 ## Key Features
 
 | | |
@@ -166,6 +206,8 @@ In an adopted repo, the surface area is intentionally small:
 | **File-backed sessions** | Plans, contracts, checks, and handoffs live in the repo, so a new session resumes from artifacts instead of a chat thread |
 | **Typed hook runtime** | Eight shared managed routes plus three Codex-only delegation routes, each bound to exactly one typed in-process handler, with fail-closed guards at the edit boundary |
 | **Plan → Contract → Review** | One lifecycle from approved plan to projected contract, isolated worktree, structured evidence, and a reviewable closeout |
+| **Authorized programs** | Campaign, refactor, automation, and collaboration programs that hold their own authorization, budget ledger, task offers, and renewable leases |
+| **Bounded unattended controller** | One Engineer dispatch loop under hard step, duration, and retry caps, reserving budget before each attempt |
 | **Progressive context loading** | A ~12KB stable root context plus ~1KB capability contracts loaded only for the files actually being touched |
 | **CodeGraph integration** | Structural queries (callers, callees, definitions) answered from a pre-built index instead of repeated grep-and-read passes |
 | **MCP planner sidecar** | ChatGPT reads real repo state and writes PRD/Sprint/Goal artifacts; Codex executes them, with no default source-code write access |
@@ -273,6 +315,140 @@ resumed Goal session never reinterprets the original chat. See
 [`agentic-development-flow.md`](docs/reference-configs/agentic-development-flow.md)
 and [`workflow-orchestration.md`](docs/reference-configs/workflow-orchestration.md).
 
+## Authorized Programs
+
+A program is work that outlives a session. Every one of them starts from the
+same three primitives, and none of them can be started without the first.
+
+```bash
+repo-harness automation grant mint   # store one operator ProgramAuthorizationV1
+repo-harness automation grant list   # digests held for this repository
+repo-harness automation budget show          # the enforceable per-goal ledger
+repo-harness automation budget repair        # seal a stopped or expired run's exhaustion receipt
+```
+
+- **Authorization.** An operator-minted `ProgramAuthorizationV1` lives in the
+  harness home gate store. There is no unauthenticated start path, and a program
+  never derives its own actor — the author of every record is resolved from
+  `--authorization-id`.
+- **Budget.** Provider calls, campaign steps, adoption observations, heartbeat
+  execution, and worker acquisition all reserve against a per-goal ledger before
+  the work is recorded. `budget repair` only re-runs a locked reconciliation; it
+  never reserves, charges, or changes a cap.
+- **Lease.** Held work carries a renewable lease with a renewal interval, a
+  maximum TTL, and a closed set of evidence sources. An unproven liveness state
+  requires attention instead of reclaiming silently.
+
+### Unattended controller
+
+```bash
+repo-harness automation controller start --maximum-steps 20 --maximum-duration-ms 300000
+repo-harness automation controller step
+repo-harness automation controller status
+repo-harness automation controller stop
+```
+
+One Engineer dispatch loop under hard caps, with deterministic backoff and a
+bounded attempt-retry ledger. Each attempt reserves budget before it is
+recorded, and a projected outcome outside the closed enum cannot be counted as
+satisfied.
+
+### Engineer scheduling
+
+```bash
+repo-harness engineer principal enroll        # map an OAuth authorization to a Binding
+repo-harness engineer acquire-next --authorization-id <id> --idempotency-key <key>
+repo-harness engineer work-demand propose|transition|materialize|status
+repo-harness engineer message send|receive|ack
+repo-harness engineer board                   # read-only organization attention
+```
+
+`acquire-next` selects and claims the first canonical offer for an enrolled
+principal. Dependency edges resolve from receipt authorities, not inference, and
+Sprint task IDs are immutable identities under backlog schema v2 — run
+`repo-harness sprint migrate-schema` once on an older backlog.
+
+### Development campaign
+
+```bash
+repo-harness campaign audit          # budgeted read-only group audit
+repo-harness campaign author         # persist an IssueBatchIntentV1, open the GPT Pro authoring lane
+repo-harness campaign adopt          # exact-SHA readback, seal authoring, publish a repair batch
+repo-harness campaign step           # hand one adopted task to its local planning session
+repo-harness campaign prepare-resume # zero-provider resume request from stored evidence
+```
+
+A seeded repair program: audit a group, author its Issues through the GPT Pro
+lane, adopt them against an exact SHA readback, then step each adopted task into
+the ordinary plan → contract → review lifecycle. `prepare-resume` reconstructs
+a resume request from stored adoption, continuation, and budget evidence without
+contacting a provider.
+
+### Refactor Mode
+
+```bash
+repo-harness refactor discover        # bounded shadow scan of one local proposal
+repo-harness refactor materialize     # one recommendation into N Work Packages
+repo-harness refactor verify-candidate
+repo-harness refactor board
+```
+
+An ArchContext-backed program that turns an architecture recommendation into
+work packages against a single canonical Sprint task authority. Activation is
+gated: the canary set and rung-promotion evidence must be refreshed against the
+installed provider before it turns on.
+
+### Collaboration plane
+
+```bash
+repo-harness collaboration exchange              # one Work Exchange snapshot
+repo-harness collaboration threads               # lanes, hotspot scores, opportunities
+repo-harness collaboration post                  # append one CoordinationSignalV1
+repo-harness collaboration handoff publish|list|adopt
+repo-harness collaboration packet build|read
+```
+
+Several Module Engineers read one Work Exchange and publish bounded coordination
+records. Handoff adoption is deliberately non-exclusive: it grants no Task,
+Claim, or Lease.
+
+The substrate keeps one Module Engineer and one writer while bounded read-only
+Workers exchange untrusted signals and explicit handoffs. Run the source-checkout
+live gate with `bun scripts/c9-collaboration-canary.ts --live`; it creates
+isolated disposable repositories for three matched baseline/treatment traces and
+records provider-authoritative Codex token usage, context size, signal reuse,
+handoff adoption, writer count, and delivery-plane digests. The accepted C9
+result is deliberately a negative multi-seat decision: the three-reader
+treatment preserved authority and reused state, but did not outproduce the
+single-reader baseline. Persistent same-capability `EngineerSeatV2`, an
+independent Review marketplace, and unattended Merge remain inactive. See
+[`20260830-c9-real-multi-agent-canary.md`](docs/researches/20260830-c9-real-multi-agent-canary.md).
+
+### External source intake
+
+```bash
+repo-harness external-source refresh   # one bounded, explicitly enabled GitHub observation
+repo-harness external-source bind      # one immutable revision to one pending canonical task
+repo-harness external-source bindings  # binding edges and current drift attention
+```
+
+Intake is inert by design. An observed Issue mints no execution authority and
+does not become a runnable task on its own; binding attaches an immutable source
+revision to a task that already has an approved plan and contract.
+
+### Persistent acceptance review
+
+```bash
+repo-harness claude-review round --timeout-ms 1800000
+repo-harness claude-review status
+repo-harness claude-review close
+```
+
+A read-only Claude reviewer hosted in an owned herdr session that survives up to
+three repair rounds against prepared `verify-sprint` evidence. A repeat session
+past the round budget is refused with
+`claude_review_session_budget_exhausted`.
+
 ## Hooks
 
 The installed adapter owns eight shared managed hook routes. The route tuple
@@ -327,26 +503,6 @@ carries exactly one write action — sending a task-addressed message — and do
 not acquire tasks, mutate workflow state, launch agents, or expose repository
 paths.
 
-## Collaboration Canary
-
-The collaboration substrate keeps one Module Engineer and one writer while
-bounded read-only Workers exchange untrusted signals and explicit handoffs.
-Run the source-checkout live gate with:
-
-```bash
-bun scripts/c9-collaboration-canary.ts --live
-```
-
-The command creates isolated disposable repositories for three matched
-baseline/treatment traces and records provider-authoritative Codex token usage,
-context size, signal reuse, handoff adoption, writer count, and delivery-plane
-digests. The accepted C9 result is deliberately a negative multi-seat decision:
-the three-reader treatment preserved authority and reused state, but did not
-outproduce the single-reader baseline. Persistent same-capability
-`EngineerSeatV2`, independent Review marketplace, and unattended Merge remain
-inactive. See
-[`20260830-c9-real-multi-agent-canary.md`](docs/researches/20260830-c9-real-multi-agent-canary.md).
-
 ## MCP Connector
 
 As an optional sidecar, `repo-harness mcp` exposes workflow artifacts to MCP
@@ -386,6 +542,10 @@ rollback. Then inspect the active contract, the latest trace in
 review recommends pass, the card verdict is pass, and external acceptance is
 pass, `not_required`, or an explicit override.
 
+Execution facts and acceptance are separate authorities: a passing
+`verify-contract` run proves a command ran, not that the work is accepted.
+Acceptance is its own typed receipt.
+
 Agents read source artifacts before derived summaries:
 
 | Agent reads first | Human reviews first |
@@ -396,8 +556,9 @@ Agents read source artifacts before derived summaries:
 | Active contract in `tasks/contracts/` | `.ai/harness/checks/latest.json` and run trace |
 | Latest handoff in `.ai/harness/handoff/` | Residual risks and rollback |
 
-`tasks/current.md` is only an orientation snapshot. If it disagrees with the
-active plan, contract, review, checks, or handoff, the source artifacts win.
+`tasks/current.md` is an ignored local orientation snapshot, not a tracked file.
+If it disagrees with the active plan, contract, review, checks, or handoff, the
+source artifacts win.
 
 Runtime-heavy validators (Unity, browser E2E, mobile simulators, hardware rigs,
 staging smoke tests) can publish external verification manifests under the
@@ -451,10 +612,13 @@ paths are symlink-backed runtime entrypoints rebuilt by
 `scripts/sync-codex-installed-copies.sh`.
 
 `bun run check:ci` is the single CI-equivalent gate; `bun run check:release` only
-adds the npm unpublished-version preflight before delegating to it.
+adds the npm unpublished-version preflight before delegating to it. Governance
+and functional checks run as independent CI jobs, and `bun run check:route-eval`
+holds a pinned coverage floor over every prompt-guard intent and action.
 
 ```bash
 bun run check:ci                    # the whole gate
+bun run check:context-map           # .ai/context drift against ArchContext nodes
 repo-harness docs list              # runtime reference docs, resolved from the package
 repo-harness docs show harness-overview
 bun scripts/assemble-template.ts --plan C --name "MyProject"
@@ -476,6 +640,7 @@ dependencies.
 | [Hylarucoder](https://x.com/hylarucoder) / Geju | P1/P2/P3 due-diligence method and Geju practice that shaped the planning, tracing, and decision-rationale discipline in this workflow | Methodology contribution and acknowledgement; not a bundled dependency |
 | Waza by [TW93](https://x.com/HiTw93), including `think`, `hunt`, `check`, and `health` | Daily planning, bug hunts, verification, health checks, and Codex-first skill sync | Installed through the skills CLI into host skill roots |
 | `mermaid` | Authoring and readability review for Mermaid architecture and system-flow source | Runtime-referenced review skill, not vendored into generated repos and never an HTML artifact generator |
+| [herdr](https://herdr.dev/) | Required peer-terminal runtime: notification dispatch, peer collaboration, and hosting the persistent acceptance reviewer | Externally installed binary, checksum-pinned in `.ai/harness/policy.json`; replaces the retired tmux runtime |
 | [`reverse-skill-router`](https://github.com/zhaoxuya520/reverse-skill) | Routes reverse-engineering and security tasks to specialist playbooks | Recommended explicit-only Skill (`--with-reverse-skill`); not profile-selected because upstream's target-mention authorization assumption requires independent scope review |
 | CodeGraph (`@colbymchenry/codegraph`) | Symbol-aware navigation, impact tracing, and readiness checks for this self-host repo | Dev dependency in this repo; generated repos stay global-MCP-first unless policy opts in |
 | [Oracle](https://github.com/steipete/oracle) by [Peter Steinberger](https://x.com/steipete) (`@steipete/oracle`, MIT) | Default GPT Pro / ChatGPT Web browser consult engine that the `chatgpt-browser` Oracle provider shells out to for `gptpro` consults | Externally-resolved binary (`--oracle-bin`, `REPO_HARNESS_ORACLE_BIN`, `node_modules/.bin`, or `PATH`); never auto-downloaded, and a missing binary is a hard `ORACLE_NOT_INSTALLED` failure |
@@ -495,8 +660,8 @@ repo-harness commit scripts or hooks unless that repo adopts the same policy.
 
 ## Current Release
 
-- npm package: `repo-harness@0.18.0`
-- Generated workflow stamp: `repo-harness@0.18.0+template@0.18.0`
+- npm package: `repo-harness@0.19.0`
+- Generated workflow stamp: `repo-harness@0.19.0+template@0.19.0`
 - GitHub repository: `Ancienttwo/repo-harness`
 - Release notes and history: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
