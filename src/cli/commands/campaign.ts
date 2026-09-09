@@ -175,9 +175,17 @@ export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): voi
     ...(basis ? { supersedes: { campaign_id: basis.superseded.campaign_id, group_number: basis.superseded.group_number, intent_sha256: basis.superseded.intent_sha256 } } : {}),
   };
   const out = required(raw.out, '--out');
-  writeFileSync(out, `${JSON.stringify(request, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
   const chainCampaigns = [source.campaign_id, ...chain.superseded.map((entry) => entry.campaign_id), ...(basis ? [basis.superseded.campaign_id] : [])]
     .filter((id, index, all) => all.indexOf(id) === index);
+  const chainConsumption = chainCampaigns.map((campaignId) => {
+    const runId = campaignAutomationRunId({ repository_id: source.repository_id, campaign_id: campaignId });
+    const budget = readAutomationBudgetStatus(root, runId);
+    return { campaign_id: campaignId, automation_run_id: runId, state: budget.current.state, drift: budget.drift,
+      consumed: budget.current.consumed, open_reservations: budget.current.open_reservation_sha256s.length };
+  });
+  // The request file is the last side effect: every projection above can still fail closed without
+  // leaving a partial exclusive file behind.
+  writeFileSync(out, `${JSON.stringify(request, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
   output({
     protocol: 1,
     kind: 'repo-harness-campaign-resume-preflight',
@@ -186,12 +194,7 @@ export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): voi
     effective_continuation: chain.effective,
     superseded_chain: chain.superseded,
     supersedes: basis?.superseded ?? null,
-    chain_consumption: chainCampaigns.map((campaignId) => {
-      const runId = campaignAutomationRunId({ repository_id: source.repository_id, campaign_id: campaignId });
-      const budget = readAutomationBudgetStatus(root, runId);
-      return { campaign_id: campaignId, automation_run_id: runId, state: budget.current.state, drift: budget.drift,
-        consumed: budget.current.consumed, open_reservations: budget.current.open_reservation_sha256s.length };
-    }),
+    chain_consumption: chainConsumption,
     verdict: basis ? 'replacement_eligible' : 'resume_eligible',
     request,
   });

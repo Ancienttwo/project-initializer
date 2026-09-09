@@ -31,7 +31,7 @@ A superseded successor can still adopt, or two competing successors both obtain 
 - root_cause: `src/effects/automation/campaign-authoring-resume.ts:56` writes an exclusive immutable `continuation` artifact that no later successor can replace, and `src/effects/automation/gpt-pro-issue-authoring.ts:254` renders `previous_marker` from the resume source intent, so a stopped never-adopted successor permanently blocks recovery and would demand a stale marker.
 - repro: bun test --timeout 60000 tests/effects/campaign-authoring-resume.test.ts
 - regression_guard: tests/effects/campaign-authoring-resume.test.ts
-- pre_fix_failure_artifact: tasks/evidence/campaign-successor-replacement-pre-fix.log
+- pre_fix_failure_artifact: tasks/evidence/campaign-successor-replacement-pre-fix.log — captured RED for the root-cause row (the real failure shape) and the ordering row only, at 30 tests / 2 failing. The rejection table, the atomicity/retry case and the ledger cases were added after this capture and are not represented in it.
 
 ## Allowed Paths
 
@@ -201,7 +201,7 @@ exit_criteria:
 
 - Functional behavior: a stopped never-adopted successor can be superseded exactly once through `campaign author --resume-from`, the replacement successor adopts with the original Issue identities, and the superseded successor can neither adopt nor act as a resume source.
 - Edge cases: competing successors, crash after the replacement write, stale or non-effective `supersedes`, unverified authoring sessions, unsettled reservations, budget drift, and a gpt_pro group whose intent is missing.
-- Regression risks: the existing resume rejection table, the issue-batch observer, and the non-gpt_pro `start_group` path must stay unchanged.
+- Regression risks: the existing resume rejection table and the issue-batch observer must stay unchanged; the `start_group` guard applies unconditionally because `ProgramAuthorizationV1.campaign.issue_author` is validator-pinned to `gpt_pro`.
 
 ## Rollback Point
 

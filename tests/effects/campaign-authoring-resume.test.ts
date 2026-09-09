@@ -220,9 +220,22 @@ test('a stopped never-adopted successor is replaced through the formal entrypoin
   expect(() => assertResumedAdoption(f.root, failed.intent, result.receipt)).toThrow('not bound');
 });
 
-const REJECTIONS = ['active', 'has-adoption', 'has-publication', 'acquired', 'open-reservation', 'active-step',
-  'unknown-provider-result', 'unverified-session', 'tampered-manifest', 'stale-supersedes', 'supersedes-not-effective'] as const;
-for (const mode of REJECTIONS) test(`replacement rejects ${mode} before any provider dispatch`, async () => {
+// Each mode pins the exact fail-closed reason, so a rejection can never pass this table by throwing
+// for an unrelated cause.
+const REJECTIONS = {
+  'active': 'a replaceable successor must be formally stopped by its own last campaign event',
+  'has-adoption': 'a replaceable successor must have no adoption and no publication',
+  'has-publication': 'a replaceable successor must have no adoption and no publication',
+  'acquired': 'a replaceable successor must have no acquisition, no open reservation and no unadopted budget record',
+  'open-reservation': 'a replaceable successor must have no acquisition, no open reservation and no unadopted budget record',
+  'active-step': 'a replaceable successor must have no active controller step and no reserved provider call',
+  'unknown-provider-result': 'a replaceable successor has a provider mutation with an unknown result',
+  'unverified-session': 'a replaceable successor has an incomplete or unverified authoring session',
+  'tampered-manifest': 'resume source publication is not an unchanged canonical ancestor',
+  'stale-supersedes': 'issue batch intent digest does not name the group intent',
+  'supersedes-not-effective': 'the superseded successor no longer holds the effective continuation',
+} as const;
+for (const mode of Object.keys(REJECTIONS) as readonly (keyof typeof REJECTIONS)[]) test(`replacement rejects ${mode} before any provider dispatch`, async () => {
   const f = await fixture();
   const failed = await f.failedSuccessor('campaign-2', mode !== 'active');
   let supersedes = { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 };
@@ -261,7 +274,7 @@ for (const mode of REJECTIONS) test(`replacement rejects ${mode} before any prov
   const before = f.adoptionArtifacts();
   const next = await f.successor('campaign-4');
   await expect(startIssueBatchAuthoring({ ...next, resume_from: { ...f.resume, supersedes } }, dispatch('campaign-4')))
-    .rejects.toThrow(mode === 'supersedes-not-effective' ? 'effective continuation' : undefined);
+    .rejects.toThrow(REJECTIONS[mode]);
   expect(calls).toBe(0);
   expect(f.adoptionArtifacts()).toEqual(before);
 }, 120000);
@@ -324,4 +337,44 @@ test('a replacement leaves the superseded budget run byte-for-byte and opens its
   const replacement = readAutomationBudgetStatus(f.root, replacementRun, f.env);
   expect(replacement.current.consumed.successful_acquisitions).toBe(0);
   expect(replacement.budget.authorization.authorization_sha256).not.toBe(before.budget.authorization.authorization_sha256);
+}, 120000);
+
+test('prepare-resume emits an exclusive request and its chain preflight with no provider', async () => {
+  const f = await fixture();
+  const failed = await f.failedSuccessor('campaign-2');
+  const cli = join(import.meta.dir, '..', '..', 'src', 'cli', 'index.ts');
+  const revision = git(f.root, ['rev-parse', 'HEAD']);
+  const prepare = (out: string, supersedes: boolean) => Bun.spawnSync([process.execPath, cli, 'campaign', 'prepare-resume',
+    '--repo', f.root, '--source-campaign-id', f.intent.campaign_id, '--source-group-number', '1',
+    '--source-intent-sha256', f.intent.intent_sha256, '--target-revision', revision,
+    ...(supersedes ? ['--superseded-campaign-id', 'campaign-2', '--superseded-group-number', '1',
+      '--superseded-intent-sha256', failed.intent.intent_sha256] : []),
+    '--out', out], { env: f.env, stdout: 'pipe', stderr: 'pipe' });
+  const plainPath = join(f.home, 'resume-request.json');
+  const plain = prepare(plainPath, false);
+  expect(plain.exitCode, plain.stderr.toString()).toBe(0);
+  expect(Object.keys(JSON.parse(readFileSync(plainPath, 'utf8'))).sort())
+    .toEqual(['campaign_id', 'group_number', 'intent_sha256', 'issues', 'source_session_ref']);
+
+  const replacementPath = join(f.home, 'replacement-request.json');
+  const replacement = prepare(replacementPath, true);
+  expect(replacement.exitCode, replacement.stderr.toString()).toBe(0);
+  const request = JSON.parse(readFileSync(replacementPath, 'utf8'));
+  expect(Object.keys(request).sort())
+    .toEqual(['campaign_id', 'group_number', 'intent_sha256', 'issues', 'source_session_ref', 'supersedes']);
+  expect(request).toMatchObject({ campaign_id: f.intent.campaign_id, group_number: 1, intent_sha256: f.intent.intent_sha256,
+    source_session_ref: f.resume.source_session_ref, issues: f.resume.issues,
+    supersedes: { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 } });
+  const preflight = JSON.parse(replacement.stdout.toString());
+  expect(preflight).toMatchObject({ kind: 'repo-harness-campaign-resume-preflight', request_path: replacementPath,
+    verdict: 'replacement_eligible', effective_continuation: { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 } });
+  expect(preflight.chain_consumption.map((entry: { campaign_id: string }) => entry.campaign_id).sort())
+    .toEqual([f.intent.campaign_id, 'campaign-2'].sort());
+  for (const entry of preflight.chain_consumption) expect(entry).toMatchObject({ drift: 'none', open_reservations: 0 });
+
+  // The request file is exclusive: a second preflight cannot overwrite an emitted request.
+  const repeated = prepare(replacementPath, true);
+  expect(repeated.exitCode).not.toBe(0);
+  expect(repeated.stderr.toString() + repeated.stdout.toString()).toContain('EEXIST');
+  expect(readFileSync(replacementPath, 'utf8')).toBe(`${JSON.stringify(request, null, 2)}\n`);
 }, 120000);

@@ -12,7 +12,7 @@ The chain is walked, never flattened: `resolveEffectiveContinuation` reads `cont
 
 `bindAdoptedResume` receives the verified `ContinuationReplacementBasis` minted by `assertReplaceableStoppedSuccessor`, not a bare successor reference. The design named a reference, but the replacement record must carry the superseded run's terminal evidence; passing the verified basis keeps one derivation site instead of re-reading the same stores under a second, unchecked path.
 
-There is no `issue_author !== 'gpt_pro'` narrowing in the `start_group` guard. `ProgramAuthorizationV1.campaign.issue_author` is the literal type `'gpt_pro'` and its validator rejects anything else, so the branch is unconstructible and TypeScript rejects the comparison. The design's "non-gpt_pro campaign unaffected" test was dropped for the same reason.
+There is no `issue_author !== 'gpt_pro'` narrowing in the `start_group` guard. `ProgramAuthorizationV1.campaign.issue_author` is validator-pinned to `'gpt_pro'` (`src/core/automation/budget.ts:307,333`), so a non-gpt_pro branch is unreachable and the guard is unconditional by construction. The design's "non-gpt_pro campaign unaffected" test was dropped for the same reason.
 
 `campaign prepare-resume` takes explicit `--source-group-number`, `--superseded-group-number` and `--target-revision`. Issue batch intents are keyed by campaign id and group number, and the successor campaign whose target revision the source publication must be an ancestor of does not exist yet at preflight time; deriving either locally would be a second authority.
 
@@ -20,4 +20,4 @@ The `previous_markers` chain is built idempotently: a retry after an interrupted
 
 No ESM import cycle appeared, so the design's fallback module split was not needed.
 
-> **Substantive Change SHA256**: `sha256:9f3878b5d83f1f19cf7c10211b6c352ad57c0450f8aa6f7d0f624b9c1a38dce1`
+> **Substantive Change SHA256**: `sha256:fca6d0dbf8c38f86fa3c133f72360a47b5f47a1e3bb86b0c5064adaeb8fb4534`
