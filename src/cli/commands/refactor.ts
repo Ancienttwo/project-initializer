@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { canonicalRepoPath } from '../../effects/repo-registry';
 import { readFileSync } from 'fs';
 
 import { buildRefactorProgramDefinition } from '../../core/refactor/program-state';
@@ -54,7 +55,7 @@ export interface RefactorStartOptions {
 }
 
 export function runRefactorStart(raw: RefactorStartOptions): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   const authorizationSha256 = required(raw.authorizationSha256, '--authorization-sha256');
   const authorization = readStoredProgramAuthorization(repo, authorizationSha256);
   const observedAt = raw.observedAt?.trim() || new Date().toISOString();
@@ -72,12 +73,12 @@ export function runRefactorStart(raw: RefactorStartOptions): void {
 }
 
 export function runRefactorStatus(raw: { readonly repo?: string; readonly programId?: string }): void {
-  output(readRefactorProgramStatus(raw.repo?.trim() || process.cwd(), required(raw.programId, '--program-id')));
+  output(readRefactorProgramStatus(canonicalRepoPath(raw.repo?.trim() || process.cwd()), required(raw.programId, '--program-id')));
 }
 
 export function runRefactorStop(raw: { readonly repo?: string; readonly programId?: string; readonly expectedCurrentSha256?: string; readonly idempotencyKey?: string; readonly observedAt?: string }): void {
   output(appendRefactorProgramEvent({
-    repo_root: raw.repo?.trim() || process.cwd(),
+    repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()),
     program_id: required(raw.programId, '--program-id'),
     expected_current_sha256: required(raw.expectedCurrentSha256, '--expected-current-sha256'),
     idempotency_key: required(raw.idempotencyKey, '--idempotency-key'),
@@ -88,11 +89,11 @@ export function runRefactorStop(raw: { readonly repo?: string; readonly programI
 
 export function runRefactorMaterialize(raw: { readonly repo?: string; readonly request?: string }): void {
   const input = requestJson(raw.request) as unknown as Omit<MaterializeRefactorProgramInput, 'repo_root'>;
-  output(materializeRefactorProgram({ ...input, repo_root: raw.repo?.trim() || process.cwd() }));
+  output(materializeRefactorProgram({ ...input, repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) }));
 }
 
 export function runRefactorArchitectureRequest(raw: { readonly repo?: string; readonly request?: string }): void {
-  output(prepareRefactorArchitectureIntervention({ ...(requestJson(raw.request) as unknown as Omit<PrepareRefactorArchitectureInterventionInput, 'repo_root'>), repo_root: raw.repo?.trim() || process.cwd() }));
+  output(prepareRefactorArchitectureIntervention({ ...(requestJson(raw.request) as unknown as Omit<PrepareRefactorArchitectureInterventionInput, 'repo_root'>), repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) }));
 }
 
 function requestJson(pathInput: string | undefined): Record<string, unknown> {
@@ -103,24 +104,24 @@ function requestJson(pathInput: string | undefined): Record<string, unknown> {
 }
 
 export async function runRefactorCandidateVerify(raw: { readonly repo?: string; readonly request?: string }): Promise<void> {
-  output(await verifyRefactorCandidate({ ...requestJson(raw.request), repo_root: raw.repo?.trim() || process.cwd() } as Parameters<typeof verifyRefactorCandidate>[0]));
+  output(await verifyRefactorCandidate({ ...requestJson(raw.request), repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) } as Parameters<typeof verifyRefactorCandidate>[0]));
 }
 
 export function runRefactorBindExecution(raw: { readonly repo?: string; readonly request?: string }): void {
   const input = requestJson(raw.request) as { program: RefactorProgramV1; candidate_verification: RefactorCandidateVerificationReceiptV1; binding: RefactorExecutionBindingV1 };
-  output(appendRefactorExecutionBinding({ repo_root: raw.repo?.trim() || process.cwd(), ...input }));
+  output(appendRefactorExecutionBinding({ repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()), ...input }));
 }
 
 export async function runRefactorPostMerge(raw: { readonly repo?: string; readonly request?: string }): Promise<void> {
-  output(await resolveRefactorPostMerge({ ...requestJson(raw.request), repo_root: raw.repo?.trim() || process.cwd() } as Parameters<typeof resolveRefactorPostMerge>[0]));
+  output(await resolveRefactorPostMerge({ ...requestJson(raw.request), repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) } as Parameters<typeof resolveRefactorPostMerge>[0]));
 }
 
 export function runRefactorBoard(raw: { readonly repo?: string; readonly request?: string }): void {
-  output(rebuildRefactorBoard({ ...requestJson(raw.request), repo_root: raw.repo?.trim() || process.cwd() } as Parameters<typeof rebuildRefactorBoard>[0]));
+  output(rebuildRefactorBoard({ ...requestJson(raw.request), repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) } as Parameters<typeof rebuildRefactorBoard>[0]));
 }
-export function runRefactorCanaryRecord(raw: { readonly repo?: string; readonly request?: string }): void { output(appendRefactorCanaryReceipt(raw.repo?.trim() || process.cwd(), requestJson(raw.request) as never)); }
-export function runRefactorActivationPromote(raw: { readonly repo?: string; readonly request?: string }): void { output(advanceRefactorActivation({ ...requestJson(raw.request), repo_root: raw.repo?.trim() || process.cwd() } as Parameters<typeof advanceRefactorActivation>[0])); }
-export function runRefactorActivationStatus(raw: { readonly repo?: string }): void { output({ level: readRefactorActivationLevel(raw.repo?.trim() || process.cwd()) }); }
+export function runRefactorCanaryRecord(raw: { readonly repo?: string; readonly request?: string }): void { output(appendRefactorCanaryReceipt(canonicalRepoPath(raw.repo?.trim() || process.cwd()), requestJson(raw.request) as never)); }
+export function runRefactorActivationPromote(raw: { readonly repo?: string; readonly request?: string }): void { output(advanceRefactorActivation({ ...requestJson(raw.request), repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) } as Parameters<typeof advanceRefactorActivation>[0])); }
+export function runRefactorActivationStatus(raw: { readonly repo?: string }): void { output({ level: readRefactorActivationLevel(canonicalRepoPath(raw.repo?.trim() || process.cwd())) }); }
 
 export function buildRefactorCommand(shadowDependencies: RefactorShadowDependencies = {}): Command {
   const command = new Command('refactor').description('Operate the authorized refactor program state machine');
@@ -130,7 +131,7 @@ export function buildRefactorCommand(shadowDependencies: RefactorShadowDependenc
     .requiredOption('--request <path>', 'Shadow request JSON with scan request and explicit call/time budgets')
     .action(async (options: { repo?: string; request?: string }) => {
       try {
-        const result = await runShadowRefactorDiscovery(requestJson(options.request) as unknown as RefactorShadowInput, options.repo?.trim() || process.cwd(), shadowDependencies) as { status: string; result?: { status: string } };
+        const result = await runShadowRefactorDiscovery(requestJson(options.request) as unknown as RefactorShadowInput, canonicalRepoPath(options.repo?.trim() || process.cwd()), shadowDependencies) as { status: string; result?: { status: string } };
         output(result);
         if (result.status === 'failed' || (result.status === 'duplicate' && result.result?.status === 'failed')) process.exitCode = 1;
       }

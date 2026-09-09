@@ -4,6 +4,7 @@ import { runCampaignFreshAudit } from '../../effects/automation/campaign-fresh-a
 import { runCampaignNotPlanned } from '../../effects/automation/campaign-not-planned';
 import { runCampaignCloseout } from '../../effects/automation/campaign-closeout';
 import { Command } from 'commander';
+import { canonicalRepoPath } from '../../effects/repo-registry';
 import { AutomationBudgetStoreError } from '../../effects/automation/budget-store';
 import { adoptIssueBatch } from '../../effects/automation/issue-batch-adoption';
 import { IssueBatchAdoptionError } from '../../core/automation/issue-batch-adoption';
@@ -11,7 +12,6 @@ import { ConnectorChallengeError } from '../../core/automation/connector-challen
 import { readBrowserBinding } from '../chatgpt-browser/binding';
 import { runBrowserConsult, runBrowserFollowup, readSession } from '../chatgpt-browser/engine';
 import { readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
 import { runHelper } from '../../effects/runtime/helper-runner';
 import { runCampaignAcquisition } from '../../effects/automation/campaign-acquisition';
 import { runCampaignPlanningStep } from '../../effects/automation/campaign-planning';
@@ -77,7 +77,7 @@ function requestString(value: unknown, name: string): string {
 }
 
 export function runCampaignStart(raw: { readonly repo?: string; readonly authorizationSha256?: string; readonly idempotencyKey?: string; readonly observedAt?: string }): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   const authorization = readStoredProgramAuthorization(repo, required(raw.authorizationSha256, '--authorization-sha256'));
   if (authorization.campaign === null) throw new CampaignArgumentError('the stored ProgramAuthorizationV1 has no campaign payload');
   const observedAt = raw.observedAt?.trim();
@@ -101,11 +101,11 @@ export function runCampaignStart(raw: { readonly repo?: string; readonly authori
 
 export function runCampaignTransition(raw: { readonly repo?: string; readonly request?: string }): void {
   const request = requestJson(raw.request) as unknown as Omit<AppendDevelopmentCampaignEventInput, 'repo_root'>;
-  output(appendDevelopmentCampaignEvent({ ...request, repo_root: raw.repo?.trim() || process.cwd() }));
+  output(appendDevelopmentCampaignEvent({ ...request, repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()) }));
 }
 
 export function runCampaignStatus(raw: { readonly repo?: string; readonly campaignId?: string }): void {
-  output(readDevelopmentCampaignStatus(raw.repo?.trim() || process.cwd(), required(raw.campaignId, '--campaign-id')));
+  output(readDevelopmentCampaignStatus(canonicalRepoPath(raw.repo?.trim() || process.cwd()), required(raw.campaignId, '--campaign-id')));
 }
 
 function groupNumber(value: string | undefined): number {
@@ -116,7 +116,7 @@ function groupNumber(value: string | undefined): number {
 
 export async function runCampaignAuthor(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly dryRun?: boolean; readonly gitleaksBin?: string; readonly resumeFrom?: string }): Promise<void> {
   output(await startIssueBatchAuthoring({
-    repo_root: raw.repo?.trim() || process.cwd(), campaign_id: required(raw.campaignId, '--campaign-id'),
+    repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()), campaign_id: required(raw.campaignId, '--campaign-id'),
     group_number: groupNumber(raw.groupNumber), dry_run: raw.dryRun === true, gitleaks_bin: raw.gitleaksBin?.trim(),
     ...(raw.resumeFrom ? { resume_from: requestJson(raw.resumeFrom) } : {}),
   }, { readBinding: readBrowserBinding, consult: runBrowserConsult }));
@@ -132,7 +132,7 @@ export async function runCampaignAuthorFollowup(raw: { readonly repo?: string; r
   if (JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(expected)) throw new CampaignArgumentError('author follow-up request fields are invalid');
   if (!Array.isArray(request.requested_slots) || !request.requested_slots.every((entry) => typeof entry === 'string')) throw new CampaignArgumentError('author follow-up requested_slots must be an array of strings');
   output(await continueIssueBatchAuthoring({
-    repo_root: raw.repo?.trim() || process.cwd(), campaign_id: requestString(request.campaign_id, 'request.campaign_id'),
+    repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()), campaign_id: requestString(request.campaign_id, 'request.campaign_id'),
     group_number: groupNumber(typeof request.group_number === 'number' ? String(request.group_number) : undefined), intent_sha256: requestString(request.intent_sha256, 'request.intent_sha256'),
     source_session_ref: requestString(request.source_session_ref, 'request.source_session_ref'), operation,
     requested_slots: request.requested_slots as IssueBatchSlot[], provider_issue_id: operation === 'edit_issue' ? requestString(request.provider_issue_id, 'request.provider_issue_id') : undefined,
@@ -158,7 +158,7 @@ export interface CampaignPrepareResumeOptions {
  * and admission re-derives all of it: this file is a request, never an authority.
  */
 export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): void {
-  const root = resolve(raw.repo?.trim() || process.cwd());
+  const root = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   const source = readIssueBatchIntent(root, required(raw.sourceCampaignId, '--source-campaign-id'),
     groupNumber(raw.sourceGroupNumber), required(raw.sourceIntentSha256, '--source-intent-sha256'));
   const resumeSource = readAdoptedResumeSource(root, source);
@@ -202,7 +202,7 @@ export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): voi
 }
 
 export function runCampaignPlanningPreflight(repo: string, contract: string) {
-  const root = resolve(repo);
+  const root = canonicalRepoPath(repo);
   const result = runHelper({ helper: 'contract-run', args: ['preflight', '--repo', root, '--contract', contract, '--json'], cwd: root, trustedPackage: true, stdio: 'pipe' });
   if (result.exitCode !== 0) throw new CampaignPlanningError('planning_failed', result.stderr || result.stdout || 'contract preflight failed');
   const parsed = JSON.parse(result.stdout || '{}');
@@ -212,7 +212,7 @@ export function runCampaignPlanningPreflight(repo: string, contract: string) {
 }
 
 export async function runCampaignHeartbeatStep(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly intentSha256?: string; readonly idempotencyKey?: string; readonly host?: string; readonly sessionId?: string; readonly planningResult?: string; readonly authorizationId?: string }): Promise<void> {
-  const root = raw.repo?.trim() || process.cwd();
+  const root = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   if (raw.authorizationId !== undefined && raw.planningResult !== undefined) throw new CampaignArgumentError('--authorization-id and --planning-result are mutually exclusive');
   const intent = readIssueBatchIntent(root, required(raw.campaignId, '--campaign-id'), groupNumber(raw.groupNumber), required(raw.intentSha256, '--intent-sha256'));
   if (readIssueBatchAdoptionArtifact(root, intent, 'publication')) {
@@ -231,7 +231,7 @@ export async function runCampaignHeartbeatStep(raw: { readonly repo?: string; re
   }
   if (raw.authorizationId !== undefined) throw new CampaignArgumentError('execution requires canonical campaign adoption');
   output(await runCampaignStep({
-    repo_root: raw.repo?.trim() || process.cwd(),
+    repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()),
     campaign_id: required(raw.campaignId, '--campaign-id'),
     group_number: groupNumber(raw.groupNumber),
     intent_sha256: required(raw.intentSha256, '--intent-sha256'),
@@ -240,7 +240,7 @@ export async function runCampaignHeartbeatStep(raw: { readonly repo?: string; re
 }
 
 export async function runCampaignAdopt(raw: { readonly repo?: string; readonly campaignId?: string; readonly groupNumber?: string; readonly intentSha256?: string; readonly sprintPath?: string; readonly publicationPolicy?: string; readonly dryRun?: boolean; readonly gitleaksBin?: string }): Promise<void> {
-  output(await adoptIssueBatch({ repo_root: raw.repo?.trim() || process.cwd(), campaign_id: required(raw.campaignId, '--campaign-id'),
+  output(await adoptIssueBatch({ repo_root: canonicalRepoPath(raw.repo?.trim() || process.cwd()), campaign_id: required(raw.campaignId, '--campaign-id'),
     group_number: groupNumber(raw.groupNumber), intent_sha256: required(raw.intentSha256, '--intent-sha256'), sprint_path: required(raw.sprintPath, '--sprint-path'),
     publication_policy_path: required(raw.publicationPolicy, '--publication-policy'), dry_run: raw.dryRun === true, gitleaks_bin: raw.gitleaksBin?.trim(),
   }, { readBinding: readBrowserBinding, followup: runBrowserFollowup, readSession }));
@@ -257,7 +257,7 @@ export function buildCampaignCommand(): Command {
     .action(raw => {
       try {
         if (raw.host !== 'codex' && raw.host !== 'claude') throw new CampaignArgumentError('--host must be codex or claude');
-        output(runCampaignNotPlanned({ root: resolve(raw.repo), artifact_path: required(raw.artifact, '--artifact'), contract_path: required(raw.contract, '--contract'),
+        output(runCampaignNotPlanned({ root: canonicalRepoPath(raw.repo), artifact_path: required(raw.artifact, '--artifact'), contract_path: required(raw.contract, '--contract'),
           host: raw.host, session_id: required(raw.sessionId, '--session-id'), verify_acceptance: (root, contract) => {
             const result = runHelper({ helper: 'acceptance-receipt', args: ['verify', '--contract', contract, '--format', 'json'],
               cwd: root, trustedPackage: true, stdio: 'pipe' });
@@ -311,7 +311,7 @@ export function buildCampaignCommand(): Command {
     .option('--gitleaks-bin <path>', 'Mandatory prompt scanner')
     .action(async raw => {
       try {
-        const result = await runCampaignRevisionObservation({ repo_root: resolve(raw.repo), authorization_sha256: required(raw.authorizationSha256, '--authorization-sha256'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult });
+        const result = await runCampaignRevisionObservation({ repo_root: canonicalRepoPath(raw.repo), authorization_sha256: required(raw.authorizationSha256, '--authorization-sha256'), gitleaks_bin: raw.gitleaksBin }, { readBinding: readBrowserBinding, consult: runBrowserConsult });
         output(result);
         process.exitCode = result.revision_evidence === 'verified' ? 0 : 1;
       } catch (error) { outputError(error); }
@@ -325,7 +325,7 @@ export function buildCampaignCommand(): Command {
     .requiredOption('--idempotency-key <key>', 'Fresh audit attempt key')
     .option('--gitleaks-bin <path>', 'Mandatory prompt scanner')
     .action(async raw => {
-      try { const result = await runCampaignFreshAudit({repo_root:resolve(raw.repo),campaign_id:required(raw.campaignId,'--campaign-id'),group_number:groupNumber(raw.groupNumber),
+      try { const result = await runCampaignFreshAudit({repo_root:canonicalRepoPath(raw.repo),campaign_id:required(raw.campaignId,'--campaign-id'),group_number:groupNumber(raw.groupNumber),
         intent_sha256:required(raw.intentSha256,'--intent-sha256'),idempotency_key:required(raw.idempotencyKey,'--idempotency-key'),gitleaks_bin:raw.gitleaksBin},
         {readBinding:readBrowserBinding,consult:runBrowserConsult}); output(result); if(result.observation.disposition==='unverified')process.exitCode=1; }
       catch(error){outputError(error);}
