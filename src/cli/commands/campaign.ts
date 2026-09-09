@@ -10,13 +10,16 @@ import { IssueBatchAdoptionError } from '../../core/automation/issue-batch-adopt
 import { ConnectorChallengeError } from '../../core/automation/connector-challenge';
 import { readBrowserBinding } from '../chatgpt-browser/binding';
 import { runBrowserConsult, runBrowserFollowup, readSession } from '../chatgpt-browser/engine';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { runHelper } from '../../effects/runtime/helper-runner';
 import { runCampaignAcquisition } from '../../effects/automation/campaign-acquisition';
 import { runCampaignPlanningStep } from '../../effects/automation/campaign-planning';
 import { CampaignPlanningError } from '../../core/automation/campaign-planning';
 import { readIssueBatchIntent, readIssueBatchAdoptionArtifact } from '../../effects/automation/issue-batch-store';
+import { assertReplaceableStoppedSuccessor, readAdoptedResumeSource, resolveEffectiveContinuation, validateAdoptedResumeSource } from '../../effects/automation/campaign-authoring-resume';
+import { readAutomationBudgetStatus } from '../../effects/automation/budget-store';
+import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 
 import { buildDevelopmentCampaignDefinition } from '../../core/automation/development-campaign';
 import { readStoredProgramAuthorization } from '../../effects/automation/grant-store';
@@ -136,6 +139,62 @@ export async function runCampaignAuthorFollowup(raw: { readonly repo?: string; r
     provider_issue_url: operation === 'edit_issue' ? requestString(request.provider_issue_url, 'request.provider_issue_url') : undefined,
     dry_run: raw.dryRun === true, gitleaks_bin: raw.gitleaksBin?.trim(),
   }, { readBinding: readBrowserBinding, followup: runBrowserFollowup }));
+}
+
+export interface CampaignPrepareResumeOptions {
+  readonly repo?: string;
+  readonly sourceCampaignId?: string;
+  readonly sourceGroupNumber?: string;
+  readonly sourceIntentSha256?: string;
+  readonly targetRevision?: string;
+  readonly supersededCampaignId?: string;
+  readonly supersededGroupNumber?: string;
+  readonly supersededIntentSha256?: string;
+  readonly out?: string;
+}
+
+/**
+ * Zero-provider preflight. Every field of the emitted request is projected from canonical stores,
+ * and admission re-derives all of it: this file is a request, never an authority.
+ */
+export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): void {
+  const root = resolve(raw.repo?.trim() || process.cwd());
+  const source = readIssueBatchIntent(root, required(raw.sourceCampaignId, '--source-campaign-id'),
+    groupNumber(raw.sourceGroupNumber), required(raw.sourceIntentSha256, '--source-intent-sha256'));
+  const resumeSource = readAdoptedResumeSource(root, source);
+  validateAdoptedResumeSource(root, resumeSource, required(raw.targetRevision, '--target-revision'));
+  const superseded = raw.supersededCampaignId === undefined ? null
+    : readIssueBatchIntent(root, required(raw.supersededCampaignId, '--superseded-campaign-id'),
+      groupNumber(raw.supersededGroupNumber), required(raw.supersededIntentSha256, '--superseded-intent-sha256'));
+  const basis = superseded === null ? null : assertReplaceableStoppedSuccessor(root, superseded);
+  const chain = resolveEffectiveContinuation(root, source);
+  const status = readDevelopmentCampaignStatus(root, source.campaign_id);
+  const request = {
+    campaign_id: source.campaign_id, group_number: source.group_number, intent_sha256: source.intent_sha256,
+    source_session_ref: resumeSource.source_session_ref, issues: resumeSource.issues,
+    ...(basis ? { supersedes: { campaign_id: basis.superseded.campaign_id, group_number: basis.superseded.group_number, intent_sha256: basis.superseded.intent_sha256 } } : {}),
+  };
+  const out = required(raw.out, '--out');
+  writeFileSync(out, `${JSON.stringify(request, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+  const chainCampaigns = [source.campaign_id, ...chain.superseded.map((entry) => entry.campaign_id), ...(basis ? [basis.superseded.campaign_id] : [])]
+    .filter((id, index, all) => all.indexOf(id) === index);
+  output({
+    protocol: 1,
+    kind: 'repo-harness-campaign-resume-preflight',
+    request_path: out,
+    source: { campaign_id: source.campaign_id, group_number: source.group_number, intent_sha256: source.intent_sha256, campaign_state: status.current.state },
+    effective_continuation: chain.effective,
+    superseded_chain: chain.superseded,
+    supersedes: basis?.superseded ?? null,
+    chain_consumption: chainCampaigns.map((campaignId) => {
+      const runId = campaignAutomationRunId({ repository_id: source.repository_id, campaign_id: campaignId });
+      const budget = readAutomationBudgetStatus(root, runId);
+      return { campaign_id: campaignId, automation_run_id: runId, state: budget.current.state, drift: budget.drift,
+        consumed: budget.current.consumed, open_reservations: budget.current.open_reservation_sha256s.length };
+    }),
+    verdict: basis ? 'replacement_eligible' : 'resume_eligible',
+    request,
+  });
 }
 
 export function runCampaignPlanningPreflight(repo: string, contract: string) {
@@ -267,6 +326,18 @@ export function buildCampaignCommand(): Command {
         {readBinding:readBrowserBinding,consult:runBrowserConsult}); output(result); if(result.observation.disposition==='unverified')process.exitCode=1; }
       catch(error){outputError(error);}
     });
+  command.command('prepare-resume')
+    .description('Emit a zero-provider resume request and its preflight from stored adoption, continuation and budget evidence')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--source-campaign-id <id>', 'Adopted source campaign id')
+    .requiredOption('--source-group-number <number>', 'Adopted source group number')
+    .requiredOption('--source-intent-sha256 <digest>', 'Adopted source issue batch intent digest')
+    .requiredOption('--target-revision <sha>', 'Exact revision the successor campaign is authorized at')
+    .option('--superseded-campaign-id <id>', 'Stopped never-adopted successor to replace')
+    .option('--superseded-group-number <number>', 'Superseded successor group number')
+    .option('--superseded-intent-sha256 <digest>', 'Superseded successor issue batch intent digest')
+    .requiredOption('--out <path>', 'New file receiving the emitted resume request JSON')
+    .action(options => { try { runCampaignPrepareResume(options); } catch (error) { outputError(error); } });
   command.command('author')
     .description('Persist an IssueBatchIntentV1, then open the GPT Pro authoring lane')
     .option('--resume-from <path>', 'Explicit stopped-campaign source and exact existing Issue identities')

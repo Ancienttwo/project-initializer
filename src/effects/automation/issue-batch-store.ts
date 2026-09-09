@@ -199,9 +199,10 @@ export function listIssueBatchJournalRecords(repoRoot: string, campaignId: strin
 }
 export function issueBatchGroupStoreRoot(repoRoot: string, campaignId: string, groupNumber: number): string { return paths(repoRoot, campaignId, groupNumber).group; }
 
-export type IssueBatchAdoptionArtifact = 'challenge' | 'response' | 'completed-response' | 'seal-sources' | 'adoption' | 'publication' | 'continuation' | 'resume-source' | `shadow-${string}`;
+export type IssueBatchAdoptionArtifact = 'challenge' | 'response' | 'completed-response' | 'seal-sources' | 'adoption' | 'publication' | 'continuation' | 'resume-source' | `shadow-${string}` | `superseded-${string}`;
 function adoptionArtifactPath(value: ReturnType<typeof paths>, name: IssueBatchAdoptionArtifact): string {
-  if (!['challenge', 'response', 'completed-response', 'seal-sources', 'adoption', 'publication', 'continuation', 'resume-source'].includes(name) && !/^shadow-[0-9a-f]{64}$/u.test(name)) fail('issue_batch_unsafe', 'invalid adoption artifact');
+  if (!['challenge', 'response', 'completed-response', 'seal-sources', 'adoption', 'publication', 'continuation', 'resume-source'].includes(name)
+    && !/^shadow-[0-9a-f]{64}$/u.test(name) && !/^superseded-[0-9a-f]{64}$/u.test(name)) fail('issue_batch_unsafe', 'invalid adoption artifact');
   return join(value.group, 'adoption', `${name}.json`);
 }
 /** Each named artifact is immutable; the caller owns its schema and verifies authority on reuse. */

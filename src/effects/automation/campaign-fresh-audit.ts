@@ -23,7 +23,7 @@ import type { DevelopmentCampaignDefinitionV1, DevelopmentCampaignEventV1 } from
 import { readDevelopmentCampaignStatus, appendDevelopmentCampaignEvent, readExactAuthorityBinding } from './development-campaign-store';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
 import { readPlanningRecord, persistPlanningRecord, withCampaignPlanningLock, storedPlanningIntents } from './campaign-planning-store';
-import { listIssueAuthoringSessions, readIssueBatchIntent } from './issue-batch-store';
+import { listIssueAuthoringSessions, readExistingIssueBatchIntent, readIssueBatchAdoptionArtifact, readIssueBatchIntent } from './issue-batch-store';
 import { ensureCampaignAuthoringBudget, reserveCampaignAuthoringBudget, appendAutomationUsage } from './budget-store';
 import type { IssueAuthoringBrowserInput, IssueAuthoringDependencies, IssueAuthoringBrowserResult } from './gpt-pro-issue-authoring';
 
@@ -111,13 +111,20 @@ export function requireCampaignGroupTransition(
   refs: readonly string[],
   env?: NodeJS.ProcessEnv,
 ): void {
-  if (!['prepare_group', 'begin_group_audit', 'accept_group', 'complete', 'complete_with_followups'].includes(operation)) return;
+  if (!['prepare_group', 'start_group', 'begin_group_audit', 'accept_group', 'complete', 'complete_with_followups'].includes(operation)) return;
   const authority = grant(root, campaign, env),
     progress = campaignGroupProgress(events, authority.campaign!.group_count);
   if (operation === 'prepare_group') {
     if (progress.group_number !== progress.accepted_groups || progress.group_number >= progress.group_count)
       throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'next group is not authorized');
     if (progress.group_number > 0) requireAcceptedCampaignGroup(root, campaign, events, progress.group_number, env);
+  } else if (operation === 'start_group') {
+    // Execution may only start behind the group's own formal publication; the intent is the group key,
+    // so a group with no persisted intent has no adoption to prove and is refused rather than assumed.
+    const intent = readExistingIssueBatchIntent(root, campaign.campaign_id, progress.group_number);
+    if (!intent) throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'start_group requires the persisted group issue batch intent');
+    if (!readIssueBatchAdoptionArtifact(root, intent, 'adoption') || !readIssueBatchAdoptionArtifact(root, intent, 'publication'))
+      throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'start_group requires the group adoption and its publication');
   } else if (['complete', 'complete_with_followups'].includes(operation)) {
     if (progress.accepted_groups !== progress.group_count)
       throw new CampaignFreshAuditError('campaign_group_sequence_invalid', 'all authorized groups must be accepted before complete');

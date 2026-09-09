@@ -2,7 +2,7 @@ import * as issueStore from '../../src/effects/automation/issue-batch-store';
 import { buildProviderIssueObservation, buildExternalSourceRefreshReceipt } from '../../src/core/external-sources/issue-observation';
 import { afterEach, expect, test, spyOn } from 'bun:test';
 import { execFileSync } from 'child_process';
-import { readFileSync, rmSync, writeFileSync } from 'fs';
+import { readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import { createAdoptionRepository, observeVerifiedFixtureRevision } from '../helpers/campaign-adoption-repository';
@@ -11,13 +11,15 @@ import { makeSnapshot } from '../helpers/issue-batch-adoption-fixture';
 import { sealProgramAuthorization } from '../../src/core/automation/budget';
 import { buildDevelopmentCampaignDefinition } from '../../src/core/automation/development-campaign';
 import { mintProgramAuthorization } from '../../src/effects/automation/grant-store';
-import { createDevelopmentCampaign, appendDevelopmentCampaignEvent, readDevelopmentCampaignStatus } from '../../src/effects/automation/development-campaign-store';
+import { createDevelopmentCampaign, appendDevelopmentCampaignEvent, readDevelopmentCampaignStatus, readExactAuthorityBinding } from '../../src/effects/automation/development-campaign-store';
 import { continueIssueBatchAuthoring, startIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
 import { adoptIssueBatch } from '../../src/effects/automation/issue-batch-adoption';
 import { readIssueBatchAdoptionArtifact, issueBatchGroupStoreRoot } from '../../src/effects/automation/issue-batch-store';
-import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage } from '../../src/effects/automation/budget-store';
+import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, beginCampaignBudgetStep, readAutomationBudgetStatus, readCampaignBudgetLedger } from '../../src/effects/automation/budget-store';
 import { assertResumedAdoption } from '../../src/effects/automation/campaign-authoring-resume';
-import { renderIssueBatchMarker } from '../../src/core/automation/issue-batch';
+import { buildIssueAuthoringSession, renderIssueBatchMarker } from '../../src/core/automation/issue-batch';
+import { campaignAutomationRunId } from '../../src/core/automation/campaign-authoring-budget';
+import { canonicalMessageBytes, canonicalMessageDigest } from '../../src/core/messages/mechanics';
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const git = (root: string, args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
@@ -60,7 +62,7 @@ async function fixture(stop = true, usage: 'none' | 'open' | 'acquired' = 'none'
    * because start_group now requires the group adoption and publication, so the group_running
    * variant is unreachable; the stopped-and-never-adopted predicate is identical either way.
    */
-  const failedSuccessor = async (id: string) => {
+  const failedSuccessor = async (id: string, stopped = true) => {
     const { resume_from, ...base } = await successor(id, 2);
     const started = await startIssueBatchAuthoring({ ...base, resume_from }, { readBinding, consult: async () => ({ sessionId: `${id}-author`, status: 'completed' as const,
       meta: campaignBrowserMetadata({ sessionId: `${id}-author`, repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) }) });
@@ -68,10 +70,14 @@ async function fixture(stop = true, usage: 'none' | 'open' | 'acquired' = 'none'
       operation: 'edit_issue', requested_slots: ['01'], provider_issue_id: resume.issues[0]!.provider_issue_id, provider_issue_url: resume.issues[0]!.provider_issue_url },
       { readBinding, followup: async () => ({ sessionId: `${id}-followup`, status: 'completed' as const,
         meta: campaignBrowserMetadata({ sessionId: `${id}-followup`, sourceSessionId: `${id}-author`, repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) }) });
-    const status = readDevelopmentCampaignStatus(f.root, id, f.env);
-    appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: id, expected_current_sha256: status.current.current_sha256,
-      idempotency_key: 'stop', operation: 'stop', observed_at: new Date().toISOString(), env: f.env });
-    return started;
+    if (stopped) {
+      const status = readDevelopmentCampaignStatus(f.root, id, f.env);
+      appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: id, expected_current_sha256: status.current.current_sha256,
+        idempotency_key: 'stop', operation: 'stop', observed_at: new Date().toISOString(), env: f.env });
+    }
+    const campaign = readDevelopmentCampaignStatus(f.root, id, f.env).campaign;
+    return { ...started, authorization: readExactAuthorityBinding(f.root, campaign, f.env),
+      run: campaignAutomationRunId({ repository_id: started.intent.repository_id, campaign_id: id }) };
   };
   const adoptionPath = (campaignId: string, name: string) => join(issueBatchGroupStoreRoot(f.root, campaignId, 1), 'adoption', `${name}.json`);
   const adoptSuccessor = (intent: typeof f.intent) => adoptIssueBatch({ ...f.input, campaign_id: intent.campaign_id, intent_sha256: intent.intent_sha256 }, {
@@ -85,7 +91,9 @@ async function fixture(stop = true, usage: 'none' | 'open' | 'acquired' = 'none'
         meta: campaignBrowserMetadata({ sessionId: `${intent.campaign_id}-challenge`, sourceSessionId: `${intent.campaign_id}-author`, repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) };
     },
   });
-  return { ...f, adopted, resume, successor, failedSuccessor, readBinding, adoptionPath, adoptSuccessor };
+  const adoptionArtifacts = () => Object.fromEntries(readdirSync(join(issueBatchGroupStoreRoot(f.root, f.intent.campaign_id, 1), 'adoption'))
+    .sort().map(name => [name, readFileSync(join(issueBatchGroupStoreRoot(f.root, f.intent.campaign_id, 1), 'adoption', name), 'utf8')]));
+  return { ...f, adopted, resume, successor, failedSuccessor, readBinding, adoptionPath, adoptSuccessor, adoptionArtifacts };
 }
 
 test.each(['exact', 'replacement', 'partial'] as const)('stopped adopted source enforces %s Issue identities through real admission', async mode => {
@@ -188,11 +196,12 @@ test('a stopped never-adopted successor is replaced through the formal entrypoin
     supersedes: { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 } } }, {
     readBinding: f.readBinding, consult: async input => {
       calls++;
-      for (const slot of ['01', '02']) {
-        expect(input.prompt).toContain(renderIssueBatchMarker('campaign-2', 1, slot));
-        expect(input.prompt).toContain(renderIssueBatchMarker(f.intent.campaign_id, 1, slot));
-        expect(input.prompt).toContain(renderIssueBatchMarker('campaign-3', 1, slot));
-      }
+      // Most recent first: the superseded successor's confirmed remote marker, then the source marker.
+      expect(JSON.parse(input.prompt.split('\n').find(line => line.startsWith('[{'))!)).toEqual(f.resume.issues.map(issue => ({
+        slot: issue.slot, provider_issue_id: issue.provider_issue_id, provider_issue_url: issue.provider_issue_url,
+        previous_markers: [renderIssueBatchMarker('campaign-2', 1, issue.slot), renderIssueBatchMarker(f.intent.campaign_id, 1, issue.slot)],
+      })));
+      for (const slot of ['01', '02']) expect(input.prompt).toContain(renderIssueBatchMarker('campaign-3', 1, slot));
       return { sessionId: 'campaign-3-author', status: 'completed' as const,
         meta: campaignBrowserMetadata({ sessionId: 'campaign-3-author', repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) };
     } });
@@ -210,3 +219,109 @@ test('a stopped never-adopted successor is replaced through the formal entrypoin
   expect(result.publication!.materialized_commit).not.toBe(f.adopted.publication!.materialized_commit);
   expect(() => assertResumedAdoption(f.root, failed.intent, result.receipt)).toThrow('not bound');
 });
+
+const REJECTIONS = ['active', 'has-adoption', 'has-publication', 'acquired', 'open-reservation', 'active-step',
+  'unknown-provider-result', 'unverified-session', 'tampered-manifest', 'stale-supersedes', 'supersedes-not-effective'] as const;
+for (const mode of REJECTIONS) test(`replacement rejects ${mode} before any provider dispatch`, async () => {
+  const f = await fixture();
+  const failed = await f.failedSuccessor('campaign-2', mode !== 'active');
+  let supersedes = { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 };
+  let calls = 0;
+  const dispatch = (id: string) => ({ readBinding: f.readBinding, consult: async () => { calls++; throw Error('must not dispatch'); } });
+  if (mode === 'has-adoption' || mode === 'has-publication') {
+    issueStore.persistIssueBatchAdoptionArtifact(f.root, failed.intent, mode === 'has-adoption' ? 'adoption' : 'publication', { synthetic: true });
+  } else if (mode === 'acquired' || mode === 'open-reservation') {
+    const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: failed.authorization, env: f.env }).budget;
+    const reservation = reserveAutomationBudget({ repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
+      idempotency_key: 'acquisition', operation: 'acquisition', unit_kind: 'execute', unit_id: 'test', attempt: 1, provider: null, env: f.env });
+    if (mode === 'acquired') appendAutomationUsage({ repo_root: f.root, reservation, outcome: 'progress', evidence_refs: [], env: f.env });
+  } else if (mode === 'active-step') {
+    const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: failed.authorization, env: f.env }).budget;
+    beginCampaignBudgetStep({ repo_root: f.root, automation_run_id: budget.automation_run_id, expected_budget_sha256: budget.budget_sha256,
+      campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256, idempotency_key: 'unsettled-step', env: f.env });
+  } else if (mode === 'unknown-provider-result') {
+    const basis = { protocol: 1, kind: 'repo-harness-campaign-mutation-reservation', slot: '01' };
+    const digest = canonicalMessageDigest(basis);
+    issueStore.persistIssueBatchJournalRecord(f.root, 'campaign-2', 1, 'reservations', digest, `${canonicalMessageBytes({ ...basis, reservation_sha256: digest })}\n`);
+  } else if (mode === 'unverified-session') {
+    issueStore.persistIssueAuthoringSession(f.root, 'campaign-2', 1, buildIssueAuthoringSession({ intent_sha256: failed.intent.intent_sha256,
+      operation: 'fill_missing', requested_slots: ['02'], provider_issue_id: null, session_ref: 'unverified-followup',
+      source_session_ref: null, browser_status: 'completed', browser_evidence: null, created_at: '2026-09-09T00:00:00.000Z' }));
+  } else if (mode === 'tampered-manifest') {
+    writeFileSync(join(f.root, f.adopted.publication!.manifest_path), '{}\n');
+    git(f.root, ['add', '.']); git(f.root, ['commit', '-qm', 'tamper source manifest']);
+  } else if (mode === 'stale-supersedes') {
+    supersedes = { ...supersedes, intent_sha256: f.intent.intent_sha256 };
+  } else if (mode === 'supersedes-not-effective') {
+    const winner = await f.successor('campaign-3');
+    await startIssueBatchAuthoring({ ...winner, resume_from: { ...f.resume, supersedes } }, { readBinding: f.readBinding,
+      consult: async () => ({ sessionId: 'campaign-3-author', status: 'completed' as const,
+        meta: campaignBrowserMetadata({ sessionId: 'campaign-3-author', repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) }) });
+  }
+  const before = f.adoptionArtifacts();
+  const next = await f.successor('campaign-4');
+  await expect(startIssueBatchAuthoring({ ...next, resume_from: { ...f.resume, supersedes } }, dispatch('campaign-4')))
+    .rejects.toThrow(mode === 'supersedes-not-effective' ? 'effective continuation' : undefined);
+  expect(calls).toBe(0);
+  expect(f.adoptionArtifacts()).toEqual(before);
+}, 120000);
+
+test('competing and interrupted replacements admit exactly one successor', async () => {
+  const f = await fixture();
+  const failed = await f.failedSuccessor('campaign-2');
+  const supersedes = { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 };
+  const winner = await f.successor('campaign-3');
+  const request = { ...winner, resume_from: { ...f.resume, supersedes } };
+  let calls = 0;
+  const consult = async () => { calls++; return { sessionId: 'campaign-3-author', status: 'completed' as const,
+    meta: campaignBrowserMetadata({ sessionId: 'campaign-3-author', repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) }; };
+  const persist = issueStore.persistIssueBatchAdoptionArtifact;
+  const crash = spyOn(issueStore, 'persistIssueBatchAdoptionArtifact').mockImplementation((...args) => {
+    persist(...args);
+    if (String(args[2]).startsWith('superseded-')) throw Error('crash after the replacement record');
+  });
+  try {
+    await expect(startIssueBatchAuthoring(request, { readBinding: f.readBinding, consult, now: () => '2026-09-09T00:00:00.000Z' }))
+      .rejects.toThrow('crash after the replacement record');
+  } finally { crash.mockRestore(); }
+  expect(calls).toBe(0);
+  const retried = await startIssueBatchAuthoring(request, { readBinding: f.readBinding, consult, now: () => '2026-09-09T00:01:00.000Z' });
+  expect(calls).toBe(1);
+  expect(retried.intent.created_at).toBe('2026-09-09T00:00:00.000Z');
+  await expect(startIssueBatchAuthoring(request, { readBinding: f.readBinding, consult })).rejects.toThrow('reconcile');
+  const artifacts = f.adoptionArtifacts();
+  expect(Object.keys(artifacts).filter(name => name.startsWith('superseded-'))).toEqual([`superseded-${failed.intent.intent_sha256.slice('sha256:'.length)}.json`]);
+  const loser = await f.successor('campaign-4');
+  await expect(startIssueBatchAuthoring({ ...loser, resume_from: { ...f.resume, supersedes } }, { readBinding: f.readBinding, consult }))
+    .rejects.toThrow('effective continuation');
+  // A changed request against the same campaign id fails closed on its own immutable intent.
+  await expect(startIssueBatchAuthoring({ ...winner, resume_from: f.resume }, { readBinding: f.readBinding, consult })).rejects.toThrow('immutable');
+  // The superseded successor is neither an adopter nor a resume source any more.
+  await expect(startIssueBatchAuthoring({ ...loser, resume_from: { campaign_id: 'campaign-2', group_number: 1,
+    intent_sha256: failed.intent.intent_sha256, source_session_ref: failed.session.session_ref, issues: f.resume.issues } },
+    { readBinding: f.readBinding, consult })).rejects.toThrow('quiescent predecessor');
+  expect(calls).toBe(1);
+  expect(f.adoptionArtifacts()).toEqual(artifacts);
+}, 120000);
+
+test('a replacement leaves the superseded budget run byte-for-byte and opens its own', async () => {
+  const f = await fixture();
+  const failed = await f.failedSuccessor('campaign-2');
+  const before = readAutomationBudgetStatus(f.root, failed.run, f.env);
+  expect(readCampaignBudgetLedger(f.root, failed.run, f.env).provider_calls).toBeGreaterThan(0);
+  const next = await f.successor('campaign-3');
+  const started = await startIssueBatchAuthoring({ ...next, resume_from: { ...f.resume,
+    supersedes: { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 } } }, {
+    readBinding: f.readBinding, consult: async () => ({ sessionId: 'campaign-3-author', status: 'completed' as const,
+      meta: campaignBrowserMetadata({ sessionId: 'campaign-3-author', repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) }) });
+  const after = readAutomationBudgetStatus(f.root, failed.run, f.env);
+  expect(after.current).toEqual(before.current);
+  const record = readIssueBatchAdoptionArtifact(f.root, f.intent, `superseded-${failed.intent.intent_sha256.slice('sha256:'.length)}`)!;
+  expect(record.superseded).toMatchObject({ automation_run_id: failed.run, ledger_sha256: before.current.ledger_sha256,
+    budget_current_sha256: before.current.current_sha256 });
+  const replacementRun = campaignAutomationRunId({ repository_id: started.intent.repository_id, campaign_id: 'campaign-3' });
+  expect(replacementRun).not.toBe(failed.run);
+  const replacement = readAutomationBudgetStatus(f.root, replacementRun, f.env);
+  expect(replacement.current.consumed.successful_acquisitions).toBe(0);
+  expect(replacement.budget.authorization.authorization_sha256).not.toBe(before.budget.authorization.authorization_sha256);
+}, 120000);
