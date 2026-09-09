@@ -8,11 +8,30 @@ import type { AcceptedArchitectureChangeReferenceV1 } from 'archctx-contracts';
 export const ARCHITECTURE_PROJECTION_RUNTIME_ROOT = '.ai/harness/architecture-projection';
 const LOCK_PATH = `${ARCHITECTURE_PROJECTION_RUNTIME_ROOT}/locks/store`;
 const MAX_ATTEMPTS = 3;
-/** Longer than the configured 120 second provider bound. A dead Stop owner
- * cannot be reclaimed while its orphaned provider may still be running. */
-const RUNNING_STALE_MS = 150_000;
+/** Reclaim margin past the provider bound. A dead Stop owner cannot be
+ * reclaimed while its orphaned provider may still be running, so the stale
+ * window derives from the same resolved policy timeout the provider runs
+ * under rather than a second constant. */
+const RUNNING_STALE_MARGIN_MS = 30_000;
 
-export type ProjectionJobFailureKind = 'preflight' | 'reconciliation' | 'host-budget' | 'process' | 'timeout' | 'stale-snapshot' | 'invalid-result' | 'refresh' | 'permanent';
+export function architectureProjectionRunningStaleMs(projectionTimeoutMs: number): number {
+  return projectionTimeoutMs + RUNNING_STALE_MARGIN_MS;
+}
+
+/** Recorded on the reclaimed record so a claim shape that predates the
+ * persisted attempt budget is visible instead of silently accepted. */
+export const LEGACY_ATTEMPT_BUDGET_NOTE = 'claim without a persisted attempt budget; stale window derived from the current policy timeout';
+
+/** The claim this process holds was reclaimed or replaced, so it may neither
+ * publish a receipt nor drive the record's failure transition. */
+export class ArchitectureProjectionOwnershipError extends Error {
+  constructor(readonly jobId: string, message: string) {
+    super(message);
+    this.name = 'ArchitectureProjectionOwnershipError';
+  }
+}
+
+export type ProjectionJobFailureKind = 'preflight' | 'reconciliation' | 'host-budget' | 'process' | 'timeout' | 'stale-snapshot' | 'invalid-result' | 'refresh' | 'permanent' | 'lost-ownership';
 
 export interface ArchitectureProjectionJobV1 {
   schemaVersion: 'repo-harness.architecture-projection-job/v1';
@@ -26,6 +45,12 @@ export interface ArchitectureProjectionJobV1 {
   createdAt: string;
   updatedAt: string;
   ownerPid?: number;
+  /** Budget resolved from the policy timeout at claim time. Recovery compares
+   * against this persisted deadline so a later policy edit cannot shorten a
+   * live attempt's lease. Absent on a legacy record and on a claim taken while
+   * the policy could not be resolved. */
+  attemptTimeoutMs?: number;
+  attemptDeadlineAt?: string;
   lastFailure?: { kind: ProjectionJobFailureKind; message: string; at: string };
 }
 
@@ -219,7 +244,18 @@ export function enqueueArchitectureProjectionJob(
   });
 }
 
-export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, now = new Date()): number {
+/** Reclaim time of a running claim. The persisted attempt deadline is the
+ * authority; only a record written before that field existed falls back to the
+ * current policy timeout, and that fallback is recorded on the reclaimed job. */
+function attemptReclaim(job: ArchitectureProjectionJobV1, projectionTimeoutMs: number): { atMs: number; legacy: boolean } {
+  const deadlineMs = job.attemptDeadlineAt === undefined ? Number.NaN : Date.parse(job.attemptDeadlineAt);
+  if (Number.isFinite(deadlineMs)) return { atMs: deadlineMs + RUNNING_STALE_MARGIN_MS, legacy: false };
+  const updatedAtMs = Date.parse(job.updatedAt);
+  if (!Number.isFinite(updatedAtMs)) return { atMs: Number.NEGATIVE_INFINITY, legacy: true };
+  return { atMs: updatedAtMs + architectureProjectionRunningStaleMs(projectionTimeoutMs), legacy: true };
+}
+
+export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, projectionTimeoutMs: number, now = new Date()): number {
   return withExclusiveDirectoryLock(repoRoot, LOCK_PATH, () => {
     let recovered = 0;
     for (const name of names(repoRoot, 'running')) {
@@ -230,14 +266,15 @@ export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, now
         recovered += 1;
         continue;
       }
-      const updatedAtMs = Date.parse(job.updatedAt);
-      const stale = !Number.isFinite(updatedAtMs) || now.getTime() - updatedAtMs >= RUNNING_STALE_MS;
-      if (!stale) continue;
+      const reclaim = attemptReclaim(job, projectionTimeoutMs);
+      if (now.getTime() < reclaim.atMs) continue;
+      const message = `running job was abandoned after attempt ${job.attempt}${reclaim.legacy ? ` (${LEGACY_ATTEMPT_BUDGET_NOTE})` : ''}`;
+      const released = { ...job, ownerPid: undefined, attemptTimeoutMs: undefined, attemptDeadlineAt: undefined };
       if (job.attempt >= MAX_ATTEMPTS) {
-        const failure = { kind: 'timeout' as const, message: `running job was abandoned after attempt ${job.attempt}` };
+        const failure = { kind: 'timeout' as const, message };
         atomicJson(pathFor(repoRoot, 'dead-letter', job.jobId), {
           schemaVersion: 'repo-harness.architecture-projection-dead-letter/v1',
-          job: { ...job, status: 'pending', ownerPid: undefined, updatedAt: now.toISOString(), lastFailure: { ...failure, at: now.toISOString() } },
+          job: { ...released, status: 'pending', updatedAt: now.toISOString(), lastFailure: { ...failure, at: now.toISOString() } },
           failedAt: now.toISOString(),
           failure,
         } satisfies ArchitectureProjectionDeadLetterV1);
@@ -246,11 +283,10 @@ export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, now
         continue;
       }
       const pending = {
-        ...job,
+        ...released,
         status: 'pending' as const,
         updatedAt: now.toISOString(),
-        ownerPid: undefined,
-        lastFailure: { kind: 'timeout' as const, message: `running job was abandoned after attempt ${job.attempt}`, at: now.toISOString() },
+        lastFailure: { kind: 'timeout' as const, message, at: now.toISOString() },
       };
       atomicJson(pathFor(repoRoot, 'pending', job.jobId), pending);
       unlinkSync(runningPath);
@@ -260,18 +296,33 @@ export function recoverAbandonedArchitectureProjectionJobs(repoRoot: string, now
   });
 }
 
-export function claimNextArchitectureProjectionJob(repoRoot: string, now = new Date()): ArchitectureProjectionJobV1 | null {
+/**
+ * `attemptTimeoutMs` is the resolved policy timeout this attempt runs under; it
+ * is persisted as the attempt's own deadline so recovery never re-derives the
+ * lease from a policy value edited after the claim. `null` means the policy was
+ * not resolvable for this claim (preflight failure), which persists no budget
+ * and leaves the record on the legacy recovery fallback.
+ */
+export function claimNextArchitectureProjectionJob(
+  repoRoot: string,
+  attemptTimeoutMs: number | null,
+  now = new Date(),
+): ArchitectureProjectionJobV1 | null {
   return withExclusiveDirectoryLock(repoRoot, LOCK_PATH, () => {
     if (names(repoRoot, 'running').length > 0) return null;
     const pending = jobsByCreatedAt(repoRoot, 'pending')[0];
     if (!pending) return null;
     const pendingPath = pathFor(repoRoot, 'pending', pending.jobId);
+    const budget = attemptTimeoutMs !== null && Number.isFinite(attemptTimeoutMs)
+      ? { attemptTimeoutMs, attemptDeadlineAt: new Date(now.getTime() + attemptTimeoutMs).toISOString() }
+      : { attemptTimeoutMs: undefined, attemptDeadlineAt: undefined };
     const running: ArchitectureProjectionJobV1 = {
       ...pending,
       status: 'running',
       attempt: pending.attempt + 1,
       ownerPid: process.pid,
       updatedAt: now.toISOString(),
+      ...budget,
     };
     atomicJson(pathFor(repoRoot, 'running', running.jobId), running);
     unlinkSync(pendingPath);
@@ -297,6 +348,8 @@ export function retryArchitectureProjectionDeadLetter(
       status: 'pending',
       attempt: 0,
       ownerPid: undefined,
+      attemptTimeoutMs: undefined,
+      attemptDeadlineAt: undefined,
       updatedAt: now.toISOString(),
       lastFailure: undefined,
     };
@@ -315,7 +368,7 @@ export function completeArchitectureProjectionJob(
 ): ArchitectureProjectionReceiptV1 {
   return withExclusiveDirectoryLock(repoRoot, LOCK_PATH, () => {
     const runningPath = pathFor(repoRoot, 'running', job.jobId);
-    if (!existsSync(runningPath)) throw new Error(`architecture projection running job is missing: ${job.jobId}`);
+    if (!existsSync(runningPath)) throw new ArchitectureProjectionOwnershipError(job.jobId, `architecture projection running job is missing: ${job.jobId}`);
     assertClaimOwner(readJson<ArchitectureProjectionJobV1>(runningPath), job);
     const receipt: ArchitectureProjectionReceiptV1 = {
       schemaVersion: 'repo-harness.architecture-projection-receipt/v1',
@@ -450,13 +503,15 @@ export function failArchitectureProjectionJob(
 ): { state: 'pending' | 'dead-letter'; job: ArchitectureProjectionJobV1 } {
   return withExclusiveDirectoryLock(repoRoot, LOCK_PATH, () => {
     const runningPath = pathFor(repoRoot, 'running', job.jobId);
-    if (!existsSync(runningPath)) throw new Error(`architecture projection running job is missing: ${job.jobId}`);
+    if (!existsSync(runningPath)) throw new ArchitectureProjectionOwnershipError(job.jobId, `architecture projection running job is missing: ${job.jobId}`);
     assertClaimOwner(readJson<ArchitectureProjectionJobV1>(runningPath), job);
     const failed: ArchitectureProjectionJobV1 = {
       ...job,
       status: 'pending',
       attempt: failure.kind === 'preflight' || failure.kind === 'reconciliation' || failure.kind === 'host-budget' ? Math.max(0, job.attempt - 1) : job.attempt,
       ownerPid: undefined,
+      attemptTimeoutMs: undefined,
+      attemptDeadlineAt: undefined,
       updatedAt: now.toISOString(),
       lastFailure: { ...failure, at: now.toISOString() },
     };
@@ -484,7 +539,10 @@ function assertClaimOwner(persisted: ArchitectureProjectionJobV1, claimed: Archi
     || persisted.attempt !== claimed.attempt
     || persisted.ownerPid !== claimed.ownerPid
   ) {
-    throw new Error(`architecture projection running claim no longer belongs to this process: ${claimed.jobId}`);
+    throw new ArchitectureProjectionOwnershipError(
+      claimed.jobId,
+      `architecture projection running claim no longer belongs to this process: ${claimed.jobId}`,
+    );
   }
 }
 

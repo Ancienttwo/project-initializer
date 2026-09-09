@@ -191,7 +191,7 @@ export function readArchitectureProjectionPolicy(value: unknown): ArchitecturePr
   }
   if (failureGate !== 'advisory' && failureGate !== 'strict') throw new Error('policy.architecture.projection_failure_gate must be advisory|strict');
   if (typeof requiredVersion !== 'string' || requiredVersion.trim() === '') throw new Error('policy.architecture.projection_version must be a non-empty string');
-  if (!Number.isInteger(timeoutMs) || (timeoutMs as number) < 1_000 || (timeoutMs as number) > 120_000) throw new Error('policy.architecture.projection_timeout_ms must be 1000..120000');
+  if (!Number.isInteger(timeoutMs) || (timeoutMs as number) < 1_000 || (timeoutMs as number) > 600_000) throw new Error('policy.architecture.projection_timeout_ms must be 1000..600000');
   return { provider, applyMode, failureGate, requiredVersion, timeoutMs: timeoutMs as number };
 }
 

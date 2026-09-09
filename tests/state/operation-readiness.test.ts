@@ -118,6 +118,18 @@ describe('evaluateReadiness fixture-driven matrix', () => {
       projection_provider: 'disabled',
       projection_apply: 'automatic',
     } })).toThrow('projection_apply must be disabled');
+    expect(readArchitectureProjectionPolicy({ architecture: {
+      projection_provider: 'archctx',
+      projection_apply: 'automatic',
+      projection_version: '0.5.8',
+      projection_timeout_ms: 300000,
+    } })).toEqual({ provider: 'archctx', applyMode: 'automatic', failureGate: 'advisory', requiredVersion: '0.5.8', timeoutMs: 300000 });
+    expect(() => readArchitectureProjectionPolicy({ architecture: {
+      projection_provider: 'archctx',
+      projection_apply: 'automatic',
+      projection_version: '0.5.8',
+      projection_timeout_ms: 600001,
+    } })).toThrow('projection_timeout_ms must be 1000..600000');
   });
   test('fixture declares exactly the nine frozen characterization cells with no duplicates', () => {
     expect(fixture.positive_cases).toHaveLength(9);
