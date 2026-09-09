@@ -1,16 +1,16 @@
 # Task Review: campaign-not-planned-acceptance
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260909-2241-campaign-not-planned-acceptance.md
 > **Contract**: tasks/contracts/20260909-2241-campaign-not-planned-acceptance.contract.md
 > **Notes File**: tasks/notes/20260909-2241-campaign-not-planned-acceptance.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-09 22:41
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:bc7afe5141615b079ea004b9bb0269b2c9a40d12d46f59abec210d3c1cf32e53
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 562063f962d97f31e2fd39262ead2bec46439b3d
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:bc7afe5141615b079ea004b9bb0269b2c9a40d12d46f59abec210d3c1cf32e53
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 562063f962d97f31e2fd39262ead2bec46439b3d
+> **Verification Evidence SHA256**: sha256:aa26829a6899f40e90453007a8f2bed7e8ea744387e03bd8ba164900b724b022
+> **Issued At**: 2026-09-09T15:00:50.419Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Quick review: the consumer now uses canonical external_pass, with user_waiver unchanged; no alias, helper translation or evidence gate is added. The model-free canonical fixture failed before the fix and passed after; noncanonical pass and reject fail with zero provider calls. Eight executable checks and 21 contract checks passed against the committed contract.
 - Findings: none
 
 ## Behavior Diff Notes

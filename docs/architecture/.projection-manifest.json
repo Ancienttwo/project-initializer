@@ -827,9 +827,9 @@
       "sourceDigest": "sha256:010ee9ce2c7935ad6ab2aa5d30e2e0225c98fb708e29c221e146ff45b6b21610",
       "outputDigest": "sha256:9deae9f17a3ad75c541b1b0ca258721b329b5a4d9521eedfab8186eb635af91a",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-contract-authority",
-        "commit": "13007f8a8349ca03f647036ea4de3b7d7c167217",
-        "committedAt": "2026-09-09T22:28:42+08:00"
+        "branch": "codex/campaign-not-planned-acceptance",
+        "commit": "b52683b81cf4ee52c8029437172a5f1e065a1099",
+        "committedAt": "2026-09-09T22:57:59+08:00"
       }
     },
     {
@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:e821c9e6e681ff519632fc2b3f385e0d78005fd6d46cf098f0657cf7fb6ae9cf",
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-contract-authority",
-        "commit": "13007f8a8349ca03f647036ea4de3b7d7c167217",
-        "committedAt": "2026-09-09T22:28:42+08:00"
+        "branch": "codex/campaign-not-planned-acceptance",
+        "commit": "b52683b81cf4ee52c8029437172a5f1e065a1099",
+        "committedAt": "2026-09-09T22:57:59+08:00"
       }
     },
     {
@@ -1227,9 +1227,9 @@
       "sourceDigest": "sha256:463d4ebee4c32feaf8e98dca3f6862530d876ff145ab4a6c0d1e83b9acd6d4b7",
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
-        "branch": "codex/campaign-worker-contract-authority",
-        "commit": "13007f8a8349ca03f647036ea4de3b7d7c167217",
-        "committedAt": "2026-09-09T22:28:42+08:00"
+        "branch": "codex/campaign-not-planned-acceptance",
+        "commit": "b52683b81cf4ee52c8029437172a5f1e065a1099",
+        "committedAt": "2026-09-09T22:57:59+08:00"
       }
     },
     {
