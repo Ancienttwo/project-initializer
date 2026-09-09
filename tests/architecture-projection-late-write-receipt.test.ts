@@ -36,7 +36,7 @@ const MANIFEST_PATH = 'docs/architecture/.projection-manifest.json';
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const digest = (token: string) => `sha256:${token.repeat(64).slice(0, 64)}` as const;
-const policy: ArchitectureProjectionPolicy = { provider: 'archctx', applyMode: 'automatic', failureGate: 'advisory', requiredVersion: '0.5.8', timeoutMs: 120_000 };
+const policy: ArchitectureProjectionPolicy = { provider: 'archctx', applyMode: 'automatic', failureGate: 'advisory', requiredVersion: '0.5.9', timeoutMs: 120_000 };
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'repo-harness-late-write-'));
@@ -47,7 +47,7 @@ function fixture() {
   mkdirSync(join(repoRoot, '.archcontext/model/nodes'), { recursive: true });
   mkdirSync(join(repoRoot, 'src'), { recursive: true });
   mkdirSync(join(consumerRoot, 'node_modules/archctx/bin'), { recursive: true });
-  writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ architecture: { projection_provider: 'archctx', projection_apply: 'automatic', projection_version: '0.5.8', projection_timeout_ms: 120000 } })}\n`);
+  writeFileSync(join(repoRoot, '.ai/harness/policy.json'), `${JSON.stringify({ architecture: { projection_provider: 'archctx', projection_apply: 'automatic', projection_version: '0.5.9', projection_timeout_ms: 120000 } })}\n`);
   writeFileSync(join(repoRoot, '.archcontext/model/nodes/root.yaml'), `schemaVersion: archcontext.node/v2
 kind: capability
 id: capability.test.root
@@ -69,7 +69,7 @@ extensions:
   writeFileSync(join(repoRoot, 'src/index.ts'), 'export const value = 1;\n');
   writeFileSync(join(repoRoot, 'AGENTS.md'), '# agents\n');
   writeFileSync(join(repoRoot, 'CLAUDE.md'), '# claude\n');
-  writeFileSync(join(consumerRoot, 'node_modules/archctx/package.json'), `${JSON.stringify({ name: 'archctx', version: '0.5.8', engines: { node: '>=22.22 <26' }, bin: { archctx: './bin/archctx' } })}\n`);
+  writeFileSync(join(consumerRoot, 'node_modules/archctx/package.json'), `${JSON.stringify({ name: 'archctx', version: '0.5.9', engines: { node: '>=22.22 <26' }, bin: { archctx: './bin/archctx' } })}\n`);
   writeFileSync(join(consumerRoot, 'node_modules/archctx/bin/archctx'), '#!/bin/sh\nexit 1\n');
   chmodSync(join(consumerRoot, 'node_modules/archctx/bin/archctx'), 0o755);
   execFileSync('git', ['init'], { cwd: repoRoot, stdio: 'ignore' });
@@ -84,10 +84,10 @@ extensions:
 function capabilities(): ArchctxProcessResult {
   return { status: 0, signal: null, stderr: '', stdout: JSON.stringify({
     schemaVersion: 'archcontext.capabilities/v1',
-    package: { name: 'archctx', version: '0.5.8' },
+    package: { name: 'archctx', version: '0.5.9' },
     protocols: { projectionRequest: 'archcontext.projection-request/v1', projectionResult: 'archcontext.projection-result/v2', architectureRefreshSignal: 'archcontext.architecture-refresh-signal/v1' },
     renderers: { architectureDocs: 'archcontext.docs-renderer/v4', agentContext: 'archcontext.agent-context-renderer/v1' },
-    features: ['architecture-docs-renderer-v2', 'architecture-refresh-signal-v1', 'projection-apply-receipt-v1', 'projection-protocol-v2'],
+    features: ['architecture-docs-renderer-v2', 'architecture-refresh-signal-v1', 'projection-apply-receipt-v1', 'projection-prior-committed-applies-v1', 'projection-protocol-v2'],
   }) };
 }
 
@@ -246,9 +246,10 @@ describe('architecture projection receipt declares late provider writes', () => 
   });
 
   /**
-   * archctx 0.5.8 has no `priorCommittedApplies`, so the evidence is simply absent. The
-   * receipt then declares nothing, and repo-harness must not invent the write back from
-   * the working tree: the manifest is on disk here and still must not be declared.
+   * `priorCommittedApplies` is omitted rather than empty when the provider reports no
+   * earlier apply, so the evidence is simply absent. The receipt then declares nothing,
+   * and repo-harness must not invent the write back from the working tree: the manifest
+   * is on disk here and still must not be declared.
    */
   test('declares nothing when the provider does not report the prior commit', () => {
     const f = fixture();

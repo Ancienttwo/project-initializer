@@ -1004,7 +1004,7 @@ ARCHITECTURE_INDEX_EOF
     "projection_provider": "disabled",
     "projection_apply": "disabled",
     "projection_failure_gate": "advisory",
-    "projection_version": "0.5.8",
+    "projection_version": "0.5.9",
     "projection_timeout_ms": 120000,
     "freshness_gate": "advisory",
     "gate_min_severity": "medium",
@@ -1021,8 +1021,8 @@ ARCHITECTURE_INDEX_EOF
     "provider": "archctx",
     "proposal_author": "local",
     "stages": {
-      "scan": { "provider_version": "0.5.8", "required_features": ["module-statistics-v1", "refactor-assessment-v1", "recommendation-v3"] },
-      "verify": { "provider_version": "0.5.8", "required_features": ["refactor-resolution-v1"] }
+      "scan": { "provider_version": "0.5.9", "required_features": ["module-statistics-v1", "refactor-assessment-v1", "recommendation-v3"] },
+      "verify": { "provider_version": "0.5.9", "required_features": ["refactor-resolution-v1"] }
     },
     "workflow_routing": {
       "module_refactor": "work_package",
