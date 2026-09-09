@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-09 22:33
+> **Related Plan**: plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260909-2233
+> **Archive Projection V1**: `plans/plan-20260909-2217-campaign-worker-contract-authority.md` => `plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md`
+> **Archive Projection V1**: `tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md` => `tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md`
+> **Archive Projection V1**: `tasks/contracts/20260909-2217-campaign-worker-contract-authority.contract.md` => `tasks/archive/contract-20260909-2233-campaign-worker-contract-authority.md`
+> **Archive Projection V1**: `tasks/reviews/20260909-2217-campaign-worker-contract-authority.review.md` => `tasks/archive/review-20260909-2233-campaign-worker-contract-authority.md`
+
 # Task Review: campaign-worker-contract-authority
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260909-2217-campaign-worker-contract-authority.md
-> **Contract**: tasks/contracts/20260909-2217-campaign-worker-contract-authority.contract.md
-> **Notes File**: tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md
+> **Plan**: plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md
+> **Contract**: tasks/archive/contract-20260909-2233-campaign-worker-contract-authority.md
+> **Notes File**: tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-09 22:17
 > **Recommendation**: pass

@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-09 22:33
+> **Related Plan**: plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260909-2233
+> **Archive Projection V1**: `plans/plan-20260909-2217-campaign-worker-contract-authority.md` => `plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md`
+> **Archive Projection V1**: `tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md` => `tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md`
+> **Archive Projection V1**: `tasks/contracts/20260909-2217-campaign-worker-contract-authority.contract.md` => `tasks/archive/contract-20260909-2233-campaign-worker-contract-authority.md`
+> **Archive Projection V1**: `tasks/reviews/20260909-2217-campaign-worker-contract-authority.review.md` => `tasks/archive/review-20260909-2233-campaign-worker-contract-authority.md`
+
 # Task Contract: campaign-worker-contract-authority
 
-> **Status**: Active
-> **Plan**: plans/plan-20260909-2217-campaign-worker-contract-authority.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-09 22:17
-> **Review File**: `tasks/reviews/20260909-2217-campaign-worker-contract-authority.review.md`
-> **Notes File**: `tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md`
+> **Review File**: `tasks/archive/review-20260909-2233-campaign-worker-contract-authority.md`
+> **Notes File**: `tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -45,10 +55,10 @@ A package-only acquisition changes authored contract bytes or a new worker hando
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260909-2217-campaign-worker-contract-authority.md`
+- Source plan: `plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260909-2217-campaign-worker-contract-authority.review.md`
-- Notes file: `tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md`
+- Review file: `tasks/archive/review-20260909-2233-campaign-worker-contract-authority.md`
+- Notes file: `tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -80,10 +90,10 @@ allowed_paths:
   - docs/researches/20260909-campaign-worker-contract-authority.md
   - tasks/evidence/campaign-worker-contract-authority-pre-fix.log
   - tasks/todos.md
-  - plans/plan-20260909-2217-campaign-worker-contract-authority.md
-  - tasks/contracts/20260909-2217-campaign-worker-contract-authority.contract.md
-  - tasks/reviews/20260909-2217-campaign-worker-contract-authority.review.md
-  - tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md
+  - plans/archive/plan-20260909-2217-campaign-worker-contract-authority.md
+  - tasks/archive/contract-20260909-2233-campaign-worker-contract-authority.md
+  - tasks/archive/review-20260909-2233-campaign-worker-contract-authority.md
+  - tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md
 ```
 
 ## Evidence Requirements
@@ -139,7 +149,7 @@ exit_criteria:
     - docs/researches/20260909-campaign-worker-contract-authority.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260909-2217-campaign-worker-contract-authority.notes.md
+    - tasks/archive/notes-20260909-2233-campaign-worker-contract-authority.md
 ```
 
 ## Verification Plan
