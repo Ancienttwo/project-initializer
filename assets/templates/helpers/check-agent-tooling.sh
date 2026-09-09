@@ -142,6 +142,7 @@ const ARCHCTX_CONTRACTS_PACKAGE = "archctx-contracts";
 const ARCHCTX_MODEL_DIR = ".archcontext/model";
 const ARCHCTX_NODES_DIR = ".archcontext/model/nodes";
 const ARCHCTX_CAPABILITY_SOURCE_KEY = ".ai/harness/policy.json#context.capability_source";
+const HERDR_PIN_KEY = ".ai/harness/policy.json#external_tooling.herdr";
 const WAZA_STAGING_ROOT = path.join(HOME, ".agents");
 const WAZA_STAGING_DIR = path.join(WAZA_STAGING_ROOT, "skills");
 const WAZA_STAGING_RULES_DIR = path.join(WAZA_STAGING_ROOT, "rules");
@@ -794,13 +795,39 @@ function detectWaza() {
   };
 }
 
+/**
+ * Reads the single herdr runtime pin. The version floor, the release URL, and
+ * the release checksum are one datum owned by
+ * `.ai/harness/policy.json#external_tooling.herdr`; CI installs from the same
+ * key. A missing or malformed pin fails closed instead of assuming a floor.
+ */
+function herdrMinVersion() {
+  const policy = readJson(path.join(REPO_ROOT, ".ai/harness/policy.json"));
+  const pinned = policy?.external_tooling?.herdr?.min_version;
+  return typeof pinned === "string" && /^\d+\.\d+\.\d+$/.test(pinned) ? pinned : null;
+}
+
+function versionAtLeast(actual, minimum) {
+  const parse = (value) => /^(\d+)\.(\d+)\.(\d+)$/.exec(value)?.slice(1, 4).map(Number) ?? null;
+  const left = parse(actual);
+  const right = parse(minimum);
+  if (!left || !right) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] > right[index];
+  }
+  return true;
+}
+
 function detectRuntimeCapabilities(waza) {
   const herdr = commandCapability("herdr", "persistent agent terminals, peer collaboration and task-scoped Claude acceptance review", "platform-runtime", true);
+  const minVersion = herdrMinVersion();
+  herdr.min_version = minVersion;
+  herdr.min_version_source = HERDR_PIN_KEY;
   if (herdr.path) {
     try {
       herdr.version = execFileSync(herdr.path, ["--version"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
-      const version = /^herdr (\d+)\.(\d+)\.(\d+)$/.exec(herdr.version);
-      if (!version || (Number(version[1]) === 0 && Number(version[2]) < 9)) herdr.status = "unavailable";
+      const reported = /^herdr (\d+\.\d+\.\d+)$/.exec(herdr.version)?.[1] ?? null;
+      if (!minVersion || !reported || !versionAtLeast(reported, minVersion)) herdr.status = "unavailable";
     } catch (_) { herdr.status = "unavailable"; }
   }
   return {
@@ -1977,7 +2004,9 @@ const report = {
 
 const strictFailures = [];
 if (strictReadiness && report.runtime_capabilities.herdr.status !== "present") {
-  strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install herdr >=0.9.0 and verify herdr --version`);
+  const pinned = report.runtime_capabilities.herdr.min_version;
+  const floor = pinned ? `herdr >=${pinned}` : `the herdr version pinned in ${HERDR_PIN_KEY} (pin missing or malformed)`;
+  strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install ${floor} and verify herdr --version`);
 }
 if (strictReadiness && ["missing", "partial"].includes(report.tools.codegraph.status)) {
   strictFailures.push(`CodeGraph readiness is ${report.tools.codegraph.status}: ${report.tools.codegraph.reason}`);
