@@ -907,9 +907,9 @@
       "sourceDigest": "sha256:e821c9e6e681ff519632fc2b3f385e0d78005fd6d46cf098f0657cf7fb6ae9cf",
       "outputDigest": "sha256:564ee2aced00ea97c72f8993668751ad2eba769dca74ae0575a2ddfe67abbc40",
       "verifiedAgainst": {
-        "branch": "codex/brc1415-text-connector",
-        "commit": "76642e551d511c13faa406fff7e702767605e376",
-        "committedAt": "2026-09-09T12:12:14+08:00"
+        "branch": "codex/fleet-packaged-helper",
+        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
+        "committedAt": "2026-09-09T15:43:05+08:00"
       }
     },
     {
@@ -1028,8 +1028,8 @@
       "outputDigest": "sha256:2e93a1f59017a07da7860cf0073e6911d9f75032b5af8be503c56087f394466a",
       "verifiedAgainst": {
         "branch": "codex/fleet-packaged-helper",
-        "commit": "223031342d2f54a886dc5adad0506dbcf07f2bcc",
-        "committedAt": "2026-09-09T12:48:09+08:00"
+        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
+        "committedAt": "2026-09-09T15:43:05+08:00"
       }
     },
     {
@@ -1107,9 +1107,9 @@
       "sourceDigest": "sha256:98aca01f5972a801ccbed7b23063276724226233393bfd9d69dda2743eb9a26f",
       "outputDigest": "sha256:f77e33f1153051b1b06a584faf6bd25a8581694d6b6148650dc66c9160b0cf2c",
       "verifiedAgainst": {
-        "branch": "codex/brc1415-adopted-continuation",
-        "commit": "33f2f1bc110056337e5dbd5414f7ca8dee69f402",
-        "committedAt": "2026-09-09T04:43:46+08:00"
+        "branch": "codex/fleet-packaged-helper",
+        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
+        "committedAt": "2026-09-09T15:43:05+08:00"
       }
     },
     {
@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/fleet-packaged-helper",
-        "commit": "cad8c94d61dc2fd76e9e657abc8d3db5fe381e96",
-        "committedAt": "2026-09-09T15:35:52+08:00"
+        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
+        "committedAt": "2026-09-09T15:43:05+08:00"
       }
     },
     {
@@ -1248,8 +1248,8 @@
       "outputDigest": "sha256:beaaa466d51cbd8f929fd6acd6645c6f5136cccf539f09b63a273e5ab38519fa",
       "verifiedAgainst": {
         "branch": "codex/fleet-packaged-helper",
-        "commit": "cad8c94d61dc2fd76e9e657abc8d3db5fe381e96",
-        "committedAt": "2026-09-09T15:35:52+08:00"
+        "commit": "285e3cb0e13ef0acf5fbc10da3771adbe3e1415c",
+        "committedAt": "2026-09-09T15:43:05+08:00"
       }
     },
     {
