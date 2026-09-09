@@ -40,7 +40,7 @@ try {
     worker.afterChild({ container_receipt_sha256, ...JSON.parse(readFileSync(join(worktree, `${role}.result`), 'utf8')), role, command: input[role === 'worker' ? 'worker_command' : 'verifier_command'], stdout_path: `${role}.out`, stderr_path: `${role}.err` });
     if (nonzero) break;
   }
-  writeFileSync(join(worktree, 'final.json'), JSON.stringify({ outcome: 'completed', evidence_paths: ['src/index.ts'] }));
+  if (failure !== 'verifier_without_result') writeFileSync(join(worktree, 'final.json'), JSON.stringify({ outcome: 'completed', evidence_paths: ['src/index.ts'] }));
   const final = worker.finish('final.json', { status: 'fail', failure_class: failure });
   expect(final.contract_run.status).toBe('fail'); expect(final.outcome).toBe('permanent_failure');
   const budget = readAutomationBudgetStatus(f.root, final.reservation.automation_run_id, env).current;

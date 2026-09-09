@@ -1,3 +1,4 @@
+import { campaignAttemptResultInstruction } from "../scripts/contract-run";
 import { describe, expect, test } from "bun:test";
 import {
   chmodSync,
@@ -382,6 +383,7 @@ describe("contract-run helper", () => {
       expect(workerPromptContent).toContain("do not rerun the old full-suite criterion merely because the subject changed");
       expect(workerPromptContent).not.toContain("Run every command listed under exit_criteria.commands_succeed");
       expect(workerPromptContent).toContain("## Record what you learned");
+      expect(workerPromptContent).toContain("If the Notes file is outside Writable paths, report those observations in your final response for the parent to record; do not write that file.");
       expect(workerPromptContent).toContain("## Stop / escalate");
       expect(workerPromptContent).not.toContain("Exemplar:");
       const verifierPromptContent = readFileSync(join(repo, ".ai/harness/runs/dry-run/verifier-prompt.md"), "utf-8");
@@ -1478,4 +1480,17 @@ describe("contract-run helper", () => {
       }
     }, 30_000);
   });
+});
+
+
+test("campaign result output authority names only the current runner-owned file", () => {
+  for (const path of [".ai/harness/runs/one/campaign-attempt-result.json", ".ai/harness/runs/two/campaign-attempt-result.json"]) {
+    const instruction = campaignAttemptResultInstruction(path);
+    expect(instruction).toContain(`explicitly authorizes writing only ${path},`);
+    expect(instruction).toContain("Even when blocked, write this file before returning");
+    expect(instruction).toContain("Select exactly one outcome supported by observed evidence");
+    expect(instruction).toContain("This authorizes no other file outside Writable paths");
+    expect(instruction).not.toContain("tasks/notes/");
+    expect(instruction.match(/campaign-attempt-result\.json/g)).toHaveLength(1);
+  }
 });
