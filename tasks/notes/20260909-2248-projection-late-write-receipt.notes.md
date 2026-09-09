@@ -46,7 +46,8 @@ added to `ARCHCTX_REQUIRED_FEATURES`, and the archctx pin stays at 0.5.8. The fi
 optional and absent under 0.5.8, so the receipt correctly declares nothing there (covered
 by the guard's third case). Add the required-feature entry and raise the pin in the same
 slice that pins the upstream version; requiring the feature before that version exists
-would fail every projection closed.
+would fail every projection closed. The deferred goal is recorded in `tasks/todos.md`
+with its tradeoff and revisit trigger.
 
 ## Deviations From Plan Or Spec
 

@@ -189,7 +189,8 @@ describe('architecture projection receipt declares late provider writes', () => 
     expect(receipt).not.toBeNull();
     expect(receipt!.attempt).toBe(2);
     // The manifest written under this jobId must appear in the durable receipt.
-    expect(receipt!.declaredWrites.map((write) => write.path)).toContain(MANIFEST_PATH);
+    // Every receipt this code path writes carries the field; only a legacy receipt omits it.
+    expect(receipt!.declaredWrites?.map((write) => write.path)).toContain(MANIFEST_PATH);
     // Drift repair commits without an apply identity, so provenance is the ChangeSet.
     expect(receipt!.declaredWrites).toEqual([{
       source: 'prior-committed-apply',

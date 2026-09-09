@@ -58,7 +58,7 @@ projection-owned late write is invisible to every snapshot repo-harness captures
 
 Required when Task Profile is `bugfix`; leave as-is otherwise.
 
-- root_cause: src/effects/architecture/projection-jobs.ts:382 mints the receipt from the last attempt's ProjectionResultV1 only, so a prior attempt's committed write under the same jobId is never declared; the applyReceipt channel is blocked by the acceptedChange gate at src/effects/architecture/archctx-provider.ts:559
+- root_cause: src/effects/architecture/projection-jobs.ts:382 mints the receipt from the last attempt's ProjectionResultV1 only, so a prior attempt's committed write under the same jobId is never declared; the applyReceipt channel is blocked by the acceptedChange gate at src/effects/architecture/archctx-provider.ts:516
 - repro: bun test --timeout 60000 tests/architecture-projection-late-write-receipt.test.ts
 - regression_guard: tests/architecture-projection-late-write-receipt.test.ts
 - pre_fix_failure_artifact: .ai/harness/failures/projection-late-write-receipt-pre-fix.log
@@ -207,6 +207,28 @@ exit_criteria:
       "cost": "normal",
       "evidence_policy": "current_exact",
       "necessity": "Covers the manifest-only classifier that now fails closed on prior applies.",
+      "inputs": { "env": [] }
+    },
+    {
+      "id": "projection-acceptance",
+      "kind": "package_test",
+      "path": "tests/unit/architecture-projection-acceptance.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Covers the reconciliation clean-current proof changed in projection-acceptance.ts.",
+      "inputs": { "env": [] }
+    },
+    {
+      "id": "refactor-materialization",
+      "kind": "package_test",
+      "path": "tests/unit/refactor-materialization-effect.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Covers the architecture write transaction changed in materialization.ts.",
       "inputs": { "env": [] }
     },
     {

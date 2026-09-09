@@ -66,12 +66,16 @@ export interface ArchitectureProjectionReceiptV1 {
   /** The provider's verbatim answer for the attempt that closed this job. */
   result: ProjectionResultV1;
   /**
-   * Every projection-owned write committed under this jobId, including a write an earlier
-   * attempt committed before losing its owner. Consumers that gate on "the projection
-   * wrote nothing" read this, never `result.files`: a retry that reaches the provider's
-   * fixed point reports `noop` with no files even when the job did write.
+   * Durable audit evidence: the projection of `result.files` union
+   * `result.priorCommittedApplies`, naming every projection-owned write committed under
+   * this jobId. It exists because a retry that reaches the provider's fixed point reports
+   * `noop` with no files even when an earlier attempt of the same job did write, so
+   * `result.files === []` cannot be read as "nothing was written". The in-src readers that
+   * must not make that reading currently consult `result.priorCommittedApplies` directly;
+   * this field is what a later audit of the receipt store has to work from. Absent on a
+   * receipt written before the field existed.
    */
-  declaredWrites: ProjectionDeclaredWriteV1[];
+  declaredWrites?: ProjectionDeclaredWriteV1[];
   refreshReceiptDigests: string[];
 }
 

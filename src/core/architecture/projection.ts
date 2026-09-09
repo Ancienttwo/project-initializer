@@ -289,8 +289,9 @@ export function projectionDeclaredWrites(result: ProjectionResultV1, attempt: nu
     if (file.action === 'unchanged') continue;
     declared.set(file.path, { source: 'attempt-result', path: file.path, operation: file.action === 'delete' ? 'delete' : 'write', attempt });
   }
+  // Code-unit ordering, matching the `sortedUnique` invariant the wire contract enforces.
   const applies = [...(result.priorCommittedApplies ?? [])]
-    .sort((left, right) => right.committedAt.localeCompare(left.committedAt) || right.changeSetId.localeCompare(left.changeSetId));
+    .sort((left, right) => compare(right.committedAt, left.committedAt) || compare(right.changeSetId, left.changeSetId));
   for (const apply of applies) {
     for (const file of apply.files) {
       if (declared.has(file.path)) continue;
@@ -299,7 +300,11 @@ export function projectionDeclaredWrites(result: ProjectionResultV1, attempt: nu
       declared.set(file.path, { source: 'prior-committed-apply', path: file.path, operation: file.operation, changeSetId: apply.changeSetId, committedAt: apply.committedAt, ...(apply.applyId === undefined ? {} : { applyId: apply.applyId }) });
     }
   }
-  return [...declared.values()].sort((left, right) => left.path.localeCompare(right.path));
+  return [...declared.values()].sort((left, right) => compare(left.path, right.path));
+}
+
+function compare(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 export function projectionResultIssues(input: ProjectionResultV1): string[] {
