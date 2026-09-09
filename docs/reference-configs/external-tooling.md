@@ -641,10 +641,9 @@ mapping.
 
 Three per-agent target overrides are applied after tuple validation, on top of
 the family row above, and are the only model/effort remaps in the generator:
-`fast-worker` (`opus`/`medium`) targets `gpt-5.6-terra` at `high` reasoning;
-`deep-worker` (`opus`/`high`) targets `gpt-5.6-sol` at `medium` reasoning; and
-`gatekeeper` (`opus`/`high`) keeps `gpt-5.6-terra` but bumps reasoning to
-`xhigh`. Every other agent's Codex model and effort follow the family row
+`fast-worker` (`opus`/`medium`) targets `gpt-6-astra` at `low` (light) reasoning;
+`deep-worker` (`opus`/`high`) and `gatekeeper` (`opus`/`high`) both target
+`gpt-6-astra` at `medium` reasoning. Every other agent's Codex model and effort follow the family row
 unchanged.
 
 `fast-worker`, `deep-worker`, `root-cause-prover`, and `harness-evaluator`
