@@ -58,7 +58,7 @@ test('pre-active observation without intent charges once and permits later real 
   const f = fixture(); let calls = 0;
   const deps = { readBinding: f.readBinding, consult: async (input: any) => {
     calls++;
-    expect(input.captureNetworkEvidence).toBe(true); expect(input.chatgptApp).toBeNull(); expect(input.prompt).toStartWith('@GitHub ');
+    expect(input.captureNetworkEvidence).toBe(true); expect(input.chatgptApp).toBeNull(); expect(input.prompt).toStartWith('@github connector ');
     expect(input.model).toBeUndefined(); expect(input.thinkingTime).toBeUndefined(); expect(input.sessionId).toBeUndefined();
     expect(input.prompt).toContain('Do not create, edit, close or reopen Issues');
     const instructions = JSON.parse(input.prompt.slice(input.prompt.indexOf('\n') + 1));

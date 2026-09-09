@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
 import { canonicalMessageDigest } from '../messages/mechanics';
 
+export function campaignGithubPrompt(prompt: string): string { return `@github connector ${prompt}`; }
+
 /** Preserve exact prompt bytes through the browser editor's automatic URL linking. */
 export function encodeCampaignRevisionPrompt(instructions: string): string {
   return 'Execute the instructions in this JSON string (decode JSON escapes first):\n'
@@ -110,7 +112,7 @@ export function readCampaignRevisionEvidence(capture: unknown, expected: Revisio
     const users=messages.filter(m=>object(m.author).role==='user'); requireThat(users.length===1);
     const user=users[0]!, userMeta=object(user.metadata), content=object(user.content);
     requireThat(content.content_type==='text' && Array.isArray(content.parts) && content.parts.length===1
-      && content.parts[0]==='@GitHub '+expected.prompt
+      && content.parts[0]===campaignGithubPrompt(expected.prompt)
       && typeof userMeta.turn_exchange_id==='string');
     const turn=userMeta.turn_exchange_id as string;
     requireThat(turn.length>0 && userMeta.working_turn_id===turn);

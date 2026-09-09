@@ -98,7 +98,7 @@ See captured planning output.
 ## Captured Planning Output
 
 ## Goal
-Replace campaign UI app preselection with literal @GitHub prompt activation, retaining real Connector history and exact-SHA acceptance. Owner explicitly approved this change after APP_SELECTION_UNVERIFIED prevented submission.
+Replace campaign UI app preselection with literal @github connector prompt activation, retaining real Connector history and exact-SHA acceptance. Owner explicitly approved this change after APP_SELECTION_UNVERIFIED prevented submission.
 ## P1 / P2 / P3
 The four campaign calls use chatgptApp, which produces Oracle --browser-app and fails before submit. CampaignBrowserSession separately requires a composer pill. Replace the call transport with a shared literal mention and conversation capture. Validate invocation-owned provider history, latest completed turn, GitHub tool identity and successful tool status. Existing version decoder continues verifying exact raw GitHub resources and SHA. Existing immutable historical receipts retain their original meaning; new receipts use captured Connector calls. No Oracle edits, model overrides, fabricated evidence or budget reset.
 ## Scope

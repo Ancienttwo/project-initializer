@@ -92,9 +92,9 @@ test('text campaign follow-up clears a historical UI app through the real browse
   const root = mkdtempSync(join(tmpdir(), 'text-connector-'));
   try {
     const first = await runBrowserConsult({ repoRoot: root, prompt: 'original', title: 'historical-app', provider: 'oracle', chatgptApp: 'GitHub', dryRun: true });
-    const next = await runBrowserFollowup({ repoRoot: root, sessionId: first.sessionId, prompt: '@GitHub read the exact revision', title: 'text-app', chatgptApp: null, dryRun: true });
+    const next = await runBrowserFollowup({ repoRoot: root, sessionId: first.sessionId, prompt: '@github connector read the exact revision', title: 'text-app', chatgptApp: null, dryRun: true });
     expect(next.dryRun!.command).not.toContain('--browser-app');
-    expect(next.dryRun!.command).toContain('@GitHub read the exact revision');
+    expect(next.dryRun!.command).toContain('@github connector read the exact revision');
     expect(next.meta.browser.chatgptApp).toBeUndefined();
   } finally { rmSync(root, {recursive: true, force: true}); }
 });

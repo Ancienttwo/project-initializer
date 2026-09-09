@@ -1,7 +1,7 @@
-import { readCampaignCapturedConversation } from './campaign-revision-evidence';
+import { campaignGithubPrompt, readCampaignCapturedConversation } from './campaign-revision-evidence';
 import { canonicalMessageDigest } from '../messages/mechanics';
 /** Session ownership and captured Connector calls are independent of backend model identity. */
-export function campaignGithubPrompt(prompt: string): string { return `@GitHub ${prompt}`; }
+export { campaignGithubPrompt } from './campaign-revision-evidence';
 export interface CampaignBrowserSessionBinding {
   readonly repoRoot: string;
   readonly profileDirectory: string;
@@ -30,7 +30,7 @@ function githubInvocation(meta: Record<string, unknown>): { pluginId: string; ca
     const user = users.at(-1), userMeta = object(user?.metadata), content = object(user?.content);
     if (userMeta?.turn_exchange_id !== turn || userMeta.working_turn_id !== turn || content?.content_type !== 'text'
       || !Array.isArray(content.parts) || content.parts.length !== 1 || typeof content.parts[0] !== 'string'
-      || !content.parts[0].startsWith('@GitHub ')) return null;
+      || !content.parts[0].startsWith(campaignGithubPrompt(''))) return null;
     const connectors = new Set<string>();
     for (const message of messages) {
       const author = object(message!.author), metadata = object(message!.metadata), resource = object(metadata?.invoked_resource);

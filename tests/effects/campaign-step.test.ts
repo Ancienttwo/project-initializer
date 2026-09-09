@@ -430,7 +430,7 @@ describe('durable campaign heartbeat step', () => {
         expect(request.prompt).toContain('missing slots: 08, 09, 10.');
         expect(request.prompt).toContain('Do not edit or duplicate any other slot.');
         expect(request).not.toHaveProperty('model');
-        expect(request.chatgptApp).toBeNull(); expect(request.prompt).toStartWith('@GitHub ');
+        expect(request.chatgptApp).toBeNull(); expect(request.prompt).toStartWith('@github connector ');
         throw new Error('browser disconnected after seven observed Issues');
       },
     };

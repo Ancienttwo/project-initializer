@@ -146,7 +146,7 @@ The immutable continuation binding permits only one successor. Its authoring may
 
 ## Text Connector activation (Owner-approved, 2026-09-09)
 
-Campaign revision observation, Issue authoring/follow-up, adoption challenge and fresh audit now frame the existing canonical prompt as literal `@GitHub <prompt>`. They explicitly clear inherited app preselection; Oracle receives no `--browser-app` for these operations. Other browser clients retain their explicit app-selection behavior. This removes a transport-specific composer-pill prerequisite, not the need for Connector evidence.
+Campaign revision observation, Issue authoring/follow-up, adoption challenge and fresh audit now frame the existing canonical prompt as literal `@github connector <prompt>`. They explicitly clear inherited app preselection; Oracle receives no `--browser-app` for these operations. Other browser clients retain their explicit app-selection behavior. This removes a transport-specific composer-pill prerequisite, not the need for Connector evidence.
 
 New session evidence consumes the invocation-owned captured conversation: validated response bytes, complete bounded history, the latest completed user/assistant turn and successful published GitHub tool returns with consistent Connector identity. A pill, answer-only claim, stale tool turn, mismatched citation or altered history cannot supply this evidence. The exact-revision decoder shares history validation and still checks both original GitHub JSON resources and their exact SHA. Historical immutable receipts retain their original evidence scope.
 

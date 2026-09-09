@@ -8,7 +8,7 @@ export function campaignBrowserMetadata(input: { repoRoot: string; sessionId: st
   const parent = input.sourceSessionId ? `oracle-${input.sourceSessionId}` : undefined;
   const history = structuredClone(historyFixture);
   const body = JSON.parse(history.response.body.replaceAll('connector_76869538009648d5b282a4bb21c3d157', 'github'));
-  body.messages[0].content.parts = ['@GitHub fixture request'];
+  body.messages[0].content.parts = ['@github connector fixture request'];
   history.response.body = JSON.stringify(body);
   history.response.decodedBodySha256 = createHash('sha256').update(history.response.body).digest('hex');
   return {
