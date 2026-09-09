@@ -373,9 +373,17 @@ function settleObservedCampaignFailureUnderLock(
   const work = handoff.acquired.envelope;
   const launch = readPlanningRecord<{ request: { provider?: string; worker_command: string; verifier_command: string } }>(root, intent, key(selector.dispatch_id, 'launch'));
   if (launch?.request.provider !== 'codex-exec') return null;
+  const failureReservation = () => {
+    const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
+    const reservation = readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), env);
+    if (!reservation || reservation.kind !== 'repo-harness-automation-reservation' || reservation.unit_id !== handoff.acquired.offer.work_package_id
+      || reservation.attempt !== handoff.acquired.offer.attempt_count + 1 || reservation.provider !== 'codex') throw new Error('failed child reservation differs');
+    return reservation;
+  };
+  const successful: { invocation: CampaignCodexInvocation; child: { observation: CampaignWorkerChildObservation; stdout_sha256: string; stderr_sha256: string }; terminal: ReturnType<typeof observeCampaignCodexTerminal> }[] = [];
   for (const role of ['worker', 'verifier'] as const) {
     const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation; stdout_sha256: string; stderr_sha256: string }>(root, intent, key(selector.dispatch_id, `child-${role}`));
-    if (!child || child.observation.exit_code === null || child.observation.exit_code === 0) continue;
+    if (!child || child.observation.exit_code === null) continue;
     const observation = child.observation;
     const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
     const started = readPlanningRecord<{ invocation_sha256: string; identity: unknown }>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'started'));
@@ -390,10 +398,8 @@ function settleObservedCampaignFailureUnderLock(
     if (terminal.supervision_proven !== true || observation.output_complete !== true || observation.output_sha256?.stdout !== `sha256:${digest(stdout)}`
       || observation.output_sha256?.stderr !== `sha256:${digest(stderr)}` || child.stdout_sha256 !== digest(stdout) || child.stderr_sha256 !== digest(stderr)
       || !exact(observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...observation }), terminal)) throw new Error('failed child supervision is incomplete');
-    const budget = ensureCampaignAuthoringBudget({ repo_root: root, authorization: authority.grant, env }).budget;
-    const reservation = readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), env);
-    if (!reservation || reservation.kind !== 'repo-harness-automation-reservation' || reservation.unit_id !== handoff.acquired.offer.work_package_id
-      || reservation.attempt !== handoff.acquired.offer.attempt_count + 1 || reservation.provider !== 'codex') throw new Error('failed child reservation differs');
+    if (observation.exit_code === 0) { successful.push({ invocation, child, terminal }); continue; }
+    const reservation = failureReservation();
     const cancelled = observation.termination_cause === 'cancelled';
     const contract_run = { status: 'fail' as const, failure_class: cancelled ? 'cancelled' : observation.timed_out ? 'wall_time_exceeded' : `${role}_failed` };
     const result_sha256 = digest(canonicalMessageBytes({ invocation, child, terminal, contract_run }));
@@ -405,7 +411,22 @@ function settleObservedCampaignFailureUnderLock(
     settleCampaignFinal({ root, selector, handoff, final, env });
     return final;
   }
-  return null;
+  if (successful.length !== 2 || successful.some(({ terminal }) => terminal.state !== 'terminal' || terminal.runtime_effect_inactive !== true)) return null;
+  const verdict = parseCampaignVerifierResponse(successful[1]!.terminal.final_response!);
+  if (verdict.verdict !== 'fail') return null;
+  // A supervised verifier rejection owns failure even if the worker never wrote
+  // its report. The runtime proof is the result; no worker outcome is invented.
+  const contract_run = { status: 'fail' as const, failure_class: 'verifier_rejected' };
+  const basis = { children: successful, contract_run };
+  const final: CampaignWorkerFinal = { reservation: failureReservation(), contract_run, outcome: 'permanent_failure',
+    ended_at: automationStoreNow(), result_sha256: digest(canonicalMessageBytes(basis)),
+    evidence: successful.flatMap(({ child }) => [
+      { path: child.observation.stdout_path, sha256: child.stdout_sha256 },
+      { path: child.observation.stderr_path, sha256: child.stderr_sha256 },
+    ]), runtime_effect_id: canonicalMessageDigest(basis), evidence_refs: successful.map(({ terminal }) => terminal.terminal_sha256) };
+  persistPlanningRecord(root, intent, key(selector.dispatch_id, 'final'), final);
+  settleCampaignFinal({ root, selector, handoff, final, env });
+  return final;
 }
 
 /** Settle the original attempt as unresolved work, never as provider success or a writable rebind. */
@@ -471,13 +492,13 @@ export function readSettledFailedCampaignDispatches(root: string, intent: IssueB
     if (readLease(root, work.task_id).classification !== 'available') throw new Error('resume requires every prior Lease to be released');
     if (readPlanningRecord(root, intent, key(selector.dispatch_id, 'recovered'))) throw new Error('resume does not cover a recovered dispatch');
     const final = readPlanningRecord<CampaignWorkerFinal>(root, intent, key(selector.dispatch_id, 'final'));
-    if (!final || final.reservation.automation_run_id !== campaignAutomationRunId({ repository_id: intent.repository_id, campaign_id: intent.campaign_id }) || final.outcome !== 'external_blocked' || final.contract_run.status !== 'fail'
+    if (!final || final.reservation.automation_run_id !== campaignAutomationRunId({ repository_id: intent.repository_id, campaign_id: intent.campaign_id }) || !['external_blocked', 'permanent_failure'].includes(final.outcome) || final.contract_run.status !== 'fail'
       || final.contract_run.failure_class !== 'verifier_rejected') throw new Error('resume requires a known failed verifier final');
     const settled = readAutomationUsageForResult({ repo_root: root, reservation: final.reservation,
       evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env, read_only: true });
     if (!settled) throw new Error('resume final has no exact budget settlement');
     const offer = handoff.acquired.offer;
-    if (readTaskAutomationAttemptCurrent(root, offer.work_package_id, offer.work_package_revision)?.last_outcome !== 'external_blocked') throw new Error('resume attempt outcome is not settled');
+    if (readTaskAutomationAttemptCurrent(root, offer.work_package_id, offer.work_package_revision)?.last_outcome !== final.outcome) throw new Error('resume attempt outcome is not settled');
     const terminals = (['worker', 'verifier'] as const).map(role => {
       const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
       const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation }>(root, intent, key(selector.dispatch_id, `child-${role}`));
