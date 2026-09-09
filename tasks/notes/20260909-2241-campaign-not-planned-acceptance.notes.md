@@ -40,4 +40,4 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 - Promote to `docs/researches/` only when it is durable repo knowledge with evidence.
 - Promote to harness asset files only after verification across more than one task or fixture.
 
-> **Substantive Change SHA256**: `sha256:493d4f37151a1bde2896d9fd39362dd42bd84ba29f2f2dc8e8776d55a4504909`
+> **Substantive Change SHA256**: `sha256:eb740d59f5960845318e5ff8075b561ad6153afb79831f9c36990c5d53dcb48e`
