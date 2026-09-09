@@ -1,4 +1,4 @@
-import { assertReplaceableStoppedSuccessor, assertResumedAuthoringTarget, bindAdoptedResume, resolveEffectiveContinuation, validateAdoptedResumeSource, type AdoptedResumeSource, type ContinuationReplacementBasis } from './campaign-authoring-resume';
+import { assertStoppedAdoptedResumeEligible, assertReplaceableStoppedSuccessor, assertResumedAuthoringTarget, bindAdoptedResume, resolveEffectiveContinuation, validateAdoptedResumeSource, type AdoptedResumeSource, type ContinuationReplacementBasis } from './campaign-authoring-resume';
 import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 import { campaignGithubPrompt, readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
@@ -253,13 +253,14 @@ function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: read
   const next = readDevelopmentCampaignStatus(input.repo_root, input.campaign_id, input.env);
   const publication = readIssueBatchAdoptionArtifact(input.repo_root, old, 'publication');
   const adopted = publication !== null;
+  if (adopted) assertStoppedAdoptedResumeEligible(input.repo_root, old, input.env);
   if (old.repository_id !== next.campaign.repository_id || old.provider_repository !== repository
     || old.target_ref !== next.campaign.target_ref || source.verification !== 'verified'
-    || (adopted ? status.current.state !== 'stopped' || budget.current.consumed.successful_acquisitions !== 0
+    || (adopted ? status.current.state !== 'stopped'
       : status.current.state !== 'group_preparing' || budget.current.state !== 'budget_exhausted' || !budget.stop_receipt)
     || budget.budget.authorization.authorization_sha256 !== grant.authorization_sha256
     || budget.current.open_reservation_sha256s.length !== 0 || ledger.active_step !== null
-    || JSON.stringify(old.slots) !== JSON.stringify(slots)) fail('issue_authoring_invalid', 'resume requires a verified quiescent predecessor: exhausted pre-adoption or stopped never-acquired publication, with identical repository scope');
+    || JSON.stringify(old.slots) !== JSON.stringify(slots)) fail('issue_authoring_invalid', 'resume requires a verified quiescent predecessor: exhausted pre-adoption or stopped settled publication, with identical repository scope');
   /**
    * Issue identity and last confirmed remote modification are two data with two authorities: the
    * source adoption still decides slot, database ID and URL, while every superseded chain link

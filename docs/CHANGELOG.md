@@ -4,14 +4,178 @@ All notable changes to this skill are documented here.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-10
+
+The release grows a second layer on top of the file-backed session contract:
+authorized programs that hold their own budget, task offers, leases, and
+evidence, so a Sprint can advance without a human driving each step. The
+session layer is unchanged in shape — plans, contracts, checks, and handoffs
+remain the durable authority — and every program surface below sits on top of
+it rather than beside it.
+
+### Breaking
+
+- **`herdr` >= 0.9.0 replaces `tmux` as the peer-terminal runtime.** tmux
+  support and its readiness probes are removed from
+  `scripts/check-agent-tooling.sh`; the pin lives in
+  `.ai/harness/policy.json#external_tooling.herdr` and is checksum-verified.
+  A host with only tmux installed fails strict readiness after upgrading.
+  Drain reviewers hosted by the previous runtime and rebind terminal endpoints
+  before the upgrade — see
+  [`20260909-herdr-runtime-cutover.md`](researches/20260909-herdr-runtime-cutover.md).
+- **`tasks/current.md` is no longer a tracked file.** It was tracked but derived
+  entirely from untracked local markers, so one session's snapshot could
+  misrepresent itself as mainline truth. It is now untracked and gitignored, the
+  adoption template ignores it from `init`, and `check-task-workflow` /
+  `check-task-sync` no longer require it. An already-adopted repo must run
+  `git rm --cached tasks/current.md` and pick up the new `.gitignore` entry.
+- **Sprint backlogs require schema v2.** Sprint task IDs are now persisted as
+  immutable identities, which the scheduler treats as authority. Run
+  `repo-harness sprint migrate-schema` — atomic, fail-closed, with pre-write
+  restore on refusal — before `engineer acquire-next` can trust task identity.
+- **The `provider-thread-effects` architecture capability is retired** and
+  replaced by `agent-runtime-effects`. Generated `CLAUDE.md` / `AGENTS.md`
+  capability blocks still naming the old identity are stale and need
+  regeneration.
+- **The Oracle exact pin moves 0.14.1 -> 0.20.0** and the ChatGPT browser cookie-path
+  transport is removed. `--copy-profile <user-data-dir>
+  --browser-chrome-profile <profile-dir>` is the only supported bound-profile
+  transport; `browser-doctor` fails closed with `ORACLE_INCOMPATIBLE` or
+  `ORACLE_RUNTIME_FLAGS_UNSUPPORTED` and points at `--oracle-bin` /
+  `REPO_HARNESS_ORACLE_BIN` instead of retrying a pinned install.
+- **`campaign close-not-planned` enforces the canonical acceptance vocabulary.**
+  Only `external_pass` and `user_waiver` are accepted; the generic `pass` status
+  from the unrelated status vocabulary is rejected rather than aliased.
+- **Fleet acquisition's plan-to-todo projection is initialize-only.** It fills a
+  missing contract and can no longer overwrite an authored one.
+
 ### Added
 
+- **Authorized programs.** `repo-harness automation grant mint` stores
+  one operator-minted `ProgramAuthorizationV1` in the harness home gate store,
+  and `authorization list` prints the digests held for a repository. Every
+  program surface below — automation, refactor, campaign, collaboration — starts
+  from a stored authorization digest; there is no unauthenticated start path.
+- **A per-goal budget ledger.** `repo-harness automation budget show|list`
+  reads the enforceable budget projection for an automation run. Provider calls,
+  campaign steps, shadow adoption observations, heartbeat execution, and worker
+  acquisition all reserve against it before the work is recorded.
+  `automation budget repair` is an operator drift-repair verb: it re-runs the
+  locked reconciliation so a stopped or expired run seals its exhaustion
+  receipt, and never reserves, charges, or changes a cap.
+- **A bounded unattended controller.** `repo-harness automation controller
+  start|step|status|stop|reconcile` runs one Engineer dispatch loop under hard
+  caps — `--maximum-steps`, `--maximum-duration-ms`,
+  `--maximum-transient-retries`, deterministic backoff — reserving budget before
+  each attempt and validating projected outcomes against a bounded attempt-retry
+  ledger.
+- **Renewable Lease liveness.** A Lease carries `renewal_interval_ms`,
+  `maximum_ttl_ms`, and a closed set of evidence sources (`controller`,
+  `runtime_effect`, `publication`, `binding`); `automation controller start`
+  configures it with `--lease-renewal-interval-ms` and
+  `--lease-maximum-ttl-ms`. An unproven liveness state requires attention rather
+  than reclaiming silently.
+- **An Engineer scheduling core.** `repo-harness engineer acquire-next
+  --authorization-id <id> --idempotency-key <key>` selects and claims the first
+  canonical offer for an enrolled principal. Dependency edges
+  (`canonical_done`, `module_accepted`, `publication_integrated`,
+  `product_accepted`) resolve from receipt authorities instead of inference,
+  `engineer principal enroll|list|status|revoke` maps an OAuth authorization to
+  a Binding, `engineer message send|receive|ack` gives each claim an immutable
+  inbox that supersedes on takeover, `engineer task-freeze` freezes a bound task
+  without transferring execution, and `engineer board` projects read-only
+  organization attention.
+- **A typed WorkDemand lifecycle.** `repo-harness engineer work-demand
+  propose|transition|materialize|status` drives agent-proposed work through
+  `proposed -> under_review -> accepted -> materializing -> materialized ->
+  integrated`, with digest-guarded transitions and an atomic materialization
+  receipt when an accepted projection becomes a canonical Sprint task.
+- **Development campaigns.** `repo-harness campaign` runs an authorized campaign
+  state machine over a seeded repair program: `audit` takes a budgeted
+  read-only group audit, `author` persists an `IssueBatchIntentV1` and opens the
+  GPT Pro authoring lane, `author-followup` reuses that session for missing
+  slots or one explicit edit, `adopt` verifies exact-SHA readback and publishes
+  an atomic repair batch candidate, `step` hands one adopted task to its local
+  planning session, and `start`/`transition`/`status`/`closeout` move and read
+  the machine. `prepare-resume` emits a zero-provider resume request and its
+  preflight from stored adoption, continuation, and budget evidence, and can
+  replace a stopped-but-never-adopted successor through a typed
+  `superseded-<hex>` record without rewriting the original continuation
+  artifact. Resuming an adopted campaign requires a formally stopped
+  predecessor whose budget evidence is fully settled — no open reservation, no
+  active ledger step, no reserved provider call, and the authorization digest
+  still matching the grant. A stopped grant is never made executable again.
+- **Refactor Mode.** `repo-harness refactor` operates an ArchContext-backed
+  refactor program: `discover` scans and assesses one local agent proposal
+  inside shadow boundaries, `materialize` turns an authorized recommendation
+  into multiple Work Packages against a single canonical Sprint task authority,
+  `verify-candidate` chains contract, cutover closure, provider measurement and
+  acceptance receipt, and `architecture-request`, `bind-execution`,
+  `resolve-post-merge`, `board`, `canary-record`, `activation-promote`, and
+  `activation-status` cover the rest of the state machine. Activation remains
+  off in this release: the canary set and rung-promotion evidence must be
+  refreshed against the installed provider before it turns on.
+- **A collaboration plane.** `repo-harness collaboration` reads the Work
+  Exchange for one authenticated Module Engineer — `exchange` for the snapshot,
+  `threads` for lanes, hotspot scores and contribution opportunities, `signals`
+  and `post` for the append-only `CoordinationSignalV1` store, `handoff
+  publish|list|adopt` for `WorkStateHandoffV1` (adoption is non-exclusive and
+  grants no Task, Claim, or Lease), and `packet build|read` for bounded
+  context packets. The author is always derived from `--authorization-id`; a
+  payload cannot declare its own actor.
+- **External source intake.** `repo-harness external-source
+  refresh|list|bind|bindings|context` observes provider Issues and binds one
+  immutable source revision to one exact pending canonical task and its approved
+  plan/contract. Intake is inert: an observed Issue mints no execution
+  authority and does not become a runnable task on its own.
+- **Persistent Claude acceptance review.** `repo-harness claude-review
+  round|status|close|cancel` hosts a read-only Claude reviewer in an owned herdr
+  session that survives up to three repair rounds against prepared
+  `verify-sprint` evidence. `round` accepts `--timeout-ms` up to 1,800,000, and
+  a repeat session past the round budget is refused with
+  `claude_review_session_budget_exhausted`.
+- **Offline uninstall.** `repo-harness uninstall --target codex|claude|both
+  [--dry-run] [--recover-interrupted]` removes only owned managed configuration
+  — hooks, managed context blocks, receipts — and preserves user edits and
+  static history. `repo-harness mcp uninstall` does the matching cleanup for
+  local MCP registration and credentials, refusing ChatGPT credential deletion
+  until `--services-stopped` confirms every MCP HTTP service is down.
 - **Real multi-agent collaboration canary.** A source-checkout canary runs three
   isolated baseline/treatment protocol traces with three concurrent read-only
   Codex Workers plus one real successor run, exact usage metrics, bounded
   context injection, source-signal reuse, handoff adoption, persisted
   writer-lineage checks and delivery-authority digests. C9-A and C9-B pass;
   persistent `EngineerSeatV2`, Phase 5 Review and Phase 6 Merge remain inactive.
+- **Context-map drift check.** `bun run check:context-map` validates
+  `.ai/context/context-map.json` against ArchContext capability nodes and disk,
+  rejecting duplicate paths and dangling capability ids. `--write` performs a
+  one-shot repair.
+- **Route-eval coverage gate and a split CI.** `check:route-eval
+  --check-ts-arm` replays 31 route scenarios covering every
+  `PROMPT_GUARD_INTENTS` and `PROMPT_GUARD_ACTIONS` entry and fails below a
+  pinned coverage floor, running ahead of the test step. Governance and
+  functional checks now run as independent CI jobs.
+
+### Changed
+
+- **Verification and acceptance are separate authorities.** Execution facts
+  (test and `verify-contract` runs) no longer double as semantic acceptance;
+  active contracts are migrated onto the split and execution identity is
+  preserved across the migration rather than re-derived.
+- **ArchContext moves 0.4.7 -> 0.5.8** as the Refactor Mode provider contract,
+  with discovery and resolution bound to the pinned version.
+- **Campaign acquisition consumes contract authority from the canonical plan
+  proof.** Workers read `acquired.envelope.plan.contract_sha256` directly
+  instead of keeping a competing digest.
+- **Fleet worktree acquisition resolves `contract-worktree` and `plan-to-todo`
+  from the packaged trusted-runtime helpers**, not repository-local `scripts/`,
+  so a downstream repo without those helper scripts can complete acquisition
+  instead of failing on a valid execution-ready offer.
+- **Shipped agent-facing surfaces are English-only.** Six orphan Chinese
+  templates and their dead advisories are deleted; the design-brief template and
+  the TDD/BDD/AssetLayer advisories are English-only. Hook intent regexes, skill
+  trigger phrases, and the operator board's i18n stay bilingual because they
+  match user input rather than instruct an agent.
 
 ### Fixed
 
@@ -20,6 +184,28 @@ All notable changes to this skill are documented here.
   final agent message. Test shims emit the same JSONL shape, raw-marker output is
   rejected, provider usage is retained, and the delegated capture ceiling is 1
   MiB so tool events cannot erase the terminal message at the old 64 KiB cap.
+- **Lease reclaim no longer races observation time.** Reclaim eligibility and
+  reclaim-receipt acceptance are revalidated across the actual observation
+  window, and reclaim additionally requires proof that the claiming command's
+  process tree still contains the original descendant.
+- **The `@github` connector is activated by exact prompt text.** `campaign
+  author` and `step` verify the tool call was captured instead of assuming
+  activation from prompt intent, so an activation prompt can no longer silently
+  no-op.
+- **Docker-supervised workers cannot grant themselves supervision authority.**
+  Renewal, liveness, and namespace-exit cleanup are isolated from the worker
+  process they supervise, and the namespace-exit cleanup race is closed.
+- **Attempt accounting is closed.** A repair attempt can no longer be recorded
+  without a matching budget reservation, an outcome outside the closed enum
+  cannot be projected as satisfied, and unobserved provider event types are
+  rejected during campaign provider-lifecycle recovery.
+- **ChatGPT browser and MCP races are closed.** The stale cookie-database
+  transport and its `browserCookiePath` capability are removed rather than
+  falling back to an anonymous session, and a same-prompt-already-running
+  refusal maps to `ORACLE_SESSION_ALREADY_RUNNING` with reattach guidance
+  instead of an automatic `--force`.
+- **Architecture projection reclaim is bound to the attempt's own timeout**, so
+  a long-running projection job is no longer reclaimed against a stale window.
 
 ## [0.18.0] - 2026-08-29
 

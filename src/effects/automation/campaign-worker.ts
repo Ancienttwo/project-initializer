@@ -1,3 +1,4 @@
+import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { createHash } from 'crypto';
 import { lstatSync, readFileSync, realpathSync } from 'fs';
@@ -6,14 +7,15 @@ import { canonicalMessageBytes, canonicalMessageDigest } from '../../core/messag
 import { attemptIdentity, AUTOMATION_ATTEMPT_OUTCOMES, type TaskAutomationAttemptOutcome } from '../../core/engineers/automation-attempt';
 import { resolveEngineerPrincipal } from '../engineers/principal';
 import { readClaimActorReceipt, validateClaimActorReceiptLive } from '../engineers/claim-actor-store';
-import { recordTaskAutomationAttemptStart, recordTaskAutomationAttemptOutcome } from '../engineers/automation-attempt-store';
+import { readTaskAutomationAttemptCurrent, recordTaskAutomationAttemptStart, recordTaskAutomationAttemptOutcome } from '../engineers/automation-attempt-store';
 import type { ScheduledEngineerAcquireResult } from '../engineers/scheduling-acquire';
 import { validateFleetWorkEnvelope } from '../fleet/acquire';
 import { readIssueBatchIntent } from './issue-batch-store';
 import { requireCampaignPlanningAuthority } from './campaign-planning-proof';
-import { persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
+import { listPlanningRecords, persistPlanningRecord, readPlanningRecord, withCampaignPlanningLock } from './campaign-planning-store';
 import { ensureCampaignAuthoringBudget, readAutomationReservationByKey, reserveAutomationBudget, appendAutomationUsage, readAutomationUsageForResult, readAutomationBudgetStatus } from './budget-store';
 import { automationStoreNow } from './clock';
+import type { IssueBatchIntentV1 } from '../../core/automation/issue-batch';
 import type { CampaignAcquisitionInput } from './campaign-acquisition';
 import { readLease } from '../state/coordination-lease-store';
 import { LeaseLivenessStoreError, readLeaseLiveness, renewLeaseLiveness } from '../state/coordination-lease-liveness-store';
@@ -444,5 +446,50 @@ export function settleInterruptedCampaignWorker(selectorValue: unknown, env?: No
     persistPlanningRecord(root, intent, key(selector.dispatch_id, 'final'), final);
     settleCampaignFinal({ root, selector, handoff, final, env });
     return final;
+  });
+}
+
+/** Read failed antecedents only; no ownership, settlement or provider effect is created here. */
+export function readSettledFailedCampaignDispatches(root: string, intent: IssueBatchIntentV1, acquisitions: number, env?: NodeJS.ProcessEnv) {
+  const inventory = listPlanningRecords(root, intent);
+  if (inventory.some(entry => entry.record !== null && typeof entry.record === 'object'
+    && 'kind' in entry.record && entry.record.kind === 'repo-harness-campaign-closeout-intent')) throw new Error('resume does not cover published task closeout');
+  const handoffs = inventory.filter(entry => {
+    const record = entry.record;
+    return record !== null && typeof record === 'object' && Object.hasOwn(record, 'selector');
+  });
+  if (!Number.isSafeInteger(acquisitions) || acquisitions <= 0 || handoffs.length !== acquisitions) throw new Error('resume acquisition inventory is incomplete');
+  return handoffs.map(entry => {
+    const supplied = entry.record as CampaignWorkerHandoff;
+    const context = readCampaignWorkerHandoff(supplied.selector);
+    const { selector, handoff } = context;
+    if (context.root !== realpathSync(root) || context.intent.intent_sha256 !== intent.intent_sha256
+      || entry.key !== key(selector.dispatch_id, 'handoff') || !exact(handoff, supplied)) throw new Error('resume handoff inventory differs');
+    const work = handoff.acquired.envelope;
+    const retired = readPlanningRecord<{ dispatch_id: string; host: string; session_id: string }>(root, intent, key(selector.dispatch_id, 'retired'));
+    if (!retired || retired.dispatch_id !== selector.dispatch_id || retired.host !== handoff.host || retired.session_id !== handoff.session_id) throw new Error('resume requires an exactly retired dispatch');
+    if (readLease(root, work.task_id).classification !== 'available') throw new Error('resume requires every prior Lease to be released');
+    if (readPlanningRecord(root, intent, key(selector.dispatch_id, 'recovered'))) throw new Error('resume does not cover a recovered dispatch');
+    const final = readPlanningRecord<CampaignWorkerFinal>(root, intent, key(selector.dispatch_id, 'final'));
+    if (!final || final.reservation.automation_run_id !== campaignAutomationRunId({ repository_id: intent.repository_id, campaign_id: intent.campaign_id }) || final.outcome !== 'external_blocked' || final.contract_run.status !== 'fail'
+      || final.contract_run.failure_class !== 'verifier_rejected') throw new Error('resume requires a known failed verifier final');
+    const settled = readAutomationUsageForResult({ repo_root: root, reservation: final.reservation,
+      evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env, read_only: true });
+    if (!settled) throw new Error('resume final has no exact budget settlement');
+    const offer = handoff.acquired.offer;
+    if (readTaskAutomationAttemptCurrent(root, offer.work_package_id, offer.work_package_revision)?.last_outcome !== 'external_blocked') throw new Error('resume attempt outcome is not settled');
+    const terminals = (['worker', 'verifier'] as const).map(role => {
+      const invocation = readPlanningRecord<CampaignCodexInvocation>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'intent'));
+      const child = readPlanningRecord<{ observation: CampaignWorkerChildObservation }>(root, intent, key(selector.dispatch_id, `child-${role}`));
+      const stored = readPlanningRecord<ReturnType<typeof observeCampaignCodexTerminal>>(root, intent, campaignRuntimeRecordKey(selector.dispatch_id, role, 'terminal'));
+      if (!invocation || !child || !stored || invocation.identity.dispatch_id !== selector.dispatch_id || invocation.identity.role !== role
+        || invocation.identity.task_id !== work.task_id || invocation.identity.task_revision !== work.task_revision
+        || invocation.identity.claim_id !== work.claim_id || invocation.identity.lease_generation !== work.generation
+        || invocation.identity.binding_generation !== handoff.acquired.offer.binding_generation) throw new Error('resume runtime identity is incomplete');
+      const terminal = observeCampaignCodexTerminal({ invocation, worktree: work.worktree_path, ...child.observation });
+      if (!exact(terminal, stored) || terminal.state !== 'terminal' || terminal.runtime_effect_inactive !== true) throw new Error('resume runtime inactivity is not proven');
+      return terminal.terminal_sha256;
+    });
+    return { dispatch_id: selector.dispatch_id, result_sha256: final.result_sha256, terminal_sha256s: terminals };
   });
 }
