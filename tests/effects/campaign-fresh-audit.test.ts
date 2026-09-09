@@ -4,11 +4,11 @@ import { createHash } from 'crypto';
 import historyFixture from '../fixtures/campaign-revision-evidence/history.json';
 import { test, expect, afterEach } from 'bun:test';
 import { execFileSync } from 'child_process';
-import { readFileSync, rmSync, writeFileSync } from 'fs';
+import { readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { createAdoptionRepository } from '../helpers/campaign-adoption-repository';
 import { installHistoricalAdoption } from '../helpers/historical-campaign-lifecycle';
-import { readDevelopmentCampaignStatus, appendDevelopmentCampaignEvent } from '../../src/effects/automation/development-campaign-store';
+import { readDevelopmentCampaignStatus, appendDevelopmentCampaignEvent, developmentCampaignStoreRoot } from '../../src/effects/automation/development-campaign-store';
 import {
   buildCampaignGroupSnapshot,
   persistCampaignGroupSnapshot,
@@ -36,6 +36,8 @@ async function fixture(cleanup = true, groupCount: 1 | 2 | 3 = 1) {
     { group_count: groupCount, max_provider_calls: 20, max_provider_failures: 10, max_agent_turns: 30, max_runner_invocations: 30 },
   );
   roots.push(f.root, f.home);
+  // Production order: the group adoption and its publication precede start_group.
+  const publication = installHistoricalAdoption(f);
   const status = readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env);
   appendDevelopmentCampaignEvent({
     repo_root: f.root,
@@ -46,7 +48,6 @@ async function fixture(cleanup = true, groupCount: 1 | 2 | 3 = 1) {
     observed_at: new Date().toISOString(),
     env: f.env,
   });
-  const publication = installHistoricalAdoption(f);
   git(f.root, ['merge', '--ff-only', publication.materialized_commit]);
   const manifest = JSON.parse(git(f.root, ['show', `${publication.materialized_commit}:${publication.manifest_path}`]));
   // Synthetic historical completion, never current active-admission evidence.
@@ -301,10 +302,10 @@ test('three-group real-store sequence carries each final SHA and refuses Group 4
       });
       intent = started.intent;
       expect(intent.base_main_sha).toBe(finals[group - 2]);
-      transition('start_group', group);
       // Synthetic adoption/cleanup only: this regression proves group sequencing, not live delivery.
       const publication = installHistoricalAdoption({ ...f, intent, input: { ...f.input, group_number: group,
         intent_sha256: intent.intent_sha256, sprint_path: 'plans/sprints/repair.sprint.md', publication_policy_path: 'plans/policies/publication.json' } });
+      transition('start_group', group);
       git(f.root, ['merge', '--ff-only', publication.materialized_commit]);
       const manifest = JSON.parse(git(f.root, ['show', `${publication.materialized_commit}:${publication.manifest_path}`]));
       withCampaignPlanningLock(f.root, intent, () => {
@@ -346,4 +347,29 @@ test('three-group real-store sequence carries each final SHA and refuses Group 4
     readBinding: f.binding, consult: async () => { throw new Error('Group 4 provider must not run'); },
   })).rejects.toThrow();
   expect(listIssueAuthoringSessions(f.root, intent.campaign_id, 3)).toHaveLength(before);
+}, 60000);
+
+test('start_group is refused before the group adoption and publication and leaves campaign state unchanged', async () => {
+  const f = await createAdoptionRepository('active', 1, undefined, {}, {},
+    { group_count: 1, max_provider_calls: 20, max_provider_failures: 10, max_agent_turns: 30, max_runner_invocations: 30 });
+  roots.push(f.root, f.home);
+  const campaign = join(developmentCampaignStoreRoot(f.root), createHash('sha256').update(f.intent.campaign_id, 'utf8').digest('hex'));
+  const facts = () => ({
+    events: readdirSync(join(campaign, 'events')).length,
+    transitions: readdirSync(join(campaign, 'transitions')).length,
+    current: readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env).current.current_sha256,
+  });
+  const before = facts();
+  const start = () => appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: f.intent.campaign_id, operation: 'start_group',
+    expected_current_sha256: readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env).current.current_sha256,
+    idempotency_key: 'guarded-start', observed_at: new Date().toISOString(), env: f.env });
+  expect(start).toThrow('adoption');
+  expect(facts()).toEqual(before);
+  const publication = installHistoricalAdoption(f);
+  expect(publication.materialized_commit).toBeTruthy();
+  start();
+  const after = facts();
+  expect(after.events).toBe(before.events + 1);
+  expect(after.transitions).toBe(before.transitions + 1);
+  expect(readDevelopmentCampaignStatus(f.root, f.intent.campaign_id, f.env).current.state).toBe('group_running');
 }, 60000);
