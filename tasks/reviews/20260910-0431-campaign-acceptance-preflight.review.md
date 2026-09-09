@@ -1,16 +1,16 @@
 # Task Review: campaign-acceptance-preflight
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260910-0431-campaign-acceptance-preflight.md
 > **Contract**: tasks/contracts/20260910-0431-campaign-acceptance-preflight.contract.md
 > **Notes File**: tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 04:31
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:3cdb656e0506da9eafc8fb1b845ea047b9c4fe5ea06ad5a48dad28dc3fff306c
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 9fd8ca27950fd62f98e776e7a2b46cf6e6ff9578
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
-> **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Disposition**: user_waiver
+> **Reviewer**: User
+> **Source**: user-waiver
+> **Actor**: ancienttwo
+> **Reviewed Subject SHA256**: sha256:3cdb656e0506da9eafc8fb1b845ea047b9c4fe5ea06ad5a48dad28dc3fff306c
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 9fd8ca27950fd62f98e776e7a2b46cf6e6ff9578
+> **Verification Evidence SHA256**: sha256:344565dd69f0e4f4e6b195b91488778367b3d1e2e2e08cc59b5ce13fd21e984c
+> **Issued At**: 2026-09-09T21:15:39.255Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Owner approved the bounded campaign acceptance-preflight repair and continuation in this session after disclosure of the external P2. The missing-review finding was reproduced and fixed, the production delta passed security and architecture checks, and all 14 executable checks passed on d5f37846. This is owner acceptance after fixes, not a second external PASS and not a waiver of campaign execution evidence.
 - Findings: none
 
 ## Behavior Diff Notes
