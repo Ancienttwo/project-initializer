@@ -1,4 +1,4 @@
-import { assertResumedAuthoringTarget, bindAdoptedResume, validateAdoptedResumeSource, type AdoptedResumeSource } from './campaign-authoring-resume';
+import { assertReplaceableStoppedSuccessor, assertResumedAuthoringTarget, bindAdoptedResume, resolveEffectiveContinuation, validateAdoptedResumeSource, type AdoptedResumeSource, type ContinuationReplacementBasis } from './campaign-authoring-resume';
 import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 import { campaignGithubPrompt, readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
@@ -216,16 +216,34 @@ function prepareBudgetedAuthoring<Result extends IssueAuthoringBrowserResult>(
 }
 
 /** A new run obtains new provider evidence; stopped source artifacts remain historical. */
-function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: readonly IssueBatchSlot[], repository: string): { action: string; adoptedSource?: AdoptedResumeSource } | undefined {
+function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: readonly IssueBatchSlot[], repository: string): { action: string; adoptedSource?: AdoptedResumeSource; supersedes?: ContinuationReplacementBasis } | undefined {
   if (input.resume_from === undefined) return undefined;
   const raw = input.resume_from;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail('issue_authoring_invalid', 'resume_from must be an object');
   const request = raw as Record<string, unknown>;
-  if (Object.keys(request).sort().join(',') !== 'campaign_id,group_number,intent_sha256,issues,source_session_ref'
+  const keys = Object.keys(request).sort().join(',');
+  if ((keys !== 'campaign_id,group_number,intent_sha256,issues,source_session_ref'
+    && keys !== 'campaign_id,group_number,intent_sha256,issues,source_session_ref,supersedes')
     || typeof request.campaign_id !== 'string' || request.campaign_id === input.campaign_id
     || !Number.isSafeInteger(request.group_number) || typeof request.intent_sha256 !== 'string'
     || typeof request.source_session_ref !== 'string' || !Array.isArray(request.issues)) fail('issue_authoring_invalid', 'resume_from fields are invalid');
+  const supersedesRequest = request.supersedes === undefined ? null : (() => {
+    const value = request.supersedes;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) fail('issue_authoring_invalid', 'resume supersedes must be an object');
+    const entry = value as Record<string, unknown>;
+    if (Object.keys(entry).sort().join(',') !== 'campaign_id,group_number,intent_sha256'
+      || typeof entry.campaign_id !== 'string' || entry.campaign_id === input.campaign_id || entry.campaign_id === request.campaign_id
+      || !Number.isSafeInteger(entry.group_number) || typeof entry.intent_sha256 !== 'string') fail('issue_authoring_invalid', 'resume supersedes fields are invalid');
+    return { campaign_id: entry.campaign_id, group_number: entry.group_number as number, intent_sha256: entry.intent_sha256 };
+  })();
   const old = readIssueBatchIntent(input.repo_root, request.campaign_id, request.group_number as number, request.intent_sha256);
+  // Eligibility is decided from canonical stores before any write, reservation or provider dispatch.
+  const supersededIntent = supersedesRequest === null ? null
+    : readIssueBatchIntent(input.repo_root, supersedesRequest.campaign_id, supersedesRequest.group_number, supersedesRequest.intent_sha256);
+  if (supersededIntent !== null && (supersededIntent.repository_id !== old.repository_id
+    || supersededIntent.provider_repository !== old.provider_repository
+    || JSON.stringify(supersededIntent.slots) !== JSON.stringify(old.slots))) fail('issue_authoring_invalid', 'resume supersedes names another repository scope');
+  const supersedes = supersededIntent === null ? undefined : assertReplaceableStoppedSuccessor(input.repo_root, supersededIntent, input.env);
   const source = assertIssueAuthoringSourceSession(input.repo_root, old.campaign_id, old.group_number, old.intent_sha256, request.source_session_ref);
   const status = readDevelopmentCampaignStatus(input.repo_root, old.campaign_id, input.env);
   const grant = readExactAuthorityBinding(input.repo_root, status.campaign, input.env ?? process.env);
@@ -242,6 +260,25 @@ function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: read
     || budget.budget.authorization.authorization_sha256 !== grant.authorization_sha256
     || budget.current.open_reservation_sha256s.length !== 0 || ledger.active_step !== null
     || JSON.stringify(old.slots) !== JSON.stringify(slots)) fail('issue_authoring_invalid', 'resume requires a verified quiescent predecessor: exhausted pre-adoption or stopped never-acquired publication, with identical repository scope');
+  /**
+   * Issue identity and last confirmed remote modification are two data with two authorities: the
+   * source adoption still decides slot, database ID and URL, while every superseded chain link
+   * whose verified sessions marked a slot contributes the marker that slot may currently carry.
+   */
+  const markerLinks = supersedes
+    ? (() => {
+      // Most recent first. A retry after an interrupted replacement already finds its own link in
+      // the chain, so the requested successor is prepended only when the chain does not carry it.
+      const links = [...resolveEffectiveContinuation(input.repo_root, old).replacements].reverse()
+        .map((entry) => ({ intent_sha256: entry.superseded.intent_sha256, campaign_id: entry.superseded.campaign_id,
+          group_number: entry.superseded.group_number, marked_slots: entry.evidence.marked_slots }));
+      if (!links.some((link) => link.intent_sha256 === supersedes.superseded.intent_sha256)) {
+        links.unshift({ intent_sha256: supersedes.superseded.intent_sha256, campaign_id: supersedes.superseded.campaign_id,
+          group_number: supersedes.superseded.group_number, marked_slots: supersedes.evidence.marked_slots });
+      }
+      return links;
+    })()
+    : [];
   const targets = request.issues.map((rawIssue: unknown) => {
     if (!rawIssue || typeof rawIssue !== 'object' || Array.isArray(rawIssue)) fail('issue_authoring_invalid', 'resume issue must be an object');
     const issue = rawIssue as Record<string, unknown>;
@@ -250,15 +287,19 @@ function resumeAuthoringAction(input: StartIssueBatchAuthoringInput, slots: read
       || typeof issue.provider_issue_url !== 'string') fail('issue_authoring_invalid', 'resume issue fields are invalid');
     const url = providerIssueUrl(issue.provider_issue_url, repository);
     if (!url) fail('issue_authoring_invalid', 'resume issue URL is outside the authorized repository');
+    const slot = issue.slot as IssueBatchSlot;
     return { slot: issue.slot, provider_issue_id: issue.provider_issue_id, provider_issue_url: url,
-      previous_marker: renderIssueBatchMarker(old.campaign_id, old.group_number, issue.slot as IssueBatchSlot) };
+      previous_markers: [
+        ...markerLinks.filter((link) => link.marked_slots.includes(slot)).map((link) => renderIssueBatchMarker(link.campaign_id, link.group_number, slot)),
+        renderIssueBatchMarker(old.campaign_id, old.group_number, slot),
+      ] };
   });
   if (JSON.stringify(targets.map(t => t.slot)) !== JSON.stringify(slots)
     || new Set(targets.map(t => t.provider_issue_id)).size !== targets.length
     || new Set(targets.map(t => t.provider_issue_url)).size !== targets.length) fail('issue_authoring_invalid', 'resume must name each slot once with unique exact Issue identities');
-  const adoptedSource = adopted ? { intent: old, source_session_ref: source.session_ref, issues: targets.map(({ previous_marker, ...issue }) => issue) } : undefined;
+  const adoptedSource = adopted ? { intent: old, source_session_ref: source.session_ref, issues: targets.map(({ previous_markers, ...issue }) => issue) } : undefined;
   if (adoptedSource) validateAdoptedResumeSource(input.repo_root, adoptedSource, next.campaign.target_revision);
-  return { adoptedSource, action: `Source intent: ${old.intent_sha256}; source session: ${source.session_sha256}; terminal evidence: ${adopted ? status.current.current_sha256 : budget.stop_receipt!.stop_receipt_sha256}. Resume only these existing Issues from the stopped campaign. Do not create any Issue. Before any edit, read every exact URL and verify its opaque database ID and previous body marker match the following manifest; if any mismatch or unavailable read occurs, stop without edits. Then re-audit the new exact baseline and update only these Issues, replacing their old markers with the new slot markers and using the current metadata schema. Preserve their scope; if it is no longer valid, report inability instead of inventing a replacement.\n${JSON.stringify(targets)}` };
+  return { adoptedSource, supersedes, action: `Source intent: ${old.intent_sha256}; source session: ${source.session_sha256}; terminal evidence: ${adopted ? status.current.current_sha256 : budget.stop_receipt!.stop_receipt_sha256}.${supersedes ? ` Superseded successor: ${supersedes.superseded.campaign_id} intent ${supersedes.superseded.intent_sha256}.` : ''} Resume only these existing Issues from the stopped campaign. Do not create any Issue. Before any edit, read every exact URL and verify its opaque GitHub database ID equals the manifest entry, then verify that the body contains exactly one repo-harness-campaign marker and that this marker is one of that entry's previous_markers; report which one you observed. If a body carries any other marker, no marker, more than one marker, or cannot be read, stop without editing that Issue. Then re-audit the new exact baseline and update only these Issues, replacing their old markers with the new slot markers and using the current metadata schema. Preserve their scope; if it is no longer valid, report inability instead of inventing a replacement.\n${JSON.stringify(targets)}` };
 }
 
 export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrowserResult>(input: StartIssueBatchAuthoringInput, deps: Pick<IssueAuthoringDependencies<Result>, 'readBinding' | 'consult' | 'now'>) {
@@ -282,7 +323,7 @@ export async function startIssueBatchAuthoring<Result extends IssueAuthoringBrow
   const prompt = buildIssueAuthoringPrompt({ ...draft, protocol: 1, kind: 'repo-harness-issue-batch-intent' }, 'initial', slots, null, null, readCampaignCapabilityIdsAtRevision(value.repoRoot, draft.base_main_sha), value.followups, resume?.action);
   const intent = buildIssueBatchIntent({ ...draft, prompt_sha256: messageSha256(prompt) });
   persistIssueBatchIntent(value.repoRoot, intent);
-  if (resume?.adoptedSource) bindAdoptedResume(value.repoRoot, intent, resume.adoptedSource);
+  if (resume?.adoptedSource) bindAdoptedResume(value.repoRoot, intent, resume.adoptedSource, resume.supersedes);
   return prepareBudgetedAuthoring(input, value.authorization, intent, 'initial', prompt, null,
     () => deps.consult(browserInput(value.repoRoot, prompt, value.binding.profileDir, value.binding.profileDirectory!, input)),
     (result) => persistSession(value.repoRoot, intent, 'initial', slots, null, null, result, createdAt, value.binding.profileDir),
