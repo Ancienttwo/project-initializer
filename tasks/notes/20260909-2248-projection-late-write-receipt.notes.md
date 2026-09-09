@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260909-2248-projection-late-write-receipt.review.md
 > **Last Updated**: 2026-09-09 22:48
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:73a194b372f2b0bf294731cd289209422443f120143e883689e459e109583240`
+> **Substantive Change SHA256**: `sha256:bf11b2d73857bd90c3b57eb25a7627799b07ae2daf2e4d0a14120593366e8a10`
 
 ## Design Decisions
 
