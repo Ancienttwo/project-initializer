@@ -62,7 +62,7 @@ export function runCampaignNotPlanned(input: {
     }
     const acceptance = input.verify_acceptance(root, input.contract_path);
     if (acceptance.protocol !== 2 || acceptance.kind !== 'repo-harness-acceptance-receipt' || acceptance.repository_root !== root
-      || acceptance.contract_file !== input.contract_path || !['pass', 'user_waiver'].includes(acceptance.disposition)
+      || acceptance.contract_file !== input.contract_path || !['external_pass', 'user_waiver'].includes(acceptance.disposition)
       || !acceptance.reviewed_paths.includes(input.artifact_path) || !acceptance.reviewed_paths.includes(artifact)) throw new Error('not_planned local acceptance is not bound to both evidence artifacts');
     if (planningArtifactBytes(root, input.artifact_path) !== bytes || messageSha256(planningArtifactBytes(root, artifact)) !== decision.falsifier.artifact_sha256) throw new Error('not_planned evidence changed during acceptance');
     withCampaignPlanningLock(root, intent, () => {
