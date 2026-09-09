@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from 'bun:test';
+import * as revisionAdmission from '../../src/effects/automation/campaign-revision-admission';
+import { afterEach, expect, test, spyOn } from 'bun:test';
 import { spawnSync } from 'child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -117,4 +118,33 @@ test.each(['reservation', 'result'] as const)('recovery rejects altered %s autho
   expect(() => recoverCampaignDispatch({ selector: f.result.worker_handoff, host: f.executeInput.host, session_id: f.executeInput.session_id, env: f.env })).toThrow(field === 'reservation' ? 'automation reservation digest' : 'exact observed result');
   expect(readLease(f.root, f.result.envelope.task_id)).toEqual(before);
   expect(readPlanningRecord(f.root, f.intent, canonicalMessageDigest({ dispatch, part: 'retired' }).slice(7))).toBeNull();
+});
+
+// Historical fixtures deliberately cannot obtain new live admission. This unit probe
+// isolates handoff persistence after that separate gate; refusal tests above keep it real.
+test('new handoff consumes admitted proof even if projection changed worktree bytes', async () => {
+  const f = await acquired();
+  writeFileSync(join(f.worktree, f.result.envelope.plan.contract_path), 'template projection\n');
+  const admission = spyOn(revisionAdmission, 'requireCampaignActiveAdmission').mockImplementation(() => {});
+  try {
+    expect(createCampaignWorkerHandoff(f.executeInput, f.result.acquired)).toEqual(f.result.worker_handoff);
+  } finally { admission.mockRestore(); }
+});
+
+test('persisted handoff with an obsolete projected digest binds only its admitted proof', async () => {
+  const f = await acquired();
+  const dispatch = f.result.worker_handoff.dispatch_id;
+  const handoffKey = canonicalMessageDigest({ dispatch, part: 'handoff' }).slice(7);
+  const handoffPath = join(issueBatchGroupStoreRoot(f.root, f.intent.campaign_id, 1), 'planning', `${handoffKey}.json`);
+  // Represent the already-persisted pre-fix record without changing its plan proof.
+  const basis = { intent_sha256: f.intent.intent_sha256, record: { ...f.result.handoff, contract_sha256: '0'.repeat(64) } };
+  writeFileSync(handoffPath, `${canonicalMessageBytes({ ...basis, record_sha256: canonicalMessageDigest(basis) })}\n`);
+  const original = readFileSync(handoffPath, 'utf8');
+  const attempt = installHistoricalAttempt(f, f.result, null);
+  writeFileSync(join(f.worktree, 'final.json'), JSON.stringify({ outcome: 'completed', evidence_paths: ['src/index.ts'] }));
+  const final = installHistoricalFinal(f, f.result, attempt);
+  expect(bindCampaignWorker(workerInput(f)).replay).toEqual(final);
+  expect(readFileSync(handoffPath, 'utf8')).toBe(original);
+  writeFileSync(join(f.worktree, f.result.envelope.plan.contract_path), 'unauthorized drift\n');
+  expect(() => bindCampaignWorker(workerInput(f))).toThrow('contract changed');
 });
