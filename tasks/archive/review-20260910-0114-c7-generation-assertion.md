@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 01:14
+> **Related Plan**: plans/archive/plan-20260910-0111-c7-generation-assertion.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260910-0114
+> **Archive Projection V1**: `plans/plan-20260910-0111-c7-generation-assertion.md` => `plans/archive/plan-20260910-0111-c7-generation-assertion.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0111-c7-generation-assertion.notes.md` => `tasks/archive/notes-20260910-0114-c7-generation-assertion.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0111-c7-generation-assertion.contract.md` => `tasks/archive/contract-20260910-0114-c7-generation-assertion.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0111-c7-generation-assertion.review.md` => `tasks/archive/review-20260910-0114-c7-generation-assertion.md`
+
 # Task Review: c7-generation-assertion
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260910-0111-c7-generation-assertion.md
-> **Contract**: tasks/contracts/20260910-0111-c7-generation-assertion.contract.md
-> **Notes File**: tasks/notes/20260910-0111-c7-generation-assertion.notes.md
+> **Plan**: plans/archive/plan-20260910-0111-c7-generation-assertion.md
+> **Contract**: tasks/archive/contract-20260910-0114-c7-generation-assertion.md
+> **Notes File**: tasks/archive/notes-20260910-0114-c7-generation-assertion.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 01:11
 > **Recommendation**: pass

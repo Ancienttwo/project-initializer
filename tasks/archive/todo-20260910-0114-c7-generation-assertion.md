@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-10 01:14
+> **Related Plan**: plans/archive/plan-20260910-0111-c7-generation-assertion.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260910-0114
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-10 01:11
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
