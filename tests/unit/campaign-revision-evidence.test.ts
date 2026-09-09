@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import history from '../fixtures/campaign-revision-evidence/history.json';
 import { readCampaignRevisionEvidence, encodeCampaignRevisionPrompt } from '../../src/core/automation/campaign-revision-evidence';
 const expected={providerSessionId:'session-fixture',connectorId:'connector_76869538009648d5b282a4bb21c3d157',repository:'example/canary',ref:'refs/heads/main',commit:'a'.repeat(40),prompt:'Read exact revision.',answer:'audit fixture'};
-const capture=()=>({status:'captured',sessionId:expected.providerSessionId,conversationId:history.conversationId,sha256:'sha256:'+'f'.repeat(64),history:structuredClone(history)});
+const capture=()=>{const h=structuredClone(history);const b=JSON.parse(h.response.body);b.messages[0].content.parts=['@github connector '+expected.prompt];h.response.body=JSON.stringify(b);h.response.decodedBodySha256=createHash('sha256').update(h.response.body).digest('hex');return {status:'captured',sessionId:expected.providerSessionId,conversationId:h.conversationId,sha256:'sha256:'+'f'.repeat(64),history:h};};
 function mutate(fn:(b:any)=>void){const c=capture();const b=JSON.parse(c.history.response.body);fn(b);c.history.response.body=JSON.stringify(b);c.history.response.decodedBodySha256=createHash('sha256').update(c.history.response.body).digest('hex');return c;}
 test('provider commit and ref responses establish exact revision without assistant authority',()=>{
  const result=readCampaignRevisionEvidence(capture(),expected);expect(result?.commit_sha).toBe(expected.commit);expect(result?.tree_sha).toBe('b'.repeat(40));
@@ -19,7 +19,7 @@ test.each([
  ['not GitHub',(b:any)=>{b.messages[1].metadata.invoked_resource.app_name='Other';}],
  ['pagination',(b:any)=>{b.page_info.has_next_page=true;}],
  ['truncated wrapper',(b:any)=>{b.messages[1].content.parts[0]='Resource uri: /response/turn0\nShowing 10 of 13 lines.';}],
- ['body changed',(b:any)=>{b.messages[0].content.parts=['@GitHub different request'];}],
+ ['body changed',(b:any)=>{b.messages[0].content.parts=['@github connector different request'];}],
  ['answer changed',(b:any)=>{b.messages[3].content.parts=['different answer'];}],
  ['duplicate tool',(b:any)=>{b.messages.push({...b.messages[1],id:'duplicate'});}],
  ['wrong repository',(b:any)=>{b.messages[1].metadata.citation_metadata.url='https://api.github.com/repos/other/repo/git/commits/'+expected.commit;}],
@@ -40,8 +40,8 @@ test('provider tool identity remains authoritative when user UI system hints are
   expect(prompt).not.toContain('github.com');
   expect(JSON.parse(prompt.slice(prompt.indexOf('\n') + 1))).toBe(instructions);
   const request = {...expected, prompt};
-  const c = mutate(b => {b.messages[0].content.parts = ['@GitHub '+prompt];});
+  const c = mutate(b => {b.messages[0].content.parts = ['@github connector '+prompt];});
   expect(readCampaignRevisionEvidence(c, request)?.commit_sha).toBe(expected.commit);
-  const changed = mutate(b => {b.messages[0].content.parts = ['@GitHub '+prompt+' changed'];});
+  const changed = mutate(b => {b.messages[0].content.parts = ['@github connector '+prompt+' changed'];});
   expect(readCampaignRevisionEvidence(changed, request)).toBeNull();
  });

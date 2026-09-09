@@ -85,7 +85,7 @@ test('fresh audit uses current default/GitHub, charges after authoring sealed, a
     readBinding: f.binding,
     consult: async (input: any) => {
       calls++;
-      expect(input.chatgptApp).toBe('GitHub');
+      expect(input.chatgptApp).toBeNull(); expect(input.prompt).toStartWith('@github connector ');
       const instructions = JSON.parse(input.prompt.slice(input.prompt.indexOf('\n') + 1));
     expect(instructions).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/commits/${git(f.root, ['rev-parse', 'HEAD'])}`);
       expect(instructions).toContain(`https://api.github.com/repos/${f.intent.provider_repository}/git/ref/${f.intent.target_ref.slice(5)}`);
@@ -234,7 +234,7 @@ test.each([1,2,3].flatMap(groupCount => (['accepted','accepted_with_followups','
     const output=JSON.stringify({protocol:1,disposition,observed_main_sha:snapshot.expected_final_main_sha,slots:['01','02'],findings:['Preserve exact upstream finding: \"retry boundary\"']});
     const history=structuredClone(historyFixture);
     const body=JSON.parse(history.response.body.replaceAll('example/canary',snapshot.provider_repository).replaceAll('a'.repeat(40),snapshot.expected_final_main_sha));
-    body.messages[0].content.parts=['@GitHub '+input.prompt];body.messages[3].content.parts=[output];history.response.body=JSON.stringify(body);
+    body.messages[0].content.parts=[input.prompt];body.messages[3].content.parts=[output];history.response.body=JSON.stringify(body);
     history.response.decodedBodySha256=createHash('sha256').update(history.response.body).digest('hex');
     return {sessionId:'audit-fresh-local',status:'completed' as const,output,meta:{status:'completed',sessionId:'audit-fresh-local',provider:'oracle',engine:'chatgpt-browser',repo:f.root,providerSessionId:'audit-fresh-provider',model:{verified:false},
       browser:{transport:'copy_profile',profileDir:'/fixture/profile',profileDirectory:f.authorization.campaign!.chrome_profile_directory,chatgptApp:'GitHub'},
@@ -271,7 +271,8 @@ test.each([1,2,3].flatMap(groupCount => (['accepted','accepted_with_followups','
     return {sessionId,status:'completed' as const,meta:campaignBrowserMetadata({repoRoot:f.root,sessionId,profileDir:input.profileDir,profileDirectory:input.profileDirectory,sourceSessionId:input.sessionId})};
   };
   const started=await startIssueBatchAuthoring({repo_root:f.root,campaign_id:f.intent.campaign_id,group_number:2,dry_run:true,env:f.env},{readBinding:f.binding,consult});
-  expect(started.intent.prompt_sha256).toBe(messageSha256(prompt));
+  expect(prompt).toStartWith('@github connector ');
+  expect(started.intent.prompt_sha256).toBe(messageSha256(prompt.slice('@github connector '.length)));
   await continueIssueBatchAuthoring({repo_root:f.root,campaign_id:f.intent.campaign_id,group_number:2,intent_sha256:started.intent.intent_sha256,source_session_ref:started.session.session_ref,operation:'fill_missing',requested_slots:['02'],dry_run:true,env:f.env},{readBinding:f.binding,followup:consult});
   expect(prompt).toContain('only for these missing slots: 02');
 },60000);
@@ -322,7 +323,7 @@ test('three-group real-store sequence carries each final SHA and refuses Group 4
         const output = JSON.stringify({ protocol: 1, disposition: 'accepted', observed_main_sha: snapshot.expected_final_main_sha, slots: ['01', '02'], findings: [] });
         const history = structuredClone(historyFixture);
         const body = JSON.parse(history.response.body.replaceAll('example/canary', snapshot.provider_repository).replaceAll('a'.repeat(40), snapshot.expected_final_main_sha));
-        body.messages[0].content.parts = ['@GitHub ' + input.prompt]; body.messages[3].content.parts = [output];
+        body.messages[0].content.parts = [input.prompt]; body.messages[3].content.parts = [output];
         history.response.body = JSON.stringify(body); history.response.decodedBodySha256 = createHash('sha256').update(history.response.body).digest('hex');
         const sessionId = `chain-audit-${group}`, providerSessionId = `chain-provider-${group}`;
         const meta = campaignBrowserMetadata({ repoRoot: f.root, sessionId, profileDir: input.profileDir, profileDirectory: input.profileDirectory });

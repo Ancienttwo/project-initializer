@@ -1,5 +1,7 @@
+import { campaignGithubPrompt, readCampaignCapturedConversation } from './campaign-revision-evidence';
 import { canonicalMessageDigest } from '../messages/mechanics';
-/** Session ownership and app selection are independent of backend model identity. */
+/** Session ownership and captured Connector calls are independent of backend model identity. */
+export { campaignGithubPrompt } from './campaign-revision-evidence';
 export interface CampaignBrowserSessionBinding {
   readonly repoRoot: string;
   readonly profileDirectory: string;
@@ -12,23 +14,55 @@ function object(value: unknown): Record<string, unknown> | null {
 }
 function nonempty(value: unknown): value is string { return typeof value === 'string' && value.trim().length > 0; }
 
+
+/** Read invocation-owned history, never a composer label or the model's answer. */
+function githubInvocation(meta: Record<string, unknown>): { pluginId: string; capturedAt: string } | null {
+  try {
+    if (!nonempty(meta.providerSessionId)) return null;
+    const captured = readCampaignCapturedConversation(object(meta.oracle)?.conversationCapture, meta.providerSessionId);
+    if (!captured) return null;
+    const {history, body, messages} = captured;
+    const final = messages.find(m => m!.id === body.current_node), finalMeta = object(final?.metadata);
+    if (object(final?.author)?.role !== 'assistant' || final?.status !== 'finished_successfully' || final.end_turn !== true
+      || !nonempty(finalMeta?.turn_exchange_id) || finalMeta.working_turn_id !== finalMeta.turn_exchange_id) return null;
+    const turn = finalMeta.turn_exchange_id;
+    const users = messages.filter(m => object(m!.author)?.role === 'user');
+    const user = users.at(-1), userMeta = object(user?.metadata), content = object(user?.content);
+    if (userMeta?.turn_exchange_id !== turn || userMeta.working_turn_id !== turn || content?.content_type !== 'text'
+      || !Array.isArray(content.parts) || content.parts.length !== 1 || typeof content.parts[0] !== 'string'
+      || !content.parts[0].startsWith(campaignGithubPrompt(''))) return null;
+    const connectors = new Set<string>();
+    for (const message of messages) {
+      const author = object(message!.author), metadata = object(message!.metadata), resource = object(metadata?.invoked_resource);
+      if (author?.role !== 'tool' || author.name !== 'api_tool.call_tool' || metadata?.turn_exchange_id !== turn) continue;
+      if (resource?.app_name !== 'GitHub') continue;
+      if (message!.status !== 'finished_successfully' || metadata.working_turn_id !== turn
+        || resource.api_tool_version !== 'v2' || resource.publish_status !== 'published' || typeof resource.resource_uri !== 'string') return null;
+      const segments = resource.resource_uri.split('/');
+      if (segments[0] !== '' || !segments[1] || segments.length < 3) return null;
+      const citation = object(metadata.citation_metadata);
+      if (citation && citation.__connector_id !== segments[1]) return null;
+      connectors.add(segments[1]);
+    }
+    if (connectors.size !== 1) return null;
+    return { pluginId: `plugin:${[...connectors][0]}`, capturedAt: history.capturedAt as string };
+  } catch { return null; }
+}
+
 function isVerifiedCampaignBrowserSession(value: unknown, binding: CampaignBrowserSessionBinding): boolean {
   const result = object(value);
   const meta = object(result?.meta);
   const browser = object(meta?.browser);
   const oracle = object(meta?.oracle);
   const observation = object(oracle?.observation);
-  const app = object(observation?.appSelection);
+
   if (result?.status !== 'completed' || meta?.status !== 'completed'
     || !nonempty(result.sessionId) || result.sessionId !== meta.sessionId
     || meta.provider !== 'oracle' || meta.engine !== 'chatgpt-browser' || meta.repo !== binding.repoRoot
     || browser?.transport !== 'copy_profile' || browser.profileDir !== binding.profileDir || browser.profileDirectory !== binding.profileDirectory
-    || browser.chatgptApp !== 'GitHub' || !nonempty(meta.providerSessionId)
+    || !nonempty(meta.providerSessionId)
     || oracle?.evidenceError !== undefined || observation?.source !== 'oracle-session-metadata'
-    || observation.sessionId !== meta.providerSessionId
-    || app?.status !== 'selected' || app.app !== 'GitHub' || app.source !== 'chatgpt-composer-pill'
-    || !nonempty(app.pluginId) || !app.pluginId.startsWith('plugin:') || app.pluginId.length <= 7
-    || !nonempty(app.capturedAt) || !Number.isFinite(Date.parse(app.capturedAt))) return false;
+    || observation.sessionId !== meta.providerSessionId) return false;
   if (binding.sourceSessionId === null) {
     return binding.parentProviderSessionId === null && meta.sourceSessionId === undefined && meta.parentProviderSessionId === undefined && observation.parentSessionId === null;
   }
@@ -57,7 +91,8 @@ export function readCampaignBrowserSessionEvidence(value: unknown, binding: Camp
   if (!isVerifiedCampaignBrowserSession(value, binding)) return null;
   const result = object(value)!;
   const meta = object(result.meta)!;
-  const app = object(object(object(meta.oracle)!.observation)!.appSelection)!;
+  const app = githubInvocation(meta);
+  if (!app) return null;
   const basis = { protocol: 1 as const, kind: 'repo-harness-campaign-browser-session-evidence' as const,
     session_ref: result.sessionId as string, provider_session_ref: meta.providerSessionId as string,
     source_session_ref: binding.sourceSessionId, parent_provider_session_ref: binding.parentProviderSessionId,

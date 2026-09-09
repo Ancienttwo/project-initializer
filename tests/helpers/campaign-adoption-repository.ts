@@ -67,7 +67,7 @@ export async function observeVerifiedFixtureRevision(f: { root: string; authoriz
       const output = 'Read the frozen fixture revision.';
       const history = structuredClone(historyFixture);
       const body = JSON.parse(history.response.body.replaceAll('example/canary', 'acme/widgets').replaceAll('a'.repeat(40), f.authorization.target_revision));
-      body.messages[0].content.parts = ['@GitHub ' + input.prompt]; body.messages[3].content.parts = [output];
+      body.messages[0].content.parts = [input.prompt]; body.messages[3].content.parts = [output];
       history.response.body = JSON.stringify(body); history.response.decodedBodySha256 = createHash('sha256').update(history.response.body).digest('hex');
       const meta = campaignBrowserMetadata({ repoRoot: f.root, sessionId, profileDir: input.profileDir, profileDirectory: input.profileDirectory });
       return { sessionId, status: 'completed' as const, output, meta: { ...meta, providerSessionId,

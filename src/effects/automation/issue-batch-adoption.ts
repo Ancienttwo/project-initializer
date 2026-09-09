@@ -1,5 +1,5 @@
 import { assertResumedAdoption } from './campaign-authoring-resume';
-import { readCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from '../../core/automation/campaign-browser-session';
+import { campaignGithubPrompt, readCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from '../../core/automation/campaign-browser-session';
 import { requireCampaignActiveAdmission } from './campaign-revision-admission';
 import { observeShadowAdoption } from './issue-batch-shadow-adoption';
 import type { GithubCommandRunner } from '../external-sources/github';
@@ -234,8 +234,8 @@ export async function adoptIssueBatch(input: AdoptIssueBatchInput, deps: IssueBa
   if (!response) {
     const admission = reserveCampaignAuthoringBudget({ ...binding, operation: 'challenge', idempotency_key: challenge.challenge_sha256 });
     if (admission.disposition === 'replayed') fail('challenge reservation already exists; reconcile its exact result before continuing');
-    const result = await deps.followup({ repoRoot: input.repo_root, sessionId: session.session_ref, title: `Campaign ${intent.campaign_id} readback`, prompt: renderConnectorChallenge(challenge, intent.provider_repository),
-      provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
+    const result = await deps.followup({ repoRoot: input.repo_root, sessionId: session.session_ref, title: `Campaign ${intent.campaign_id} readback`, prompt: campaignGithubPrompt(renderConnectorChallenge(challenge, intent.provider_repository)),
+      provider: 'oracle', chatgptApp: null, requireSecretScan: true, captureConversationEvidence: true, gitleaksBin: input.gitleaks_bin, profileDir: browser.binding.profileDir, profileDirectory: browser.binding.profileDirectory!, dryRun: false });
     response = { response: result.output ?? '', response_session_ref: result.sessionId, response_session_evidence: readCampaignBrowserSessionEvidence(result, { repoRoot: input.repo_root, profileDir: browser.binding.profileDir, profileDirectory: intent.chrome_profile_directory, sourceSessionId: session.session_ref, parentProviderSessionId: session.browser_evidence!.provider_session_ref }), status: result.status, reservation: admission.reservation };
     persistIssueBatchAdoptionArtifact(input.repo_root, intent, 'response', { ...response });
   }

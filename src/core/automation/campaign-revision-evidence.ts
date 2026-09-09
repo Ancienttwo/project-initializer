@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
 import { canonicalMessageDigest } from '../messages/mechanics';
 
+export function campaignGithubPrompt(prompt: string): string { return `@github connector ${prompt}`; }
+
 /** Preserve exact prompt bytes through the browser editor's automatic URL linking. */
 export function encodeCampaignRevisionPrompt(instructions: string): string {
   return 'Execute the instructions in this JSON string (decode JSON escapes first):\n'
@@ -79,11 +81,11 @@ function toolObject(message: ObjectValue, connector: string, turn: string, url: 
   return object(JSON.parse(wrapper.content as string));
 }
 
-/** Caller supplies only history obtained at the invocation-owned provider effect boundary. */
-export function readCampaignRevisionEvidence(capture: unknown, expected: RevisionExpectation): CampaignRevisionEvidence | null {
+/** Shared invocation-owned history validation for session and exact-revision evidence. */
+export function readCampaignCapturedConversation(capture: unknown, providerSessionId: string) {
   try {
     const c=object(capture); if(c.status!=='captured') return null;
-    requireThat(c.sessionId===expected.providerSessionId && typeof c.sha256==='string' && /^sha256:[a-f0-9]{64}$/.test(c.sha256));
+    requireThat(c.sessionId===providerSessionId && typeof c.sha256==='string' && /^sha256:[a-f0-9]{64}$/.test(c.sha256));
     const h=object(c.history), request=object(h.request), response=object(h.response);
     requireThat(h.protocol===1 && h.kind==='chatgpt-conversation-history' && typeof h.conversationId==='string' && h.conversationId===c.conversationId
       && typeof h.capturedAt==='string' && Number.isFinite(Date.parse(h.capturedAt)));
@@ -96,10 +98,21 @@ export function readCampaignRevisionEvidence(capture: unknown, expected: Revisio
       && Array.isArray(history.messages) && history.messages.length<=1024);
     const messages=(history.messages as unknown[]).map(object);
     requireThat(new Set(messages.map(m=>m.id)).size===messages.length && messages.every(m=>typeof m.id==='string'));
+    return { capture: c, history: h, body: history, messages };
+  } catch { return null; }
+}
+
+/** Caller supplies only history obtained at the invocation-owned provider effect boundary. */
+export function readCampaignRevisionEvidence(capture: unknown, expected: RevisionExpectation): CampaignRevisionEvidence | null {
+  try {
+    const captured=readCampaignCapturedConversation(capture, expected.providerSessionId);
+    if (!captured) return null;
+    const {capture:c, history:h, body:history, messages}=captured;
+    const response=object(h.response);
     const users=messages.filter(m=>object(m.author).role==='user'); requireThat(users.length===1);
     const user=users[0]!, userMeta=object(user.metadata), content=object(user.content);
     requireThat(content.content_type==='text' && Array.isArray(content.parts) && content.parts.length===1
-      && content.parts[0]==='@GitHub '+expected.prompt
+      && content.parts[0]===campaignGithubPrompt(expected.prompt)
       && typeof userMeta.turn_exchange_id==='string');
     const turn=userMeta.turn_exchange_id as string;
     requireThat(turn.length>0 && userMeta.working_turn_id===turn);

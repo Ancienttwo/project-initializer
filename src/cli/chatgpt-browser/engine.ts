@@ -580,7 +580,7 @@ export async function runBrowserFollowup(input: Omit<BrowserConsultInput, 'sourc
     thinking: input.thinking,
     provider,
     chatgptUrl: input.chatgptUrl ?? existing.meta.browser.conversationUrl ?? existing.meta.browser.chatgptUrl,
-    chatgptApp: input.chatgptApp ?? existing.meta.browser.chatgptApp,
+    chatgptApp: input.chatgptApp === null ? undefined : input.chatgptApp ?? existing.meta.browser.chatgptApp,
     profileDir: input.profileDir ?? existing.meta.browser.profileDir,
     profileDirectory: input.profileDirectory ?? existing.meta.browser.profileDirectory,
     browserChannel: input.browserChannel ?? existing.meta.browser.channel,

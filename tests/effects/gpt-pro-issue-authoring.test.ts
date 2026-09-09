@@ -121,13 +121,7 @@ describe('GPT Pro issue batch authoring effect', () => {
     const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, {
       readBinding: readBrowserBinding, now: () => observedAt,
       consult: async input => {
-        const value = result(input, 'default-session', 'completed', false);
-        return { ...value, meta: { ...value.meta,
-          providerSessionId: 'oracle-default',
-          browser: { ...value.meta.browser, chatgptApp: 'GitHub' },
-          oracle: { observation: { source: 'oracle-session-metadata' as const, sessionId: 'oracle-default', parentSessionId: null,
-            appSelection: { status: 'selected', app: 'GitHub', pluginId: 'plugin:github', source: 'chatgpt-composer-pill', capturedAt: observedAt } } },
-        } };
+        return result(input, 'default-session', 'completed', true);
       },
     });
     expect(started.browser.meta.model.verified).toBe(false);
@@ -317,7 +311,7 @@ describe('GPT Pro issue batch authoring effect', () => {
         return result(input, 'session-initial');
       },
     });
-    expect(captured).toMatchObject({ provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, profileDirectory: 'Profile 13' });
+    expect(captured).toMatchObject({ provider: 'oracle', captureConversationEvidence: true, requireSecretScan: true, profileDirectory: 'Profile 13' });
     expect(captured).not.toHaveProperty('model');
     expect(captured).not.toHaveProperty('thinking');
     expect(started.intent).toMatchObject({ repository_id: 'repo-1', provider_repository: 'acme/widgets', target_ref: 'refs/heads/main', base_main_sha: f.revision });
@@ -332,7 +326,7 @@ describe('GPT Pro issue batch authoring effect', () => {
     const started = await startIssueBatchAuthoring({ repo_root: f.root, campaign_id: 'campaign-1', group_number: 1, env: f.env }, { readBinding: readBrowserBinding, now: () => observedAt, consult: async (input) => result(input, 'session-initial', 'completed', true) });
     const calls: Array<{ sessionId: string; prompt: string; secretScan?: boolean }> = [];
     const followup = async (input: Omit<BrowserConsultInput, 'sourceSessionId'> & { sessionId: string }) => {
-      expect(input).toMatchObject({ chatgptApp: 'GitHub' });
+      expect(input.chatgptApp).toBeNull(); expect(input.prompt).toStartWith('@github connector ');
       expect(input).not.toHaveProperty('model');
       expect(input).not.toHaveProperty('thinking');
       calls.push({ sessionId: input.sessionId, prompt: input.prompt, secretScan: input.requireSecretScan });
