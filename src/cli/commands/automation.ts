@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { canonicalRepoPath } from '../../effects/repo-registry';
 
 import { readFileSync } from 'fs';
 
@@ -58,7 +59,7 @@ function outputError(error: unknown): void {
  * run has spent or why it stopped.
  */
 export function runAutomationBudgetShow(raw: AutomationBudgetRawOptions): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   const run = raw.run?.trim();
   if (!run) throw new AutomationArgumentError('--run is required');
   const slice = readAutomationBudgetBoardSlice(repo, run);
@@ -72,7 +73,7 @@ export function runAutomationBudgetShow(raw: AutomationBudgetRawOptions): void {
  * already reconciled it is a plain read.
  */
 export function runAutomationBudgetRepair(raw: AutomationBudgetRawOptions): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   const run = raw.run?.trim();
   if (!run) throw new AutomationArgumentError('--run is required');
   const status = repairAutomationBudgetDrift({ repo_root: repo, automation_run_id: run });
@@ -88,7 +89,7 @@ export function runAutomationBudgetRepair(raw: AutomationBudgetRawOptions): void
 }
 
 export function runAutomationBudgetList(raw: AutomationBudgetRawOptions): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   process.stdout.write(`${JSON.stringify({ ok: true, runs: listAutomationBudgetRuns(repo) }, null, 2)}\n`);
 }
 
@@ -98,7 +99,7 @@ export function runAutomationBudgetList(raw: AutomationBudgetRawOptions): void {
  * store then accepts only grants that resolve here byte for byte.
  */
 export function runAutomationGrantMint(raw: AutomationGrantRawOptions): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   const from = raw.from?.trim();
   if (!from) throw new AutomationArgumentError('--from is required');
   let parsed: ProgramAuthorizationV1;
@@ -117,7 +118,7 @@ export function runAutomationGrantMint(raw: AutomationGrantRawOptions): void {
 }
 
 export function runAutomationGrantList(raw: AutomationGrantRawOptions): void {
-  const repo = raw.repo?.trim() || process.cwd();
+  const repo = canonicalRepoPath(raw.repo?.trim() || process.cwd());
   process.stdout.write(`${JSON.stringify({
     ok: true,
     store: automationGrantStoreDirectory(repo),

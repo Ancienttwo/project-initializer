@@ -106,7 +106,16 @@ export function repoHarnessRepoIdFor(path: string): string {
   return `repo_${createHash("sha256").update(path).digest("hex").slice(0, 16)}`;
 }
 
-function canonicalRepoPath(path: string): string {
+/**
+ * The single canonicalization rule for a repository root. `repoHarnessRepoIdFor`
+ * hashes its argument verbatim, and every writer of a stored `repository_id`
+ * passes a path through here first, so any caller that later compares against a
+ * stored id must canonicalize the same way. `resolve` alone is not enough: it is
+ * lexical and cannot collapse a symlink, so a symlinked root would still derive a
+ * different id. Falls back to the resolved path when the target does not exist,
+ * so a caller keeps its own clear not-a-repository error instead of a raw ENOENT.
+ */
+export function canonicalRepoPath(path: string): string {
   const absolute = resolve(path);
   try {
     if (!statSync(absolute).isDirectory()) return absolute;
