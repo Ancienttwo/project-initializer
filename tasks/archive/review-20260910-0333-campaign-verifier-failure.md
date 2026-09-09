@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 03:33
+> **Related Plan**: plans/archive/plan-20260910-0321-campaign-verifier-failure.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260910-0333
+> **Archive Projection V1**: `plans/plan-20260910-0321-campaign-verifier-failure.md` => `plans/archive/plan-20260910-0321-campaign-verifier-failure.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0321-campaign-verifier-failure.notes.md` => `tasks/archive/notes-20260910-0333-campaign-verifier-failure.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0321-campaign-verifier-failure.contract.md` => `tasks/archive/contract-20260910-0333-campaign-verifier-failure.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0321-campaign-verifier-failure.review.md` => `tasks/archive/review-20260910-0333-campaign-verifier-failure.md`
+
 # Task Review: campaign-verifier-failure
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260910-0321-campaign-verifier-failure.md
-> **Contract**: tasks/contracts/20260910-0321-campaign-verifier-failure.contract.md
-> **Notes File**: tasks/notes/20260910-0321-campaign-verifier-failure.notes.md
+> **Plan**: plans/archive/plan-20260910-0321-campaign-verifier-failure.md
+> **Contract**: tasks/archive/contract-20260910-0333-campaign-verifier-failure.md
+> **Notes File**: tasks/archive/notes-20260910-0333-campaign-verifier-failure.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 03:21
 > **Recommendation**: pass
