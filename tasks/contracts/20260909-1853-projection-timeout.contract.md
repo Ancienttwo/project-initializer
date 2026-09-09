@@ -28,7 +28,7 @@ reclaimed attempt cannot publish its receipt afterwards.
 ## Scope
 
 - In scope: projection policy validator upper bound (600000, default unchanged at 120000);
-  this repo's policy value (300000); the per-attempt reclaim budget persisted on the running
+  this repo's policy value (300000, deferred to a follow-up: the installed runtime still validates 1000..120000); the per-attempt reclaim budget persisted on the running
   job record (`attemptTimeoutMs`, `attemptDeadlineAt`) by
   `claimNextArchitectureProjectionJob` and consumed by
   `recoverAbandonedArchitectureProjectionJobs` in

@@ -20,7 +20,7 @@ export function architectureProjectionRunningStaleMs(projectionTimeoutMs: number
 
 /** Recorded on the reclaimed record so a claim shape that predates the
  * persisted attempt budget is visible instead of silently accepted. */
-export const LEGACY_ATTEMPT_BUDGET_NOTE = 'legacy claim without a persisted attempt budget; stale window derived from the current policy timeout';
+export const LEGACY_ATTEMPT_BUDGET_NOTE = 'claim without a persisted attempt budget; stale window derived from the current policy timeout';
 
 /** The claim this process holds was reclaimed or replaced, so it may neither
  * publish a receipt nor drive the record's failure transition. */

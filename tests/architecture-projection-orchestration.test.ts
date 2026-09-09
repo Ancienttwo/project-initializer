@@ -543,7 +543,7 @@ describe('durable architecture projection orchestration', () => {
     const pending = JSON.parse(readFileSync(join(root, '.ai/harness/architecture-projection/pending', pendingName!), 'utf8'));
     expect(pending.attemptDeadlineAt).toBeUndefined();
     expect(pending.attemptTimeoutMs).toBeUndefined();
-    expect(pending.lastFailure.message).not.toContain('legacy claim');
+    expect(pending.lastFailure.message).not.toContain('without a persisted attempt budget');
   });
 
   test('falls back to the current policy derivation for a legacy running record and records the fallback', () => {

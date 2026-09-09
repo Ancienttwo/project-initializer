@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260909-1853-projection-timeout.review.md
 > **Last Updated**: 2026-09-09 18:53
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:a7599c3f245b48f01c5517b7bc49c6881c88c61a3e0fb163b7b155e9cc6ba24f`
+> **Substantive Change SHA256**: `sha256:e5749bd3f8997277ce8acd6b77df358878d6627eca57df54e14fb0f2a5756781`
 
 ## Design Decisions
 
