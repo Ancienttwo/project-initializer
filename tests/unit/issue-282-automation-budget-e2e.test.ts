@@ -297,6 +297,22 @@ describe('issue #282 — end-to-end stop before the next claim', () => {
     expect(listed.status).toBe(0);
     expect(JSON.parse(listed.stdout).runs).toEqual([budget.automation_run_id]);
 
+    // The repair verb is wired to the same store. This run is already reconciled,
+    // so it is a plain read: same receipt, same counts, nothing spent.
+    const repaired = spawnSync(
+      process.execPath,
+      [CLI, 'automation', 'budget', 'repair', '--repo', repo, '--run', budget.automation_run_id],
+      { cwd: ROOT, encoding: 'utf-8' },
+    );
+    expect(repaired.status, repaired.stderr).toBe(0);
+    const payload = JSON.parse(repaired.stdout);
+    expect(payload.ok).toBe(true);
+    expect(payload.drift).toBe('none');
+    expect(payload.state).toBe('budget_exhausted');
+    expect(payload.open_reservation_sha256s).toEqual([]);
+    expect(payload.stop_receipt.stop_receipt_sha256).toBe(direct.stop_receipt!.stop_receipt_sha256);
+    expect(payload.consumed.successful_acquisitions).toBe(direct.stop_receipt!.limit);
+
     const missing = spawnSync(
       process.execPath,
       [CLI, 'automation', 'budget', 'show', '--repo', repo, '--run', hex('no-such-run')],
@@ -304,5 +320,26 @@ describe('issue #282 — end-to-end stop before the next claim', () => {
     );
     expect(missing.status).not.toBe(0);
     expect(JSON.parse(missing.stderr).error).toBe('automation_budget_store_not_found');
+
+    // Repair reconciles; it does not publish. Against an empty store an unknown
+    // run reports the same refusal as `show` and leaves nothing behind: no run
+    // directory, and a list that still names no runs.
+    const empty = repoFixture();
+    const repairMissing = spawnSync(
+      process.execPath,
+      [CLI, 'automation', 'budget', 'repair', '--repo', empty, '--run', hex('no-such-run')],
+      { cwd: ROOT, encoding: 'utf-8' },
+    );
+    expect(repairMissing.status).not.toBe(0);
+    expect(JSON.parse(repairMissing.stderr).error).toBe('automation_budget_store_not_found');
+    expect(repairMissing.stderr).toBe(missing.stderr);
+    expect(existsSync(join(empty, '.git', 'repo-harness/automation-budget/v1/runs', hex('no-such-run')))).toBe(false);
+    const listedAfterRepair = spawnSync(
+      process.execPath,
+      [CLI, 'automation', 'budget', 'list', '--repo', empty],
+      { cwd: ROOT, encoding: 'utf-8' },
+    );
+    expect(listedAfterRepair.status, listedAfterRepair.stderr).toBe(0);
+    expect(JSON.parse(listedAfterRepair.stdout).runs).toEqual([]);
   }, 60_000);
 });

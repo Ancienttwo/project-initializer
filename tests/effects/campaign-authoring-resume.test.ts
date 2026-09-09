@@ -15,7 +15,8 @@ import { createDevelopmentCampaign, appendDevelopmentCampaignEvent, readDevelopm
 import { continueIssueBatchAuthoring, startIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
 import { adoptIssueBatch } from '../../src/effects/automation/issue-batch-adoption';
 import { readIssueBatchAdoptionArtifact, issueBatchGroupStoreRoot } from '../../src/effects/automation/issue-batch-store';
-import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, beginCampaignBudgetStep, readAutomationBudgetStatus, readCampaignBudgetLedger } from '../../src/effects/automation/budget-store';
+import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, beginCampaignBudgetStep, readAutomationBudgetStatus, readCampaignBudgetLedger, repairAutomationBudgetDrift } from '../../src/effects/automation/budget-store';
+import { AUTOMATION_TEST_CLOCK_SEAM_ENV, __resetAutomationClockForTests, __setAutomationClockForTests } from '../../src/effects/automation/budget-store.internal';
 import { assertResumedAdoption } from '../../src/effects/automation/campaign-authoring-resume';
 import { buildIssueAuthoringSession, renderIssueBatchMarker } from '../../src/core/automation/issue-batch';
 import { campaignAutomationRunId } from '../../src/core/automation/campaign-authoring-budget';
@@ -337,6 +338,50 @@ test('a replacement leaves the superseded budget run byte-for-byte and opens its
   const replacement = readAutomationBudgetStatus(f.root, replacementRun, f.env);
   expect(replacement.current.consumed.successful_acquisitions).toBe(0);
   expect(replacement.budget.authorization.authorization_sha256).not.toBe(before.budget.authorization.authorization_sha256);
+}, 120000);
+
+/**
+ * A stopped successor that never adopted can still sit on `unsealed_exhaustion`: its budget
+ * deadline passed while it was quiescent, so no business verb is left to seal the receipt and
+ * the replacement gate refuses the drift. The repair verb is the explicit operator step that
+ * seals it; the gate itself stays strict and never reads drift as "nothing happened".
+ */
+test('an expired stopped successor is admitted for replacement only after the budget repair verb', async () => {
+  const f = await fixture();
+  const failed = await f.failedSuccessor('campaign-2');
+  const expired = readAutomationBudgetStatus(f.root, failed.run, f.env);
+  const previousSeam = process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV];
+  process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV] = '1';
+  // Past the superseded run's frozen deadline; the grant itself is still valid, so the only
+  // thing standing between the successor and replacement is the unsealed exhaustion.
+  const pinned = new Date(Date.parse(expired.budget.deadline_at) + 60_000);
+  __setAutomationClockForTests(() => pinned);
+  try {
+    const supersedes = { campaign_id: 'campaign-2', group_number: 1, intent_sha256: failed.intent.intent_sha256 };
+    const next = await f.successor('campaign-3');
+    const request = { ...next, resume_from: { ...f.resume, supersedes } };
+    let calls = 0;
+    const consult = async () => { calls++; return { sessionId: 'campaign-3-author', status: 'completed' as const,
+      meta: campaignBrowserMetadata({ sessionId: 'campaign-3-author', repoRoot: f.root, profileDir: f.home, profileDirectory: 'Profile 1' }) }; };
+
+    expect(readAutomationBudgetStatus(f.root, failed.run, f.env).drift).toBe('unsealed_exhaustion');
+    await expect(startIssueBatchAuthoring(request, { readBinding: f.readBinding, consult }))
+      .rejects.toThrow('no unadopted budget record');
+    expect(calls).toBe(0);
+
+    const repaired = repairAutomationBudgetDrift({ repo_root: f.root, automation_run_id: failed.run, env: f.env });
+    expect(repaired.drift).toBe('none');
+    expect(repaired.stop_receipt).not.toBeNull();
+    expect(repaired.current.consumed.successful_acquisitions).toBe(0);
+
+    const started = await startIssueBatchAuthoring(request, { readBinding: f.readBinding, consult });
+    expect(calls).toBe(1);
+    expect(started.intent.campaign_id).toBe('campaign-3');
+  } finally {
+    __resetAutomationClockForTests();
+    if (previousSeam === undefined) delete process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV];
+    else process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV] = previousSeam;
+  }
 }, 120000);
 
 test('prepare-resume emits an exclusive request and its chain preflight with no provider', async () => {

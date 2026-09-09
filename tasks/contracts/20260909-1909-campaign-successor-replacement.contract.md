@@ -19,6 +19,7 @@ Allow one controlled, evidence-bound replacement of a stopped, never-adopted suc
 ## Scope
 
 - In scope: a typed `superseded-<intent>` replacement record on the predecessor, one `resolveEffectiveContinuation` used by both binder and adoption checker, a zero-write canonical-store eligibility check invoked before any write or dispatch, an evidence-bounded `previous_markers` set, a `campaign prepare-resume` zero-provider CLI, and a gpt_pro `start_group` ordering guard.
+- In scope: an `automation budget repair` operator verb (`repairAutomationBudgetDrift`) bounded to the `lockedStatus` reconciliation every mutating verb already performs — folding existing durable records and sealing an exhaustion receipt the run's own records already prove — and never rewriting or deleting any durable record.
 - Out of scope: rolling `stopped` back to runnable, relaxing the issue-batch observer, changing resume identity rules, raising or inheriting authorization caps, and rewriting or deleting any continuation, intent, session, grant, stop event or budget run.
 - Taste constraints: no compatibility fallback, no dual authority, no new error vocabulary.
 
@@ -42,7 +43,12 @@ allowed_paths:
   - src/effects/automation/gpt-pro-issue-authoring.ts
   - src/effects/automation/campaign-fresh-audit.ts
   - src/cli/commands/campaign.ts
+  - src/effects/automation/budget-store.ts
+  - src/cli/commands/automation.ts
+  - docs/spec.md
   - tests/effects/campaign-authoring-resume.test.ts
+  - tests/unit/issue-282-automation-budget-store.test.ts
+  - tests/unit/issue-282-automation-budget-e2e.test.ts
   - tests/effects/campaign-fresh-audit.test.ts
   - .archcontext/model/nodes/capability.runtime-harness.development-campaign.yaml
   - docs/architecture/
@@ -64,7 +70,7 @@ allowed_paths:
 ## Change Assessment
 
 ```json
-{"protocol": 1, "oracles": [{"id": "successor-replacement", "kind": "deterministic_test", "paths": [".archcontext/model/nodes/capability.runtime-harness.development-campaign.yaml", "docs/architecture/.projection-manifest.json", "docs/architecture/changelog.md", "docs/architecture/decisions/index.md", "docs/architecture/diagrams/architecture.likec4", "docs/architecture/diagrams/architecture.mmd", "docs/architecture/diagrams/architecture.structurizr.json", "docs/architecture/index.md", "docs/architecture/modules/runtime-harness/development-campaign.md", "docs/researches/20260909-campaign-successor-replacement.md", "src/cli/commands/campaign.ts", "src/effects/automation/campaign-authoring-resume.ts", "src/effects/automation/campaign-fresh-audit.ts", "src/effects/automation/gpt-pro-issue-authoring.ts", "src/effects/automation/issue-batch-store.ts", "tasks/evidence/campaign-successor-replacement-pre-fix.log", "tests/effects/campaign-authoring-resume.test.ts", "tests/effects/campaign-fresh-audit.test.ts"]}]}
+{"protocol": 1, "oracles": [{"id": "successor-replacement", "kind": "deterministic_test", "paths": [".archcontext/model/nodes/capability.runtime-harness.development-campaign.yaml", "docs/architecture/.projection-manifest.json", "docs/architecture/changelog.md", "docs/architecture/decisions/index.md", "docs/architecture/diagrams/architecture.likec4", "docs/architecture/diagrams/architecture.mmd", "docs/architecture/diagrams/architecture.structurizr.json", "docs/architecture/index.md", "docs/architecture/modules/runtime-harness/development-campaign.md", "docs/researches/20260909-campaign-successor-replacement.md", "src/cli/commands/automation.ts", "src/cli/commands/campaign.ts", "docs/spec.md", "src/effects/automation/budget-store.ts", "src/effects/automation/campaign-authoring-resume.ts", "src/effects/automation/campaign-fresh-audit.ts", "src/effects/automation/gpt-pro-issue-authoring.ts", "src/effects/automation/issue-batch-store.ts", "tasks/evidence/campaign-successor-replacement-pre-fix.log", "tests/effects/campaign-authoring-resume.test.ts", "tests/effects/campaign-fresh-audit.test.ts", "tests/unit/issue-282-automation-budget-e2e.test.ts", "tests/unit/issue-282-automation-budget-store.test.ts"]}]}
 ```
 
 ## Evidence Requirements
@@ -139,6 +145,17 @@ exit_criteria:
       "inputs": { "env": [] }
     },
     {
+      "id": "automation-budget-drift-repair",
+      "kind": "command",
+      "command": "bun test --timeout 60000 tests/unit/issue-282-automation-budget-store.test.ts tests/unit/issue-282-automation-budget-e2e.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "The new repair verb seals an exhaustion receipt under the run lock and must spend nothing; the CLI wiring is verified over a real store.",
+      "inputs": { "env": [] }
+    },
+    {
       "id": "campaign-ordering-regression",
       "kind": "command",
       "command": "bun test --timeout 60000 tests/effects/campaign-fresh-audit.test.ts tests/effects/issue-batch-adoption.test.ts tests/effects/gpt-pro-issue-authoring.test.ts",
@@ -205,5 +222,5 @@ exit_criteria:
 
 ## Rollback Point
 
-- Commit / checkpoint: base `origin/main` 3a30bd89 on branch `codex/campaign-successor-replacement`.
+- Commit / checkpoint: base `origin/main` 16b8670c on branch `codex/campaign-successor-replacement`.
 - Revert strategy: revert the branch's fix and feature commits in one PR; the replacement record, resolver, eligibility check, prepare-resume CLI and start_group guard are additive and share one rollback surface.

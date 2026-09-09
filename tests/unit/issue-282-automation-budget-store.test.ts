@@ -47,6 +47,7 @@ import {
   type ReconcileAutomationReservationInput,
   type ReserveAutomationBudgetInput,
   readAutomationBudget,
+  repairAutomationBudgetDrift,
 } from '../../src/effects/automation/budget-store';
 import type { AutomationBudgetStatusV1 } from '../../src/effects/automation/budget-store';
 import {
@@ -842,6 +843,51 @@ describe('issue #282 — exhaustion is sealed deterministically', () => {
     expect(sealed.drift).toBe('none');
     expect(sealed.current.state).toBe('budget_exhausted');
     expect(sealed.stop_receipt?.triggering_metric).toBe('successful_acquisitions');
+  });
+
+  /**
+   * The field shape a business verb cannot reach: a quiescent run whose deadline
+   * simply passed. It is over, has nothing to charge and no verb left to invoke,
+   * so `repairAutomationBudgetDrift` is the only thing that can seal its receipt.
+   */
+  test('an expired quiescent run is sealed by the repair verb and by nothing else it spends', () => {
+    const repo = repoFixture();
+    const budget = makeBudget({ run: 'expired-quiescent', limits: { ...BASE_LIMITS, max_wall_clock_seconds: 60 } });
+    // Publish inside the window; the fixture clock is shared, so this pins it
+    // rather than inheriting wherever the previous test left it.
+    at('2026-09-03T00:00:30.000Z');
+    publishBudget(repo, budget);
+    expect(budget.deadline_at).toBe('2026-09-03T00:01:00.000Z');
+    const runRoot = join(repo, '.git', AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, 'runs', budget.automation_run_id);
+    const records = () => Object.fromEntries((['reservations', 'events'] as const)
+      .map(directory => [directory, readdirSync(join(runRoot, directory)).sort()]));
+    const before = records();
+
+    at('2026-09-03T00:02:00.000Z');
+    const drifted = readAutomationBudgetStatus(repo, budget.automation_run_id);
+    expect(drifted.drift).toBe('unsealed_exhaustion');
+    expect(drifted.stop_receipt).toBeNull();
+
+    const repaired = repairAutomationBudgetDrift({ repo_root: repo, automation_run_id: budget.automation_run_id });
+    expect(repaired.drift).toBe('none');
+    expect(repaired.current.state).toBe('budget_exhausted');
+    expect(repaired.stop_receipt?.triggering_metric).toBe('wall_clock_seconds');
+    // The seal spends nothing: the counts are the ones the run already had and
+    // the receipt is the only record the repair added.
+    expect(repaired.current.consumed).toEqual(drifted.stored_current.consumed);
+    expect(repaired.current.open_reservation_sha256s).toEqual([]);
+    expect(repaired.current.event_count).toBe(drifted.stored_current.event_count);
+    expect(records()).toEqual(before);
+    expect(existsSync(join(runRoot, 'stop-receipt.json'))).toBe(true);
+
+    const reread = readAutomationBudgetStatus(repo, budget.automation_run_id);
+    expect(reread.drift).toBe('none');
+    // A second repair on an already reconciled run is a plain read.
+    const again = repairAutomationBudgetDrift({ repo_root: repo, automation_run_id: budget.automation_run_id });
+    expect(again.current).toEqual(repaired.current);
+    expect(again.stop_receipt).toEqual(repaired.stop_receipt);
+    expect(records()).toEqual(before);
+    resumeAutoClock();
   });
 });
 

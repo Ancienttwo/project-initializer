@@ -145,6 +145,7 @@ repos.
 | `.ai/harness/runs/*.json` | Verifier | Immutable run/trace snapshots |
 | `.ai/harness/handoff/` | Session owner | Resume packets and exact next step |
 | `repo-harness automation budget show --run <id>` | Package runtime | Read-only operator projection of one automation run's budget, consumption, and stop receipt |
+| `repo-harness automation budget repair --run <id>` | Package runtime | Operator re-run of the locked reconciliation so a stopped or expired run seals its exhaustion receipt; it reserves, charges and re-caps nothing |
 | `repo-harness automation controller start\|step\|status\|stop\|reconcile` | Package runtime | Bounded unattended Engineer orchestration over the existing budget, acquire-next, WorkEnvelope and delegated-run authorities |
 | `docs/reference-configs/ux-feature-guard.md`, `docs/reference-configs/design-options.md`, `.claude/templates/design-brief.template.md` | Conventions | Frontend behavior discipline: freeze rules and non-goals before implementation, product boundary before imagegen variants, taste-class refinement ceiling, role-aware visible-concept declaration; `frontend` task_profile contracts must cite a design brief, and the runtime `[UXFeatureGuard]` advisory fires only on frontend-scoped feature intent |
 
