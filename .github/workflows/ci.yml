@@ -12,6 +12,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  governance:
+    name: Governance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install shell dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq rsync
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Resolve workflow evidence diff
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_PARENT_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "REPO_HARNESS_DIFF_BASE=$PR_BASE_SHA" >> "$GITHUB_ENV"
+            echo "REPO_HARNESS_DIFF_MODE=merge-base" >> "$GITHUB_ENV"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            echo "REPO_HARNESS_DIFF_BASE=$PUSH_PARENT_SHA" >> "$GITHUB_ENV"
+            echo "REPO_HARNESS_DIFF_MODE=direct" >> "$GITHUB_ENV"
+          else
+            echo "REPO_HARNESS_DIFF_BASE=$(git rev-parse HEAD^)" >> "$GITHUB_ENV"
+            echo "REPO_HARNESS_DIFF_MODE=direct" >> "$GITHUB_ENV"
+          fi
+
+      - name: Governance gate
+        run: bash scripts/check-ci.sh governance
+
+      - name: Diff hygiene
+        run: git diff --check
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -74,11 +125,8 @@ jobs:
             echo "REPO_HARNESS_DIFF_MODE=direct" >> "$GITHUB_ENV"
           fi
 
-      - name: CI gate
-        run: bun run check:ci
-
-      - name: Diff hygiene
-        run: git diff --check
+      - name: Functional and package tests
+        run: bash scripts/check-ci.sh functional
 
   mcp-path-matrix:
     name: MCP path matrix (${{ matrix.os }})
@@ -132,12 +180,15 @@ jobs:
     # context skipped and the required check never reports at all.
     if: always()
     needs:
+      - governance
       - test
       - mcp-path-matrix
     steps:
       - name: Assert upstream jobs succeeded
         run: |
+          echo "governance=${{ needs.governance.result }}"
           echo "test=${{ needs.test.result }}"
           echo "mcp-path-matrix=${{ needs.mcp-path-matrix.result }}"
+          [ "${{ needs.governance.result }}" = "success" ] || exit 1
           [ "${{ needs.test.result }}" = "success" ] || exit 1
           [ "${{ needs.mcp-path-matrix.result }}" = "success" ] || exit 1
