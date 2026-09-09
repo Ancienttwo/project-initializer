@@ -320,5 +320,26 @@ describe('issue #282 — end-to-end stop before the next claim', () => {
     );
     expect(missing.status).not.toBe(0);
     expect(JSON.parse(missing.stderr).error).toBe('automation_budget_store_not_found');
+
+    // Repair reconciles; it does not publish. Against an empty store an unknown
+    // run reports the same refusal as `show` and leaves nothing behind: no run
+    // directory, and a list that still names no runs.
+    const empty = repoFixture();
+    const repairMissing = spawnSync(
+      process.execPath,
+      [CLI, 'automation', 'budget', 'repair', '--repo', empty, '--run', hex('no-such-run')],
+      { cwd: ROOT, encoding: 'utf-8' },
+    );
+    expect(repairMissing.status).not.toBe(0);
+    expect(JSON.parse(repairMissing.stderr).error).toBe('automation_budget_store_not_found');
+    expect(repairMissing.stderr).toBe(missing.stderr);
+    expect(existsSync(join(empty, '.git', 'repo-harness/automation-budget/v1/runs', hex('no-such-run')))).toBe(false);
+    const listedAfterRepair = spawnSync(
+      process.execPath,
+      [CLI, 'automation', 'budget', 'list', '--repo', empty],
+      { cwd: ROOT, encoding: 'utf-8' },
+    );
+    expect(listedAfterRepair.status, listedAfterRepair.stderr).toBe(0);
+    expect(JSON.parse(listedAfterRepair.stdout).runs).toEqual([]);
   }, 60_000);
 });

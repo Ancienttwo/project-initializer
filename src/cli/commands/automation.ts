@@ -127,7 +127,7 @@ export function runAutomationGrantList(raw: AutomationGrantRawOptions): void {
 
 export function buildAutomationCommand(): Command {
   const automation = new Command('automation').description('Read the per-goal automation budget ledger');
-  const budget = new Command('budget').description('Read-only automation budget projections');
+  const budget = new Command('budget').description('Automation budget projections and the operator drift repair verb');
   budget
     .command('show')
     .description('Print the read-only budget projection for one automation run')

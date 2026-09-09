@@ -19,6 +19,7 @@ Allow one controlled, evidence-bound replacement of a stopped, never-adopted suc
 ## Scope
 
 - In scope: a typed `superseded-<intent>` replacement record on the predecessor, one `resolveEffectiveContinuation` used by both binder and adoption checker, a zero-write canonical-store eligibility check invoked before any write or dispatch, an evidence-bounded `previous_markers` set, a `campaign prepare-resume` zero-provider CLI, and a gpt_pro `start_group` ordering guard.
+- In scope: an `automation budget repair` operator verb (`repairAutomationBudgetDrift`) bounded to the `lockedStatus` reconciliation every mutating verb already performs — folding existing durable records and sealing an exhaustion receipt the run's own records already prove — and never rewriting or deleting any durable record.
 - Out of scope: rolling `stopped` back to runnable, relaxing the issue-batch observer, changing resume identity rules, raising or inheriting authorization caps, and rewriting or deleting any continuation, intent, session, grant, stop event or budget run.
 - Taste constraints: no compatibility fallback, no dual authority, no new error vocabulary.
 
@@ -221,5 +222,5 @@ exit_criteria:
 
 ## Rollback Point
 
-- Commit / checkpoint: base `origin/main` 3a30bd89 on branch `codex/campaign-successor-replacement`.
+- Commit / checkpoint: base `origin/main` 16b8670c on branch `codex/campaign-successor-replacement`.
 - Revert strategy: revert the branch's fix and feature commits in one PR; the replacement record, resolver, eligibility check, prepare-resume CLI and start_group guard are additive and share one rollback surface.

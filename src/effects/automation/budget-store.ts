@@ -1102,6 +1102,13 @@ export function repairAutomationBudgetDrift(input: {
 }): AutomationBudgetStatusV1 {
   const repoRoot = resolve(input.repo_root);
   const paths = runPaths(repoRoot, input.automation_run_id);
+  // Repair reconciles an existing ledger; it never creates one. Preparing the
+  // run directory first would materialise a store for a run that was never
+  // published, so an unknown run fails closed with the same not-found error a
+  // read reports and leaves no trace on disk.
+  if (!existsSync(paths.current)) {
+    fail('automation_budget_store_not_found', `automation run ${input.automation_run_id} has no budget`);
+  }
   prepareRun(paths);
   return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () =>
     lockedStatus(repoRoot, paths, input.automation_run_id, automationStoreNow(), input.env));

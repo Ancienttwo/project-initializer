@@ -28,4 +28,4 @@ No ESM import cycle appeared, so the design's fallback module split was not need
 
 The gate stays strict. Drift is still a refusal, not a tolerated state -- the repair is an explicit operator act that leaves a receipt behind, so admitting the replacement afterwards rests on a sealed record rather than on silently reading "counts look fine" as quiescence.
 
-> **Substantive Change SHA256**: `sha256:e9eba1421a7a596dfc37ff30c5ecea5cb076ed61ec6760d5867ce6d6cbb24bc1`
+> **Substantive Change SHA256**: `sha256:4042a43160b8f4b3a4aebeca418b1bb14f48967f8ee4d73caeda39ca3269c3da`
