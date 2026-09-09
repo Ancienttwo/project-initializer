@@ -17,7 +17,7 @@ import { runCampaignAcquisition } from '../../effects/automation/campaign-acquis
 import { runCampaignPlanningStep } from '../../effects/automation/campaign-planning';
 import { CampaignPlanningError } from '../../core/automation/campaign-planning';
 import { readIssueBatchIntent, readIssueBatchAdoptionArtifact } from '../../effects/automation/issue-batch-store';
-import { assertReplaceableStoppedSuccessor, readAdoptedResumeSource, resolveEffectiveContinuation, validateAdoptedResumeSource } from '../../effects/automation/campaign-authoring-resume';
+import { assertStoppedAdoptedResumeEligible, assertReplaceableStoppedSuccessor, readAdoptedResumeSource, resolveEffectiveContinuation, validateAdoptedResumeSource } from '../../effects/automation/campaign-authoring-resume';
 import { readAutomationBudgetStatus } from '../../effects/automation/budget-store';
 import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
 
@@ -163,6 +163,7 @@ export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): voi
     groupNumber(raw.sourceGroupNumber), required(raw.sourceIntentSha256, '--source-intent-sha256'));
   const resumeSource = readAdoptedResumeSource(root, source);
   validateAdoptedResumeSource(root, resumeSource, required(raw.targetRevision, '--target-revision'));
+  assertStoppedAdoptedResumeEligible(root, source);
   const superseded = raw.supersededCampaignId === undefined ? null
     : readIssueBatchIntent(root, required(raw.supersededCampaignId, '--superseded-campaign-id'),
       groupNumber(raw.supersededGroupNumber), required(raw.supersededIntentSha256, '--superseded-intent-sha256'));

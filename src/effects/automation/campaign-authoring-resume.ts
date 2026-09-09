@@ -7,6 +7,7 @@ import { listIssueAuthoringSessions, listIssueBatchJournalRecords, readIssueBatc
 import { readAutomationBudgetStatus, readCampaignAuthoringBudgetTerminal, readCampaignBudgetLedger } from './budget-store';
 import { readDevelopmentCampaignStatus, readExactAuthorityBinding } from './development-campaign-store';
 import { readPlanningRecord } from './campaign-planning-store';
+import { readSettledFailedCampaignDispatches } from './campaign-worker';
 import type { CampaignPublicationV1 } from './issue-batch-publication';
 
 export interface ResumedIssueIdentity {
@@ -151,6 +152,24 @@ export function validateAdoptedResumeSource(root: string, source: AdoptedResumeS
   const manifest = JSON.parse(original);
   if (manifest.projection_sha256 !== digest || !same(manifest.receipt, adopted.receipt) || !same(manifest.evidence, evidence)
     || !same(manifest.slots.map((s: { task_id: string }) => s.task_id), publication.task_ids)) fail('resume canonical manifest differs');
+}
+
+
+/** Shared preflight/admission authority. A stopped grant is never made executable again. */
+export function assertStoppedAdoptedResumeEligible(root: string, intent: IssueBatchIntentV1, env?: NodeJS.ProcessEnv): void {
+  const status = readDevelopmentCampaignStatus(root, intent.campaign_id, env);
+  const last = status.events.at(-1);
+  if (status.current.state !== 'stopped' || last?.operation !== 'stop' || status.current.current_event_sha256 !== last.event_sha256) fail('adopted resume requires a formally stopped predecessor');
+  const grant = readExactAuthorityBinding(root, status.campaign, env ?? process.env);
+  const run = campaignAutomationRunId({ repository_id: intent.repository_id, campaign_id: intent.campaign_id });
+  const budget = readAutomationBudgetStatus(root, run, env);
+  const ledger = readCampaignBudgetLedger(root, run, env);
+  if (budget.budget.authorization.authorization_sha256 !== grant.authorization_sha256 || budget.current.open_reservation_sha256s.length
+    || ledger.active_step !== null || ledger.reserved_provider_calls !== 0) fail('adopted resume requires fully settled predecessor budget evidence');
+  if (budget.current.consumed.successful_acquisitions !== 0) {
+    if (budget.drift !== 'none' || budget.current.state === 'reconciliation_required') fail('acquired adopted resume requires reconciled predecessor budget evidence');
+    readSettledFailedCampaignDispatches(root, intent, budget.current.consumed.successful_acquisitions, env);
+  }
 }
 
 /** Project the exact resume request an operator would otherwise transcribe from the stored receipt. */

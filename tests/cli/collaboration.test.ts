@@ -238,6 +238,38 @@ const FORGED_WORK_ENVELOPE = `sha256:${'1'.repeat(64)}`;
 const FORGED_FREEZE_RECEIPT = `sha256:${'2'.repeat(64)}`;
 const FORGED_LEASE_GENERATION = 4242;
 
+function expectNoForgedExecutionAuthority(payload: string): void {
+  for (const forgedValue of [FORGED_CLAIM_ID, FORGED_WORK_ENVELOPE, FORGED_FREEZE_RECEIPT,
+    FORGED_TASK_ID, FORGED_TASK_REVISION]) {
+    expect(payload).not.toContain(forgedValue);
+  }
+  // Decimal generations can occur inside unrelated hashes; compare JSON scalars.
+  const inspect = (value: unknown): void => {
+    if (value !== null && typeof value === 'object') {
+      for (const child of Object.values(value)) inspect(child);
+    } else {
+      expect(value).not.toBe(FORGED_LEASE_GENERATION);
+      expect(value).not.toBe(String(FORGED_LEASE_GENERATION));
+    }
+  };
+  inspect(JSON.parse(payload));
+}
+
+test('generation assertion allows the legitimate digest from the CI collision', () => {
+  expectNoForgedExecutionAuthority(JSON.stringify({
+    signal_sha256: 'sha256:47c4013424684242727e9cceed3e35b00b2dee3363371b722f46fcd64ecb11e6',
+    execution_context: null,
+  }));
+});
+
+test('generation assertion rejects nested numeric and string execution authority', () => {
+  for (const lease_generation of [FORGED_LEASE_GENERATION, String(FORGED_LEASE_GENERATION)]) {
+    expect(() => expectNoForgedExecutionAuthority(JSON.stringify({
+      snapshot: { handoffs: [{ execution_context: { lease_generation } }] },
+    }))).toThrow();
+  }
+});
+
 function forgedBoundTaskHandoffInput(threadKey: string): Record<string, unknown> {
   return {
     idempotency_key: 'forged-bound-task',
@@ -290,22 +322,9 @@ describe('C7 the surface never re-exports an unproven execution context', () => 
       expect(result.status).toBe(0);
     }
 
-    // Non-containment over the whole payload: no projection, count or nested
-    // record may carry the Claim, the Lease generation or the freeze digest.
-    // The publication acknowledgement is included deliberately: persistence
-    // proves identity and bytes, not the caller-supplied execution authority.
-    // Its shape must never masquerade as the verified read projection.
+    // The acknowledgement and every read surface must withhold forged authority.
     for (const payload of [published.stdout, listed.stdout, exchange.stdout, threads.stdout, signals.stdout]) {
-      for (const forgedValue of [
-        FORGED_CLAIM_ID,
-        FORGED_WORK_ENVELOPE,
-        FORGED_FREEZE_RECEIPT,
-        String(FORGED_LEASE_GENERATION),
-        FORGED_TASK_ID,
-        FORGED_TASK_REVISION,
-      ]) {
-        expect(payload).not.toContain(forgedValue);
-      }
+      expectNoForgedExecutionAuthority(payload);
     }
 
     // The knowledge was never the forged part: the handoff still projects, and
