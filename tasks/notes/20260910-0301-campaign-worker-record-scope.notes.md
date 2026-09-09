@@ -13,7 +13,7 @@
 
 ## Deviations From Plan Or Spec
 
-- None recorded.
+- Acceptance first observed a proof-only architecture candidate because the isolated worktree had no CodeGraph index. Canonical tools ensure initialized/synced the index; projection updated its manifest, and architecture-projection reconcile produced an empty noop with ready proof. No model or semantic approval was changed. Evidence: /tmp/worker-record-architecture-reconcile-final.json.
 
 ## Tradeoffs Considered
 
