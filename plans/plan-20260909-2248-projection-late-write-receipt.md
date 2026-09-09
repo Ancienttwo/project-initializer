@@ -175,16 +175,16 @@ prior applies into `result.files` would forge the provider's answer (and break
 
 ## Task Breakdown
 
-- [ ] Land the regression guard `tests/architecture-projection-late-write-receipt.test.ts`
+- [x] Land the regression guard `tests/architecture-projection-late-write-receipt.test.ts`
       and capture the pre-fix failing run into
       `.ai/harness/failures/projection-late-write-receipt-pre-fix.log`
-- [ ] Add `priorCommittedApplies` to `ProjectionResultV1`, its strict decoder, invariants,
+- [x] Add `priorCommittedApplies` to `ProjectionResultV1`, its strict decoder, invariants,
       and the `projectionDeclaredWrites` mapping
-- [ ] Accept `priorCommittedApplies` in `assertProjectionResultAuthority` under the
+- [x] Accept `priorCommittedApplies` in `assertProjectionResultAuthority` under the
       existing target-escape and request-identity rules
-- [ ] Add `declaredWrites` to the durable receipt in all three receipt writers
-- [ ] Point the "nothing written" readers at the declared writes
-- [ ] Record the deferred feature-flag handshake in `tasks/notes/`
+- [x] Add `declaredWrites` to the durable receipt in all three receipt writers
+- [x] Point the "nothing written" readers at the declared writes
+- [x] Record the deferred feature-flag handshake in `tasks/notes/`
 
 ## Verification
 
@@ -203,9 +203,9 @@ result and no consumer keeps a dangling reference.
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Land the regression guard `tests/architecture-projection-late-write-receipt.test.ts`
-- [ ] Add `priorCommittedApplies` to `ProjectionResultV1`, its strict decoder, invariants,
-- [ ] Accept `priorCommittedApplies` in `assertProjectionResultAuthority` under the
-- [ ] Add `declaredWrites` to the durable receipt in all three receipt writers
-- [ ] Point the "nothing written" readers at the declared writes
-- [ ] Record the deferred feature-flag handshake in `tasks/notes/`
+- [x] Land the regression guard `tests/architecture-projection-late-write-receipt.test.ts`
+- [x] Add `priorCommittedApplies` to `ProjectionResultV1`, its strict decoder, invariants,
+- [x] Accept `priorCommittedApplies` in `assertProjectionResultAuthority` under the
+- [x] Add `declaredWrites` to the durable receipt in all three receipt writers
+- [x] Point the "nothing written" readers at the declared writes
+- [x] Record the deferred feature-flag handshake in `tasks/notes/`

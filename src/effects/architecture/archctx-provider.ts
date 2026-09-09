@@ -520,9 +520,16 @@ function assertProjectionResultAuthority(
   const allowed = new Set<string>();
   if (request.targets.includes('architecture-docs')) allowed.add('docs/architecture');
   if (request.targets.includes('agent-context')) for (const path of architectureAgentContextTargets(repoRoot)) allowed.add(path);
-  for (const file of result.files) {
-    if (![...allowed].some((path) => file.path === path || file.path.startsWith(`${path}/`))) {
-      throw new Error(`archctx projection result path escapes requested projection targets: ${file.path}`);
+  // A prior committed apply is the provider declaring an earlier attempt's commit under
+  // this same requestId; it is not an applyReceipt, so it carries no accepted-change
+  // requirement. It is held to the same target boundary as this attempt's own files.
+  const writtenPaths = [
+    ...result.files.map((file) => file.path),
+    ...(result.priorCommittedApplies ?? []).flatMap((apply) => apply.files.map((file) => file.path)),
+  ];
+  for (const written of writtenPaths) {
+    if (![...allowed].some((path) => written === path || written.startsWith(`${path}/`))) {
+      throw new Error(`archctx projection result path escapes requested projection targets: ${written}`);
     }
   }
 }

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { projectionResultReceiptDigest, type ArchitectureProjectionPolicy, type ProjectionRequestV1, type ProjectionResultV1 } from '../src/core/architecture/projection';
+import { assertProjectionResult, projectionResultReceiptDigest, type ArchitectureProjectionPolicy, type ProjectionRequestV1, type ProjectionResultV1 } from '../src/core/architecture/projection';
 import { runMutationObserved, readPendingPostEditEvents } from '../src/cli/hook/mutation-observed';
 import { drainArchitectureProjectionJobs } from '../src/effects/architecture/projection-orchestrator';
 import {
@@ -25,6 +25,11 @@ import type { ArchctxProcessResult, RunArchctxProcess } from '../src/effects/arc
  * Invariant under test: a durable receipt must declare every
  * projection-owned write made under its own jobId. The retry's fixed-point
  * `noop` may not erase the previous attempt's committed write.
+ *
+ * The provider is the only authority for that earlier commit: it declares it as
+ * `priorCommittedApplies` on the result, and repo-harness projects it into the
+ * receipt's `declaredWrites` while keeping `result` the verbatim answer. Nothing
+ * here infers a write from the working tree.
  */
 const MANIFEST_PATH = 'docs/architecture/.projection-manifest.json';
 
@@ -86,8 +91,24 @@ function capabilities(): ArchctxProcessResult {
   }) };
 }
 
+const PRIOR_APPLY = {
+  applyId: 'apply.late-write-ca58d5a7',
+  lookupKey: 'lookup.late-write-ca58d5a7',
+  changeSetId: 'changeset.late-write-ca58d5a7',
+  committedAt: '2026-09-09T09:29:58.858Z',
+} as const;
+
+/** The provider's declaration of the ChangeSet the orphaned daemon already committed. */
+function priorCommittedApplies(request: ProjectionRequestV1): NonNullable<ProjectionResultV1['priorCommittedApplies']> {
+  return [{
+    ...PRIOR_APPLY,
+    requestId: request.requestId,
+    files: [{ path: MANIFEST_PATH, operation: 'write', hash: digest('7') }],
+  }];
+}
+
 /** Fixed-point retry answer: the write already landed, so archctx reports noop with no files. */
-function noopEnvelope(request: ProjectionRequestV1) {
+function noopEnvelope(request: ProjectionRequestV1, applies?: NonNullable<ProjectionResultV1['priorCommittedApplies']>) {
   const snapshot = {
     ...request.expected,
     baseHeadSha: request.expected.headSha,
@@ -103,8 +124,21 @@ function noopEnvelope(request: ProjectionRequestV1) {
     inputSnapshot: snapshot,
     outputSnapshot: snapshot,
     affectedNodeIds: [], files: [], humanActions: [], refreshSignals: [],
+    ...(applies ? { priorCommittedApplies: applies } : {}),
   };
   return { schemaVersion: 'archcontext.envelope/v1', ok: true, requestId: 'projection.run', data: { ...body, receiptDigest: projectionResultReceiptDigest(body) } };
+}
+
+/** Re-seals an edited body so a rejection is the named invariant, not a stale digest. */
+function sealed(body: Omit<ProjectionResultV1, 'receiptDigest'>): unknown {
+  return { ...body, receiptDigest: projectionResultReceiptDigest(body) };
+}
+
+function noopBody(applies?: NonNullable<ProjectionResultV1['priorCommittedApplies']>): Omit<ProjectionResultV1, 'receiptDigest'> {
+  const request = { requestId: 'repo-harness.projection.job-000000000000000000000000', expected: { repositoryId: 'repo.decode', workspaceId: 'workspace.decode', headSha: 'a'.repeat(40), worktreeDigest: digest('9') } } as ProjectionRequestV1;
+  const { data } = noopEnvelope(request, applies) as { data: ProjectionResultV1 };
+  const { receiptDigest: _ignored, ...body } = data;
+  return body;
 }
 
 /** Simulates the archctx daemon committing its ChangeSet after the CLI child was killed. */
@@ -132,7 +166,7 @@ describe('architecture projection receipt declares late provider writes', () => 
         commitManifestOutOfBand(root, request.requestId);
         return { status: null, signal: 'SIGTERM', stdout: '', stderr: 'terminated' };
       }
-      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request)) };
+      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request, priorCommittedApplies(request))) };
     };
     const options = { consumerRoot: f.consumerRoot, policy, run };
 
@@ -150,7 +184,19 @@ describe('architecture projection receipt declares late provider writes', () => 
     expect(receipt).not.toBeNull();
     expect(receipt!.attempt).toBe(2);
     // The manifest written under this jobId must appear in the durable receipt.
-    expect(receipt!.result.files.map((file) => file.path)).toContain(MANIFEST_PATH);
+    expect(receipt!.declaredWrites.map((write) => write.path)).toContain(MANIFEST_PATH);
+    // Provenance names the earlier apply; `lookupKey` stays in the verbatim result.
+    expect(receipt!.declaredWrites).toEqual([{
+      source: 'prior-committed-apply',
+      path: MANIFEST_PATH,
+      operation: 'write',
+      applyId: PRIOR_APPLY.applyId,
+      changeSetId: PRIOR_APPLY.changeSetId,
+      committedAt: PRIOR_APPLY.committedAt,
+    }]);
+    // `result` stays the provider's verbatim answer for the attempt that closed the job.
+    expect(receipt!.result.files).toEqual([]);
+    expect(receipt!.result.priorCommittedApplies?.[0]?.requestId).toBe(`repo-harness.projection.${second.jobId}`);
   });
 
   test('records the manifest write when recovery reclaims the abandoned attempt', () => {
@@ -173,7 +219,7 @@ describe('architecture projection receipt declares late provider writes', () => 
       if (args[0] === 'capabilities') return capabilities();
       projectionCalls += 1;
       const request = JSON.parse(args[3]!) as ProjectionRequestV1;
-      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request)) };
+      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request, priorCommittedApplies(request))) };
     };
     const drained = drain(root, { consumerRoot: f.consumerRoot, policy, run });
     expect(drained).toMatchObject({ status: 'succeeded', resultStatus: 'noop' });
@@ -181,7 +227,83 @@ describe('architecture projection receipt declares late provider writes', () => 
 
     const receipt = readArchitectureProjectionReceipt(root, drained.jobId!);
     expect(receipt!.attempt).toBe(2);
-    expect(receipt!.result.files.map((file) => file.path)).toContain(MANIFEST_PATH);
+    expect(receipt!.declaredWrites.map((write) => write.path)).toContain(MANIFEST_PATH);
     expect(readdirSync(join(root, '.ai/harness/architecture-projection/receipts'))).toHaveLength(1);
   });
+
+  /**
+   * archctx 0.5.8 has no `priorCommittedApplies`, so the evidence is simply absent. The
+   * receipt then declares nothing, and repo-harness must not invent the write back from
+   * the working tree: the manifest is on disk here and still must not be declared.
+   */
+  test('declares nothing when the provider does not report the prior commit', () => {
+    const f = fixture();
+    const root = realpathSync(f.repoRoot);
+    runMutationObserved({ collector: f.collector, input: JSON.stringify({ file_path: 'src/silent-write.ts', session_id: 'silent-write' }) });
+    let projectionCalls = 0;
+    const run: RunArchctxProcess = (_binary, args) => {
+      if (args[0] === 'capabilities') return capabilities();
+      projectionCalls += 1;
+      const request = JSON.parse(args[3]!) as ProjectionRequestV1;
+      if (projectionCalls === 1) {
+        commitManifestOutOfBand(root, request.requestId);
+        return { status: null, signal: 'SIGTERM', stdout: '', stderr: 'terminated' };
+      }
+      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request)) };
+    };
+    const options = { consumerRoot: f.consumerRoot, policy, run };
+
+    expect(drain(root, options).status).toBe('retry-pending');
+    const second = drain(root, options);
+    expect(second).toMatchObject({ status: 'succeeded', resultStatus: 'noop' });
+
+    const receipt = readArchitectureProjectionReceipt(root, second.jobId!);
+    expect(existsSync(join(root, MANIFEST_PATH))).toBe(true);
+    expect(receipt!.declaredWrites).toEqual([]);
+    expect(receipt!.result.priorCommittedApplies).toBeUndefined();
+  });
+
+  /**
+   * A prior committed apply is provider authority, not an applyReceipt, so it needs no
+   * accepted change -- but it stays inside the requested projection targets. A declared
+   * write outside them is the provider claiming a commit repo-harness never requested.
+   */
+  test('rejects a prior committed apply outside the requested projection targets', () => {
+    const f = fixture();
+    const root = realpathSync(f.repoRoot);
+    runMutationObserved({ collector: f.collector, input: JSON.stringify({ file_path: 'src/escaping-write.ts', session_id: 'escaping-write' }) });
+    const run: RunArchctxProcess = (_binary, args) => {
+      if (args[0] === 'capabilities') return capabilities();
+      const request = JSON.parse(args[3]!) as ProjectionRequestV1;
+      const [apply] = priorCommittedApplies(request);
+      return { status: 0, signal: null, stderr: '', stdout: JSON.stringify(noopEnvelope(request, [{ ...apply!, files: [{ path: 'src/index.ts', operation: 'write', hash: digest('8') }] }])) };
+    };
+    const drained = drain(root, { consumerRoot: f.consumerRoot, policy, run });
+    expect(drained.status).toBe('retry-pending');
+    expect(drained.error).toContain('escapes requested projection targets: src/index.ts');
+    expect(drained.queue.receipts).toBe(0);
+  });
+});
+
+describe('projection result decodes prior committed applies fail closed', () => {
+  test('accepts a well-formed declaration', () => {
+    const body = noopBody([{ applyId: 'apply.a', lookupKey: 'lookup.a', requestId: 'repo-harness.projection.job-000000000000000000000000', changeSetId: 'changeset.a', committedAt: '2026-09-09T09:29:58.858Z', files: [{ path: MANIFEST_PATH, operation: 'write', hash: digest('7') }] }]);
+    expect(assertProjectionResult(sealed(body)).priorCommittedApplies).toHaveLength(1);
+  });
+
+  const base = { applyId: 'apply.a', lookupKey: 'lookup.a', requestId: 'repo-harness.projection.job-000000000000000000000000', changeSetId: 'changeset.a', committedAt: '2026-09-09T09:29:58.858Z', files: [{ path: MANIFEST_PATH, operation: 'write' as const, hash: digest('7') }] };
+  const cases: Array<[string, unknown, string]> = [
+    ['a foreign requestId', [{ ...base, requestId: 'repo-harness.projection.job-111111111111111111111111' }], 'requestId must match'],
+    ['a duplicate applyId', [base, { ...base, changeSetId: 'changeset.b' }], 'unique by applyId'],
+    ['an unknown operation', [{ ...base, files: [{ ...base.files[0]!, operation: 'rename' }] }], 'operation invalid'],
+    ['an escaping path', [{ ...base, files: [{ ...base.files[0]!, path: '../outside.json' }] }], 'path invalid'],
+    ['a non-UTC committedAt', [{ ...base, committedAt: '2026-09-09 09:29:58 +0800' }], 'committedAt must be a UTC ISO-8601 instant'],
+    ['an empty applyId', [{ ...base, applyId: '  ' }], 'applyId invalid'],
+    ['a non-array payload', { applyId: 'apply.a' }, 'must be an array'],
+  ];
+  for (const [label, applies, message] of cases) {
+    test(`rejects ${label}`, () => {
+      expect(() => assertProjectionResult(sealed({ ...noopBody(), priorCommittedApplies: applies } as Omit<ProjectionResultV1, 'receiptDigest'>))).toThrow(message);
+    });
+  }
 });

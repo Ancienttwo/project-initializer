@@ -98,6 +98,12 @@ export function materializeRefactorProgram(input: MaterializeRefactorProgramInpu
   assertCanonicalSprintTaskIdsUniqueAtCommit(root, { commit: current, sprintPath, sprintText: sprint });
   const tasks = projectCanonicalTasks({ repoIdentity: status.program.repository_id, sprintPath, sprintText: sprint }).map((task, index) => ({ task_id: task.task_id, task_revision: task.task_revision, task_ref: task.row.task, status: task.row.status, row_order: index + 1 }));
   validateWorkGraphTopology([projectWorkGraph(projection.workGraph, tasks)]);
+  // Prior committed applies declare paths this transaction cannot reconstruct: they carry
+  // no output digest to verify bytes against, so a transaction built from this attempt's
+  // files alone would silently drop declared writes.
+  if (architectureReceipt !== null && (architectureReceipt.result.priorCommittedApplies?.length ?? 0) > 0) {
+    fail('refactor_materialization_conflict', 'architecture projection receipt declares prior committed applies this transaction cannot reproduce');
+  }
   const architectureWrites = architectureReceipt === null ? [] : architectureReceipt.result.files.filter((entry) => entry.action === 'create' || entry.action === 'update').map((entry) => {
     const path = safePath(entry.path, 'architecture projection path'); const absolute = join(root, path); const stat = lstatSync(absolute);
     if (!stat.isFile() || stat.isSymbolicLink()) fail('refactor_materialization_conflict', `architecture projection output is unsafe: ${path}`);

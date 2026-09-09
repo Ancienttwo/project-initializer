@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { withExclusiveDirectoryLock } from '../locking/exclusive-directory-lock';
-import { sameAcceptedArchitectureChange, type ProjectionResultV1 } from '../../core/architecture/projection';
+import { projectionDeclaredWrites, sameAcceptedArchitectureChange, type ProjectionDeclaredWriteV1, type ProjectionResultV1 } from '../../core/architecture/projection';
 import type { AcceptedArchitectureChangeReferenceV1 } from 'archctx-contracts';
 
 export const ARCHITECTURE_PROJECTION_RUNTIME_ROOT = '.ai/harness/architecture-projection';
@@ -63,7 +63,15 @@ export interface ArchitectureProjectionReceiptV1 {
   acceptedChange?: AcceptedArchitectureChangeReferenceV1;
   attempt: number;
   completedAt: string;
+  /** The provider's verbatim answer for the attempt that closed this job. */
   result: ProjectionResultV1;
+  /**
+   * Every projection-owned write committed under this jobId, including a write an earlier
+   * attempt committed before losing its owner. Consumers that gate on "the projection
+   * wrote nothing" read this, never `result.files`: a retry that reaches the provider's
+   * fixed point reports `noop` with no files even when the job did write.
+   */
+  declaredWrites: ProjectionDeclaredWriteV1[];
   refreshReceiptDigests: string[];
 }
 
@@ -380,6 +388,7 @@ export function completeArchitectureProjectionJob(
       attempt: job.attempt,
       completedAt: now.toISOString(),
       result,
+      declaredWrites: projectionDeclaredWrites(result, job.attempt),
       refreshReceiptDigests: [...new Set(refreshReceiptDigests)].sort(),
     };
     atomicJson(pathFor(repoRoot, 'receipts', job.jobId), receipt);
@@ -434,6 +443,7 @@ export function completeArchitectureProjectionDeadLetterAcceptance(
       attempt: deadLetter.job.attempt,
       completedAt: now.toISOString(),
       result,
+      declaredWrites: projectionDeclaredWrites(result, deadLetter.job.attempt),
       refreshReceiptDigests: [...new Set(refreshReceiptDigests)].sort(),
     };
     atomicJson(receiptPath, receipt);
@@ -487,6 +497,7 @@ export function completeArchitectureProjectionDeadLetterReconciliation(
       attempt: deadLetter.job.attempt,
       completedAt: now.toISOString(),
       result,
+      declaredWrites: projectionDeclaredWrites(result, deadLetter.job.attempt),
       refreshReceiptDigests: [],
     };
     atomicJson(receiptPath, receipt);

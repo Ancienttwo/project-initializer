@@ -25,11 +25,15 @@ const HEAD_SHA = /^[a-f0-9]{40}$/;
 
 /**
  * Frozen classifier: `status === 'applied'`, exactly one file, that file is the
- * manifest, the action is `update`, and no human action is pending.
+ * manifest, the action is `update`, no human action is pending, and no earlier attempt of
+ * the same request committed a ChangeSet of its own.
  */
 export function isManifestRestampOnly(result: ProjectionResultV1): boolean {
   if (result.status !== 'applied') return false;
   if (result.humanActions.length !== 0) return false;
+  // An earlier attempt of this same request committed its own ChangeSet, so this
+  // attempt's file list is not the whole write set the classifier claims to describe.
+  if ((result.priorCommittedApplies?.length ?? 0) !== 0) return false;
   if (result.files.length !== 1) return false;
   const file = result.files[0]!;
   return file.path === ARCHITECTURE_PROJECTION_MANIFEST_PATH && file.action === 'update';
