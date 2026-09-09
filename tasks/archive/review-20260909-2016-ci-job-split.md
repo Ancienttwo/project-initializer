@@ -24,29 +24,23 @@
 
 ## Human Review Card
 
-- Verdict: blocked by automatic projection before acceptance freeze
-- Change type: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | frontend
-- Intended files changed:
-- Actual files changed:
-- Commands passed: 24 focused CI tests; typecheck; six root integrity checks.
-- Residual risks: hosted CI unrun; automatic architecture projection rejected after adding generated/ARCHITECTURE.md.
-- Reviewer action required: inspect diff and card
-- Rollback:
+- Verdict: local acceptance passed; hosted CI remains the merge gate.
+- Change type: code-change (CI orchestration).
+- Intended/actual substantive files: `.github/workflows/ci.yml`, `scripts/check-ci.sh`, `tests/check-ci-job-split.test.ts`.
+- Commands passed: 24 focused CI tests; typecheck; six root integrity checks; `verify-sprint --prepare-acceptance` and finalization.
+- Residual risk: archctx 0.5.8 can create an undeclared generated file on a fresh checkout; the separate upstream correction is arch-context PR #150. This worktree completed projection and reconciled its earlier proof-only candidate without weakening the fence.
+- Rollback: revert this CI slice.
 
 ## Mode Evidence
 
-- Selected route:
-- P1/P2/P3 evidence:
-- Root cause or plan evidence:
+- Selected route: standard scope review; independent hosted governance and functional invocations with a fail-closed aggregate.
+- P1/P2/P3: the plan records the single CI script, governance fail-fast path, preserved no-argument local/release gate and independent hosted setup.
 
 ## Verification Evidence
 
-- Waza `/check` run: standard scope review of CI lanes, preserved full gate, setup and aggregate; formal acceptance remains blocked.
-- Commands run:
-- Manual checks:
-- Supporting artifacts:
-- Implementation notes reviewed:
-- Run snapshot:
+- Waza `/check`: scope, full-gate preservation, setup and all 64 aggregate result combinations reviewed.
+- Formal acceptance: all 15 contract verification items passed, receipt recorded, finalization reused the prepared evidence, then `contract-worktree finish --no-merge` archived the slice.
+- Substantive implementation remained unchanged during this documentation correction; earlier acceptance is evidence for its stated subject, not a newly minted receipt.
 
 ## Acceptance Receipt Projection
 
@@ -65,30 +59,8 @@
 
 ## Behavior Diff Notes
 
-- ...
+Governance failure no longer suppresses hosted functional tests. The aggregate rejects every non-success dependency. Runtime pins, MCP coverage and the complete no-argument local/release gate are preserved.
 
 ## Residual Risks / Follow-ups
 
-- ...
-
-## Scorecard
-
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Functionality | 0/10 | |
-| Product depth | 0/10 | |
-| Design quality | 0/10 | |
-| Code quality | 0/10 | |
-
-## Failing Items
-
-- ...
-
-## Retest Steps
-
-- Re-run:
-- Re-check:
-
-## Summary
-
-- ...
+Hosted CI must pass before merge. Upstream archctx publication and downstream pin adoption are separate from this CI change.
