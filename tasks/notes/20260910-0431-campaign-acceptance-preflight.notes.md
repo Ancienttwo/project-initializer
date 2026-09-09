@@ -6,7 +6,7 @@
 > **Review**: tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md
 > **Last Updated**: 2026-09-10 04:31
 > **Lifecycle**: notes
-> **Substantive Change SHA256**: `sha256:4afb3f6b0923193aa34543771f2da85c27300aa36e628651c2672a57b0bd6ca1`
+> **Substantive Change SHA256**: `sha256:310bb26127d5dc68baccd21365ab61cfd63059d2f8f519196a78dc854293c7d8`
 
 ## Design Decisions
 
@@ -15,6 +15,7 @@
 ## Deviations From Plan Or Spec
 
 - Final codex-plugin review identified removal of review initialization without an availability check. Reproduced against ae213ada, then added canonical metadata preflight before claim and in the fresh worktree, plus missing and uncommitted-only review regression cases. This is the same admission/activation boundary; no second provider review is requested.
+- The authority-freeze unit fixture injects its metadata preflight dependency alongside its synthetic offer, preserving the claim-control and negative authority assertions; the real CLI fixtures exercise the canonical helper.
 
 ## Tradeoffs Considered
 

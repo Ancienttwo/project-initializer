@@ -77,6 +77,7 @@ allowed_paths:
   - tests/cli/campaign-planning.test.ts
   - tests/cli/fleet-offer-acquire.test.ts
   - tests/fleet-acquire-concurrency.test.ts
+  - tests/characterization/repair-campaign-authority-freeze.test.ts
   - tasks/evidence/campaign-review-artifact-pre-fix.log
   - docs/researches/20260910-campaign-acceptance-preflight.md
   - plans/plan-20260910-0431-campaign-acceptance-preflight.md
