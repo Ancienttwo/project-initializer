@@ -68,3 +68,17 @@ export function storedPlanningIntents(root: string): readonly IssueBatchIntentV1
   }
   return result;
 }
+
+/** A recovery proof must account for every stored effect, not only caller-selected keys. */
+export function listPlanningRecords(root: string, intent: IssueBatchIntentV1): readonly { key: string; record: unknown }[] {
+  const dir = dirname(location(root, intent, 'parent'));
+  if (!existsSync(dir)) return [];
+  directory(dir);
+  return readdirSync(dir).sort().map(name => {
+    if (!/^(?:parent|[a-f0-9]{64})\.json$/u.test(name)) throw new CampaignPlanningError('planning_failed', 'unsettled or unsupported planning record');
+    const key = name.slice(0, -5);
+    const record = readPlanningRecord<unknown>(root, intent, key);
+    if (record === null) throw new CampaignPlanningError('planning_failed', 'planning inventory changed');
+    return { key, record };
+  });
+}
