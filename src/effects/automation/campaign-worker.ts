@@ -474,7 +474,7 @@ export function readSettledFailedCampaignDispatches(root: string, intent: IssueB
     if (!final || final.reservation.automation_run_id !== campaignAutomationRunId({ repository_id: intent.repository_id, campaign_id: intent.campaign_id }) || final.outcome !== 'external_blocked' || final.contract_run.status !== 'fail'
       || final.contract_run.failure_class !== 'verifier_rejected') throw new Error('resume requires a known failed verifier final');
     const settled = readAutomationUsageForResult({ repo_root: root, reservation: final.reservation,
-      evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env });
+      evidence_refs: [{ ref: `campaign-worker:${selector.dispatch_id}:result`, sha256: final.result_sha256 }], env, read_only: true });
     if (!settled) throw new Error('resume final has no exact budget settlement');
     const offer = handoff.acquired.offer;
     if (readTaskAutomationAttemptCurrent(root, offer.work_package_id, offer.work_package_revision)?.last_outcome !== 'external_blocked') throw new Error('resume attempt outcome is not settled');

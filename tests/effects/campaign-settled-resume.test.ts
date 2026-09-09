@@ -1,3 +1,4 @@
+import { AUTOMATION_TEST_CLOCK_SEAM_ENV, __resetAutomationClockForTests, __setAutomationClockForTests } from '../../src/effects/automation/budget-store.internal';
 import { afterEach, expect, test } from 'bun:test';
 import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -119,4 +120,23 @@ test('actual author admission binds one fresh continuation after settled failure
   await expect(startIssueBatchAuthoring(await next('competing-resume'), deps)).rejects.toThrow();
   expect(calls).toBe(1);
   expect(readAutomationBudgetStatus(f.root, f.budget.automation_run_id, f.env)).toEqual(before);
+}, 60000);
+
+
+test('settlement proof lookup never repairs predecessor budget after its deadline', async () => {
+  const f = await fixture();
+  const previous = process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV];
+  process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV] = '1';
+  __setAutomationClockForTests(() => new Date(Date.parse(f.budget.deadline_at) + 60_000));
+  try {
+    const before = readAutomationBudgetStatus(f.root, f.budget.automation_run_id, f.env);
+    expect(before.drift).toBe('unsealed_exhaustion');
+    expect(readSettledFailedCampaignDispatches(f.root, f.intent, 1, f.env)).toHaveLength(1);
+    expect(readAutomationBudgetStatus(f.root, f.budget.automation_run_id, f.env)).toEqual(before);
+    expect(() => assertStoppedAdoptedResumeEligible(f.root, f.intent, f.env)).toThrow('reconciled');
+  } finally {
+    __resetAutomationClockForTests();
+    if (previous === undefined) delete process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV];
+    else process.env[AUTOMATION_TEST_CLOCK_SEAM_ENV] = previous;
+  }
 }, 60000);
