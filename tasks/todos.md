@@ -1,7 +1,7 @@
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-09 22:48
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
@@ -13,6 +13,7 @@ Audit evidence and closure rationale: `docs/researches/20260907-deferred-goal-le
 
 | Goal | Why Deferred | Tradeoff | Revisit Trigger |
 |------|--------------|----------|-----------------|
+| Pin archctx to the release carrying `projection-prior-committed-applies-v1` and add it to `ARCHCTX_REQUIRED_FEATURES` | The upstream contract landed on arch-context PR #151 but no archctx release carries it yet; the consumer reads the field as optional and the pin stays at 0.5.8 | Requiring the feature now fail-closes every projection on 0.5.8, and until the pin moves a provider that silently drops the field leaves a late write undeclared with no version signal | arch-context PR #151 merged and an archctx release published with the feature |
 | Derive the claim-scope canonical fence from the lease record | The fleet collector still reads the main checkout's active-sprint marker to resolve a claim's canonical source, which is the wrong authority when the claim's own lease already names one | A worktree whose lease points at a different sprint than the main checkout's marker is observed against the wrong canonical row | A repository observed with two live sprints, or the next change to `readActiveSprintPath` callers |
 | Let R1 delivery and reachability contribute to the Fleet card `attention_owner` | Whether an unreachable Agent Runtime is the operator's problem or the agent's is a product contract decision, not an implementation detail of the card projection | A card whose runtime is unreachable reports `attention_owner: 'none'` unless another signal raises it | The Task Board defining who owns a stalled runtime |
 | Decide whether `addressed_to_current_claim` means more than `unread_count > 0` | The Fleet card currently derives it from the unread count alone, so it carries no independent fact; whether an unread message is addressed to the live claim is a Task Board product contract decision, not a projection detail | An operator reading the card cannot distinguish "there is unread mail" from "the current claimant is the addressee" | The Task Board defining per-claim addressing, or the next change to the card's inbox projection |

@@ -116,6 +116,38 @@ export interface ProjectionApplyIdentityV1 {
   refreshSignalsDigest: Sha256Digest;
 }
 
+/**
+ * A ChangeSet the provider committed under this result's own `requestId` during an
+ * earlier attempt. The attempt that committed it may have lost its repo-harness owner
+ * (host kill, provider timeout, or a recovery reclaim) before the answer came back, so a
+ * later attempt reaches the provider's fixed point and reports `noop` with no files. This
+ * is the provider's declaration of that earlier commit; repo-harness never re-derives it.
+ */
+export interface ProjectionPriorCommittedApplyV1 {
+  /**
+   * Present together with `lookupKey` only when the committed ChangeSet also carried an
+   * apply receipt, which happens only for an accepted-semantic-change apply. A plain
+   * drift-repair apply -- the incident shape -- commits without one, and both fields are
+   * then absent rather than invented.
+   */
+  applyId?: Sha256Digest;
+  lookupKey?: Sha256Digest;
+  requestId: string;
+  changeSetId: string;
+  committedAt: string;
+  /** `hash` is the digest of the written body, or the literal `missing` for a delete. */
+  files: Array<{ path: string; operation: 'write' | 'delete'; hash: string }>;
+}
+
+/**
+ * One projection-owned write a durable receipt declares. `attempt-result` comes from the
+ * receipt's own attempt; `prior-committed-apply` comes from an earlier attempt of the same
+ * job whose ChangeSet the provider had already committed.
+ */
+export type ProjectionDeclaredWriteV1 =
+  | { source: 'attempt-result'; path: string; operation: 'write' | 'delete'; attempt: number }
+  | { source: 'prior-committed-apply'; path: string; operation: 'write' | 'delete'; changeSetId: string; committedAt: string; applyId?: Sha256Digest };
+
 export interface ProjectionResultV1 {
   schemaVersion: typeof PROJECTION_RESULT_VERSION;
   requestId: string;
@@ -136,6 +168,8 @@ export interface ProjectionResultV1 {
   }>;
   refreshSignals: ArchitectureRefreshSignalV1[];
   applyReceipt?: ProjectionApplyIdentityV1;
+  /** Omitted, never `[]`, when no earlier attempt of this requestId committed. */
+  priorCommittedApplies?: ProjectionPriorCommittedApplyV1[];
   receiptDigest: Sha256Digest;
 }
 
@@ -169,6 +203,7 @@ export interface ArchitectureProjectionReadinessV1 {
 
 type JsonRecord = Record<string, unknown>;
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
+const ISO_UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const HEAD = /^[a-f0-9]{40}$/;
 
 export function digestProjectionJson(value: unknown): Sha256Digest {
@@ -238,6 +273,40 @@ export function projectionResultReceiptDigest(input: Omit<ProjectionResultV1, 'r
   return digestProjectionJson({ ...input, refreshSignals });
 }
 
+/**
+ * The single mapping from a provider result to the projection-owned writes a durable
+ * receipt declares. `result` stays the provider's verbatim answer; this projection is what
+ * consumers gate on, so an upstream shape change has exactly one consumer edit.
+ *
+ * `unchanged` files are excluded: the result contract makes their preimage and output
+ * digests equal, so they are not writes. A path claimed by this attempt's own result wins
+ * over any earlier apply, and among earlier applies the newest commit wins, because the
+ * latest statement about a path is the one that describes the current state.
+ */
+export function projectionDeclaredWrites(result: ProjectionResultV1, attempt: number): ProjectionDeclaredWriteV1[] {
+  const declared = new Map<string, ProjectionDeclaredWriteV1>();
+  for (const file of result.files) {
+    if (file.action === 'unchanged') continue;
+    declared.set(file.path, { source: 'attempt-result', path: file.path, operation: file.action === 'delete' ? 'delete' : 'write', attempt });
+  }
+  // Code-unit ordering, matching the `sortedUnique` invariant the wire contract enforces.
+  const applies = [...(result.priorCommittedApplies ?? [])]
+    .sort((left, right) => compare(right.committedAt, left.committedAt) || compare(right.changeSetId, left.changeSetId));
+  for (const apply of applies) {
+    for (const file of apply.files) {
+      if (declared.has(file.path)) continue;
+      // `changeSetId` is the apply's only always-present identity; `applyId` exists only
+      // for an accepted-semantic-change apply, so it is carried through when present.
+      declared.set(file.path, { source: 'prior-committed-apply', path: file.path, operation: file.operation, changeSetId: apply.changeSetId, committedAt: apply.committedAt, ...(apply.applyId === undefined ? {} : { applyId: apply.applyId }) });
+    }
+  }
+  return [...declared.values()].sort((left, right) => compare(left.path, right.path));
+}
+
+function compare(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 export function projectionResultIssues(input: ProjectionResultV1): string[] {
   const issues: string[] = [];
   if (input.schemaVersion !== PROJECTION_RESULT_VERSION) issues.push('schemaVersion mismatch');
@@ -263,6 +332,23 @@ export function projectionResultIssues(input: ProjectionResultV1): string[] {
   if (input.status === 'applied-reconcile-required') {
     if (!input.applyReceipt) issues.push('applied-reconcile-required requires applyReceipt');
     if (input.refreshSignals.length > 0) issues.push('applied-reconcile-required cannot deliver refreshSignals');
+  }
+  if (input.priorCommittedApplies) {
+    if (input.priorCommittedApplies.length === 0) issues.push('priorCommittedApplies must be omitted instead of empty');
+    if (!sortedUnique(input.priorCommittedApplies.map((apply) => apply.changeSetId))) issues.push('priorCommittedApplies.changeSetId must be sorted and unique');
+    for (const [index, apply] of input.priorCommittedApplies.entries()) {
+      // The provider only declares applies committed under this very request; an entry
+      // carrying another requestId is attributing a foreign commit to this job.
+      if (apply.requestId !== input.requestId) issues.push(`priorCommittedApplies[${index}].requestId must match the result requestId`);
+      if (apply.changeSetId.trim() === '') issues.push(`priorCommittedApplies[${index}].changeSetId must not be empty`);
+      if (apply.files.length === 0) issues.push(`priorCommittedApplies[${index}].files must name at least one committed file`);
+      if (!sortedUnique(apply.files.map((file) => file.path))) issues.push(`priorCommittedApplies[${index}].files.path must be sorted and unique`);
+      // A drift-repair apply carries no ProjectionApplyIdentityV1 at all; half an identity
+      // is a malformed declaration, not a partially known one.
+      if ((apply.applyId === undefined) !== (apply.lookupKey === undefined)) {
+        issues.push(`priorCommittedApplies[${index}].applyId and lookupKey must be present together or both absent`);
+      }
+    }
   }
   if (input.applyReceipt) issues.push(...projectionApplyIdentityIssues(input.applyReceipt, input));
   if (input.applyReceipt) {
@@ -353,11 +439,34 @@ export function assertProjectionResult(value: unknown, expectedRequestId?: strin
   if (!Array.isArray(input.refreshSignals)) throw new Error('projection result refreshSignals must be an array');
   for (const [index, signal] of input.refreshSignals.entries()) assertArchitectureRefreshSignal(signal, `projection result refreshSignals[${index}]`);
   if (input.applyReceipt !== undefined) assertProjectionApplyIdentity(input.applyReceipt, 'projection result applyReceipt');
+  if (input.priorCommittedApplies !== undefined) {
+    if (!Array.isArray(input.priorCommittedApplies)) throw new Error('projection result priorCommittedApplies must be an array');
+    for (const [index, entry] of input.priorCommittedApplies.entries()) assertProjectionPriorCommittedApply(entry, `projection result priorCommittedApplies[${index}]`);
+  }
   if (!isDigest(input.receiptDigest)) throw new Error('projection result receiptDigest invalid');
   const result = input as unknown as ProjectionResultV1;
   const issues = projectionResultIssues(result);
   if (issues.length > 0) throw new Error(`projection result invariant failed: ${issues.join('; ')}`);
   return result;
+}
+
+function assertProjectionPriorCommittedApply(value: unknown, label: string): void {
+  const apply = record(value, label);
+  for (const field of ['requestId', 'changeSetId'] as const) {
+    if (typeof apply[field] !== 'string' || (apply[field] as string).trim() === '') throw new Error(`${label}.${field} invalid`);
+  }
+  if (!/^[a-zA-Z0-9_.:-]+$/.test(apply.requestId as string)) throw new Error(`${label}.requestId invalid`);
+  for (const field of ['applyId', 'lookupKey'] as const) {
+    if (apply[field] !== undefined && !isDigest(apply[field])) throw new Error(`${label}.${field} must be a SHA-256 digest`);
+  }
+  if (typeof apply.committedAt !== 'string' || !ISO_UTC_INSTANT.test(apply.committedAt) || Number.isNaN(Date.parse(apply.committedAt))) throw new Error(`${label}.committedAt must be a UTC ISO-8601 instant`);
+  if (!Array.isArray(apply.files)) throw new Error(`${label}.files must be an array`);
+  for (const [index, value] of apply.files.entries()) {
+    const file = record(value, `${label}.files[${index}]`);
+    if (typeof file.path !== 'string' || !repoRelativePosix(file.path)) throw new Error(`${label}.files[${index}].path invalid`);
+    if (file.operation !== 'write' && file.operation !== 'delete') throw new Error(`${label}.files[${index}].operation invalid`);
+    if (file.operation === 'delete' ? file.hash !== 'missing' : !isDigest(file.hash)) throw new Error(`${label}.files[${index}].hash invalid for operation ${file.operation}`);
+  }
 }
 
 function assertProjectionApplyIdentity(value: unknown, label: string): void {

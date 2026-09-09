@@ -610,6 +610,7 @@ function assertCleanCurrentProof(request: ProjectionRequestV1, result: Projectio
   if (result.status !== 'noop'
     || result.affectedNodeIds.length > 0
     || result.files.length > 0
+    || (result.priorCommittedApplies?.length ?? 0) > 0
     || result.humanActions.length > 0
     || result.refreshSignals.length > 0) {
     throw new Error('architecture reconciliation requires an empty noop with no unresolved evidence');
