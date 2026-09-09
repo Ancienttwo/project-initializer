@@ -2005,8 +2005,8 @@ const report = {
 const strictFailures = [];
 if (strictReadiness && report.runtime_capabilities.herdr.status !== "present") {
   const pinned = report.runtime_capabilities.herdr.min_version;
-  const floor = pinned ? `>=${pinned}` : `the version pinned in ${HERDR_PIN_KEY} (pin missing or malformed)`;
-  strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install herdr ${floor} and verify herdr --version`);
+  const floor = pinned ? `herdr >=${pinned}` : `the herdr version pinned in ${HERDR_PIN_KEY} (pin missing or malformed)`;
+  strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install ${floor} and verify herdr --version`);
 }
 if (strictReadiness && ["missing", "partial"].includes(report.tools.codegraph.status)) {
   strictFailures.push(`CodeGraph readiness is ${report.tools.codegraph.status}: ${report.tools.codegraph.reason}`);

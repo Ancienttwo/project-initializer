@@ -13,17 +13,34 @@
 
 ## Why
 
-Why this task matters and what breaks downstream if it ships wrong or is skipped.
+The herdr runtime version was pinned in four independent places: the CI install step
+hard-coded `v0.9.0` plus its checksum, `scripts/check-agent-tooling.sh` hard-coded the
+`0.9` floor in a regex comparison, the reference docs restated `>=0.9.0`, and downstream
+repos got none of it. Bumping herdr therefore meant editing several unrelated files, and
+missing one silently produced a CI runner and a readiness check that disagreed about which
+herdr version is required.
 
 ## Goal
 
-Describe the exact outcome this task must deliver.
+Make `.ai/harness/policy.json#external_tooling.herdr` the single source of truth for the
+herdr runtime pin (`min_version` plus the checksum-verified `release_assets` entry), and
+turn every other mention into a deterministic projection of that key: CI installs and
+version-asserts from it via `jq`, `check-agent-tooling.sh` reads it for the strict-readiness
+floor and reports `min_version`/`min_version_source`, the reference docs point at the key
+instead of restating the number, and the downstream policy seeds carry the same block.
+Drift tests keep the projections honest.
 
 ## Scope
 
-- In scope:
-- Out of scope:
-- Taste constraints: <!-- advisory only, no run gate; default style/taste lives in AGENTS.md and the minimal-change policy, use this to record a per-task override -->
+- In scope: `.ai/harness/policy.json` herdr block; `.github/workflows/ci.yml` pinned-install
+  step; `scripts/check-agent-tooling.sh` pin read plus semver comparison; the downstream
+  policy seeds in `scripts/ensure-task-workflow.sh` and `scripts/lib/project-init-lib.sh`;
+  the `assets/templates/helpers/` and `assets/reference-configs/` mirrors;
+  `docs/reference-configs/external-tooling.md`; drift/pin tests under `tests/`.
+- Out of scope: installing or upgrading herdr itself, bumping the pinned version, adding
+  release assets for platforms other than `linux-x86_64`, and any change to herdr's role in
+  the reviewer lifecycle.
+- Taste constraints: no default-floor fallback — a missing or malformed pin fails closed. <!-- advisory only, no run gate; default style/taste lives in AGENTS.md and the minimal-change policy, use this to record a per-task override -->
 
 ## Stop Conditions
 
@@ -78,7 +95,12 @@ allowed_paths:
   - tasks/reviews/20260909-1731-herdr-pin-source.review.md
   - tasks/notes/20260909-1731-herdr-pin-source.notes.md
   - .ai/context/capabilities.json
+  - .ai/harness/policy.json
+  - .github/workflows/ci.yml
   - .claude/templates/
+  - assets/
+  - docs/reference-configs/
+  - scripts/
   - src/
   - tests/
 ```

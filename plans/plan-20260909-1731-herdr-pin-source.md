@@ -95,7 +95,7 @@ See captured planning output.
 - **Stop condition**: all task breakdown items are complete, sprint verification passes, and the review recommends pass
 - **Rollback surface**: Single commit revert restores the previous literals
 
-> **Substantive Change SHA256**: `sha256:a67d8a267c287d8959b0e515658c9d1eedb2a3ab4d8f127b4266926d147f9d15`
+> **Substantive Change SHA256**: `sha256:dc4f0d7d724901012784589f5695ee234066b4404c6a2e71cf2b0c37c1a84560`
 
 ## Captured Planning Output
 
