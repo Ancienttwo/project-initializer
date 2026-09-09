@@ -190,7 +190,7 @@ export function writeBrowserSession(opts: {
       mode: 'manual-login',
       transport: resolveSessionTransport(opts.provider, opts.input.profileDir),
       chatgptUrl: opts.input.chatgptUrl ?? 'https://chatgpt.com/',
-      chatgptApp: opts.input.chatgptApp,
+      chatgptApp: opts.input.chatgptApp ?? undefined,
       channel: opts.input.browserChannel,
       profileDir: opts.input.profileDir,
       profileDirectory: opts.input.profileDirectory,

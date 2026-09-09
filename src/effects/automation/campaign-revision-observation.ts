@@ -7,7 +7,7 @@ import { resolve } from 'path';
 import { canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
 import { automationDigest, type CampaignAutomationBudgetReservationV1 } from '../../core/automation/budget';
 import { CampaignFreshAuditError } from '../../core/automation/campaign-fresh-audit';
-import { readCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from '../../core/automation/campaign-browser-session';
+import { campaignGithubPrompt, readCampaignBrowserSessionEvidence, type CampaignBrowserSessionEvidenceV1 } from '../../core/automation/campaign-browser-session';
 import { withCampaignRevisionAdmission, readCampaignRevisionRecord, persistCampaignRevisionRecord } from './development-campaign-store';
 import { readCampaignExternalSourcesPolicyAtRevision, readDevelopmentCampaignPolicyAtRevision } from './development-campaign-policy';
 import { requireManualGithubPolicy } from '../external-sources/policy';
@@ -95,8 +95,8 @@ export async function runCampaignRevisionObservation(input: {
       automation_run_id: budget.budget.automation_run_id, expected_budget_sha256: budget.budget.budget_sha256,
       request_sha256: requestDigest, env: input.env });
     if (admission.disposition === 'replayed') refuse('revision observation reservation is unresolved; do not repeat provider I/O');
-    const pending = deps.consult({ repoRoot: root, title: `${campaignId} pre-active revision observation`, prompt,
-      provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, captureNetworkEvidence: true, captureConversationEvidence: true,
+    const pending = deps.consult({ repoRoot: root, title: `${campaignId} pre-active revision observation`, prompt: campaignGithubPrompt(prompt),
+      provider: 'oracle', chatgptApp: null, requireSecretScan: true, captureNetworkEvidence: true, captureConversationEvidence: true,
       profileDir: binding.binding!.profileDir, profileDirectory: binding.binding!.profileDirectory!,
       gitleaksBin: input.gitleaks_bin, dryRun: false });
     return { admission, pending };

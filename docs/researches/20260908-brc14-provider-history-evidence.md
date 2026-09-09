@@ -143,3 +143,11 @@ The existing stopped BYOK campaign completed real revision, authoring, challenge
 `campaign author --resume-from` can preserve already adopted Issues only when the predecessor is stopped, has zero successful acquisitions, no open budget reservations and no active controller step. Source adoption is rebuilt and its canonical publication must remain unchanged in the new target ancestry. A new campaign and authorization obtain new evidence; predecessor grants, sessions and manifests remain historical.
 
 The immutable continuation binding permits only one successor. Its authoring may edit only the original Issue identities, and adoption independently rejects replacements. The ordinary challenge, publication, planning, acquire and manual delivery gates remain in force. This mechanism does not recover already acquired work or prove the real BRC14/BRC15 delivery/audit by itself.
+
+## Text Connector activation (Owner-approved, 2026-09-09)
+
+Campaign revision observation, Issue authoring/follow-up, adoption challenge and fresh audit now frame the existing canonical prompt as literal `@GitHub <prompt>`. They explicitly clear inherited app preselection; Oracle receives no `--browser-app` for these operations. Other browser clients retain their explicit app-selection behavior. This removes a transport-specific composer-pill prerequisite, not the need for Connector evidence.
+
+New session evidence consumes the invocation-owned captured conversation: validated response bytes, complete bounded history, the latest completed user/assistant turn and successful published GitHub tool returns with consistent Connector identity. A pill, answer-only claim, stale tool turn, mismatched citation or altered history cannot supply this evidence. The exact-revision decoder shares history validation and still checks both original GitHub JSON resources and their exact SHA. Historical immutable receipts retain their original evidence scope.
+
+Focused implementation verification passed 167 tests across eight campaign files; the additional real browser-command regression verifies that explicit null clears a historical app in a follow-up. This is code evidence only. The real canary's failed pre-submission observation remains retained and is not relabeled or silently retried; BRC14/BRC15 delivery and final audit remain pending.

@@ -58,7 +58,7 @@ test('pre-active observation without intent charges once and permits later real 
   const f = fixture(); let calls = 0;
   const deps = { readBinding: f.readBinding, consult: async (input: any) => {
     calls++;
-    expect(input.captureNetworkEvidence).toBe(true); expect(input.chatgptApp).toBe('GitHub');
+    expect(input.captureNetworkEvidence).toBe(true); expect(input.chatgptApp).toBeNull(); expect(input.prompt).toStartWith('@GitHub ');
     expect(input.model).toBeUndefined(); expect(input.thinkingTime).toBeUndefined(); expect(input.sessionId).toBeUndefined();
     expect(input.prompt).toContain('Do not create, edit, close or reopen Issues');
     const instructions = JSON.parse(input.prompt.slice(input.prompt.indexOf('\n') + 1));
@@ -226,7 +226,7 @@ function historyBrowser(f: ReturnType<typeof fixture>, prompt: string) {
   const value=f.browser(), output=JSON.stringify({observed_main_sha:f.campaign.target_revision,summary:'Read commit and ref.'});
   const history=structuredClone(historyFixture);
   const body=JSON.parse(history.response.body.replaceAll('example/canary','acme/widgets').replaceAll('a'.repeat(40),f.campaign.target_revision));
-  body.messages[0].content.parts=['@GitHub '+prompt]; body.messages[3].content.parts=[output];
+  body.messages[0].content.parts=[prompt]; body.messages[3].content.parts=[output];
   history.response.body=JSON.stringify(body);history.response.decodedBodySha256=createHash('sha256').update(history.response.body).digest('hex');
   const oracle=value.meta.oracle;
   return {...value,output,meta:{...value.meta,oracle:{...oracle,observation:{...oracle.observation!,appSelection:{...oracle.observation!.appSelection!,pluginId:'plugin:connector_76869538009648d5b282a4bb21c3d157'}},conversationCapture:{status:'captured',sessionId:value.meta.providerSessionId,conversationId:history.conversationId,sha256:'sha256:'+'f'.repeat(64),history}}}};

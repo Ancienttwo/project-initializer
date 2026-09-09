@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { expect, test } from 'bun:test';
 import { readCampaignBrowserSessionEvidence, validateCampaignBrowserSessionEvidence } from '../../src/core/automation/campaign-browser-session';
 import { requireVerifiedIssueAuthoringSession, validateIssueAuthoringSession } from '../../src/core/automation/issue-batch';
@@ -24,10 +25,9 @@ const faults: Record<string, (v: ReturnType<typeof result>) => void> = {
   'missing descriptor': v => { delete v.meta.providerSessionId; },
   'descriptor mismatch': v => { v.meta.providerSessionId = 'foreign'; },
   'descriptor error': v => { v.meta.oracle!.evidenceError = 'invalid descriptor'; },
-  'missing app': v => { delete v.meta.oracle!.observation!.appSelection; },
-  'wrong app': v => { (v.meta.oracle!.observation!.appSelection as Record<string, unknown>).app = 'Other'; },
-  'unselected app': v => { (v.meta.oracle!.observation!.appSelection as Record<string, unknown>).status = 'unverified'; },
-  'wrong observation origin': v => { (v.meta.oracle!.observation!.appSelection as Record<string, unknown>).source = 'answer-text'; },
+  'missing tool history': v => { delete v.meta.oracle!.conversationCapture; },
+  'wrong capture session': v => { Object.assign(v.meta.oracle!.conversationCapture!, {sessionId: 'foreign'}); },
+  'empty tool capture': v => { Object.assign(v.meta.oracle!.conversationCapture!, {status: 'missing'}); },
   'model-only proof': v => { delete v.meta.oracle; v.meta.model.verified = true; },
   'initial foreign parent': v => { v.meta.parentProviderSessionId = 'foreign'; v.meta.oracle!.observation!.parentSessionId = 'foreign'; },
 };
@@ -55,4 +55,46 @@ test('evidence tampering and response parent mismatch are rejected; receipts pre
   expect(receipt.response_provider_session_ref).toBe(f.response_session_evidence!.provider_session_ref);
   expect(receipt.response_session_evidence_sha256).toBe(f.response_session_evidence!.evidence_sha256);
   expect(receipt).not.toHaveProperty('observed_main_sha');
+});
+
+test('a UI selection pill alone cannot substitute for real Connector history', () => {
+  const v = result(); delete v.meta.oracle!.conversationCapture;
+  v.meta.oracle!.observation!.appSelection = { status: 'selected', app: 'GitHub', pluginId: 'plugin:github', source: 'chatgpt-composer-pill', capturedAt: '2026-09-05T00:00:00Z' };
+  expect(readCampaignBrowserSessionEvidence(v, binding)).toBeNull();
+});
+
+function editHistory(v: ReturnType<typeof result>, change: (body: any) => void) {
+  const h = v.meta.oracle!.conversationCapture!.history as any;
+  const body = JSON.parse(h.response.body); change(body);
+  h.response.body = JSON.stringify(body);
+  h.response.decodedBodySha256 = createHash('sha256').update(h.response.body).digest('hex');
+}
+for (const [name, change] of Object.entries({
+  'answer-only GitHub claim': (b: any) => { b.messages = b.messages.filter((m: any) => m.author.role !== 'tool'); },
+  'old-turn tool returns': (b: any) => { for (const m of b.messages.filter((m: any) => m.author.role === 'tool')) m.metadata.turn_exchange_id = 'old-turn'; },
+  'wrong Connector app': (b: any) => { for (const m of b.messages.filter((m: any) => m.author.role === 'tool')) m.metadata.invoked_resource.app_name = 'Other'; },
+  'mismatched Connector citation': (b: any) => { b.messages[1].metadata.citation_metadata.__connector_id = 'foreign'; },
+  'failed tool return': (b: any) => { b.messages[1].status = 'failed'; },
+  'truncated history': (b: any) => { b.page_info.has_previous_page = true; },
+})) test(`text activation rejects ${name}`, () => {
+  const v = result(); editHistory(v, change);
+  expect(readCampaignBrowserSessionEvidence(v, binding)).toBeNull();
+});
+test('text activation refuses changed history bytes without a matching digest', () => {
+  const v = result(); const h = v.meta.oracle!.conversationCapture!.history as any;
+  h.response.body += ' ';
+  expect(readCampaignBrowserSessionEvidence(v, binding)).toBeNull();
+});
+
+test('text campaign follow-up clears a historical UI app through the real browser command builder', async () => {
+  const { mkdtempSync, rmSync } = await import('fs'); const { tmpdir } = await import('os'); const { join } = await import('path');
+  const { runBrowserConsult, runBrowserFollowup } = await import('../../src/cli/chatgpt-browser/engine');
+  const root = mkdtempSync(join(tmpdir(), 'text-connector-'));
+  try {
+    const first = await runBrowserConsult({ repoRoot: root, prompt: 'original', title: 'historical-app', provider: 'oracle', chatgptApp: 'GitHub', dryRun: true });
+    const next = await runBrowserFollowup({ repoRoot: root, sessionId: first.sessionId, prompt: '@GitHub read the exact revision', title: 'text-app', chatgptApp: null, dryRun: true });
+    expect(next.dryRun!.command).not.toContain('--browser-app');
+    expect(next.dryRun!.command).toContain('@GitHub read the exact revision');
+    expect(next.meta.browser.chatgptApp).toBeUndefined();
+  } finally { rmSync(root, {recursive: true, force: true}); }
 });

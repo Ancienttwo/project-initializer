@@ -1,5 +1,5 @@
 import { readCampaignRevisionEvidence, buildCampaignRevisionReadInstruction, encodeCampaignRevisionPrompt } from '../../core/automation/campaign-revision-evidence';
-import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
+import { campaignGithubPrompt, readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
 import { execFileSync } from 'child_process';
 import { canonicalMessageDigest, messageSha256 } from '../../core/messages/mechanics';
 import { automationDigest, type ProgramAuthorizationV1, type CampaignAutomationBudgetReservationV1 } from '../../core/automation/budget';
@@ -294,9 +294,9 @@ export async function runCampaignFreshAudit(
   const browserInput: IssueAuthoringBrowserInput = {
     repoRoot: root,
     title: `${input.campaign_id} group ${input.group_number} fresh audit`,
-    prompt,
+    prompt: campaignGithubPrompt(prompt),
     provider: 'oracle',
-    chatgptApp: 'GitHub',
+    chatgptApp: null,
     requireSecretScan: true,
     captureNetworkEvidence: true,
     captureConversationEvidence: true,

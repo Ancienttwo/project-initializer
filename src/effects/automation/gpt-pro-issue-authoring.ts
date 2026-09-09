@@ -1,7 +1,7 @@
 import { assertResumedAuthoringTarget, bindAdoptedResume, validateAdoptedResumeSource, type AdoptedResumeSource } from './campaign-authoring-resume';
 import { readCampaignProtectionAtRevision } from './campaign-protection';
 import { campaignAutomationRunId } from '../../core/automation/campaign-authoring-budget';
-import { readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
+import { campaignGithubPrompt, readCampaignBrowserSessionEvidence } from '../../core/automation/campaign-browser-session';
 import { resolveCampaignGroupAuthoringContext } from './campaign-fresh-audit';
 import { readCampaignCapabilityIdsAtRevision } from './campaign-capability-registry';
 import { issueBatchMetadataAuthoringSchema, ISSUE_BATCH_METADATA_KIND } from '../../core/automation/issue-batch-reconcile';
@@ -37,7 +37,7 @@ export interface IssueAuthoringBrowserInput {
   readonly title: string;
   readonly prompt: string;
   readonly provider: 'oracle';
-  readonly chatgptApp: 'GitHub';
+  readonly chatgptApp: null;
   readonly requireSecretScan: true;
   readonly captureNetworkEvidence?: true;
   readonly captureConversationEvidence?: true;
@@ -156,8 +156,8 @@ function context(input: StartIssueBatchAuthoringInput, readBinding: IssueAuthori
 
 function browserInput(repoRoot: string, prompt: string, profileDir: string, profileDirectory: string, input: StartIssueBatchAuthoringInput): IssueAuthoringBrowserInput {
   return {
-    repoRoot, title: `${input.campaign_id} group ${input.group_number} issue authoring`, prompt,
-    provider: 'oracle', chatgptApp: 'GitHub', requireSecretScan: true, gitleaksBin: input.gitleaks_bin,
+    repoRoot, title: `${input.campaign_id} group ${input.group_number} issue authoring`, prompt: campaignGithubPrompt(prompt),
+    provider: 'oracle', chatgptApp: null, requireSecretScan: true, captureConversationEvidence: true, gitleaksBin: input.gitleaks_bin,
     profileDir, profileDirectory, dryRun: input.dry_run === true,
   };
 }

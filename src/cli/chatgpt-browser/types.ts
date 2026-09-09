@@ -33,7 +33,8 @@ export interface BrowserConsultInput {
   followups?: string[];
   model?: string;
   thinking?: ThinkingLevel;
-  chatgptApp?: string;
+  /** null explicitly clears app preselection inherited by a follow-up. */
+  chatgptApp?: string | null;
   provider?: BrowserProviderName;
   chatgptUrl?: string;
   timeoutMs?: number;
