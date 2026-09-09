@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 03:19
+> **Related Plan**: plans/archive/plan-20260910-0301-campaign-worker-record-scope.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260910-0319
+> **Archive Projection V1**: `plans/plan-20260910-0301-campaign-worker-record-scope.md` => `plans/archive/plan-20260910-0301-campaign-worker-record-scope.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0301-campaign-worker-record-scope.notes.md` => `tasks/archive/notes-20260910-0319-campaign-worker-record-scope.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0301-campaign-worker-record-scope.contract.md` => `tasks/archive/contract-20260910-0319-campaign-worker-record-scope.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0301-campaign-worker-record-scope.review.md` => `tasks/archive/review-20260910-0319-campaign-worker-record-scope.md`
+
 # Implementation Notes: campaign-worker-record-scope
 
 > **Status**: Active
-> **Plan**: plans/plan-20260910-0301-campaign-worker-record-scope.md
-> **Contract**: tasks/contracts/20260910-0301-campaign-worker-record-scope.contract.md
-> **Review**: tasks/reviews/20260910-0301-campaign-worker-record-scope.review.md
+> **Plan**: plans/archive/plan-20260910-0301-campaign-worker-record-scope.md
+> **Contract**: tasks/archive/contract-20260910-0319-campaign-worker-record-scope.md
+> **Review**: tasks/archive/review-20260910-0319-campaign-worker-record-scope.md
 > **Last Updated**: 2026-09-10 03:01
 > **Lifecycle**: notes
 

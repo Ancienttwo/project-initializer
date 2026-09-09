@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-10 03:19
+> **Related Plan**: plans/archive/plan-20260910-0301-campaign-worker-record-scope.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260910-0319
+> **Archive Projection V1**: `plans/plan-20260910-0301-campaign-worker-record-scope.md` => `plans/archive/plan-20260910-0301-campaign-worker-record-scope.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0301-campaign-worker-record-scope.notes.md` => `tasks/archive/notes-20260910-0319-campaign-worker-record-scope.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0301-campaign-worker-record-scope.contract.md` => `tasks/archive/contract-20260910-0319-campaign-worker-record-scope.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0301-campaign-worker-record-scope.review.md` => `tasks/archive/review-20260910-0319-campaign-worker-record-scope.md`
+
 # Task Contract: campaign-worker-record-scope
 
-> **Status**: Active
-> **Plan**: plans/plan-20260910-0301-campaign-worker-record-scope.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260910-0301-campaign-worker-record-scope.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-10 03:01
-> **Review File**: `tasks/reviews/20260910-0301-campaign-worker-record-scope.review.md`
-> **Notes File**: `tasks/notes/20260910-0301-campaign-worker-record-scope.notes.md`
+> **Review File**: `tasks/archive/review-20260910-0319-campaign-worker-record-scope.md`
+> **Notes File**: `tasks/archive/notes-20260910-0319-campaign-worker-record-scope.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -43,10 +53,10 @@ A narrow-scope dry-run still mandates a Notes write outside its writable paths, 
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260910-0301-campaign-worker-record-scope.md`
+- Source plan: `plans/archive/plan-20260910-0301-campaign-worker-record-scope.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260910-0301-campaign-worker-record-scope.review.md`
-- Notes file: `tasks/notes/20260910-0301-campaign-worker-record-scope.notes.md`
+- Review file: `tasks/archive/review-20260910-0319-campaign-worker-record-scope.md`
+- Notes file: `tasks/archive/notes-20260910-0319-campaign-worker-record-scope.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
