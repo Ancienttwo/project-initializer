@@ -947,9 +947,13 @@ screenshot/artifact path, or reviewer observation.
 REVIEW_TEMPLATE_EOF
 fi
 
-render_contract_file "$plan_file" "$contract_file" "$review_file" "$notes_file" "$slug" "$timestamp_human" "$capability_id"
+# An existing contract may already be admitted by digest. Projection initializes
+# missing contracts only; preflight owns rejection of incomplete existing briefs.
+if [[ ! -e "$contract_file" && ! -L "$contract_file" ]]; then
+  render_contract_file "$plan_file" "$contract_file" "$review_file" "$notes_file" "$slug" "$timestamp_human" "$capability_id"
+  carry_forward_plan_scope_boundary "$plan_file" "$contract_file"
+fi
 maybe_advise_geju_freeze || true
-carry_forward_plan_scope_boundary "$plan_file" "$contract_file"
 maybe_advise_contract_brief_preflight "$contract_file"
 render_implementation_notes_file "$plan_file" "$contract_file" "$review_file" "$notes_file" "$slug" "$timestamp_human"
 sed \

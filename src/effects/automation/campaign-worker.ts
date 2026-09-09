@@ -36,7 +36,6 @@ export interface CampaignWorkerHandoff {
   readonly session_id: string;
   readonly authorization_id: string;
   readonly acquired: Acquisition;
-  readonly contract_sha256: string;
 }
 export interface CampaignContractRunResult {
   readonly status: 'pass' | 'fail';
@@ -74,8 +73,7 @@ export function createCampaignWorkerHandoff(input: CampaignAcquisitionInput, acq
   requireCampaignActiveAdmission(root, intent, input.env);
   const dispatch = canonicalMessageDigest({ operation: 'campaign-worker', intent: intent.intent_sha256, claim: acquired.envelope.claim_id, generation: acquired.envelope.generation });
   const selector = { repo_root: root, campaign_id: intent.campaign_id, group_number: intent.group_number, intent_sha256: intent.intent_sha256, dispatch_id: dispatch };
-  const handoff: CampaignWorkerHandoff = { selector, host: input.host, session_id: input.session_id, authorization_id: input.authorization_id, acquired,
-    contract_sha256: digest(file(acquired.envelope.worktree_path, acquired.envelope.plan.contract_path)) };
+  const handoff: CampaignWorkerHandoff = { selector, host: input.host, session_id: input.session_id, authorization_id: input.authorization_id, acquired };
   withCampaignPlanningLock(root, intent, () => {
     persistPlanningRecord(root, intent, key(dispatch, 'handoff'), handoff);
     const policy = requireCampaignPlanningAuthority(root, intent, input.env).grant.campaign?.liveness_policy;
@@ -124,12 +122,12 @@ export function bindCampaignWorker(input: {
       || !stored || !exact(stored, handoff.acquired.receipt)) throw new Error('campaign worker parent or Engineer authority is stale');
     validateClaimActorReceiptLive(root, stored, work);
     validateFleetWorkEnvelope(root, work, input.env);
-    if (digest(file(work.worktree_path, input.contract)) !== handoff.contract_sha256) throw new Error('campaign worker projected contract changed');
+    if (digest(file(work.worktree_path, input.contract)) !== work.plan.contract_sha256.slice(7)) throw new Error('campaign worker projected contract changed');
     return authority;
   };
   const authority = validate();
   const livenessPolicy = authority.grant.campaign?.liveness_policy;
-  const request = { dispatch_id: selector.dispatch_id, contract_sha256: handoff.contract_sha256, worker_command: input.worker_command, verifier_command: input.verifier_command, ...(input.provider ? { provider: input.provider } : {}) };
+  const request = { dispatch_id: selector.dispatch_id, contract_sha256: work.plan.contract_sha256.slice(7), worker_command: input.worker_command, verifier_command: input.verifier_command, ...(input.provider ? { provider: input.provider } : {}) };
   const read = <T>(part: string) => readPlanningRecord<T>(root, intent, key(selector.dispatch_id, part));
   const persist = (part: string, value: unknown) => withCampaignPlanningLock(root, intent, () => persistPlanningRecord(root, intent, key(selector.dispatch_id, part), value));
   const priorLaunch = read<{ request: typeof request; started_at: string }>('launch');
