@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { listHelperIds, listHelpers, runHelper } from '../runtime/helper-runner';
+import { listHelperIds, listHelpers, runHelper } from '../../effects/runtime/helper-runner';
 
 export const RUN_HELP_MAX_HELPERS = 60;
 export const RUN_HELP_MAX_LINES = 83;

@@ -2,8 +2,8 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from 'fs';
 import { dirname, extname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { ARCHCONTEXT_NODE_RANGE } from 'archctx-contracts';
-import { runProcess as runBoundedProcess } from '../../effects/process-runner';
-import { trustedNodeCandidates } from '../../effects/runtime/node-candidates';
+import { runProcess as runBoundedProcess } from '../process-runner';
+import { trustedNodeCandidates } from './node-candidates';
 import {
   protectedHelperRuntimeEnv,
   resolveProtectedHelperPlatform,

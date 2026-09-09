@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from "os";
 import { join } from "path";
 import { spawnSync } from "child_process";
-import { listHelpers, protectedChildEnv, resolveHelper, runHelper } from "../../src/cli/runtime/helper-runner";
+import { listHelpers, protectedChildEnv, resolveHelper, runHelper } from "../../src/effects/runtime/helper-runner";
 import { RUN_HELP_GROUPS, RUN_HELP_MAX_HELPERS, RUN_HELP_MAX_LINES } from "../../src/cli/commands/run";
 import { fixtureTaskId } from '../helpers/sprint-fixture';
 

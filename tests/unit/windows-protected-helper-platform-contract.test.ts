@@ -10,8 +10,8 @@ import {
   writeWindowsProtectedHelperContract,
   type ProtectedHelperFileAccess,
   type WindowsProtectedHelperContract,
-} from '../../src/cli/runtime/protected-helper-platform';
-import { protectedChildEnv } from '../../src/cli/runtime/helper-runner';
+} from '../../src/effects/runtime/protected-helper-platform';
+import { protectedChildEnv } from '../../src/effects/runtime/helper-runner';
 
 const GIT_ROOT = 'C:\\Program Files\\Git';
 const CONTRACT: WindowsProtectedHelperContract = {

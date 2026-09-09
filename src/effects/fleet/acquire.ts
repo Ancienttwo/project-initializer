@@ -10,7 +10,7 @@ import { canonicalMessageBytes } from '../../core/messages/mechanics';
  * an offer into authority without re-reading the owning stores.
  */
 
-import { execFileSync } from 'child_process';
+import { runHelper } from '../runtime/helper-runner';
 import { randomUUID } from 'crypto';
 import { realpathSync } from 'fs';
 import { join } from 'path';
@@ -425,36 +425,28 @@ function failure(
 
 function defaultStart(repo: RepoHarnessRegisteredRepo, offer: TaskOfferV1): ContractWorktreeStartV1 {
   if (offer.plan === null) throw new Error(`offer ${offer.task_id} has no plan proof`);
-  const script = join(repo.path, 'scripts', 'contract-worktree.sh');
-  const bash = process.env.REPO_HARNESS_BASH_BIN ?? '/bin/bash';
-  const stdout = execFileSync(bash, [
-    script,
-    'start',
-    '--plan', offer.plan.plan_path,
-    '--fresh',
-    '--json',
-    '--no-plan-to-todo',
-  ], {
+  const result = runHelper({
+    helper: 'contract-worktree',
+    args: ['start', '--plan', offer.plan.plan_path, '--fresh', '--json', '--no-plan-to-todo'],
     cwd: repo.path,
-    encoding: 'utf-8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    maxBuffer: 16 * 1024 * 1024,
+    trustedPackage: true,
+    stdio: 'pipe',
+    maxOutputBytes: 16 * 1024 * 1024,
   });
-  return parseStartResult(stdout);
+  if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || 'contract-worktree start failed');
+  return parseStartResult(result.stdout ?? '');
 }
 
 function defaultProject(worktreePath: string, planPath: string): void {
-  const bash = process.env.REPO_HARNESS_BASH_BIN ?? '/bin/bash';
-  execFileSync(bash, [join(worktreePath, 'scripts', 'plan-to-todo.sh'), '--plan', planPath], {
+  const result = runHelper({
+    helper: 'plan-to-todo',
+    args: ['--plan', planPath],
     cwd: worktreePath,
-    env: {
-      ...process.env,
-      REPO_HARNESS_TARGET_REPO_ROOT: worktreePath,
-      REPO_HARNESS_CONTRACT_WORKTREE: '1',
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    maxBuffer: 16 * 1024 * 1024,
+    trustedPackage: true,
+    stdio: 'pipe',
+    maxOutputBytes: 16 * 1024 * 1024,
   });
+  if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || 'plan-to-todo projection failed');
 }
 
 function acquisitionDependencies(overrides: Partial<FleetAcquireDependencies> = {}): FleetAcquireDependencies {

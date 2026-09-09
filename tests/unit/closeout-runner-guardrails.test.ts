@@ -18,7 +18,7 @@ import { spawnSync } from 'child_process';
 import {
   helperTimeoutMs,
   runHelper,
-} from '../../src/cli/runtime/helper-runner';
+} from '../../src/effects/runtime/helper-runner';
 import { acquireExpensiveRunLock } from '../../src/effects/expensive-run-lock';
 import { acquireExclusiveDirectoryLock } from '../../src/effects/locking/exclusive-directory-lock';
 import { runProcess } from '../../src/effects/process-runner';
@@ -383,7 +383,7 @@ describe('closeout runner guardrails', () => {
     ]);
     const worker = join(root, 'helper-entrypoint.ts');
     writeFileSync(worker, [
-      `import { runHelper } from ${JSON.stringify(join(ROOT, 'src/cli/runtime/helper-runner.ts'))};`,
+      `import { runHelper } from ${JSON.stringify(join(ROOT, 'src/effects/runtime/helper-runner.ts'))};`,
       `const result = runHelper({ helper: 'verify-sprint', cwd: ${JSON.stringify(root)},`,
       `  env: { REPO_HARNESS_SOURCE_ROOT: ${JSON.stringify(sourceRoot)} }, stdio: 'pipe', timeoutMs: 10_000 });`,
       'process.exitCode = result.exitCode;',
@@ -659,7 +659,7 @@ describe('closeout runner guardrails', () => {
 
   test('the fixed source retains the ordinary default without making it closeout authority', () => {
     const processRunner = readFileSync(join(ROOT, 'src/effects/process-runner.ts'), 'utf-8');
-    const helperRunner = readFileSync(join(ROOT, 'src/cli/runtime/helper-runner.ts'), 'utf-8');
+    const helperRunner = readFileSync(join(ROOT, 'src/effects/runtime/helper-runner.ts'), 'utf-8');
     const ship = readFileSync(join(ROOT, 'scripts/ship-worktrees.sh'), 'utf-8');
     const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf-8' });
 

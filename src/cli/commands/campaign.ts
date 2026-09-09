@@ -12,7 +12,7 @@ import { readBrowserBinding } from '../chatgpt-browser/binding';
 import { runBrowserConsult, runBrowserFollowup, readSession } from '../chatgpt-browser/engine';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { runHelper } from '../runtime/helper-runner';
+import { runHelper } from '../../effects/runtime/helper-runner';
 import { runCampaignAcquisition } from '../../effects/automation/campaign-acquisition';
 import { runCampaignPlanningStep } from '../../effects/automation/campaign-planning';
 import { CampaignPlanningError } from '../../core/automation/campaign-planning';

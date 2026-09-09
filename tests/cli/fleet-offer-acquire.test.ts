@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -139,10 +138,7 @@ function acquireFixture(): AcquireFixture {
   mkdirSync(join(repo, 'plans/sprints'), { recursive: true });
   mkdirSync(join(repo, 'tasks/contracts'), { recursive: true });
   mkdirSync(home, { recursive: true });
-  cpSync(join(CWD, 'assets/templates/helpers'), join(repo, 'scripts'), { recursive: true });
   cpSync(join(CWD, '.claude/templates/contract.template.md'), join(repo, '.claude/templates/contract.template.md'));
-  chmodSync(join(repo, 'scripts/contract-worktree.sh'), 0o755);
-  chmodSync(join(repo, 'scripts/plan-to-todo.sh'), 0o755);
   writeFileSync(join(repo, '.ai/harness/policy.json'), JSON.stringify({
     worktree_strategy: { merge_back: { target: 'main' }, branch_prefix: 'codex/' },
   }));
@@ -316,9 +312,11 @@ describe('fleet offers CLI', () => {
     }
   });
 
-  test('acquires exactly one real bound worktree and never returns a second envelope', () => {
+  test('acquires a package-helper-only repository and never returns a second envelope', () => {
     const fixture = acquireFixture();
     try {
+      expect(existsSync(join(fixture.repo, 'scripts/contract-worktree.sh'))).toBe(false);
+      expect(existsSync(join(fixture.repo, 'scripts/plan-to-todo.sh'))).toBe(false);
       const env = acquireEnvironment(fixture.home);
       const offers = runCli(['fleet', 'offers', '--json', '--repo-id', fixture.repoId], env);
       expect(offers.status, offers.stderr).toBe(0);
@@ -339,7 +337,7 @@ describe('fleet offers CLI', () => {
         '--max-attempts', '2',
       ];
       const acquired = runCli(args, env);
-      expect(acquired.status, acquired.stderr).toBe(0);
+      expect(acquired.status, acquired.stderr || acquired.stdout).toBe(0);
       expect(acquired.stderr).toBe('');
       const result = JSON.parse(acquired.stdout) as {
         ok: boolean;

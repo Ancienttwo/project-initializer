@@ -4,7 +4,7 @@ import { join } from 'path';
 /**
  * Single authority for the trusted Node runtime candidate scan.
  *
- * Both the protected helper runner (`src/cli/runtime/helper-runner.ts`) and the
+ * Both the protected helper runner (`src/effects/runtime/helper-runner.ts`) and the
  * architecture projection provider (`src/effects/architecture/archctx-provider.ts`)
  * need the same list of locations where a compatible Node runtime may live when
  * `PATH` cannot be trusted or carries no compatible runtime. The scan is a pure
