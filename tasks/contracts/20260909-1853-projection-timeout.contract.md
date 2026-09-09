@@ -223,6 +223,10 @@ the intended coverage; do not infer that choice from paths or command text.
   have written architecture docs and agent context to the worktree; only the receipt and the
   failure transition are ownership-gated, and the reclaiming owner re-runs an idempotent
   snapshot-checked apply.
+- Policy bump deferred: `.ai/harness/policy.json` stays at 120000 in this PR because the installed
+  `repo-harness` runtime (Stop hook, global CLI) validates the old 1000..120000 cap; raising the value
+  before that runtime is rebuilt from this change would break every hook-driven drain. The 300000 bump
+  is a follow-up one-line change gated on the installed runtime version.
 - Runtime skew: the installed `repo-harness` 0.18.0 CLI still enforces the old
   `1000..120000` validator bound, so `repo-harness architecture-projection drain` against this
   repo's 300000 policy fails until this branch ships; the branch source CLI resolves it.

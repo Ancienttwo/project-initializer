@@ -119,7 +119,7 @@ under host load, and the projection job dead-letters after four consecutive
 ## Task Breakdown
 
 - [x] Raise the projection timeout validator cap to 600000 and keep the 120000 default
-- [x] Set this repo's policy projection_timeout_ms to 300000
+- [ ] Set this repo's policy projection_timeout_ms to 300000 (deferred: the installed repo-harness runtime and Stop hook still validate 1000..120000; bump only after a runtime built from this change is installed globally)
 - [x] Derive the running stale window from the resolved policy timeout
 - [x] Update validator boundary and stale-window tests
 
@@ -140,6 +140,6 @@ stale window returns to a fixed 150000-equivalent derivation.
 
 ## Task Breakdown
 - [x] Raise the projection timeout validator cap to 600000 and keep the 120000 default
-- [x] Set this repo's policy projection_timeout_ms to 300000
+- [ ] Set this repo's policy projection_timeout_ms to 300000 (deferred: the installed repo-harness runtime and Stop hook still validate 1000..120000; bump only after a runtime built from this change is installed globally)
 - [x] Derive the running stale window from the resolved policy timeout
 - [x] Update validator boundary and stale-window tests
