@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 00:28
+> **Related Plan**: plans/archive/plan-20260910-0004-campaign-settled-resume.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260910-0028
+> **Archive Projection V1**: `plans/plan-20260910-0004-campaign-settled-resume.md` => `plans/archive/plan-20260910-0004-campaign-settled-resume.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0004-campaign-settled-resume.notes.md` => `tasks/archive/notes-20260910-0028-campaign-settled-resume.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0004-campaign-settled-resume.contract.md` => `tasks/archive/contract-20260910-0028-campaign-settled-resume.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0004-campaign-settled-resume.review.md` => `tasks/archive/review-20260910-0028-campaign-settled-resume.md`
+
 # Task Review: campaign-settled-resume
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260910-0004-campaign-settled-resume.md
-> **Contract**: tasks/contracts/20260910-0004-campaign-settled-resume.contract.md
-> **Notes File**: tasks/notes/20260910-0004-campaign-settled-resume.notes.md
+> **Plan**: plans/archive/plan-20260910-0004-campaign-settled-resume.md
+> **Contract**: tasks/archive/contract-20260910-0028-campaign-settled-resume.md
+> **Notes File**: tasks/archive/notes-20260910-0028-campaign-settled-resume.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 00:04
 > **Recommendation**: pass
