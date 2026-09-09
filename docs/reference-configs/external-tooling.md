@@ -326,7 +326,7 @@ boundary explicit:
 
 | Capability | Owner | Required for |
 |---|---|---|
-| `herdr` | user install (herdr.dev) | required, version >=0.9.0; peer terminals and persistent task reviewer hosting |
+| `herdr` | user install (herdr.dev) | required at the version pinned in `.ai/harness/policy.json#external_tooling.herdr`; peer terminals and persistent task reviewer hosting |
 | `bun` | repo-harness | repo-harness-owned global installs, local dependency install, tests, and runtime execution |
 | `bash` | repo-harness | helper scripts, migration, setup checks, and contract verification wrappers; Git-for-Windows Bash is the Windows platform contract |
 | `npm` | npm registry | registry readbacks, publish gates, and opt-in update checks; not repo-harness-owned global install repair |
@@ -334,10 +334,12 @@ boundary explicit:
 | `rsync` | platform filesystem | Waza staging-to-Codex sync and installed-copy runtime mirroring |
 | `symlink` | platform filesystem | link-mode aliases; copy mode is the fallback |
 
-Install herdr through its official installer or platform package manager and verify
-`herdr --version` reports version 0.9.0 or newer. `check-agent-tooling.sh
---strict-readiness` fails if it is missing or unusable; `setup check` projects
-`runtime.herdr`. Repo-harness does not install it or edit user Herdr config.
+`.ai/harness/policy.json#external_tooling.herdr` is the single herdr pin: it owns
+the `min_version` floor and the checksum-verified `release_assets` entry that CI
+installs. Install herdr through its official installer or platform package manager
+and verify `herdr --version` reports at least that pinned `min_version`.
+`check-agent-tooling.sh --strict-readiness` reads the same key and fails if herdr is
+missing, unusable, or older than the pin; `setup check` projects `runtime.herdr`. Repo-harness does not install it or edit user Herdr config.
 The persistent reviewer still requires POSIX process groups: use macOS/Linux or
 WSL. Native Windows review lifecycle support is not implied by Herdr support.
 Drain old tmux reviewers with the previous repo-harness version before upgrading.

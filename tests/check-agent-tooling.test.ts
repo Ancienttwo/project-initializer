@@ -351,12 +351,24 @@ function writeFakeCurl(fakeBin: string, version: string, logFile?: string) {
   );
 }
 
-function writeArchctxRepo(repoRoot: string, capabilitySource: "registry" | "archcontext") {
+const HERDR_PIN = JSON.parse(readFileSync(join(ROOT, ".ai/harness/policy.json"), "utf8")).external_tooling.herdr;
+
+/**
+ * Strict readiness reads the herdr floor from
+ * `.ai/harness/policy.json#external_tooling.herdr`, so a fixture repo that stands
+ * in for a ready repo must carry the same pin this repo publishes.
+ */
+function writeFixturePolicy(repoRoot: string, policy: Record<string, unknown> = {}) {
   mkdirSync(join(repoRoot, ".ai/harness"), { recursive: true });
+  const externalTooling = { ...((policy.external_tooling as Record<string, unknown>) ?? {}), herdr: HERDR_PIN };
   writeFileSync(
     join(repoRoot, ".ai/harness/policy.json"),
-    JSON.stringify({ version: 1, context: { capability_source: capabilitySource } }, null, 2)
+    `${JSON.stringify({ ...policy, external_tooling: externalTooling }, null, 2)}\n`
   );
+}
+
+function writeArchctxRepo(repoRoot: string, capabilitySource: "registry" | "archcontext") {
+  writeFixturePolicy(repoRoot, { version: 1, context: { capability_source: capabilitySource } });
   writeFileSync(
     join(repoRoot, "package.json"),
     JSON.stringify({ devDependencies: { "archctx-contracts": "0.3.0" } }, null, 2)
@@ -1105,6 +1117,7 @@ describe("check-agent-tooling", () => {
     ]) {
       const envRoot = setupFakeEnvironment(`check-agent-tooling-role-${testCase.evidenceStatus}`);
       try {
+        writeFixturePolicy(envRoot.root);
         mkdirSync(join(envRoot.home, ".codex", "agents"), { recursive: true });
         writeFileSync(
           join(envRoot.home, ".codex", "config.toml"),
@@ -1194,8 +1207,7 @@ describe("check-agent-tooling", () => {
   test("accepts the top-level evidence pointer written by a real SubagentStart handler", () => {
     const envRoot = setupFakeEnvironment("check-agent-tooling-hook-e2e");
     try {
-      mkdirSync(join(envRoot.root, ".ai", "harness"), { recursive: true });
-      writeFileSync(join(envRoot.root, ".ai", "harness", "policy.json"), "{}\n");
+      writeFixturePolicy(envRoot.root);
       mkdirSync(join(envRoot.home, ".codex", "agents"), { recursive: true });
       writeFileSync(
         join(envRoot.home, ".codex", "config.toml"),
