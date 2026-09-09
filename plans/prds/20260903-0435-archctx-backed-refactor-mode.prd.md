@@ -343,7 +343,7 @@
   - 只透過 CLI 消費；0.5.x 不新增 MCP 工具。
   - `archctx-contracts@0.5.2` 已凍結 `RefactorVerificationRequestV1` 與 ingress validator；核心 API 維持 `refactorVerifyInvariantIssues(afterSnapshot, evidence)`，語義輸入是 after `ModuleStatisticsSnapshotV1` + `RefactorResolutionEvidenceV1`。
   - 上游錯誤碼原樣透出，不本地翻譯成別的語義。
-- Recommended Defaults: scan stage = `0.5.2` + `["module-statistics-v1","refactor-assessment-v1","recommendation-v3"]`；verify stage = `0.5.2` + `["refactor-resolution-v1"]`；timeout 沿用 `projection_timeout_ms` 的 1000..120000 邊界。
+- Recommended Defaults: scan stage = `0.5.2` + `["module-statistics-v1","refactor-assessment-v1","recommendation-v3"]`；verify stage = `0.5.2` + `["refactor-resolution-v1"]`；timeout 沿用 `projection_timeout_ms` 的 1000..600000 邊界。
 - Freedoms: request 組裝的內部結構；readback 快取策略。
 - Normal path: 解析 package-local archctx → `capabilities` handshake → 組 `RefactorRequestV1`（帶 `expectedHeadSha` / `expectedWorktreeDigest`）→ 呼叫 → 驗證 result → 回傳。
 - Failure path 1: 版本或 feature 不匹配 → `refactor_provider_version_mismatch`，零產出。
@@ -651,7 +651,7 @@ Module 8 完整 → Module 9 → Module 10
 | Target | Number | Measurement Method | Degradation Threshold |
 |---|---:|---|---:|
 | Cutover Closure gate 單次執行 | 15 秒 | 在本倉庫規模上計時 | 45 秒 |
-| `refactor scan` 端到端（含 provider） | 120 秒 | 沿用 `projection_timeout_ms` 上限 | 硬上限 120 秒即失敗 |
+| `refactor scan` 端到端（含 provider） | policy `projection_timeout_ms` | 沿用 `projection_timeout_ms` 上限（validator 1000..600000，本 repo 300000） | 超過 policy 值即失敗 |
 | Board 從權威完全重建 | 10 秒 | 刪除目錄後重建計時 | 30 秒 |
 | Program event chain 重放 | 2 秒 | 1000 event 的 projection 重建 | 8 秒 |
 
@@ -750,7 +750,7 @@ You are implementing this PRD.
 - **判級與提案的職責倒置是這條鏈最容易做錯的地方。** 直覺會以為「分析工具給建議、執行方採納」，但上游 contract 的實際形狀相反：ArchContext 只給觀察與判級，**提案由 repo-harness 側的 agent 撰寫並送進去評估**。這意味著 proposal 的質量是 repo-harness 的責任，而 scale 的正確性是 ArchContext 的責任。任何把兩者混在一起的實作（例如本地先猜 scale 再去驗證）都會退化成第二個判定器。
 - **「PR merged ≠ resolved」是資料模型層強制，不是文檔提醒。** `RefactorExecutionBindingV1` 結構上沒有狀態欄位，`RefactorProgramV1` 也沒有。repo-harness 在 exact final main 的 ArchContext resolution 尚未產生前，唯一能表達的就是 `merged_pending_measurement`——它結構上無法說謊。
 - **10x 時最先失敗的三處。** 其一，program event chain 的線性掃描：program 數上升後 projection 重建會變慢，解法是 content-addressed 索引與 per-program 投影，GC 只清 terminal runtime cache、絕不刪 binding。其二，closure gate 的殘留掃描：selector 數 × 檔案數是乘積關係，解法是把掃描限縮在 contract allowed paths 與 diff 觸及檔案，而不是全倉庫掃。其三，`maximum_parallel_modules` 與 node 粒度 concurrency key 的組合會在大型 cross-module program 上成為吞吐瓶頸——正確解法是拆小 program，不是放寬 concurrency key。
-- **provider 呼叫是外部 I/O，必須有預算。** scan 走既有 `projection_timeout_ms` 的 1000..120000 邊界；一次 program 的 provider 呼叫次數應有上限並記入 event chain，避免重試風暴打到上游。GPT Pro lane 的呼叫成本更高，`proposal_author = gpt_pro` 必須有每 program 的次數上限。
+- **provider 呼叫是外部 I/O，必須有預算。** scan 走既有 `projection_timeout_ms` 的 1000..600000 邊界；一次 program 的 provider 呼叫次數應有上限並記入 event chain，避免重試風暴打到上游。GPT Pro lane 的呼叫成本更高，`proposal_author = gpt_pro` 必須有每 program 的次數上限。
 - **兩階段 provider 的代價是狀態空間變大。** Stage 2 不可用時 Module 8 的預驗跳過、Module 9 的測量停在 `merged_pending_measurement`——這兩條路徑必須有獨立測試，否則會退化成「Stage 2 永遠不可用也沒人發現」。
 
 ## Approved execution mapping clarification (2026-09-05)
