@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 11:55
+> **Related Plan**: plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260910-1155
+> **Archive Projection V1**: `plans/plan-20260910-0431-campaign-acceptance-preflight.md` => `plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md`
+> **Archive Projection V1**: `tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md` => `tasks/archive/notes-20260910-1155-campaign-acceptance-preflight.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-0431-campaign-acceptance-preflight.contract.md` => `tasks/archive/contract-20260910-1155-campaign-acceptance-preflight.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md` => `tasks/archive/review-20260910-1155-campaign-acceptance-preflight.md`
+
 # Implementation Notes: campaign-acceptance-preflight
 
 > **Status**: Active
-> **Plan**: plans/plan-20260910-0431-campaign-acceptance-preflight.md
-> **Contract**: tasks/contracts/20260910-0431-campaign-acceptance-preflight.contract.md
-> **Review**: tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md
+> **Plan**: plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md
+> **Contract**: tasks/archive/contract-20260910-1155-campaign-acceptance-preflight.md
+> **Review**: tasks/archive/review-20260910-1155-campaign-acceptance-preflight.md
 > **Last Updated**: 2026-09-10 04:31
 > **Lifecycle**: notes
 > **Substantive Change SHA256**: `sha256:0b9f593b7fc277a3434baffc533814fb15edc27c6847fc5a3cba6d99b38b5403`
