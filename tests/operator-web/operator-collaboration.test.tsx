@@ -73,6 +73,12 @@ async function mount(node: React.ReactElement): Promise<void> {
   await act(async () => root?.render(node));
 }
 
+async function selectRepository(id: string): Promise<void> {
+  const select = document.querySelector<HTMLSelectElement>('.repository-switch select');
+  if (!select) throw new Error('repository selector missing');
+  await act(async () => { select.value = id; select.dispatchEvent(new Event('change', { bubbles: true })); });
+}
+
 function buttonWithText(text: string): HTMLButtonElement {
   const button = Array.from(document.querySelectorAll('button')).find((candidate) =>
     candidate.textContent?.includes(text),
@@ -501,6 +507,7 @@ describe('operator collaboration read', () => {
     expect(asked).toEqual([]);
     expect(paneText()).toContain('Select a task to read its repository collaboration lanes.');
 
+    await selectRepository('repo-console');
     await act(async () => buttonWithText(fixtureTasks.console.task_label).click());
     expect(asked).toEqual(['repo-console']);
     expect(paneText()).toContain('repository repo-console');
@@ -513,6 +520,7 @@ describe('operator collaboration read', () => {
     expect(paneText()).toContain('repository repo-console');
 
     // Selecting a task in another repository moves the scope.
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(asked).toEqual(['repo-console', 'repo-console', 'repo-harness']);
     expect(paneText()).toContain('repository repo-harness');
@@ -533,6 +541,7 @@ describe('operator collaboration read', () => {
       />,
     );
 
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(paneText()).toContain('The collaboration store cannot be read');
     expect(paneText()).not.toContain('No lane has a signal in this snapshot.');
@@ -569,6 +578,7 @@ describe('operator collaboration read', () => {
       />,
     );
 
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(asked).toEqual(['repo-harness']);
     expect(paneText()).toContain('The collaboration store cannot be read');
@@ -594,7 +604,9 @@ describe('operator collaboration read', () => {
         fetchCollaboration={fetchCollaboration}
       />,
     );
+    await selectRepository('repo-console');
     await act(async () => buttonWithText(fixtureTasks.console.task_label).click());
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(paneText()).toContain('repository repo-harness');
 
@@ -633,7 +645,9 @@ describe('operator collaboration read', () => {
         fetchCollaboration={fetchCollaboration}
       />,
     );
+    await selectRepository('repo-console');
     await act(async () => buttonWithText(fixtureTasks.console.task_label).click());
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
 
     expect(requests.map((request) => request.repositoryId)).toEqual(['repo-console', 'repo-harness']);
@@ -655,6 +669,7 @@ describe('operator collaboration read', () => {
         }}
       />,
     );
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(observed.signal?.aborted).toBe(false);
 
@@ -691,6 +706,7 @@ describe('operator collaboration read', () => {
         fetchCollaboration={fetchCollaboration}
       />,
     );
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(signals).toHaveLength(1);
 
@@ -783,6 +799,7 @@ describe('operator collaboration read', () => {
         fetchCollaboration={async () => ({ ...collaborationSnapshot, repository_id: otherRepository })}
       />,
     );
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect(paneText()).toContain('does not match the requested repository');
     expect(paneText()).not.toContain('hotspot 87');

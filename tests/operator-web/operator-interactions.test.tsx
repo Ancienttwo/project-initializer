@@ -11,6 +11,7 @@ import {
   fetchOperatorSnapshot,
   groupWorklist,
   OperatorApp,
+  OPERATOR_REPOSITORY_STORAGE_KEY,
   primaryCause,
   TASK_MESSAGE_BODY_LIMIT_BYTES,
   type TaskMessageRequestV1,
@@ -85,6 +86,12 @@ function installDom(wide = false): void {
     KeyboardEvent: window.KeyboardEvent,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
+}
+
+async function selectRepository(id: string): Promise<void> {
+  const select = document.querySelector<HTMLSelectElement>('.repository-switch select');
+  if (!select) throw new Error('repository selector missing');
+  await act(async () => { select.value = id; select.dispatchEvent(new Event('change', { bubbles: true })); });
 }
 
 function buttonWithText(text: string): HTMLButtonElement {
@@ -275,13 +282,46 @@ describe('operator web worklist projection', () => {
 });
 
 describe('operator web interactions', () => {
+  test('repository switch scopes counts and detail, persists across reload and refuses a removed selection', async () => {
+    installDom(true);
+    let next = stableSnapshot;
+    await mount(<OperatorApp initialSnapshot={stableSnapshot} initialLocale="en" fetchSnapshot={async () => next} />);
+    expect(filterChipCount('All')).toBe(stableSnapshot.repositories[0]!.cards.length);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect(paneText()).toContain(fixtureTasks.blocked.task_label);
+    await selectRepository('repo-console');
+    expect(paneText()).not.toContain(fixtureTasks.blocked.task_label);
+    expect(filterChipCount('All')).toBe(stableSnapshot.repositories[1]!.cards.length);
+    expect(document.querySelector('.worklist')?.textContent).not.toContain(fixtureTasks.blocked.task_label);
+    expect(window.localStorage.getItem(OPERATOR_REPOSITORY_STORAGE_KEY)).toBe('repo-console');
+    await act(async () => root?.unmount()); root = null;
+    await mount(<OperatorApp initialSnapshot={stableSnapshot} initialLocale="en" fetchSnapshot={async () => next} />);
+    expect(document.querySelector<HTMLSelectElement>('.repository-switch select')?.value).toBe('repo-console');
+    await act(async () => buttonWithText('Refresh').click());
+    expect(filterChipCount('All')).toBe(stableSnapshot.repositories[1]!.cards.length);
+    next = { ...stableSnapshot, repositories: [stableSnapshot.repositories[0]!] };
+    await act(async () => buttonWithText('Refresh').click());
+    expect(document.querySelector('.worklist')).toBeNull();
+    expect(document.querySelector<HTMLSelectElement>('.repository-switch select')?.value).toBe('');
+    expect(document.querySelector('main')?.textContent).toContain('Select repository');
+  });
+
+  test('duplicate display names remain distinguishable and names never become request identities', async () => {
+    const snapshot = { ...stableSnapshot, repositories: stableSnapshot.repositories.map(repo => ({ ...repo, display_name: 'shared-name' })) };
+    await mount(<OperatorApp initialSnapshot={snapshot} initialLocale="en" />);
+    const options = Array.from(document.querySelectorAll<HTMLOptionElement>('.repository-switch option')).filter(option => option.value);
+    expect(options.map(option => option.textContent?.trim())).toEqual(['shared-name · repo-harness', 'shared-name · repo-console']);
+    await selectRepository('repo-console');
+    expect(filterChipCount('All')).toBe(snapshot.repositories[1]!.cards.length);
+  });
+
   test('renders the plain-language cause with its raw code and expands a collapsed group on demand', async () => {
     await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
 
     const worklist = document.querySelector('.worklist')?.textContent ?? '';
     expect(worklist).toContain('The base branch moved after verification');
     expect(worklist).toContain('base_moved_since_verification');
-    expect(worklist).toContain('no progress');
+    expect(worklist).not.toContain('no progress');
     expect(worklist).not.toContain(fixtureTasks.review.task_label);
 
     await act(async () => buttonWithText('External').click());
@@ -320,6 +360,7 @@ describe('operator web interactions', () => {
 
     installDom(true);
     await mount(<OperatorApp initialState={projectSnapshotViewState(runtimeEffectFailure)} initialLocale="en" />);
+    await selectRepository('repo-unreadable');
     await act(async () => buttonWithText('Unreadable repos').click());
     const english = document.querySelector('.worklist')?.textContent ?? '';
     expect(english).toContain('Agent Runtime effect evidence is unavailable');
@@ -378,6 +419,7 @@ describe('operator web interactions', () => {
     const close = document.querySelector<HTMLButtonElement>('.detail-pane [aria-label="Close task details"]');
     if (!close) throw new Error('close button not found');
     await act(async () => close.click());
+    await selectRepository('repo-console');
     await act(async () => buttonWithText(fixtureTasks.console.task_label).click());
     const consolePane = paneText();
     expect(consolePane).toContain('Feedback reports no progress');
@@ -697,7 +739,7 @@ describe('operator web interactions', () => {
     expect(translate('zh', 'status.observedAgo', { age: '2 分钟' })).toBe('2 分钟前读到的快照');
   });
 
-  test('keeps a persistent complementary pane on wide layouts and a fleet overview until a task is picked', async () => {
+  test('keeps a persistent complementary pane on wide layouts and a repository overview until a task is picked', async () => {
     installDom(true);
     await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
 
@@ -705,11 +747,11 @@ describe('operator web interactions', () => {
     expect(overview?.getAttribute('aria-modal')).toBeNull();
     expect(overview?.getAttribute('aria-labelledby')).toBe('detail-pane-title');
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(paneText()).toContain('Fleet overview');
+    expect(paneText()).toContain('Repository overview');
     expect(paneText()).toContain('Tasks by repository and stage');
     expect(paneText()).toContain('Repository health');
-    expect(paneText()).toContain('read only');
-    expect(document.querySelectorAll('.stage-matrix tbody tr').length).toBe(stableSnapshot.repositories.length);
+    expect(paneText()).toContain('read write');
+    expect(document.querySelectorAll('.stage-matrix tbody tr').length).toBe(1);
 
     const trigger = buttonWithText(fixtureTasks.blocked.task_label);
     trigger.focus();
@@ -784,7 +826,7 @@ describe('operator web interactions', () => {
     installDom(true);
     await mount(<OperatorApp initialState={projectSnapshotViewState(degradedSnapshot)} initialLocale="en" />);
 
-    const cards = degradedSnapshot.repositories.flatMap((repository) => repository.cards).length;
+    const cards = degradedSnapshot.repositories[0]!.cards.length;
     const unreadable = degradedSnapshot.repositories.filter((repository) => repository.status === 'unreadable').length;
     expect(cards).toBeGreaterThan(0);
     expect(unreadable).toBeGreaterThan(0);
@@ -792,6 +834,9 @@ describe('operator web interactions', () => {
     // The All chip used to sum repositories into the card total, so a fleet
     // with many unreadable repositories reported hundreds of phantom tasks.
     expect(filterChipCount('All')).toBe(cards);
+    expect(filterChipCount('Unreadable repos')).toBe(0);
+    await selectRepository('repo-unreadable');
+    expect(filterChipCount('All')).toBe(0);
     expect(filterChipCount('Unreadable repos')).toBe(unreadable);
     expect(document.querySelector('.operator-statusbar [data-fact="repositories"]')?.textContent)
       .toContain(`${degradedSnapshot.counts.unreadable} unreadable`);
@@ -873,6 +918,9 @@ describe('operator web task message composer', () => {
     await mount(
       <OperatorApp initialState={projectSnapshotViewState(snapshot)} initialLocale="en" {...props} />,
     );
+    const repository = snapshot.repositories.find((repo) => repo.cards.some((card) => card.task_label === task));
+    if (!repository) throw new Error('fixture task missing');
+    await selectRepository(repository.repository_id);
     await act(async () => buttonWithText(task).click());
     await act(async () => composerToggle().click());
   }
@@ -979,6 +1027,7 @@ describe('operator web task message composer', () => {
         })),
       } : stableSnapshot;
       await mount(<OperatorApp initialState={projectSnapshotViewState(snapshot)} initialLocale="en" />);
+      await selectRepository(snapshot.repositories[0]!.repository_id);
       await act(async () => buttonWithText(differentRepository ? fixtureTasks.blocked.task_label : fixtureTasks.available.task_label).click());
       expect(composerToggle().getAttribute('aria-expanded')).toBe('false');
       await act(async () => composerToggle().click());
@@ -989,6 +1038,7 @@ describe('operator web task message composer', () => {
     await act(async () => root?.unmount());
     root = null;
     await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+    await selectRepository('repo-harness');
     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
     expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('keep in this repository and task');
     await typeMessage('');
