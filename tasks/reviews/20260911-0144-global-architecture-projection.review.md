@@ -1,16 +1,16 @@
 # Task Review: global-architecture-projection
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260911-0144-global-architecture-projection.md
 > **Contract**: tasks/contracts/20260911-0144-global-architecture-projection.contract.md
 > **Notes File**: tasks/notes/20260911-0144-global-architecture-projection.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-11 01:44
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:5430431888e40d701aea66f458f66775f7649272031cc85631ed846905687ef9
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 7541026031d74e46bd5b6a65c653fcff31b0e6ce
 
 ## Human Review Card
 
@@ -40,17 +40,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
-> **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Disposition**: user_waiver
+> **Reviewer**: User
+> **Source**: user-waiver
+> **Actor**: kito
+> **Reviewed Subject SHA256**: sha256:5430431888e40d701aea66f458f66775f7649272031cc85631ed846905687ef9
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 7541026031d74e46bd5b6a65c653fcff31b0e6ce
+> **Verification Evidence SHA256**: sha256:36fa138baad80f26b04f47fe600ff0a8eeae792c8661c06f2d9acc74e3a09e1f
+> **Issued At**: 2026-09-10T20:17:43.328Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Owner explicitly requested merge after being informed that final acceptance is recorded as user_waiver; CI remains required.
 - Findings: none
 
 ## Behavior Diff Notes
