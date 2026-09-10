@@ -26,3 +26,10 @@ CI fixtures isolate system/global Git config. The hosted runners configure Git L
 
 PR comparison against origin/main:
 > **Substantive Change SHA256**: `sha256:4a531f8ce0dcaff1090938e6c1772e18db0bd022cab6f5ed05c3ed3f5e1f25e4`
+
+Windows CI exposed pre-existing directory-fsync EPERM in the lease writer used during fixture setup, before any diff read. Reader fixtures now seed canonical serialized lease bytes using the existing path functions on every platform; no write-durability implementation or expectation is changed.
+
+> **Substantive Change SHA256**: `sha256:79db7293745bb780d6c22796e9422e92d748b7006b642503fca911f77356315f`
+
+Final PR comparison against origin/main:
+> **Substantive Change SHA256**: `sha256:ac9b456e5de8653da7be32b11d42cd8b8c9fd738d80293b8c4a1d40d5f2aacb4`

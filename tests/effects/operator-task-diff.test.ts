@@ -3,11 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildLeaseOwnerRecord, bindLeaseRecord, deriveTaskRevision } from '../../src/core/state/coordination-identity';
+import { buildLeaseOwnerRecord, bindLeaseRecord, deriveTaskRevision, serializeLeaseOwnerRecord, type LeaseOwnerRecord } from '../../src/core/state/coordination-identity';
 import { decodeOperatorTaskDiff, TASK_DIFF_MAX_BYTES } from '../../src/core/operator/task-diff';
 import { readOperatorTaskDiff } from '../../src/effects/operator/task-diff';
 import { repoHarnessRepoIdFor } from '../../src/effects/repo-registry';
-import { createLeaseDirectory, writeLeaseOwnerDurably } from '../../src/effects/state/coordination-lease-store';
+import { leaseDirectory, leaseOwnerPath } from '../../src/effects/state/coordination-lease-store';
 import { fixtureTaskId } from '../helpers/sprint-fixture';
 
 const cleanup: string[] = [];
@@ -29,6 +29,11 @@ afterEach(() => {
 });
 afterEach(() => { for (const path of cleanup.splice(0)) rmSync(path, { recursive: true, force: true }); });
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+// Reader fixtures use the canonical serialized bytes without invoking write durability.
+function seedLease(root: string, taskId: string, owner: LeaseOwnerRecord): void {
+  mkdirSync(leaseDirectory(root, taskId), { recursive: true });
+  writeFileSync(leaseOwnerPath(root, taskId), serializeLeaseOwnerRecord(owner));
+}
 function fixture() {
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'operator-diff-'))); cleanup.push(parent);
   const root = join(parent, 'repo'); const worktree = join(parent, 'worktree'); const home = join(parent, 'home');
@@ -48,7 +53,7 @@ function fixture() {
   const owner = buildLeaseOwnerRecord({ claimId: claim, taskId, taskRevision, sprintPath: sprint, targetRef: 'main', generation: 1, sessionId: 'test', sourceWorktree: root });
   const bound = bindLeaseRecord(owner, { claimId: claim, executionWorktree: worktree, branch: 'codex/diff', unitRef: 'plans/plan-diff.md' });
   if (!bound.ok) throw new Error(bound.error);
-  createLeaseDirectory(root, taskId); writeLeaseOwnerDurably(root, taskId, bound.record);
+  seedLease(root, taskId, bound.record);
   const input = { repository_id: repositoryId, task_id: taskId, task_revision: taskRevision, claim_id: claim, generation: 1, env: { REPO_HARNESS_HOME: home } };
   return { root, worktree, home, base, input, owner: bound.record };
 }
@@ -82,9 +87,9 @@ test('stale fence, foreign worktree and missing binding fail closed', () => {
   expect(() => readOperatorTaskDiff({ ...f.input, generation: 2 })).toThrow('stale');
   expect(() => readOperatorTaskDiff({ ...f.input, task_revision: '0'.repeat(64) })).toThrow('stale');
   const foreign = fixture();
-  writeLeaseOwnerDurably(f.root, f.input.task_id, { ...f.owner, execution_worktree: foreign.worktree });
+  seedLease(f.root, f.input.task_id, { ...f.owner, execution_worktree: foreign.worktree });
   expect(() => readOperatorTaskDiff(f.input)).toThrow('unavailable');
-  writeLeaseOwnerDurably(f.root, f.input.task_id, { ...f.owner, execution_worktree: join(f.root, 'absent') });
+  seedLease(f.root, f.input.task_id, { ...f.owner, execution_worktree: join(f.root, 'absent') });
   expect(() => readOperatorTaskDiff(f.input)).toThrow('unavailable');
 });
 
