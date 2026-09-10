@@ -1,3 +1,9 @@
+> **Archived**: 2026-09-10 11:55
+> **Related Plan**: plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260910-1155
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog

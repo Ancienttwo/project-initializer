@@ -203,6 +203,8 @@ export function runCampaignPrepareResume(raw: CampaignPrepareResumeOptions): voi
 
 export function runCampaignPlanningPreflight(repo: string, contract: string) {
   const root = canonicalRepoPath(repo);
+  const metadata = runHelper({ helper: 'verify-contract', args: ['--contract', contract, '--preflight'], cwd: root, trustedPackage: true, stdio: 'pipe' });
+  if (metadata.exitCode !== 0) throw new CampaignPlanningError('planning_failed', metadata.stderr || metadata.stdout || 'contract metadata preflight failed');
   const result = runHelper({ helper: 'contract-run', args: ['preflight', '--repo', root, '--contract', contract, '--json'], cwd: root, trustedPackage: true, stdio: 'pipe' });
   if (result.exitCode !== 0) throw new CampaignPlanningError('planning_failed', result.stderr || result.stdout || 'contract preflight failed');
   const parsed = JSON.parse(result.stdout || '{}');
