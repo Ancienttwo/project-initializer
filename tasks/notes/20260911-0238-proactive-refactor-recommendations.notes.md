@@ -62,3 +62,7 @@ Current stacked compare binding after protected-runtime base correction:
 Final stacked base synchronized to 76b05000 (main e238a73a incorporated).
 
 > **Substantive Change SHA256**: `sha256:a7e80326504ed33b13690fb43d9d3beab47ced7e81c31953e8a11bdefa9215c9`
+
+Official codex-plugin review approved beacd220 against base 76b05000 with zero findings. Review subject: sha256:4940895c75a757cbe9be3fb59232054611bb819e34eddd2ea233220f89fc8c2b. The subsequent base synchronization retained upstream run-summary retention and both test blocks; that merge delta is locally verified separately. The earlier approval is not an exact-current-subject AcceptanceReceipt.
+
+> **Substantive Change SHA256**: `sha256:d5aeb5683c3436efb293787c5c47b3116345763bda840a7f20a16e4c7a3a6fa5`
