@@ -4,7 +4,7 @@ import { spawnSync } from 'child_process';
 import { dirname, join } from 'path';
 import { tmpdir } from 'os';
 import type { EffectiveState } from '../src/core/state/types';
-import { runStopHandler, type StopProjectionTarget } from '../src/cli/hook/stop-handler';
+import { runStopHandler as runStopHandlerRuntime, type StopProjectionTarget } from '../src/cli/hook/stop-handler';
 import { RUN_SUMMARY_RETENTION_COUNT } from '../src/effects/run-summary-retention';
 import { consumePendingPostEditEvents, readPendingPostEditEvents } from '../src/cli/hook/mutation-observed';
 import { advanceArchitectureDriftCursor, computeArchitectureDriftChangedSet, readArchitectureDriftCursor } from '../src/cli/hook/architecture-drift';
@@ -15,10 +15,15 @@ afterEach(() => {
   while (fixtures.length > 0) rmSync(fixtures.pop()!, { recursive: true, force: true });
 });
 
+function runStopHandler(options: Parameters<typeof runStopHandlerRuntime>[0]) {
+  return runStopHandlerRuntime({ ...options, env: { ...process.env, ...options.env, HOME: join(options.collector.getRepoRoot(), '.ai/harness/test-home') } });
+}
+
 function fixture(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'repo-harness-stop-handler-'));
   fixtures.push(cwd);
   mkdirSync(join(cwd, '.ai/harness'), { recursive: true });
+  mkdirSync(join(cwd, '.ai/harness/test-home/.repo-harness'), { recursive: true });
   writeFileSync(join(cwd, '.ai/harness/policy.json'), '{}\n');
   return cwd;
 }
@@ -167,7 +172,7 @@ describe('runStopHandler', () => {
       queue: { schemaVersion: 'repo-harness.architecture-projection-queue-state/v1' as const, pending: 1, running: 0, receipts: 0, deadLetters: 0, oldestPendingJobId: 'job-test', oldestDeadLetterJobId: null },
     });
     const advisoryRoot = fixture();
-    writeFileSync(join(advisoryRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_failure_gate":"advisory"}}\n');
+    writeFileSync(join(advisoryRoot, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_failure_gate":"advisory"}}\n');
     const advisory = runStopHandler({ collector: collector(advisoryRoot, () => canonicalState()), dependencies: { drainArchitectureProjection: failedDrain } });
     expect(advisory.exitCode).toBe(0);
     expect(advisory.stderr).toContain('[ArchitectureProjection] retry-pending');
@@ -178,7 +183,7 @@ describe('runStopHandler', () => {
     expect(freshnessOnly.stdout).not.toContain('Strict projection failure gate blocked Stop');
 
     const strictRoot = fixture();
-    writeFileSync(join(strictRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_version":"0.5.10","projection_failure_gate":"strict"}}\n');
+    writeFileSync(join(strictRoot, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_failure_gate":"strict"}}\n');
     const strict = runStopHandler({ collector: collector(strictRoot, () => canonicalState()), dependencies: { drainArchitectureProjection: failedDrain } });
     expect(strict.exitCode).toBe(0);
     expect(JSON.parse(strict.stdout).decision).toBe('block');
@@ -191,19 +196,19 @@ describe('runStopHandler', () => {
     expect(deadLetter.stdout).toContain('retry-dead-letter --job-id job-test --json');
 
     const invalidGateRoot = fixture();
-    writeFileSync(join(invalidGateRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_version":"0.5.10","projection_failure_gate":"block"}}\n');
+    writeFileSync(join(invalidGateRoot, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"archctx","projection_apply":"automatic","projection_failure_gate":"block"}}\n');
     const invalidGate = runStopHandler({ collector: collector(invalidGateRoot, () => canonicalState()), dependencies: { drainArchitectureProjection: failedDrain } });
     expect(invalidGate.stdout).toContain('Strict projection failure gate blocked Stop');
     expect(invalidGate.stdout).toContain('projection policy invalid');
 
     const disabledRoot = fixture();
-    writeFileSync(join(disabledRoot, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled","projection_failure_gate":"strict"}}\n');
+    writeFileSync(join(disabledRoot, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled","projection_failure_gate":"strict"}}\n');
     const disabled = runStopHandler({ collector: collector(disabledRoot, () => canonicalState()), dependencies: { drainArchitectureProjection: failedDrain } });
     expect(disabled.exitCode).toBe(0);
     expect(disabled.stdout).not.toContain('Strict projection failure gate blocked Stop');
 
     const malformedInactiveRoot = fixture();
-    writeFileSync(join(malformedInactiveRoot, '.ai/harness/policy.json'), '{not-json\n');
+    writeFileSync(join(malformedInactiveRoot, '.ai/harness/test-home/.repo-harness/config.json'), '{not-json\n');
     const malformedInactive = runStopHandler({ collector: collector(malformedInactiveRoot, () => canonicalState()) });
     expect(malformedInactive.exitCode).toBe(0);
     expect(malformedInactive.stdout).not.toContain('Strict projection failure gate blocked Stop');
@@ -407,7 +412,7 @@ describe('runStopHandler', () => {
 
   test('retains a committed drift range when the disabled-provider cascade runner is unavailable', () => {
     const { cwd, head: anchor } = gitFixture();
-    writeFileSync(join(cwd, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
+    writeFileSync(join(cwd, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
     advanceArchitectureDriftCursor(cwd, anchor, null);
     writeFileSync(join(cwd, 'committed-only.ts'), 'export const committed = true;\n');
     git(cwd, ['add', 'committed-only.ts']);
@@ -427,7 +432,7 @@ describe('runStopHandler', () => {
 
   test('retains a committed drift range when a request-triggered cascade follow-up fails', () => {
     const { cwd, head: anchor } = gitFixture();
-    writeFileSync(join(cwd, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
+    writeFileSync(join(cwd, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
     advanceArchitectureDriftCursor(cwd, anchor, null);
     writeFileSync(join(cwd, 'follow-up-failure.ts'), 'export const followUp = true;\n');
     git(cwd, ['add', 'follow-up-failure.ts']);
@@ -476,7 +481,7 @@ describe('runStopHandler', () => {
     // saw nothing. Every mutation below is a plain fs/git write -- no hook
     // payload is ever handed to the journal writer.
     const { cwd } = gitFixture();
-    writeFileSync(join(cwd, '.ai/harness/policy.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
+    writeFileSync(join(cwd, '.ai/harness/test-home/.repo-harness/config.json'), '{"architecture":{"projection_provider":"disabled","projection_apply":"disabled"}}\n');
     const anchor = git(cwd, ['rev-parse', 'HEAD']);
 
     const stubRoot = mkdtempSync(join(tmpdir(), 'repo-harness-stop-cascade-'));

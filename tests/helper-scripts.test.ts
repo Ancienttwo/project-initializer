@@ -71,6 +71,12 @@ function commitAll(cwd: string, message: string) {
 }
 
 function copyHelpers(cwd: string) {
+  // Source CLI imports this package-owned template during readiness checks.
+  mkdirSync(join(cwd, "assets/templates"), { recursive: true });
+  copyFileSync(join(TEMPLATE_DIR, "runtime.gitignore"), join(cwd, "assets/templates/runtime.gitignore"));
+  if (!existsSync(join(cwd, "node_modules"))) {
+    symlinkSync(join(ROOT, "node_modules"), join(cwd, "node_modules"), "dir");
+  }
   const scriptsDir = join(cwd, "scripts");
   const harnessScriptsDir = join(cwd, ".ai", "harness", "scripts");
   mkdirSync(scriptsDir, { recursive: true });
@@ -4491,6 +4497,7 @@ describe("Workflow helper scripts", () => {
 
       const res = run("bash", [join(HELPER_DIR, "verify-sprint.sh"), "--prepare-acceptance"], cwd, {
         REPO_HARNESS_TARGET_REPO_ROOT: cwd,
+        REPO_HARNESS_CLI_BIN: join(ROOT, "src/cli/index.ts"),
         HOOK_HOST: "claude",
         REPO_HARNESS_HOOK_CLI: join(ROOT, "src/cli/hook-entry.ts"),
       });
@@ -5958,7 +5965,7 @@ describe("Workflow helper scripts", () => {
       const tsDefaultPolicy = defaultPolicy("minimal-agentic", "en") as Record<string, any>;
       expect(fallbackPolicy.agentic_development.routing).toEqual(tsDefaultPolicy.agentic_development.routing);
       expect(readRefactorPolicy(fallbackPolicy).stages).toEqual(readRefactorPolicy({}).stages);
-      expect(fallbackPolicy.architecture.projection_version).toBe(readRefactorPolicy({}).stages.scan.provider_version);
+      expect(fallbackPolicy.architecture.projection_version).toBeUndefined();
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

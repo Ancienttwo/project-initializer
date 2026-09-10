@@ -1,3 +1,4 @@
+import { loadArchitectureProjectionPolicy, readGlobalArchitectureConfiguration } from './projection-config';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
@@ -15,7 +16,6 @@ import {
   assertProjectionResult,
   digestProjectionJson,
   projectionRequestIssues,
-  readArchitectureProjectionPolicy,
   sameAcceptedArchitectureChange,
   type ArchitectureProjectionPolicy,
   type ArchitectureProjectionReadinessV1,
@@ -122,11 +122,6 @@ const DEFAULT_RUNNER: RunArchctxProcess = (binary, args, options) => {
   return { status: overflow ? 1 : result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, ...((overflow ? 'archctx output exceeded maxBuffer' : result.error) ? { error: overflow ? 'archctx output exceeded maxBuffer' : result.error } : {}) };
 };
 
-export function loadArchitectureProjectionPolicy(repoRoot: string): ArchitectureProjectionPolicy {
-  const path = join(repoRoot, '.ai', 'harness', 'policy.json');
-  if (!existsSync(path)) return readArchitectureProjectionPolicy({});
-  return readArchitectureProjectionPolicy(JSON.parse(readFileSync(path, 'utf8')));
-}
 
 function architectureModelReady(repoRoot: string): boolean {
   return existsSync(join(repoRoot, '.archcontext', 'manifest.yaml'))
@@ -268,19 +263,19 @@ export function runPackageLocalArchctxJson(
 }
 
 export function archctxCapabilities(repoRoot: string, options: ArchctxProviderOptions = {}): { resolved: ResolvedArchctxPackage; capabilities: ArchctxCapabilitiesV1 } {
-  const policy = options.policy ?? loadArchitectureProjectionPolicy(repoRoot);
+  const policy = options.policy ?? loadArchitectureProjectionPolicy(options.env);
   if (policy.provider === 'disabled') throw new Error('architecture projection provider is disabled');
   const { resolved, value } = runPackageLocalArchctxJson(repoRoot, policy.requiredVersion, ['capabilities', '--json'], options, Math.min(policy.timeoutMs, 10_000));
   return { resolved, capabilities: assertArchctxCapabilities(value, policy.requiredVersion) };
 }
 
 export function inspectArchitectureProjectionReadiness(repoRoot: string, options: ArchctxProviderOptions = {}): ArchitectureProjectionReadinessV1 {
-  const policy = options.policy ?? loadArchitectureProjectionPolicy(repoRoot);
+  const policy = options.policy ?? loadArchitectureProjectionPolicy(options.env);
   const source = capabilitySource(repoRoot);
   if (policy.provider === 'disabled') return {
     schemaVersion: 'repo-harness.architecture-projection-readiness/v1',
     modelAuthority: { source, ready: capabilityAuthorityReady(repoRoot) },
-    projectionProvider: { provider: 'disabled', state: 'disabled', binaryPath: null, version: null, reason: 'policy.architecture.projection_provider=disabled' },
+    projectionProvider: { provider: 'disabled', state: 'disabled', binaryPath: null, version: null, reason: readGlobalArchitectureConfiguration(options.env).initialized ? 'global architecture.projection_provider=disabled' : 'global architecture configuration is missing; run repo-harness update once' },
     codeFacts: { requirement: 'required', state: 'not-evaluated' },
     apply: { mode: policy.applyMode, enabled: false },
   };
@@ -314,7 +309,7 @@ export function inspectArchitectureProjectionReadiness(repoRoot: string, options
 export function runArchitectureProjection(request: ProjectionRequestV1, repoRoot: string, options: ArchctxProviderOptions = {}): ProjectionResultV1 {
   const requestIssues = projectionRequestIssues(request);
   if (requestIssues.length > 0) throw new Error(`invalid projection request: ${requestIssues.join('; ')}`);
-  const policy = options.policy ?? loadArchitectureProjectionPolicy(repoRoot);
+  const policy = options.policy ?? loadArchitectureProjectionPolicy(options.env);
   if ((request.mode === 'apply' || request.mode === 'adopt') && policy.applyMode === 'disabled') throw new Error('architecture projection apply is disabled');
   const { resolved } = archctxCapabilities(repoRoot, { ...options, policy });
   const args = ['projection', 'run', '--request-json', JSON.stringify(request)];

@@ -38,6 +38,8 @@ try {
     PATH: `${binDir}:${process.env.PATH ?? ''}`,
   });
   const adapters = readInstalledAdapters(hostHome);
+  mkdirSync(join(hostHome, '.repo-harness'), { recursive: true });
+  writeFileSync(join(hostHome, '.repo-harness/config.json'), JSON.stringify({ architecture: { projection_provider: 'archctx', projection_apply: 'automatic' } }));
 
   initializeFixture(fixture);
   const hookEnv = {
@@ -178,10 +180,6 @@ function initializeFixture(root: string): void {
   writeFileSync(join(root, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
     context: { capability_source: 'archcontext' },
     architecture: {
-      projection_provider: 'archctx',
-      projection_apply: 'automatic',
-      projection_version: '0.5.10',
-      projection_timeout_ms: 120000,
       freshness_gate: 'advisory',
     },
   }, null, 2)}\n`);

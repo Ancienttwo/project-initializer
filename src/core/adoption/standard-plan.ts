@@ -794,6 +794,11 @@ export function planStandardAdoption(opts: StandardPlanOptions): { operations: A
   const mergedDocumentation = isObject(policy.documentation) ? policy.documentation : {};
   requireDocumentationLanguage(mergedDocumentation.language);
   delete policy.hook_source;
+  // Operator-invoked adoption retires the old execution authority. Never copy
+  // repository preferences into the host-wide configuration.
+  if (isObject(policy.architecture)) {
+    for (const key of ['projection_provider', 'projection_apply', 'projection_failure_gate', 'projection_version', 'projection_timeout_ms']) delete policy.architecture[key];
+  }
   const externalTooling = isObject(policy.external_tooling) ? policy.external_tooling : {};
   const externalRouting = isObject(externalTooling.routing) ? externalTooling.routing : {};
   const retiredComplexProvider = typeof externalRouting.complex === "string" ? externalRouting.complex : null;

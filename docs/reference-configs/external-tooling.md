@@ -930,17 +930,33 @@ spawns a daemon or external process. Bun older than 1.3 has no `Bun.YAML`; that
 fails closed with upgrade guidance and only when `capability_source` is
 `archcontext`.
 
-Architecture projection is a separate authority. When
-`architecture.projection_provider=archctx`, repo-harness resolves the exact
-version from the consumer dependency tree, executes only that package's declared
-`bin.archctx`, performs a JSON capability handshake, and rejects PATH-only,
-escaping, or mismatched installations. The advisory
-global-tool detector below does not satisfy projection readiness; use
-`repo-harness architecture-projection status --json`. The provider remains
-disabled by default until the release pin is cut over.
+Architecture projection execution is user-level configuration in
+`~/.repo-harness/config.json#architecture`. `repo-harness install` and
+`repo-harness update` initialize it once with `projection_provider: "archctx"`,
+`projection_apply: "automatic"`, `projection_failure_gate: "advisory"`, and
+`projection_timeout_ms: 120000`. Repeated setup preserves an explicit global
+choice, including disabled. Malformed or partial settings fail closed without
+rewriting the file; unrelated user settings are preserved. The exact provider
+version is owned by the packaged release contract, not a configurable repo pin.
 
-When enabled, PostEdit writes only `change_observed` v2 journal records. Stop
-coalesces all eligible records into one durable projection job, excludes
+`repo-harness init` remains a repository-only transaction. Standard/self-host adoption
+removes retired `architecture.projection_*` execution keys from repo policy and
+reports global provider readiness, without writing user configuration or
+inventing the project's model. Minimal adoption does not author a policy.
+Runtime does not read or merge retired repo execution settings. Capability
+identity, model files, documentation ownership and project freshness gates
+remain repository-local. Missing model/adoption evidence still blocks apply;
+global automatic mode does not authorize ownership adoption or semantic acceptance.
+
+Use `repo-harness architecture-projection policy --json` to inspect the global
+source path, initialization state and effective execution settings without a
+provider process. `repo-harness architecture-projection status --json` adds the
+exact package capability handshake and project apply readiness. A repo that
+vendors a mismatching provider still fails closed; the global setting does not
+relax version or executable identity checks.
+
+When enabled, Stop observes the Git changed set and coalesces eligible paths
+into one durable projection job, excludes
 ArchContext-owned `docs/architecture/**` and declared agent-context targets,
 and acknowledges the source records only after a typed projection receipt is
 durable. Process, timeout, stale-snapshot, invalid-result, and refresh failures

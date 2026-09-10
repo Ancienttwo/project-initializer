@@ -102,7 +102,9 @@ function fixture(policy: Record<string, unknown> = {}): string {
   mkdirSync(join(root, 'docs/architecture'), { recursive: true });
   mkdirSync(join(root, '.archcontext/model/nodes'), { recursive: true });
   mkdirSync(join(root, 'src'), { recursive: true });
-  writeFileSync(join(root, '.ai/harness/policy.json'), `${JSON.stringify(policy)}\n`);
+  writeFileSync(join(root, '.ai/harness/policy.json'), '{}\n');
+  mkdirSync(join(root, '.ai/harness/test-home/.repo-harness'), { recursive: true });
+  writeFileSync(join(root, '.ai/harness/test-home/.repo-harness/config.json'), `${JSON.stringify(policy)}\n`);
   writeFileSync(join(root, '.gitignore'), '.ai/harness/\n');
   writeFileSync(join(root, 'README.md'), '# fixture\n');
   writeFileSync(join(root, 'AGENTS.md'), '# agents\n');
@@ -176,7 +178,7 @@ function stop(root: string, drain: ArchitectureProjectionDrainResultV1) {
       getActivePlanMarker: () => null,
       getStopEffectiveState: () => canonicalState(),
     },
-    env: { ...process.env, HOOK_RUN_ID: 'restamp-publication' },
+    env: { ...process.env, HOME: join(root, '.ai/harness/test-home'), HOOK_RUN_ID: 'restamp-publication' },
     dependencies: { drainArchitectureProjection: () => drain },
   });
 }
@@ -243,7 +245,7 @@ describe('Stop-time restamp auto-publication', () => {
   });
 
   test('leaves the strict projection failure gate criteria untouched', () => {
-    const strictPolicy = { architecture: { projection_provider: 'archctx', projection_apply: 'automatic', projection_version: '0.5.10', projection_failure_gate: 'strict' } };
+    const strictPolicy = { architecture: { projection_provider: 'archctx', projection_apply: 'automatic', projection_failure_gate: 'strict' } };
 
     // A publication fault under strict never blocks: it is not a drain failure.
     const faulted = fixture(strictPolicy);
@@ -263,7 +265,7 @@ describe('Stop-time restamp auto-publication', () => {
   });
 
   test('converges: the published restamp keeps the next drain idle without a provider run', () => {
-    const root = fixture({ architecture: { projection_provider: 'archctx', projection_apply: 'automatic', projection_version: '0.5.10' } });
+    const root = fixture({ architecture: { projection_provider: 'archctx', projection_apply: 'automatic' } });
     seedReceipt(root, RESTAMP);
 
     expect(stop(root, drainResult()).exitCode).toBe(0);

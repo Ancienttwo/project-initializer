@@ -1082,12 +1082,11 @@ describe("create-project-dirs runtime smoke", () => {
         expect([source, refactor.stages.scan.provider_version]).toEqual([source, REFACTOR_PROVIDER_VERSION]);
         expect([source, refactor.stages.verify.provider_version]).toEqual([source, REFACTOR_PROVIDER_VERSION]);
 
-        // The seeded architecture block defaults to the disabled provider, whose reader
-        // short-circuits before reading projection_version. Flip it to archctx so the
-        // seeded pin is the value the reader actually resolves.
-        const architecture = { ...seeded.architecture, projection_provider: "archctx", projection_apply: "manual" };
-        const projection = readArchitectureProjectionPolicy({ ...seeded, architecture });
-        expect([source, projection.requiredVersion]).toEqual([source, ARCHCTX_REQUIRED_VERSION]);
+        // Projection execution is global; repository seeders must not author it.
+        for (const key of ['projection_provider', 'projection_apply', 'projection_version', 'projection_failure_gate', 'projection_timeout_ms']) {
+          expect([source, seeded.architecture?.[key]]).toEqual([source, undefined]);
+        }
+        expect(readArchitectureProjectionPolicy({}).requiredVersion).toBe(ARCHCTX_REQUIRED_VERSION);
       }
 
       expect(REFACTOR_PROVIDER_VERSION).toBe(ARCHCTX_REQUIRED_VERSION);

@@ -1,8 +1,9 @@
+import { loadArchitectureProjectionPolicy, readGlobalArchitectureConfiguration } from '../../effects/architecture/projection-config';
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { Command } from 'commander';
 import { PROJECTION_REQUEST_VERSION, type ProjectionMode, type ProjectionRequestV1 } from '../../core/architecture/projection';
-import { captureArchitectureProjectionSnapshot, inspectArchitectureProjectionReadiness, loadArchitectureProjectionPolicy, runArchitectureProjection } from '../../effects/architecture/archctx-provider';
+import { captureArchitectureProjectionSnapshot, inspectArchitectureProjectionReadiness, runArchitectureProjection } from '../../effects/architecture/archctx-provider';
 import { drainArchitectureProjectionJobs } from '../../effects/architecture/projection-orchestrator';
 import { architectureProjectionQueueState, retryArchitectureProjectionDeadLetter } from '../../effects/architecture/projection-jobs';
 import { publishLatestArchitectureProjectionRestamp } from '../../effects/architecture/restamp-publication';
@@ -32,10 +33,17 @@ export interface ProjectionCommandOptions {
 
 export function buildArchitectureProjectionCommand(): Command {
   const command = new Command('architecture-projection').description('Run the configured deterministic architecture projection provider');
+  command.command('policy').requiredOption('--json', 'Output the global execution policy without invoking the provider').action(() => {
+    try {
+      const { path, initialized, policy } = readGlobalArchitectureConfiguration();
+      write({ ...policy, configuration: { scope: 'global', path, initialized } });
+    } catch (error) { fail(error); }
+  });
   command.command('status').requiredOption('--json', 'Output readiness JSON').action(() => {
     try {
       const root = repositoryRoot();
-      write({ ...inspectArchitectureProjectionReadiness(root), acceptance: inspectArchitectureProjectionAcceptanceState(root) });
+      const { path, initialized } = readGlobalArchitectureConfiguration();
+      write({ ...inspectArchitectureProjectionReadiness(root), configuration: { scope: 'global', path, initialized }, acceptance: inspectArchitectureProjectionAcceptanceState(root) });
     }
     catch (error) { fail(error); }
   });
@@ -52,7 +60,7 @@ export function buildArchitectureProjectionCommand(): Command {
       const changedSet = computeArchitectureDriftChangedSet(root);
       for (const warning of changedSet.warnings) process.stderr.write(`${warning}\n`);
       const driftEvent = architectureDriftSourceEvent(changedSet);
-      const deadlineMs = Date.now() + loadArchitectureProjectionPolicy(root).timeoutMs;
+      const deadlineMs = Date.now() + loadArchitectureProjectionPolicy().timeoutMs;
       const result = drainArchitectureProjectionJobs(root, { sourceEvents: driftEvent ? [driftEvent] : [] });
       if (result.status === 'disabled') {
         drainArchitectureDriftCascade(root, changedSet, (changedPath) => {

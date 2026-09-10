@@ -204,8 +204,29 @@ pending_requests_for_capabilities() {
 mode="${mode:-$(policy_value '.architecture.freshness_gate' 'advisory')}"
 target_branch="${target_branch:-$(policy_value '.worktree_strategy.merge_back.target' 'main')}"
 threshold="$(policy_value '.architecture.gate_min_severity' 'medium')"
-projection_provider="$(policy_value '.architecture.projection_provider' 'disabled')"
-projection_apply="$(policy_value '.architecture.projection_apply' 'disabled')"
+projection_cli=()
+if [[ -n "${REPO_HARNESS_CLI_BIN:-}" ]]; then
+  projection_cli=("$REPO_HARNESS_CLI_BIN")
+elif [[ -f "$repo/src/cli/index.ts" && -f "$repo/package.json" ]] && command -v bun >/dev/null 2>&1 \
+    && bun -e 'const p = await Bun.file(process.argv[1]).json(); process.exit(p.name === "repo-harness" && p.bin?.["repo-harness"] === "src/cli/index.ts" ? 0 : 1)' "$repo/package.json" >/dev/null 2>&1; then
+  projection_cli=(bun "$repo/src/cli/index.ts")
+else
+  projection_cli=(repo-harness)
+fi
+projection_policy_json="$("${projection_cli[@]}" architecture-projection policy --json)" || {
+  echo "[ArchitectureSync] global projection policy unavailable" >&2; exit 1;
+}
+if command -v jq >/dev/null 2>&1; then
+  projection_provider="$(printf '%s' "$projection_policy_json" | jq -er '.provider')" || exit 1
+  projection_apply="$(printf '%s' "$projection_policy_json" | jq -er '.applyMode')" || exit 1
+else
+  projection_policy_readback="$(PROJECTION_POLICY_JSON="$projection_policy_json" node -e '
+const value = JSON.parse(process.env.PROJECTION_POLICY_JSON);
+if (!["archctx", "disabled"].includes(value.provider) || !["automatic", "manual", "disabled"].includes(value.applyMode)) process.exit(1);
+process.stdout.write(`${value.provider}\t${value.applyMode}`);
+')" || { echo "[ArchitectureSync] global projection policy unreadable" >&2; exit 1; }
+  IFS=$'\t' read -r projection_provider projection_apply <<< "$projection_policy_readback"
+fi
 
 count_json_files() {
   local directory="$1"
@@ -214,24 +235,21 @@ count_json_files() {
 }
 
 projection_state="disabled"
-projection_reason="policy.architecture.projection_provider=disabled"
+projection_reason="global architecture projection disabled or not initialized; see repo-harness architecture-projection policy --json"
 projection_acceptance_unresolved=0
 projection_acceptance_invalid=0
 if [[ "$projection_provider" == "archctx" ]]; then
-  if [[ -f "$repo/src/cli/index.ts" ]] && command -v bun >/dev/null 2>&1; then
-    projection_status_json="$(bun "$repo/src/cli/index.ts" architecture-projection status --json 2>/dev/null || true)"
-    if [[ -z "$projection_status_json" ]]; then
-      projection_state="error"
-      projection_reason="candidate readiness status unavailable"
-    fi
-  elif command -v repo-harness >/dev/null 2>&1; then
-    projection_status_json="$(repo-harness architecture-projection status --json 2>/dev/null || true)"
-  else
-    projection_state="missing"
-    projection_reason="repo-harness CLI unavailable for provider handshake"
-  fi
+  projection_status_json="$("${projection_cli[@]}" architecture-projection status --json)" || {
+    echo "[ArchitectureSync] global projection readiness unavailable" >&2; exit 1;
+  }
   if [[ "$projection_state" != "missing" && -n "${projection_status_json:-}" ]]; then
     if [[ -n "$projection_status_json" ]] && command -v jq >/dev/null 2>&1; then
+      if ! printf '%s' "$projection_status_json" | jq -e '.projectionProvider.provider and .apply.mode' >/dev/null; then
+        echo "[ArchitectureSync] invalid global projection readiness" >&2
+        exit 1
+      fi
+      projection_provider="$(printf '%s' "$projection_status_json" | jq -r '.projectionProvider.provider')"
+      projection_apply="$(printf '%s' "$projection_status_json" | jq -r '.apply.mode')"
       projection_state="$(printf '%s' "$projection_status_json" | jq -r '.projectionProvider.state // "error"' 2>/dev/null || printf 'error')"
       projection_reason="$(printf '%s' "$projection_status_json" | jq -r '.projectionProvider.reason // "readiness status unavailable"' 2>/dev/null || printf 'readiness status unavailable')"
       projection_acceptance_unresolved="$(printf '%s' "$projection_status_json" | jq -r '.acceptance.unresolvedCandidates // 0' 2>/dev/null || printf '0')"
@@ -239,16 +257,18 @@ if [[ "$projection_provider" == "archctx" ]]; then
     elif [[ -n "$projection_status_json" ]] && command -v node >/dev/null 2>&1; then
       projection_readback="$(PROJECTION_STATUS_JSON="$projection_status_json" node -e '
 try {
-  const value = JSON.parse(process.env.PROJECTION_STATUS_JSON || "{}");
-  process.stdout.write(`${value.projectionProvider?.state || "error"}\t${value.projectionProvider?.reason || "readiness status unavailable"}\t${value.acceptance?.unresolvedCandidates || 0}\t${value.acceptance?.invalidArtifacts || 0}`);
-} catch { process.stdout.write("error\treadiness status invalid"); }
-' 2>/dev/null || printf 'error\treadiness status unavailable')"
-      IFS=$'\t' read -r projection_state projection_reason projection_acceptance_unresolved projection_acceptance_invalid <<< "$projection_readback"
+  const value = JSON.parse(process.env.PROJECTION_STATUS_JSON);
+  if (!["archctx", "disabled"].includes(value.projectionProvider?.provider) || !["automatic", "manual", "disabled"].includes(value.apply?.mode)) process.exit(1);
+  process.stdout.write(`${value.projectionProvider?.provider || ""}\t${value.apply?.mode || ""}\t${value.projectionProvider?.state || "error"}\t${value.projectionProvider?.reason || "readiness status unavailable"}\t${value.acceptance?.unresolvedCandidates || 0}\t${value.acceptance?.invalidArtifacts || 0}`);
+} catch { process.exit(1); }
+')" || { echo "[ArchitectureSync] invalid global projection readiness" >&2; exit 1; }
+      IFS=$'\t' read -r projection_provider projection_apply projection_state projection_reason projection_acceptance_unresolved projection_acceptance_invalid <<< "$projection_readback"
       : "${projection_acceptance_unresolved:=0}"
       : "${projection_acceptance_invalid:=0}"
     fi
   fi
 fi
+[[ -n "$projection_provider" && -n "$projection_apply" ]] || { echo "[ArchitectureSync] global projection readiness unavailable: $projection_reason" >&2; exit 1; }
 
 projection_runtime_root=".ai/harness/architecture-projection"
 projection_pending="$(count_json_files "$projection_runtime_root/pending")"

@@ -3,6 +3,19 @@
 > **Status**: Approved
 > **Owner**: repo-harness maintainers
 
+## Global Architecture Projection
+
+Architecture projection execution preferences have one user-level authority:
+`~/.repo-harness/config.json#architecture`. Global install/update initializes
+archctx automatic projection once and preserves explicit user choices. The
+package release owns the exact provider version. Repository init retires the
+old projection execution keys and reports readiness; it never configures the
+host. Runtime, Stop and acceptance helpers read the same global policy without
+repo overrides. Project model/capability authority, document ownership,
+freshness gates and semantic acceptance remain local. Missing setup is reported
+explicitly; malformed global config fails closed. No model or approval is
+synthesized to make automatic projection continue.
+
 ## Product Outcome
 
 `repo-harness` makes long-running AI engineering work reviewable and resumable

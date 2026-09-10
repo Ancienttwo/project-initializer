@@ -133,6 +133,7 @@ function installFixture(container: string): { primary: string; linked: string } 
       'import { mkdirSync, writeFileSync } from "fs";',
       'import { join } from "path";',
       'const args = process.argv.slice(2);',
+      'if (args[0] === "architecture-projection" && args[1] === "policy") { console.log(JSON.stringify({ provider: "archctx", applyMode: "automatic" })); process.exit(0); }',
       'if (args[0] !== "architecture-projection" || args[1] !== "acknowledge-publication") process.exit(64);',
       'const shaIndex = args.indexOf("--publication-sha");',
       'const publicationSha = shaIndex >= 0 ? args[shaIndex + 1] : "";',

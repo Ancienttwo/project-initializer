@@ -423,6 +423,9 @@ export function runHelper(opts: RunHelperOptions): RunHelperResult {
     childEnv.REPO_HARNESS_BASH_BIN = trustedBash;
     childEnv.REPO_HARNESS_GIT_BIN = trustedGit;
     childEnv.REPO_HARNESS_BUN_BIN = process.execPath;
+    childEnv.REPO_HARNESS_CLI_BIN = resolveFromDir(
+      'index.ts', join(PACKAGE_ROOT, 'src', 'cli'), 'package', resolved.repoRoot,
+    ).path;
     childEnv.REPO_HARNESS_HOOK_CLI = resolveFromDir(
       'hook-entry.ts', join(PACKAGE_ROOT, 'src', 'cli'), 'package', resolved.repoRoot,
     ).path;

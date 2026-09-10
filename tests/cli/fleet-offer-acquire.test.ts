@@ -418,7 +418,7 @@ describe('fleet offers CLI', () => {
         return JSON.parse(readFileSync(join(runs, files.at(-1)!), 'utf8'));
       };
       const accepted = verify();
-      expect(accepted.exitCode, (accepted.stdout ?? "") + (accepted.stderr ?? "") + JSON.stringify(snapshot())).toBe(0);
+      expect(accepted.exitCode, (accepted.stdout ?? "") + (accepted.stderr ?? "")).toBe(0);
       expect(snapshot().allowed_paths_check.status).toBe('pass');
       expect(snapshot().contract.status).toBe('pass');
       const sentinel = join(envelope.worktree_path, '.ai/harness/business-command-ran');
