@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 18:02
+> **Related Plan**: plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260910-1802
+> **Archive Projection V1**: `plans/plan-20260910-1553-campaign-reconciliation-recovery.md` => `plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md` => `tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-1553-campaign-reconciliation-recovery.contract.md` => `tasks/archive/contract-20260910-1802-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-1553-campaign-reconciliation-recovery.review.md` => `tasks/archive/review-20260910-1802-campaign-reconciliation-recovery.md`
+
 # Task Review: campaign-reconciliation-recovery
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260910-1553-campaign-reconciliation-recovery.md
-> **Contract**: tasks/contracts/20260910-1553-campaign-reconciliation-recovery.contract.md
-> **Notes File**: tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md
+> **Plan**: plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md
+> **Contract**: tasks/archive/contract-20260910-1802-campaign-reconciliation-recovery.md
+> **Notes File**: tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 15:54
 > **Recommendation**: pass

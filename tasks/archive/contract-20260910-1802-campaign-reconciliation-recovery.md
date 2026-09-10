@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-10 18:02
+> **Related Plan**: plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260910-1802
+> **Archive Projection V1**: `plans/plan-20260910-1553-campaign-reconciliation-recovery.md` => `plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md` => `tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-1553-campaign-reconciliation-recovery.contract.md` => `tasks/archive/contract-20260910-1802-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-1553-campaign-reconciliation-recovery.review.md` => `tasks/archive/review-20260910-1802-campaign-reconciliation-recovery.md`
+
 # Task Contract: campaign-reconciliation-recovery
 
-> **Status**: Active
-> **Plan**: plans/plan-20260910-1553-campaign-reconciliation-recovery.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: runtime-harness-automation-budget
 > **Last Updated**: 2026-09-10 15:54
-> **Review File**: `tasks/reviews/20260910-1553-campaign-reconciliation-recovery.review.md`
-> **Notes File**: `tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md`
+> **Review File**: `tasks/archive/review-20260910-1802-campaign-reconciliation-recovery.md`
+> **Notes File**: `tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -44,10 +54,10 @@ If malformed input can already be corrected through an ordinary exact replay wit
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260910-1553-campaign-reconciliation-recovery.md`
+- Source plan: `plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260910-1553-campaign-reconciliation-recovery.review.md`
-- Notes file: `tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md`
+- Review file: `tasks/archive/review-20260910-1802-campaign-reconciliation-recovery.md`
+- Notes file: `tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -92,10 +102,10 @@ allowed_paths:
   - docs/architecture/modules/runtime-harness/automation-budget.md
   - docs/researches/20260910-reconciliation-recovery.md
   - tasks/evidence/campaign-reconciliation-recovery-pre-fix.log
-  - plans/plan-20260910-1553-campaign-reconciliation-recovery.md
-  - tasks/contracts/20260910-1553-campaign-reconciliation-recovery.contract.md
-  - tasks/reviews/20260910-1553-campaign-reconciliation-recovery.review.md
-  - tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md
+  - plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md
+  - tasks/archive/contract-20260910-1802-campaign-reconciliation-recovery.md
+  - tasks/archive/review-20260910-1802-campaign-reconciliation-recovery.md
+  - tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md
 ```
 
 ## Evidence Requirements

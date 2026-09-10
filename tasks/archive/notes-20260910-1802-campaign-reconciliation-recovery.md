@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-10 18:02
+> **Related Plan**: plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260910-1802
+> **Archive Projection V1**: `plans/plan-20260910-1553-campaign-reconciliation-recovery.md` => `plans/archive/plan-20260910-1553-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md` => `tasks/archive/notes-20260910-1802-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-1553-campaign-reconciliation-recovery.contract.md` => `tasks/archive/contract-20260910-1802-campaign-reconciliation-recovery.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-1553-campaign-reconciliation-recovery.review.md` => `tasks/archive/review-20260910-1802-campaign-reconciliation-recovery.md`
+
 # Reconciliation recovery decisions
 
 Owner approval: Codex conversation `01a089b3-6b92-72e2-ba20-da48ab37c465`, user message `msg_01a08a7b-c10c-78d0-a5c3-9cd1722610f3`, received `2026-09-10T08:42:41.300Z`, text `批准`. This approves the described architecture update, external review, PR/CI and subsequent live repair/stop/continuation. Controlled root context files, the context map and the capability request are included only as outputs of the approved canonical architecture refresh.
