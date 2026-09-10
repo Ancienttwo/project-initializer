@@ -205,10 +205,11 @@ mode="${mode:-$(policy_value '.architecture.freshness_gate' 'advisory')}"
 target_branch="${target_branch:-$(policy_value '.worktree_strategy.merge_back.target' 'main')}"
 threshold="$(policy_value '.architecture.gate_min_severity' 'medium')"
 projection_cli=()
-if [[ -f "$repo/src/cli/index.ts" ]] && command -v bun >/dev/null 2>&1; then
-  projection_cli=(bun "$repo/src/cli/index.ts")
-elif [[ -n "${REPO_HARNESS_CLI_BIN:-}" ]]; then
+if [[ -n "${REPO_HARNESS_CLI_BIN:-}" ]]; then
   projection_cli=("$REPO_HARNESS_CLI_BIN")
+elif [[ -f "$repo/src/cli/index.ts" && -f "$repo/package.json" ]] && command -v bun >/dev/null 2>&1 \
+    && bun -e 'const p = await Bun.file(process.argv[1]).json(); process.exit(p.name === "repo-harness" && p.bin?.["repo-harness"] === "src/cli/index.ts" ? 0 : 1)' "$repo/package.json" >/dev/null 2>&1; then
+  projection_cli=(bun "$repo/src/cli/index.ts")
 else
   projection_cli=(repo-harness)
 fi

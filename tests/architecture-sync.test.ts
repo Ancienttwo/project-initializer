@@ -275,3 +275,24 @@ fi
     expect(malformed.stderr).toContain("invalid global projection readiness");
   });
 }, 60000);
+
+
+test("downstream source CLI is never selected and explicit harness CLI wins", () => {
+  tmpRepo((cwd) => {
+    mkdirSync(join(cwd, "src/cli"), { recursive: true });
+    writeFileSync(join(cwd, "src/cli/index.ts"), 'await Bun.write("wrong-cli-ran", "yes"); process.exit(78);');
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ name: "business-cli", bin: { "business-cli": "src/cli/index.ts" } }));
+    expect(run("bash", ["scripts/architecture-queue.sh", "reindex"], cwd).status).toBe(0);
+    const args = ["scripts/check-architecture-sync.sh", "--mode", "off", "--format", "json"];
+    const explicit = run("bash", args, cwd);
+    expect(explicit.status).toBe(0);
+    expect(existsSync(join(cwd, "wrong-cli-ran"))).toBe(false);
+    const bin = join(cwd, "bin"); mkdirSync(bin);
+    copyFileSync(join(cwd, "projection-cli"), join(bin, "repo-harness"));
+    const env = { ...process.env, HOME: join(cwd, "home"), PATH: `${bin}:${process.env.PATH}` };
+    delete env.REPO_HARNESS_CLI_BIN;
+    const installed = spawnSync("bash", args, { cwd, encoding: "utf8", env });
+    expect(installed.status).toBe(0);
+    expect(existsSync(join(cwd, "wrong-cli-ran"))).toBe(false);
+  });
+}, 60000);
