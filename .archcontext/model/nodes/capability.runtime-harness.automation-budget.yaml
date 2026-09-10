@@ -38,11 +38,13 @@ source:
     - id: entrypoint.automation-budget.append
       path: "src/effects/automation/budget-store.ts"
       symbols:
-        - name: "commitUsage"
+        - name: "prepareUsageCommit"
           sinks:
             - id: sink.automation-budget.usage-event
               path: "src/core/automation/budget.ts"
               symbol: "sealAutomationUsageEvent"
+        - name: "publishUsageCommit"
+          sinks:
             - id: sink.automation-budget.ledger-chain
               path: "src/core/automation/budget.ts"
               symbol: "chainAutomationLedgerDigest"

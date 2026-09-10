@@ -15,9 +15,9 @@ import { createDevelopmentCampaign, appendDevelopmentCampaignEvent, readDevelopm
 import { continueIssueBatchAuthoring, startIssueBatchAuthoring } from '../../src/effects/automation/gpt-pro-issue-authoring';
 import { adoptIssueBatch } from '../../src/effects/automation/issue-batch-adoption';
 import { readIssueBatchAdoptionArtifact, issueBatchGroupStoreRoot } from '../../src/effects/automation/issue-batch-store';
-import { ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, beginCampaignBudgetStep, readAutomationBudgetStatus, readCampaignBudgetLedger, repairAutomationBudgetDrift } from '../../src/effects/automation/budget-store';
+import { reserveCampaignAuthoringBudget, repairAutomationReconciliation, ensureCampaignAuthoringBudget, reserveAutomationBudget, appendAutomationUsage, beginCampaignBudgetStep, readAutomationBudgetStatus, readCampaignBudgetLedger, repairAutomationBudgetDrift } from '../../src/effects/automation/budget-store';
 import { AUTOMATION_TEST_CLOCK_SEAM_ENV, __resetAutomationClockForTests, __setAutomationClockForTests } from '../../src/effects/automation/budget-store.internal';
-import { assertResumedAdoption } from '../../src/effects/automation/campaign-authoring-resume';
+import { assertResumedAdoption, assertReplaceableStoppedSuccessor } from '../../src/effects/automation/campaign-authoring-resume';
 import { buildIssueAuthoringSession, renderIssueBatchMarker } from '../../src/core/automation/issue-batch';
 import { campaignAutomationRunId } from '../../src/core/automation/campaign-authoring-budget';
 import { canonicalMessageBytes, canonicalMessageDigest } from '../../src/core/messages/mechanics';
@@ -422,4 +422,47 @@ test('prepare-resume emits an exclusive request and its chain preflight with no 
   expect(repeated.exitCode).not.toBe(0);
   expect(repeated.stderr.toString() + repeated.stdout.toString()).toContain('EEXIST');
   expect(readFileSync(replacementPath, 'utf8')).toBe(`${JSON.stringify(request, null, 2)}\n`);
+}, 120000);
+
+test('recovery preserves expired history and only unlocks continuation after the stranded charge settles', async () => {
+  const f = await fixture();
+  const failed = await f.failedSuccessor('expired-successor', false);
+  const budget = readAutomationBudgetStatus(f.root, failed.run, f.env);
+  const admission = reserveCampaignAuthoringBudget({ repo_root: f.root, automation_run_id: failed.run,
+    expected_budget_sha256: budget.budget.budget_sha256, campaign_id: failed.intent.campaign_id,
+    group_number: 1, intent_sha256: failed.intent.intent_sha256, operation: 'challenge', idempotency_key: 'stranded-challenge', env: f.env });
+  const reservation = admission.reservation;
+  const status = readDevelopmentCampaignStatus(f.root, failed.intent.campaign_id, f.env);
+  const originalNow = Date.now;
+  try {
+    Date.now = () => Date.parse(failed.authorization.expires_at) + 1;
+    appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: failed.intent.campaign_id,
+      expected_current_sha256: status.current.current_sha256, idempotency_key: 'record-expiry',
+      operation: 'expire_authorization', observed_at: new Date().toISOString(), env: f.env });
+  } finally { Date.now = originalNow; }
+  const expired = readDevelopmentCampaignStatus(f.root, failed.intent.campaign_id, f.env);
+  expect(() => assertReplaceableStoppedSuccessor(f.root, failed.intent, f.env)).toThrow('formally stopped');
+  appendDevelopmentCampaignEvent({ repo_root: f.root, campaign_id: failed.intent.campaign_id,
+    expected_current_sha256: expired.current.current_sha256, idempotency_key: 'acknowledge-stop',
+    operation: 'stop', evidence_refs: [expired.events.at(-1)!.event_sha256], observed_at: new Date().toISOString(), env: f.env });
+  const stopped = readDevelopmentCampaignStatus(f.root, failed.intent.campaign_id, f.env);
+  expect(stopped.events.slice(0, -1)).toEqual([...expired.events]);
+  expect(() => assertReplaceableStoppedSuccessor(f.root, failed.intent, f.env)).toThrow('no open reservation');
+  const digest = createHash('sha256').update('original provider evidence').digest('hex');
+  const recordPath = join(f.root, '.git/repo-harness/automation-budget/v1/runs', failed.run, 'reconciliations', `${reservation.reservation_sha256}.json`);
+  const original = JSON.stringify({ protocol: 1, kind: 'repo-harness-automation-reconciliation',
+    automation_run_id: failed.run, reservation_sha256: reservation.reservation_sha256, resolution: 'reconciled_reserved',
+    reason: 'Challenge result was lost after dispatch.', evidence_refs: [{ ref: 'provider-run:original-challenge', sha256: `sha256:${digest}` }],
+    reconciled_at: new Date().toISOString() });
+  writeFileSync(recordPath, original, { flag: 'wx' });
+  const repaired = repairAutomationReconciliation({ repo_root: f.root, automation_run_id: failed.run,
+    reservation_sha256: reservation.reservation_sha256, expected_reconciliation_sha256: createHash('sha256').update(original).digest('hex'),
+    repair_reason: 'Use the digest of the original evidence bytes.', outcome: 'provider_failure',
+    evidence_refs: [{ ref: 'provider-run:original-challenge', sha256: digest }], mode: 'apply', env: f.env });
+  expect(repaired.event.consumed).toEqual(reservation.reserved);
+  const basis = assertReplaceableStoppedSuccessor(f.root, failed.intent, f.env);
+  expect(basis.superseded.stop_event_sha256).toBe(stopped.events.at(-1)!.event_sha256);
+  expect(readFileSync(recordPath, 'utf8')).toBe(original);
+  expect(readCampaignBudgetLedger(f.root, failed.run, f.env).reserved_provider_calls).toBe(0);
+  expect(readAutomationBudgetStatus(f.root, failed.run, f.env).current.consumed.successful_acquisitions).toBe(0);
 }, 120000);
