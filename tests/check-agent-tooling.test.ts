@@ -1755,3 +1755,20 @@ test.each(['present', 'missing', 'unavailable'])('herdr is a required runtime ca
     }
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 }, 20_000);
+
+test.each([undefined, "invalid"])("Herdr missing or malformed version policy is a configuration error: %s", pin => {
+  const fixture = setupFakeEnvironment("herdr-policy-error");
+  try {
+    mkdirSync(join(fixture.root, ".ai/harness"), { recursive: true });
+    writeFileSync(join(fixture.root, ".ai/harness/policy.json"), JSON.stringify({ external_tooling: { herdr: { min_version: pin } } }));
+    const result = spawnSync("/bin/bash", [SCRIPT, "--json", "--strict-readiness", "--host", "claude"], {
+      cwd: fixture.root, encoding: "utf8", env: { ...process.env, HOME: fixture.home, PATH: `${fixture.fakeBin}:${process.env.PATH}` }, timeout: 15000,
+    });
+    const herdr = JSON.parse(result.stdout).runtime_capabilities.herdr;
+    expect(herdr.status).toBe("configuration-error");
+    expect(herdr.version).toBe("herdr 0.9.0");
+    expect(herdr.reason).toContain("min_version");
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("repo-harness init --repo .");
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+}, 20000);

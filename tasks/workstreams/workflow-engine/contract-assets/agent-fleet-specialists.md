@@ -28,3 +28,11 @@ Track durable multi-session progress for `workflow-engine-contract-assets` witho
 
 - Project the current slice into `tasks/todos.md` for a single session.
 - Keep architecture facts in `docs/architecture/modules/workflow-engine/contract-assets.md`; keep execution progress here.
+
+## 2026-09-11 installation repair
+
+- Completed receipt-owned fleet and bundled cross-review upgrades, deep-worker transaction coverage, and the missing Herdr adoption pin/configuration diagnostic.
+- Durable evidence and operational boundary: `docs/researches/20260911-install-019-owned-upgrade.md`.
+- Verification: targeted installer/profile/init/adoption/tooling regressions and extracted npm-package fleet smoke; repository integrity checks are required before integration. Publication remains a separate release boundary.
+
+> **Substantive Change SHA256**: `sha256:de07ea6f9c95bd3da0540cad55047a15dd80eb45e1ebbcbc8f250f52558fa2f4`

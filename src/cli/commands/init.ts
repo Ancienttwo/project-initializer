@@ -17,6 +17,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  lstatSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -33,7 +34,8 @@ import {
   probeExpectations as catalogProbeExpectations,
   type SkillSurfaceCatalog,
 } from "../../core/skill-surface/catalog";
-import { PROFILE_COMPONENTS } from "../installer/install-profile";
+import { skillTreeSha256 } from "../../effects/skill-tree-integrity";
+import { beginInstallHostTransaction, commitInstallHostTransaction, rollbackInstallHostTransaction, managedInstallSurfaceIsCurrent, readInstalledProfile, PROFILE_COMPONENTS } from "../installer/install-profile";
 import {
   defaultBrainRootChoice,
   discoverBrainRootChoices,
@@ -444,8 +446,10 @@ function syncBundledItemsAtHome(
   home: string | null,
   skills: ReadonlyArray<BundledHostSkill>,
   agents: ReadonlyArray<BundledHostAgent>,
+  env?: NodeJS.ProcessEnv,
 ): InitStep[] {
   const steps: InitStep[] = [];
+  const installed = home ? readInstalledProfile({ ...env, HOME: home }) : null;
   for (const { skill, host, step } of skills) {
     if (target !== "both" && target !== host) continue;
     if (!home) {
@@ -465,17 +469,29 @@ function syncBundledItemsAtHome(
     if (
       existsSync(dest) &&
       (samePath(source, dest) ||
-        (existsSync(destSkill) && readFileSync(destSkill, "utf-8") === readFileSync(srcSkill, "utf-8")))
+        (existsSync(destSkill) && lstatSync(dest).isDirectory() && skillTreeSha256(dest) === skillTreeSha256(source)))
     ) {
       steps.push({ step, status: "ok", detail: "already present" });
       continue;
     }
     if (existsSync(dest)) {
-      steps.push({
-        step,
-        status: "failed",
-        detail: `refusing to overwrite unowned or modified skill at ${dest}`,
-      });
+      const owned = installed?.ownership_manifest.find(surface =>
+        surface.path === dest && surface.type === "directory-copy");
+      if (!owned || !managedInstallSurfaceIsCurrent(owned)) {
+        steps.push({ step, status: "failed", detail: `refusing to overwrite unowned or modified skill at ${dest}` });
+        continue;
+      }
+      const transaction = beginInstallHostTransaction([dest], { HOME: home });
+      try {
+        // Replace the verified old tree so retired references cannot survive an upgrade.
+        rmSync(dest, { recursive: true });
+        cpSync(source, dest, { recursive: true });
+        commitInstallHostTransaction(transaction);
+        steps.push({ step, status: "ok", detail: `synced ${dest}` });
+      } catch (error) {
+        rollbackInstallHostTransaction(transaction);
+        steps.push({ step, status: "failed", detail: `cannot update bundled skill ${dest}: ${String(error)}` });
+      }
       continue;
     }
     cpSync(source, dest, { recursive: true });
@@ -515,7 +531,7 @@ export function syncCrossReviewSkills(
   env?: NodeJS.ProcessEnv,
 ): InitStep[] {
   const catalog = loadSkillSurfaceCatalog(sourceRoot);
-  const steps = syncBundledItemsAtHome(sourceRoot, target, homeDir(env), crossReviewSkillsFromCatalog(catalog), []);
+  const steps = syncBundledItemsAtHome(sourceRoot, target, homeDir(env), crossReviewSkillsFromCatalog(catalog), [], env);
   if (target === "codex" || target === "both") steps.push(ensureOfficialCodexPlugin(sourceRoot, env));
   return steps;
 }

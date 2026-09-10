@@ -82,7 +82,7 @@ function writeManagedHostSurfaces(
     writePath(join(source, 'scripts/verify-sprint.sh'), '# managed\n');
     writePath(join(source, 'scripts/ship-worktrees.sh'), '# managed\n');
     writePath(join(home, '.bun', 'bin', 'codegraph'), '#!/bin/sh\n');
-    for (const agent of ['explorer', 'deep-reasoner', 'fast-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator']) {
+    for (const agent of ['explorer', 'deep-reasoner', 'fast-worker', 'deep-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator']) {
       writePath(join(home, '.codex', 'agents', `${agent}.toml`), '# managed\n');
     }
     writePath(join(home, '.codex', 'skills', 'repo-harness-cross-review', 'SKILL.md'), '# external\n');
@@ -816,7 +816,7 @@ describe('install profiles', () => {
     writePath(join(source, 'scripts/verify-sprint.sh'), '# managed\n');
     writePath(join(source, 'scripts/ship-worktrees.sh'), '# managed\n');
     writePath(join(env.HOME!, '.bun', 'bin', 'codegraph'), '#!/bin/sh\n');
-    for (const agent of ['explorer', 'deep-reasoner', 'fast-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator']) {
+    for (const agent of ['explorer', 'deep-reasoner', 'fast-worker', 'deep-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator']) {
       writePath(join(env.HOME!, '.codex', 'agents', `${agent}.toml`), '# managed\n');
     }
     writePath(join(env.HOME!, '.codex', 'skills', 'repo-harness-cross-review', 'SKILL.md'), '# external\n');
