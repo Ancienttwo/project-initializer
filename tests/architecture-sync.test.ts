@@ -208,7 +208,7 @@ describe("architecture sync gate", () => {
         apply: { mode: "automatic", enabled: true },
         acceptance: { unresolvedCandidates, invalidArtifacts },
       }));
-      writeFileSync(join(cwd, "src/cli/index.ts"), `process.stdout.write(process.argv[3] === "policy" ? JSON.stringify({ provider: "archctx", applyMode: "automatic" }) : await Bun.file(${JSON.stringify(statusFile)}).text());\n`);
+      writeFileSync(join(cwd, "projection-cli"), `#!${process.execPath}\nprocess.stdout.write(process.argv[3] === "policy" ? JSON.stringify({ provider: "archctx", applyMode: "automatic" }) : await Bun.file(${JSON.stringify(statusFile)}).text());\n`);
       writeChangedFiles(cwd, ["apps/web/src/routes/account.tsx"]);
       expect(run("bash", ["scripts/architecture-queue.sh", "reindex"], cwd).status).toBe(0);
 
