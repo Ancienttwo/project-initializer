@@ -39,3 +39,6 @@ Semantic acceptance remains blocked: `/tmp/operator-diff-plugin-review.json` is 
 Owner explicitly approved the typed user waiver and continuation. A temporary Windows fixture diagnostic records the exact binding values before the unavailable read; it must be removed after proving the refusal point and before final acceptance.
 
 > **Substantive Change SHA256**: `sha256:cfa91fb2c3556a7e9b8445e87ca81bf7a2697956e984b7f875312e81b99fe757`
+
+Integrated origin/main a8b56203 (PR #396) before final acceptance; App/i18n merged cleanly and the generated projection is regenerated from the new base.
+> **Substantive Change SHA256**: `sha256:47a8ecda15a04c08ebe66ec39ac87385896a1a8dcf81364bf20cdb84ebd3e758`
