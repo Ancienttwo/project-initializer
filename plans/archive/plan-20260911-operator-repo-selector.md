@@ -41,7 +41,7 @@ Focused operator-web interaction/SSR/types, operator fleet projection and serve 
 - **Stop condition**: Focused/integrity checks pass and browser interaction matches the request.
 - **Rollback surface**: Revert the scoped UI and transport commit together; no live repository state changes.
 
-> **Substantive Change SHA256**: `sha256:b7ffabf3f57f0cb3cd80323ee6b44a6551aaf12f2cc9d5172c6b0a934b787497`
+> **Substantive Change SHA256**: `sha256:53e353e671c12d61ac1f870ac12ce36d91311bb7f1c15436fa4d13320804b998`
 
 ## Acceptance Notes
 
