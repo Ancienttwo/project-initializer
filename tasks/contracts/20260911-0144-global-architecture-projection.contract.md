@@ -302,6 +302,19 @@ exit_criteria:
       "inputs": {
         "env": []
       }
+    },
+    {
+      "id": "protected-readiness-regression",
+      "kind": "command",
+      "command": "bun test tests/cli/fleet-offer-acquire.test.ts tests/cli/status.test.ts tests/unit/windows-protected-helper-platform-contract.test.ts --timeout 60000",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Covers package-owned CLI binding in protected helper execution and global readiness diagnostics.",
+      "inputs": {
+        "env": []
+      }
     }
   ]
 }

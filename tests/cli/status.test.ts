@@ -249,7 +249,7 @@ describe('status command (Phase 1C)', () => {
             state: 'disabled',
             binaryPath: null,
             version: null,
-            reason: 'policy.architecture.projection_provider=disabled',
+            reason: 'global architecture configuration is missing; run repo-harness update once',
           },
           codeFacts: { requirement: 'required', state: 'not-evaluated' },
           apply: { mode: 'disabled', enabled: false },
