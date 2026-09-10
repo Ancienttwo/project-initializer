@@ -48,11 +48,11 @@ test('pre-journal preparation failure can retry without extending its deadline o
     const deadline = Date.now() + 30000;
     await expect(worker.prepareChild('worker', 'prompt.md', deadline)).rejects.toThrow('transport unavailable');
     const recordKey = campaignRuntimeRecordKey(f.result.worker_handoff.dispatch_id, 'worker', 'preparation');
-    const original = readPlanningRecord(f.root, f.intent, recordKey);
+    const original = readPlanningRecord<campaignRuntime.CampaignCodexPreparation>(f.root, f.intent, recordKey);
     expect(original).not.toBeNull();
     await expect(worker.prepareChild('worker', 'prompt.md', deadline + 30000)).rejects.toThrow('transport unavailable');
     expect(calls).toEqual([deadline, deadline]);
-    expect(readPlanningRecord(f.root, f.intent, recordKey)).toEqual(original);
+    expect(readPlanningRecord<campaignRuntime.CampaignCodexPreparation>(f.root, f.intent, recordKey)).toEqual(original);
     expect(budgetStatus(f)).toEqual(before);
     expect(readPlanningRecord(f.root, f.intent, canonicalMessageDigest({ dispatch: f.result.worker_handoff.dispatch_id, part: 'launch' }).slice(7))).toBeNull();
     expect(readPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.result.worker_handoff.dispatch_id, 'worker', 'intent'))).toBeNull();
