@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildLeaseOwnerRecord, bindLeaseRecord, deriveTaskRevision } from '../../src/core/state/coordination-identity';
@@ -113,4 +113,32 @@ test('decoder refuses malformed and oversized payloads instead of displaying par
     { untracked_paths: ['../foreign'] },
     { base_sha: 'main' }, { generation: 0 }, { protocol: 2 },
   ]) expect(() => decodeOperatorTaskDiff({ ...value, ...change }, f.input)).toThrow();
+});
+
+
+test('GET diff refuses configured clean/process commands and never executes fsmonitor', () => {
+  const f = fixture();
+  const marker = join(f.worktree, 'filter-ran');
+  git(f.worktree, 'config', 'filter.probe.clean', 'echo ran > filter-ran; cat');
+  writeFileSync(join(f.worktree, '.gitattributes'), 'file.txt filter=probe\n');
+  writeFileSync(join(f.worktree, 'file.txt'), 'new content\n');
+  expect(() => readOperatorTaskDiff(f.input)).toThrow('filters_unsupported');
+  expect(existsSync(marker)).toBe(false);
+  git(f.worktree, 'config', '--unset', 'filter.probe.clean');
+  git(f.worktree, 'config', 'filter.probe.process', 'echo ran > filter-ran');
+  expect(() => readOperatorTaskDiff(f.input)).toThrow('filters_unsupported');
+  expect(existsSync(marker)).toBe(false);
+  git(f.worktree, 'config', '--unset', 'filter.probe.process');
+  git(f.worktree, 'config', 'core.fsmonitor', 'echo ran > fsmonitor-ran; false');
+  expect(readOperatorTaskDiff(f.input).patch).toContain('+new content');
+  expect(existsSync(join(f.worktree, 'fsmonitor-ran'))).toBe(false);
+});
+
+test('a different prunable worktree does not hide a valid task binding', () => {
+  const f = fixture();
+  const missing = join(f.root, '..', 'aaa-prunable');
+  git(f.root, 'worktree', 'add', '-b', 'obsolete', missing);
+  rmSync(missing, { recursive: true, force: true });
+  expect(git(f.root, 'worktree', 'list', '--porcelain')).toContain('prunable');
+  expect(readOperatorTaskDiff(f.input).base_sha).toBe(f.base);
 });

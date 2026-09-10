@@ -69,3 +69,9 @@ Only the task's authoritative linked worktree can be read. Base and HEAD are exp
 ## Delivery
 
 Implementation and local verification are complete. The branch remains isolated for integration because the primary worktree has existing composer/checkpoint edits. Public merge and release are not reported as complete.
+
+## Merge acceptance and security correction
+
+The user authorized merge. The exact main policy requires an AcceptanceReceipt and local seal. Review proved configured Git clean filters and fsmonitor can execute commands through the GET reader; `state resolve --operation security` raises this correction to strict. Keep this same work-package, freeze the contract below, reproduce first, then reject configured external filters and disable fsmonitor without changing comparison semantics.
+
+> **Task Contract**: `tasks/contracts/20260910-2225-operator-task-diff.contract.md`

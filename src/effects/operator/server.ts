@@ -1888,6 +1888,10 @@ export async function startOperatorServer(
 
     const diffRoute = OPERATOR_TASK_DIFF_ROUTE.exec(pathname);
     if (diffRoute !== null) {
+      if (closed) {
+        sendJson(response, 503, { code: 'unavailable' }, headOnly);
+        return;
+      }
       const params = url.searchParams;
       const input = {
         repository_id: diffRoute[1]!, task_id: diffRoute[2]!,

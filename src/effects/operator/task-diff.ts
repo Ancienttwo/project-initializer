@@ -5,6 +5,7 @@ import { lookupCanonicalTask } from '../../core/state/coordination-identity';
 import { resolveGitCommonDirectory } from '../git/common-directory';
 import { readWorktreeTopology } from '../git/worktree-topology';
 import { readRepoHarnessRegistryStrictSnapshot } from '../repo-registry';
+import { safeRealpath } from '../state/collect-state-inputs';
 import { readActiveSprintPath, readCanonicalTargetRef } from '../state/collect-board-inputs';
 import { readCanonicalSprint, resolveRepoIdentity } from '../state/coordination-canonical-source';
 import { readLease } from '../state/coordination-lease-store';
@@ -14,18 +15,35 @@ export class OperatorTaskDiffError extends Error {
 }
 const refuse = (code: TaskDiffFailure): never => { throw new OperatorTaskDiffError(code); };
 
-function git(cwd: string, args: string[]): string {
+function git(cwd: string, args: string[], allowNoMatch = false): string {
   try {
-    const bytes = execFileSync('git', ['--no-pager', ...args], {
+    const bytes = execFileSync('git', ['--no-pager', '-c', 'core.fsmonitor=false', ...args], {
       cwd, timeout: 5000, maxBuffer: TASK_DIFF_MAX_BYTES, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' },
     });
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     return text;
   } catch (error) {
+    if (allowNoMatch && (error as { status?: number }).status === 1) return '';
     if ((error as NodeJS.ErrnoException).code === 'ENOBUFS') return refuse('too_large');
     return refuse('unavailable');
   }
+}
+
+/** Filters may execute commands even with --no-ext-diff and --no-textconv.
+ * Refuse them rather than silently changing the repository's Git semantics.
+ */
+function refuseExternalFilters(cwd: string): void {
+  const output = git(cwd, ['config', '--includes', '--null', '--get-regexp', '^filter\\..*\\.(clean|process)$'], true);
+  if (!output) return;
+  if (!output.endsWith('\0')) return refuse('unavailable');
+  const effective = new Map<string, string>();
+  for (const record of output.slice(0, -1).split('\0')) {
+    const separator = record.indexOf('\n');
+    if (separator < 1) return refuse('unavailable');
+    effective.set(record.slice(0, separator), record.slice(separator + 1));
+  }
+  if ([...effective.values()].some(command => command !== '')) return refuse('filters_unsupported');
 }
 
 /** Synchronous local authority/Git reads run only in the cancellable worker. */
@@ -51,13 +69,14 @@ export function readOperatorTaskDiff(input: OperatorTaskDiffRequest & { readonly
         || owner.target_ref !== targetRef || owner.sprint_path !== sprintPath) return refuse('stale');
       const worktree = realpathSync(owner.execution_worktree);
       if (worktree !== owner.execution_worktree || resolveGitCommonDirectory(root) !== resolveGitCommonDirectory(worktree)) return refuse('unavailable');
-      const entry = readWorktreeTopology(root).worktrees.find(w => w.path === worktree);
+      const entry = readWorktreeTopology(root).worktrees.find(w => safeRealpath(w.path) === worktree);
       if (!entry || entry.branch !== `refs/heads/${owner.branch}` || entry.detached) return refuse('unavailable');
-      if (git(worktree, ['rev-parse', '--show-toplevel']).trim() !== worktree
+      if (realpathSync(git(worktree, ['rev-parse', '--show-toplevel']).trim()) !== worktree
         || git(worktree, ['symbolic-ref', 'HEAD']).trim() !== entry.branch) return refuse('unavailable');
       return { root, worktree, base: canonical.commit, targetRef, branch: owner.branch, lease: lease.raw };
     };
     const before = authority();
+    refuseExternalFilters(before.worktree);
     const head = git(before.worktree, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
     const patchArgs = ['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '--ignore-submodules=none', '--submodule=short', '--src-prefix=a/', '--dst-prefix=b/', before.base, '--'];
     const patch = git(before.worktree, patchArgs);

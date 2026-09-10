@@ -9,7 +9,7 @@ export interface OperatorTaskDiffRequest {
 
 export const TASK_DIFF_MAX_BYTES = 512 * 1024;
 export const TASK_DIFF_MAX_UNTRACKED = 1000;
-export const TASK_DIFF_FAILURES = ['unavailable', 'stale', 'too_large', 'busy', 'timeout'] as const;
+export const TASK_DIFF_FAILURES = ['unavailable', 'filters_unsupported', 'stale', 'too_large', 'busy', 'timeout'] as const;
 export type TaskDiffFailure = typeof TASK_DIFF_FAILURES[number];
 export interface OperatorTaskDiff extends OperatorTaskDiffRequest {
   readonly protocol: 1;

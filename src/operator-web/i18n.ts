@@ -26,6 +26,7 @@ const ZH_REOBSERVE_ACTION = '刷新看板重新读一次任务，然后重试。
 const ZH_COLLABORATION_ACTION = '检查仓库的协作 store，然后刷新看板。';
 
 const en = {
+  'diff.filters_unsupported': 'This repository configures external Git filters. Review the diff locally.',
   "diff.title": "Worktree diff",
   "diff.scope": "Current target commit → tracked working files, including committed and uncommitted changes. This is a live observation; untracked contents are not loaded.",
   "diff.load": "Load diff",
@@ -464,6 +465,7 @@ export function isOperatorMessageKey(value: string): value is OperatorMessageKey
 }
 
 const zh: Readonly<Record<OperatorMessageKey, string>> = {
+  'diff.filters_unsupported': '此仓库配置了外部 Git filter，请在本地审阅差异。',
   "diff.title": "Worktree 差异",
   "diff.scope": "当前目标 commit → 已跟踪的工作文件，包含已提交和未提交改动。这是实时观测；不读取未跟踪文件内容。",
   "diff.load": "加载差异",
