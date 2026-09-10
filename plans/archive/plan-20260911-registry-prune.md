@@ -41,7 +41,7 @@ Focused: registry prune CLI tests, registry authority tests, init environment re
 - **Stop condition**: Live cleanup readback and named tests/checks pass.
 - **Rollback surface**: Code revert; user explicitly declines a live registry backup.
 
-> **Substantive Change SHA256**: `sha256:c9ca8ea886607fef2b906205fc7e16ea00a16ae26720685ce1ae3828906591c0`
+> **Substantive Change SHA256**: `sha256:0138335adc28c4adcc00fd15494d48b489cebbbe138cb43485715b2feeff416e`
 
 ## Acceptance Notes
 
