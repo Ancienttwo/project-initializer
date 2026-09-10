@@ -1,3 +1,4 @@
+import { TaskDiff } from './TaskDiff';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { Icon } from './icons';
@@ -1864,7 +1865,10 @@ function DetailPane({
         </div>
         <div className="detail-pane__body">
           {card ? (
-            <TaskDetail card={card} revisionChangedFrom={revisionChangedFrom} t={t} />
+            <>
+              <TaskDetail card={card} revisionChangedFrom={revisionChangedFrom} t={t} />
+              <TaskDiff key={JSON.stringify([card.repository_id, card.task_id, card.task_revision, card.claim_id, card.generation])} card={card} t={t} />
+            </>
           ) : snapshot ? (
             <>
               <p className="detail-quiet">{t('detail.overviewHint')}</p>

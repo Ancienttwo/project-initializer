@@ -39,3 +39,15 @@ Explicit Board refresh increments a collaboration refresh generation → only th
 - The production collaboration collector is isolated because a timer on the same event loop cannot preempt synchronous filesystem work. At 10× repository/store cost, worker startup and one worker per collaboration request are the first scaling costs; the current selected-repository-only request model and bounded deadline keep that cost contained.
 
 The implementation is the smallest coherent change that preserves the existing authorities: it adds no alternate parser, fallback identity, compatibility envelope, or shadow source of truth.
+
+## Task worktree diff
+
+The task detail pane offers an on-demand, read-only comparison. The browser sends only repository/task identity and the observed task revision, claim id and generation to `GET /api/v1/fleet/tasks/:repository/:task/diff`. Registry, canonical sprint and the bound lease resolve the execution tree locally; the API never accepts a worktree path or an arbitrary Git ref.
+
+The base is the canonical target commit observed during this read, not the task's start commit. The lease has a `target_ref` but no task-start commit; `unit_ref` is a plan reference, not a key for legacy contract worktree metadata. The response includes target ref, base SHA, branch, HEAD and observation time. The patch compares that base against tracked working files, including committed and uncommitted changes. It does not attribute individual lines to a task. Untracked filenames are listed separately without loading their contents. Git binary/submodule summaries remain Git output.
+
+The reader proves the execution worktree's real path, shared Git common directory and symbolic branch against topology. It rechecks registry/canonical/lease binding, HEAD, patch and untracked names before returning. Changes observed during the read produce a stale refusal. This is a bounded live observation, not an atomic filesystem snapshot or a delivery receipt. Missing/cleaned bindings have no historical fallback.
+
+Synchronous authority and Git operations run in a disposable worker so the HTTP deadline remains enforceable. Active diff requests are bounded by the server concurrency limit, with no unbounded queue. Disconnect, deadline and shutdown terminate the reader; individual diff Git commands additionally have a five-second timeout. Each patch and untracked filename stream is capped at 512 KiB, with at most 1,000 untracked paths. Oversize output is refused, never silently truncated. External diff and textconv are disabled. The browser renders patch text through React, resets on the complete task/claim fence and discards aborted responses.
+
+The structural route inventory still has exactly one write: Task Message. No new dependency, editing, commit, merge, publication history, or TeamAI integration is introduced. The new core file owns the HTTP payload/decoder; the effect file owns local read authority; the worker isolates blocking reads; `TaskDiff.tsx` owns only the on-demand display lifecycle. Focused real-Git, HTTP worker/route and browser tests cover these boundaries.

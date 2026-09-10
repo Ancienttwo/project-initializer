@@ -1,3 +1,4 @@
+import { decodeOperatorTaskDiff, isTaskDiffRequest, TASK_DIFF_FAILURES, type OperatorTaskDiffRequest, type OperatorTaskDiff, type TaskDiffFailure } from '../../core/operator/task-diff';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -78,6 +79,7 @@ export const OPERATOR_FLEET_SNAPSHOT_PATH = '/api/v1/fleet/snapshot' as const;
 export const OPERATOR_API_PATH_PREFIX = '/api' as const;
 /** The static fallback has no path shape of its own; it is whatever is left. */
 export const OPERATOR_STATIC_ASSET_PATTERN = '/*' as const;
+export const OPERATOR_TASK_DIFF_ROUTE = /^\/api\/v1\/fleet\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/([0-9a-f]{64})\/diff$/u;
 export const OPERATOR_TASK_MESSAGE_ROUTE = /^\/api\/v1\/fleet\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/([0-9a-f]{64})\/messages$/u;
 /**
  * The repository id is matched loosely and resolved strictly, the same split the
@@ -117,6 +119,7 @@ export const OPERATOR_ROUTES: readonly OperatorRouteV1[] = Object.freeze([
     pattern: OPERATOR_COLLABORATION_SNAPSHOT_ROUTE.source,
     write: false,
   }),
+  Object.freeze({ id: 'task_diff', method: 'GET', pattern: OPERATOR_TASK_DIFF_ROUTE.source, write: false }),
   Object.freeze({ id: 'static_asset', method: 'GET', pattern: OPERATOR_STATIC_ASSET_PATTERN, write: false }),
   Object.freeze({ id: 'task_message', method: 'POST', pattern: OPERATOR_TASK_MESSAGE_ROUTE.source, write: true }),
 ] as const);
@@ -129,6 +132,7 @@ export type OperatorCollaborationSnapshotReaderInput = ReadOperatorCollaboration
 };
 
 export interface OperatorServerOptions {
+  readonly read_task_diff?: (input: OperatorTaskDiffRequest & { readonly signal: AbortSignal }) => Promise<OperatorTaskDiff>;
   readonly host?: string;
   /** Port 0 is accepted by the effect for ephemeral test servers. */
   readonly port?: number;
@@ -1392,6 +1396,7 @@ export async function startOperatorServer(
   const collaborationObservations = new Map<string, CollaborationObservation>();
   const collaborationQueue: CollaborationObservation[] = [];
   const collaborationQueueCapacity = maxConcurrency * 2;
+  const activeDiffCancellers = new Set<() => void>();
   let activeCollaborationWorkers = 0;
 
   interface CollaborationObservation {
@@ -1881,6 +1886,66 @@ export async function startOperatorServer(
       return;
     }
 
+    const diffRoute = OPERATOR_TASK_DIFF_ROUTE.exec(pathname);
+    if (diffRoute !== null) {
+      const params = url.searchParams;
+      const input = {
+        repository_id: diffRoute[1]!, task_id: diffRoute[2]!,
+        task_revision: params.get('task_revision'), claim_id: params.get('claim_id'),
+        generation: Number(params.get('generation')),
+      };
+      const keys = [...params.keys()];
+      if (keys.length !== 3 || new Set(keys).size !== 3
+        || keys.some(key => !['task_revision', 'claim_id', 'generation'].includes(key)) || !isTaskDiffRequest(input)) {
+        sendRefusal(request, response, 400, errorBody('invalid_request', 'A task diff requires the current task and claim fence.'), headOnly);
+        return;
+      }
+      if (activeDiffCancellers.size >= maxConcurrency) {
+        sendJson(response, 503, { code: 'busy' }, headOnly);
+        return;
+      }
+      const controller = new AbortController();
+      let worker: Worker | undefined;
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const cancel = () => finish('unavailable');
+      const finish = (failure?: TaskDiffFailure, snapshot?: OperatorTaskDiff) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        controller.abort();
+        worker?.terminate();
+        activeDiffCancellers.delete(cancel);
+        response.removeListener('close', cancel);
+        if (response.destroyed) return;
+        if (failure) sendJson(response, failure === 'stale' ? 409 : 503, { code: failure }, headOnly);
+        else sendJson(response, 200, snapshot, headOnly);
+      };
+      const accept = (snapshot: unknown) => {
+        try { finish(undefined, decodeOperatorTaskDiff(snapshot, input)); }
+        catch { finish('unavailable'); }
+      };
+      activeDiffCancellers.add(cancel);
+      response.once('close', cancel);
+      timer = setTimeout(() => finish('timeout'), timeoutMs);
+      if (options.read_task_diff) {
+        void Promise.resolve().then(() => options.read_task_diff!({ ...input, signal: controller.signal }))
+          .then(accept, () => finish('unavailable'));
+      } else {
+        try {
+          worker = new Worker(new URL('./task-diff-worker.ts', import.meta.url));
+          worker.onmessage = (event: MessageEvent<unknown>) => {
+            const value = event.data as { ok?: unknown; snapshot?: unknown; code?: unknown } | null;
+            if (value?.ok === true) accept(value.snapshot);
+            else finish(TASK_DIFF_FAILURES.includes(value?.code as TaskDiffFailure) ? value!.code as TaskDiffFailure : 'unavailable');
+          };
+          worker.onerror = () => finish('unavailable');
+          worker.postMessage({ ...input, env: collaborationWorkerEnvironment(options.env) });
+        } catch { finish('unavailable'); }
+      }
+      return;
+    }
+
     const collaborationRoute = OPERATOR_COLLABORATION_SNAPSHOT_ROUTE.exec(pathname);
     if (collaborationRoute !== null) {
       // POST reached 405 above; this route reads and nothing else.
@@ -1964,6 +2029,7 @@ export async function startOperatorServer(
     if (closed) return;
     closed = true;
     activeFleetCanceller?.();
+    for (const cancel of activeDiffCancellers) cancel();
     for (const cancel of activeTaskMessageCancellers) cancel();
     for (const cancel of activeCollaborationRequestCancellers) cancel();
     await Promise.allSettled([...activeTaskMessageCompletions]);

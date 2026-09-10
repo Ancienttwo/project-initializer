@@ -331,3 +331,6 @@ code, .mono-value { font-family: var(--font-mono); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+.task-diff__patch { max-height: 32rem; overflow: auto; white-space: pre; font-size: 12px; line-height: 1.5; }
+.task-diff dd, .task-diff li { min-width: 0; overflow-wrap: anywhere; }

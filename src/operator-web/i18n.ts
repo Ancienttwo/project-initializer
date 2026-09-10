@@ -26,6 +26,22 @@ const ZH_REOBSERVE_ACTION = '刷新看板重新读一次任务，然后重试。
 const ZH_COLLABORATION_ACTION = '检查仓库的协作 store，然后刷新看板。';
 
 const en = {
+  "diff.title": "Worktree diff",
+  "diff.scope": "Current target commit → tracked working files, including committed and uncommitted changes. This is a live observation; untracked contents are not loaded.",
+  "diff.load": "Load diff",
+  "diff.refresh": "Refresh diff",
+  "diff.loading": "Loading diff…",
+  "diff.unavailable": "No readable bound worktree. Refresh the board to check the task binding.",
+  "diff.stale": "Task or worktree changed while reading. Refresh the board and load again.",
+  "diff.too_large": "Diff exceeds the display limit. Review it locally.",
+  "diff.busy": "Diff reader is busy. Try again.",
+  "diff.timeout": "Diff read timed out. Try again or review locally.",
+  "diff.base": "Target / base",
+  "diff.observed": "Observed at",
+  "diff.patch": "Tracked changes",
+  "diff.empty": "No tracked changes against this base.",
+  "diff.untracked": "Untracked files (contents not loaded)",
+
   'app.subtitle': 'control board',
   'app.skipToWorklist': 'Skip to worklist',
 
@@ -448,6 +464,22 @@ export function isOperatorMessageKey(value: string): value is OperatorMessageKey
 }
 
 const zh: Readonly<Record<OperatorMessageKey, string>> = {
+  "diff.title": "Worktree 差异",
+  "diff.scope": "当前目标 commit → 已跟踪的工作文件，包含已提交和未提交改动。这是实时观测；不读取未跟踪文件内容。",
+  "diff.load": "加载差异",
+  "diff.refresh": "刷新差异",
+  "diff.loading": "正在读取差异…",
+  "diff.unavailable": "没有可读取的绑定 worktree。刷新看板检查任务绑定。",
+  "diff.stale": "读取期间任务或 worktree 已变化。请刷新看板后重读。",
+  "diff.too_large": "差异超过显示上限，请在本地审阅。",
+  "diff.busy": "差异读取器繁忙，请重试。",
+  "diff.timeout": "差异读取超时，请重试或在本地审阅。",
+  "diff.base": "目标 / base",
+  "diff.observed": "观测时间",
+  "diff.patch": "已跟踪改动",
+  "diff.empty": "相对此 base 没有已跟踪改动。",
+  "diff.untracked": "未跟踪文件（未读取内容）",
+
   'app.subtitle': '控制台',
   'app.skipToWorklist': '跳到工作队列',
 
