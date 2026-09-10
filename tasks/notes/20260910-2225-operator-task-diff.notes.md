@@ -35,3 +35,7 @@ Final PR comparison against origin/main:
 > **Substantive Change SHA256**: `sha256:ac9b456e5de8653da7be32b11d42cd8b8c9fd738d80293b8c4a1d40d5f2aacb4`
 
 Semantic acceptance remains blocked: `/tmp/operator-diff-plugin-review.json` is stale_scope and `/tmp/operator-diff-plugin-final.json` is review_budget_exhausted. The existing one-attempt circuit policy was preserved. All 11 declared verification commands passed at run-20260910T231010-87128. An explicit owner waiver is still required; merge authorization is not a waiver.
+
+Owner explicitly approved the typed user waiver and continuation. A temporary Windows fixture diagnostic records the exact binding values before the unavailable read; it must be removed after proving the refusal point and before final acceptance.
+
+> **Substantive Change SHA256**: `sha256:cfa91fb2c3556a7e9b8445e87ca81bf7a2697956e984b7f875312e81b99fe757`

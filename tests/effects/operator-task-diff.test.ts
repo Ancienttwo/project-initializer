@@ -63,6 +63,17 @@ test('read-only registry: explicit target/head, committed and dirty tracked chan
   writeFileSync(join(f.worktree, 'committed.txt'), 'commit\n'); git(f.worktree, 'add', '.'); git(f.worktree, 'commit', '-m', 'work');
   writeFileSync(join(f.worktree, 'file.txt'), 'staged\n'); git(f.worktree, 'add', 'file.txt'); writeFileSync(join(f.worktree, 'file.txt'), '<script>dirty</script>\n');
   writeFileSync(join(f.worktree, 'untracked space.txt'), 'not loaded');
+  if (process.platform === 'win32') {
+    console.error('WINDOWS_DIFF_BINDING', JSON.stringify({
+      root: f.root, worktree: f.worktree, owner: f.owner.execution_worktree,
+      realWorktree: realpathSync(f.worktree),
+      rootCommon: git(f.root, 'rev-parse', '--git-common-dir'),
+      worktreeCommon: git(f.worktree, 'rev-parse', '--git-common-dir'),
+      topology: git(f.root, 'worktree', 'list', '--porcelain'),
+      toplevel: git(f.worktree, 'rev-parse', '--show-toplevel'),
+      branch: git(f.worktree, 'symbolic-ref', 'HEAD'),
+    }));
+  }
   const result = readOperatorTaskDiff(f.input);
   expect(result.base_sha).toBe(f.base); expect(result.head_sha).toBe(git(f.worktree, 'rev-parse', 'HEAD'));
   expect(result.patch).toContain('+commit'); expect(result.patch).toContain('+<script>dirty</script>');
