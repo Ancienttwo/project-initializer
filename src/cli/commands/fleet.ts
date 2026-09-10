@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { pruneRepoHarnessRegistry } from '../../effects/repo-registry';
 import { randomUUID } from 'crypto';
 import { lstatSync, realpathSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -358,6 +359,18 @@ function outputAcquireResult(result: ReturnType<typeof acquireFleetTask>): void 
 
 export function buildFleetCommand(): Command {
   const fleet = new Command('fleet').description('Project fleet workflow views and task acquisition');
+  fleet.command('prune')
+    .description('Preview missing repository registrations; --apply removes registry rows only, without backup')
+    .option('--apply', 'Remove confirmed absent paths under the registry mutation lock')
+    .option('--expected-revision <digest>', 'Exact registry_revision from the preview; required with --apply')
+    .option('--repo-id <id...>', 'Limit inspection/removal to these registered repository IDs')
+    .action(options => {
+      try {
+        const result = pruneRepoHarnessRegistry({ apply: options.apply,
+          expectedRevision: options.expectedRevision, repoIds: options.repoId });
+        process.stdout.write(`${JSON.stringify({ ok: true, ...result }, null, 2)}\n`);
+      } catch (error) { outputFeedbackValidation(error); }
+    });
   fleet
     .command('ready')
     .description('Aggregate current reviewing publications in canonical sprint row order')
