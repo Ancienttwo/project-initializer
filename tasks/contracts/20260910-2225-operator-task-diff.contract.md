@@ -50,7 +50,7 @@ allowed_paths:
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"operator-task-diff-regression","kind":"deterministic_test","paths":["src/core/operator/task-diff.ts"]}]}
 ```
 
 ## Acceptance Policy

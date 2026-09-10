@@ -10,7 +10,7 @@
 
 ## Review scope
 
-The full task diff and its security correction are under review. Native specialist review found external Git filter/fsmonitor execution and Windows path spelling assumptions. Real-Git regressions cover filter refusal, disabled fsmonitor and prunable unrelated worktrees; native paths run in the platform matrix. Shutdown rejects new diff admission. The official Codex plugin must approve the frozen final subject before an AcceptanceReceipt can be recorded.
+The full task diff and its security correction are under review. Native specialist review found external Git filter/fsmonitor execution and Windows path spelling assumptions. Real-Git regressions cover filter refusal, disabled fsmonitor and prunable unrelated worktrees; native paths run in the platform matrix. Shutdown rejects new diff admission. Cascade review verified lazy-fetch prohibition across worker authority reads and explicit assume-unchanged refusal after real pre-fix failures. Limited readback passed on fa0a5abb; parent confirmed that commit contains the reviewed corrections. The official Codex plugin must approve the frozen final subject before an AcceptanceReceipt can be recorded.
 
 ## Verification evidence
 
