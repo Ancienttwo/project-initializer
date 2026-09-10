@@ -1,21 +1,37 @@
 # Task Review: operator-task-diff
 
-> **Status**: Blocked
+> **Status**: Accepted
 > **Plan**: plans/plan-20260910-2225-operator-task-diff.md
 > **Contract**: tasks/contracts/20260910-2225-operator-task-diff.contract.md
 > **Notes File**: tasks/notes/20260910-2225-operator-task-diff.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
 
 ## Review scope
 
-The full task diff and its security correction are under review. Native specialist review found external Git filter/fsmonitor execution and Windows path spelling assumptions. Real-Git regressions cover filter refusal, disabled fsmonitor and prunable unrelated worktrees; native paths run in the platform matrix. Shutdown rejects new diff admission. Cascade review verified lazy-fetch prohibition across worker authority reads and explicit assume-unchanged refusal after real pre-fix failures. Limited readback passed on fa0a5abb; parent confirmed that commit contains the reviewed corrections. The official Codex plugin must approve the frozen final subject before an AcceptanceReceipt can be recorded.
+Native specialist review found configured Git command execution and path spelling assumptions. Real-Git regressions cover external-filter refusal, disabled fsmonitor, lazy-fetch prohibition (including worker authority reads), assume-unchanged refusal, foreign worktree rejection and prunable siblings. Shutdown refuses new diff admission. Windows short/long directory aliases use physical device/inode identity while preserving task, claim, canonical owner-path and branch fences.
 
 ## Verification evidence
 
-Initial feature: 211 focused operator tests, typecheck, build and repository integrity checks. Security correction regressions have captured pre-fix failures and post-fix passes. Final prepare-acceptance passed at run-20260910T231010-87128, including all 11 declared executable checks. No semantic acceptance or merge completion is claimed here.
+All 11 declared executable checks passed in `run-20260910T234507-62658` against the implementation integrated with origin/main a8b56203. This includes focused operator regressions, typecheck, UI build and repository-integrity checks. The finalization consumed this evidence without rerunning tests. GitHub Required CI remains a separate publication gate.
 
-## Semantic acceptance blocker
+## Semantic acceptance
 
-The first official Codex plugin invocation returned `stale_scope` while deterministic projection changed the subject. After final verification, the next invocation was refused as `review_budget_exhausted`: the work-package has spent its single semantic review attempt. Neither result is an external pass. The contract owner must explicitly authorize the allowed typed UserWaiverGrant before acceptance can proceed; the existing request to merge is not treated as a waiver. No circuit state, policy or gate was changed.
+The first official plugin invocation was rejected as stale_scope and its retry admission as review_budget_exhausted. These were not external passes. The user explicitly approved the allowed owner waiver, recorded as UserWaiverGrant and materialized below as user_waiver against the final implementation and evidence. The circuit, policy and CI gates were preserved.
+
+## Acceptance Receipt Projection
+
+> **Disposition**: user_waiver
+> **Reviewer**: User
+> **Source**: user-waiver
+> **Actor**: ancienttwo
+> **Reviewed Subject SHA256**: sha256:3a291bc8535c755617350de3354a52bb871da48d0a8385cf9acd3fc4a7ef4682
+> **Reviewed Subject Scope**: normalized-final-content
+> **Reviewed Target Revision**: a8b5620308a3d2123e4e4c1dc59ad2f34883fe2f
+> **Verification Evidence SHA256**: sha256:0dba4072ad93f0a5da5eb0f0d3be5636699295b0ef474e500fe30020c78e04bb
+> **Issued At**: 2026-09-10T15:46:40.157Z
+
+- Summary: User explicitly approved owner waiver after the stale_scope invocation consumed the single semantic review allowance; merge remains conditional on passing final verification and Required CI.
+- Findings: none
+
