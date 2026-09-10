@@ -719,6 +719,7 @@ describe('BRC0 negative freeze: a prompt is not a Claim', () => {
     const dependencies = (): Partial<FleetAcquireDependencies> => ({
       readRegistry: () => registry,
       collectOffers: () => document,
+      preflight: () => {},
       sprintDependencies: (() => ({})) as unknown as FleetAcquireDependencies['sprintDependencies'],
       claim: spy('claim') as unknown as FleetAcquireDependencies['claim'],
       bind: spy('bind') as unknown as FleetAcquireDependencies['bind'],

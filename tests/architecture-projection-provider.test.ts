@@ -46,14 +46,14 @@ function fixture() {
   mkdirSync(join(repoRoot, '.ai', 'harness'), { recursive: true });
   mkdirSync(join(repoRoot, '.archcontext', 'model', 'nodes'), { recursive: true });
   mkdirSync(join(repoRoot, 'src', 'core'), { recursive: true });
-  writeFileSync(join(packageRoot, 'package.json'), `${JSON.stringify({ name: 'archctx', version: '0.5.8', engines: { node: '>=22.22 <26' }, bin: { archctx: './bin/archctx' } })}\n`);
+  writeFileSync(join(packageRoot, 'package.json'), `${JSON.stringify({ name: 'archctx', version: '0.5.9', engines: { node: '>=22.22 <26' }, bin: { archctx: './bin/archctx' } })}\n`);
   const binary = join(packageRoot, 'bin', 'archctx');
   writeFileSync(binary, '#!/bin/sh\nexit 99\n');
   chmodSync(binary, 0o755);
   symlinkSync(join('..', 'archctx', 'bin', 'archctx'), join(binRoot, 'archctx'));
   writeFileSync(join(repoRoot, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
     context: { capability_source: 'archcontext' },
-    architecture: { projection_provider: 'archctx', projection_apply: 'manual', projection_version: '0.5.8', projection_timeout_ms: 120000 },
+    architecture: { projection_provider: 'archctx', projection_apply: 'manual', projection_version: '0.5.9', projection_timeout_ms: 120000 },
   })}\n`);
   writeFileSync(join(repoRoot, '.archcontext', 'model', 'nodes', 'capability.test.core.yaml'), `schemaVersion: archcontext.node/v2
 kind: capability
@@ -94,7 +94,7 @@ function vendorArchctx(root: string, version: string): string {
   return binary;
 }
 
-function capabilities(version = '0.5.8') {
+function capabilities(version = '0.5.9') {
   return {
     schemaVersion: 'archcontext.capabilities/v1',
     package: { name: 'archctx', version },
@@ -104,7 +104,7 @@ function capabilities(version = '0.5.8') {
       architectureRefreshSignal: 'archcontext.architecture-refresh-signal/v1',
     },
     renderers: { architectureDocs: 'archcontext.docs-renderer/v4', agentContext: 'archcontext.agent-context-renderer/v1' },
-    features: ['architecture-docs-renderer-v2', 'architecture-refresh-signal-v1', 'projection-apply-receipt-v1', 'projection-protocol-v2'],
+    features: ['architecture-docs-renderer-v2', 'architecture-refresh-signal-v1', 'projection-apply-receipt-v1', 'projection-prior-committed-applies-v1', 'projection-protocol-v2'],
   };
 }
 
@@ -328,7 +328,7 @@ describe('package-local ArchContext projection provider', () => {
     const resolved = resolvePackageLocalArchctx(f.consumerRoot);
     expect(resolved.binaryPath).toBe(realpathSync(f.binary));
     writeFileSync(join(f.consumerRoot, 'node_modules', 'archctx', 'package.json'), '{"name":"archctx","version":"0.3.0"}\n');
-    expect(() => resolvePackageLocalArchctx(f.consumerRoot)).toThrow('expected archctx@0.5.8');
+    expect(() => resolvePackageLocalArchctx(f.consumerRoot)).toThrow('expected archctx@0.5.9');
   });
 
   test('resolves a hoisted package from an installed repo-harness package root', () => {
@@ -354,6 +354,15 @@ describe('package-local ArchContext projection provider', () => {
     vendorArchctx(f.repoRoot, '0.0.1');
     expect(() => archctxCapabilities(f.repoRoot, { policy, run: () => ({ status: 0, signal: null, stdout: JSON.stringify(capabilities()), stderr: '' }) }))
       .toThrow(`expected archctx@${ARCHCTX_REQUIRED_VERSION}, got archctx@0.0.1 (resolved from repo root ${f.repoRoot})`);
+  });
+
+  test('fails closed when the pinned version omits the prior-committed-applies feature', () => {
+    const f = fixture();
+    const payload = capabilities();
+    const withoutFeature = { ...payload, features: payload.features.filter((feature) => feature !== 'projection-prior-committed-applies-v1') };
+    expect(withoutFeature.features).not.toContain('projection-prior-committed-applies-v1');
+    expect(() => archctxCapabilities(f.repoRoot, { consumerRoot: f.consumerRoot, policy, run: () => ({ status: 0, signal: null, stdout: JSON.stringify(withoutFeature), stderr: '' }) }))
+      .toThrow('archctx required feature set mismatch');
   });
 
   test('resolves from the running CLI package root when the target repo vendors no archctx', () => {
