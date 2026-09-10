@@ -420,7 +420,7 @@ class StopProjectionBatch {
 function projection(repoRoot: string, activePlan: string | null, env: NodeJS.ProcessEnv, now: Date): {
   paths: ProjectionPaths;
   content: { handoff: string; resume: string; event: string; runSummary: string };
-  retention: { runsDir: string; checksFile: string };
+  retention: { runsDir: string };
 } {
   // EPC-07: handoff/resume content now comes from the single recovery
   // materializer (src/effects/evidence/recovery-materializer.ts) instead of
@@ -482,7 +482,7 @@ function projection(repoRoot: string, activePlan: string | null, env: NodeJS.Pro
   return {
     paths: { handoff: context.paths.handoff, resume: context.paths.resume, events: context.paths.events, runSummary },
     content: { handoff: handoffContent, resume: resumeContent, event: eventContent, runSummary: runSummaryContent },
-    retention: { runsDir: context.paths.runsDir, checksFile: context.paths.checks },
+    retention: { runsDir: context.paths.runsDir },
   };
 }
 

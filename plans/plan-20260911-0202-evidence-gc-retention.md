@@ -131,23 +131,30 @@ this round: leave those constants alone.
 from `.ai/harness/checks/*.json` and re-validates that exact snapshot. A
 time-or-count-only sweep of `runs/*.json` would delete a prepared acceptance
 snapshot and strand the acceptance with no operator exit (the same failure shape
-as a wedged reservation). Retention must pin every run file currently referenced
-by a checks projection.
+as a wedged reservation).
 
-Stop's own summaries and `verify-sprint.sh:1009`'s prepared snapshots share the
-`run-` prefix, so a filename rule cannot separate them. The pin set is the only
-correct discriminator.
+`src/effects/evidence/verification-execution.ts:919-921` is a third writer in the
+same directory: an immutable `verification-${executionId}.json` the evidence
+ledger binds by sha256. `readValidRunResult:507-510` treats a missing file as an
+absent baseline, so `baselineResult:574-580` fails a `baseline_with_delta`
+criterion permanently -- a rerun only mints a new execution id, and the only
+escape is editing the contract, which discards the whole `criterion_reuse` cache.
+
+Stop's summaries and `verify-sprint.sh:1009`'s snapshots share the `run-` prefix,
+so no filename rule separates the three. Only the record shapes do.
 
 ## Decision
 
 One retention policy, one owner, two callers.
 
-- New `src/effects/run-summary-retention.ts` owns the policy: keep every
-  run file pinned by `.ai/harness/checks/*.json#.run_file`, keep the newest
-  `RUN_SUMMARY_RETENTION_COUNT` by mtime, delete the rest. Count cap, not byte
-  cap -- these are ~4 KB fixed-shape records, so count is the honest bound, and
-  it mirrors `HOOK_LOG_ARCHIVE_SEGMENTS` rather than inventing a new policy
-  surface. No `policy.json` key: there is no second consumer asking to tune it.
+- New `src/effects/run-summary-retention.ts` owns the policy: delete only records
+  carrying Stop's own `reason: "session-stop"` marker, keeping the newest
+  `RUN_SUMMARY_RETENTION_COUNT` by mtime. Positive identification, not a denylist
+  of the other writers' names: a fourth writer is protected by default, and no
+  second authority is consulted to decide what to keep. Count cap, not byte cap
+  -- these are ~4 KB fixed-shape records, so count is the honest bound, and it
+  mirrors `HOOK_LOG_ARCHIVE_SEGMENTS` rather than inventing a new policy surface.
+  No `policy.json` key: there is no second consumer asking to tune it.
 - `stop-handler.ts` calls it after its run-summary write, so the bound is
   self-healing and needs no operator step.
 - New `scripts/evidence-gc.ts` helper (`repo-harness run evidence-gc`) calls the

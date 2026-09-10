@@ -35,7 +35,8 @@ function usage(): string {
     "usage: evidence-gc.ts [--repo <path>] [--dry-run] [--format text|json]",
     "",
     "Removes superseded evidence checkpoints and Stop run summaries beyond the",
-    "retention bound. Run summaries pinned by a checks projection are always kept.",
+    "retention bound. Only Stop's own summaries are ever removed; acceptance",
+    "snapshots and verification execution records are left to their owners.",
   ].join("\n");
 }
 
@@ -63,14 +64,15 @@ function parseArgs(argv: readonly string[]): { repo: string; dryRun: boolean; fo
 }
 
 /**
- * Bytes held by checkpoint directories the current marker does not name. This
- * is a reporting upper bound, not a second copy of the store's deletion rule:
- * the store additionally leaves any directory holding an unexpected child, so a
- * dry run may name more bytes than the real prune reclaims.
+ * Bytes held by checkpoint directories the current marker does not name. The
+ * naming rule comes from the store itself; only the "how much" is local. This
+ * remains a reporting upper bound: the store additionally leaves any directory
+ * holding an unexpected child, so a dry run may name more than a prune reclaims.
  */
 function supersededCheckpoints(
   checkpointsDir: string,
   currentId: string | null,
+  isCheckpointDirectoryName: (name: string) => boolean,
   sizeOf: (path: string) => number,
 ): { count: number; bytes: number } {
   let count = 0;
@@ -82,7 +84,7 @@ function supersededCheckpoints(
     return { count, bytes };
   }
   for (const name of entries) {
-    if (name === currentId || !/^chk-[0-9a-f]{64}$/.test(name)) continue;
+    if (name === currentId || !isCheckpointDirectoryName(name)) continue;
     count++;
     bytes += sizeOf(join(checkpointsDir, name));
   }
@@ -113,8 +115,8 @@ async function main(argv: readonly string[]): Promise<number> {
 
   const errors: string[] = [];
 
-  // Reuse the single `harness.runs_dir` / `harness.checks_file` reader rather
-  // than adding a third policy reading of the same datum.
+  // Reuse the single `harness.runs_dir` reader rather than adding a second
+  // policy reading of the same datum.
   const paths = recovery.buildRecoveryContext(options.repo, null, process.env).paths;
 
   const checkpointsDir = checkpointStore.resolveCheckpointsDir(options.repo);
@@ -130,6 +132,7 @@ async function main(argv: readonly string[]): Promise<number> {
         const superseded = supersededCheckpoints(
           checkpointsDir,
           current.resolved.checkpointId,
+          checkpointStore.isCheckpointDirectoryName,
           retention.directoryBytes,
         );
         checkpointsRemoved = superseded.count;
@@ -150,7 +153,6 @@ async function main(argv: readonly string[]): Promise<number> {
     summaries = retention.sweepRunSummaries({
       repoRoot: options.repo,
       runsDir: paths.runsDir,
-      checksFile: paths.checks,
       dryRun: options.dryRun,
     });
     for (const entry of summaries.skipped) errors.push(`run summary ${entry}`);
@@ -165,7 +167,7 @@ async function main(argv: readonly string[]): Promise<number> {
     checkpoints: { removed: checkpointsRemoved, reclaimed_bytes: checkpointBytes },
     run_summaries: {
       scanned: summaries?.scanned ?? 0,
-      pinned: summaries?.pinned ?? 0,
+      foreign: summaries?.foreign ?? 0,
       removed: summaries?.removed.length ?? 0,
       reclaimed_bytes: summaries?.reclaimedBytes ?? 0,
       retention_count: retention.RUN_SUMMARY_RETENTION_COUNT,
@@ -182,7 +184,8 @@ async function main(argv: readonly string[]): Promise<number> {
       `evidence-gc ${options.repo}${options.dryRun ? " (dry run)" : ""}`,
       `  checkpoints:   ${checkpointsRemoved} ${options.dryRun ? "superseded" : "removed"}, ${human(checkpointBytes)} ${verb}`,
       `  run summaries: ${summaries?.removed.length ?? 0} of ${summaries?.scanned ?? 0} removed `
-        + `(${summaries?.pinned ?? 0} pinned by checks, newest ${retention.RUN_SUMMARY_RETENTION_COUNT} kept), `
+        + `(newest ${retention.RUN_SUMMARY_RETENTION_COUNT} kept; `
+        + `${summaries?.foreign ?? 0} non-Stop records left to their own owners), `
         + `${human(summaries?.reclaimedBytes ?? 0)} ${verb}`,
       `  total:         ${human(reclaimed)} ${verb}`,
       ...errors.map((entry) => `  ! ${entry}`),

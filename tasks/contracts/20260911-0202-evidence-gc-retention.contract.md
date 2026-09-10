@@ -22,18 +22,21 @@ so a repo whose ledger is gone (`publishCheckpointFromLedger` returns
 command to reclaim it. Separately, `stop-handler.ts:436` writes one run summary
 per Stop that nothing ever deletes -- 5931 files here, back to 2026-05-25.
 
-If this ships wrong, retention deletes a run summary that
-`scripts/verify-sprint.sh:913-937` reads back during acceptance finalization,
-stranding a prepared acceptance with no operator recovery.
+If this ships wrong, retention deletes durable evidence that shares the
+directory: the snapshot `scripts/verify-sprint.sh:913-937` reads back during
+acceptance finalization, or the ledger-bound record
+`verification-execution.ts:507-510` reads as a `baseline_with_delta` baseline.
+Either strands an acceptance with no operator recovery.
 
 ## Goal
 
 Bound Stop run-summary growth at the writer, and give operators one command that
 reclaims obsolete evidence in a repo the Stop path can no longer heal.
 
-1. `src/effects/run-summary-retention.ts` owns one retention policy:
-   retain every run file pinned by `.ai/harness/checks/*.json#.run_file`, retain
-   the newest `RUN_SUMMARY_RETENTION_COUNT` by mtime, delete the rest.
+1. `src/effects/run-summary-retention.ts` owns one retention policy: delete only
+   records carrying Stop's own `reason: "session-stop"` marker, keeping the
+   newest `RUN_SUMMARY_RETENTION_COUNT` by mtime. Every other shape in the
+   directory belongs to its own owner and is never a candidate.
 2. `stop-handler.ts` applies that sweep after its own run-summary write, fail-open
    so a sweep fault never fails Stop.
 3. `repo-harness run evidence-gc [--dry-run] [--repo <path>]` applies the same
@@ -64,11 +67,16 @@ reclaims obsolete evidence in a repo the Stop path can no longer heal.
 
 ## Falsifier
 
-The direction is wrong if run summaries are not actually write-only telemetry --
-that is, if some reader other than `verify-sprint.sh`'s prepared-snapshot
-readback depends on the full history. Cheapest proof point: grep every
-`runs_dir` / `run_file` consumer in `src/` and `scripts/` and confirm each is
-either a writer or the checks-pinned readback already handled by the pin set.
+The direction is wrong if any file in `harness.runs_dir` that a reader depends on
+can carry Stop's `reason: "session-stop"` marker, or if Stop's own summaries can
+lack it. Cheapest proof point: grep every `runs_dir` / `run_file` consumer in
+`src/` and `scripts/`, and for each writer confirm the record shape it emits.
+
+Executed. Three writers: `stop-handler.ts:467` (marker present, disposable),
+`verify-sprint.sh:1009` (`schema: repo-harness-run-trace.v1`, read back at
+finalization), and `verification-execution.ts:919-921` (`kind:
+verification_execution_record`, ledger-bound by sha256, read at
+`readValidRunResult:507-510`). Only the first carries the marker.
 
 ## Root Cause Evidence
 

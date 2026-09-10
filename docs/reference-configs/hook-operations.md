@@ -131,19 +131,29 @@ registry with `bun test` and `repo-harness init --repo . --dry-run`.
 
 ## Evidence Retention
 
-Three files under `.ai/harness/` grow on every Stop, and each has its own
-retention owner that runs automatically:
+`.ai/harness/runs/` has three writers, and only one of them produces disposable
+history:
 
-| Surface | Owner | Bound |
+| File | Writer | Retention owner |
 | --- | --- | --- |
-| `evidence/checkpoints/` | `checkpoint-store.ts`, inside every successful publish | only the checkpoint the published marker names |
-| `runs/*.json` | `run-summary-retention.ts`, at the end of every Stop | pinned snapshots plus the newest `RUN_SUMMARY_RETENTION_COUNT` |
-| `runs/hook-events.jsonl` | `hook-event-log.ts`, on rotation | 8 MB segments, 256 MB or 32 archived segments |
+| `${runId}.json` carrying the four resolved projection paths | Stop | `run-summary-retention.ts`, at the end of every Stop: newest `RUN_SUMMARY_RETENTION_COUNT` |
+| `${runId}-${contractSlug}.json` (`schema: repo-harness-run-trace.v1`) | `verify-sprint.sh` | none; a checks projection reads it back at acceptance finalization |
+| `verification-${executionId}.json` / `.log` | `verification-execution.ts` | none; immutable, bound by sha256 in the evidence ledger |
+| `hook-events.jsonl` | hook telemetry | `hook-event-log.ts`, on rotation: 8 MB segments, 256 MB or 32 archived segments |
 
-A run summary is pinned while a checks projection's `.run_file` points at it:
-`verify-sprint --prepare-acceptance` freezes a snapshot there and reads that
-exact file back at finalization. Retention therefore treats an unreadable checks
-projection as a reason to cancel the sweep, not to widen it.
+Evidence checkpoints under `.ai/harness/evidence/checkpoints/` are owned by
+`checkpoint-store.ts`, which keeps only the checkpoint the published marker
+names and prunes inside every successful publish.
+
+The two unowned classes are durable evidence, not leaks. A frozen acceptance
+snapshot shares Stop's `run-` prefix, and a missing verification record makes
+`readValidRunResult` report an absent baseline, which fails a
+`baseline_with_delta` criterion permanently because a rerun only mints a new
+execution id. Retention therefore never reasons about what to keep: it deletes
+only records with Stop's own run-summary shape -- a `run_id` plus
+`checks_file`, `handoff_file`, `policy_file`, and `context_map_file`, every one
+a pointer the next Stop recomputes -- and leaves every other shape to its owner.
+The shape, not `reason`: that field is free-form operator text.
 
 Checkpoint retention was added in 0.19.0. A repository upgraded from an earlier
 version carries a checkpoint per Stop, each one a whole-ledger snapshot -- on a

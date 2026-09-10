@@ -5,7 +5,6 @@ import { join } from 'path';
 import { RUN_SUMMARY_RETENTION_COUNT, sweepRunSummaries } from '../../src/effects/run-summary-retention';
 
 const RUNS_DIR = '.ai/harness/runs';
-const CHECKS_FILE = '.ai/harness/checks/latest.json';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -14,21 +13,56 @@ function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), 'run-retention-'));
   roots.push(root);
   mkdirSync(join(root, RUNS_DIR), { recursive: true });
-  mkdirSync(join(root, '.ai/harness/checks'), { recursive: true });
   return root;
 }
 
-/** `index` orders age: 0 is the newest. */
-function seedRun(root: string, name: string, index: number): string {
-  const path = join(root, RUNS_DIR, name);
-  writeFileSync(path, JSON.stringify({ run_id: name }));
+function age(root: string, name: string, index: number): void {
   const seconds = 1_600_000_000 - index * 60;
-  utimesSync(path, seconds, seconds);
-  return `${RUNS_DIR}/${name}`;
+  utimesSync(join(root, RUNS_DIR, name), seconds, seconds);
 }
 
-function seedChecks(root: string, body: unknown, name = 'latest.json'): void {
-  writeFileSync(join(root, '.ai/harness/checks', name), JSON.stringify(body));
+/** `index` orders age: 0 is the newest. Mirrors `stop-handler.ts`'s record. */
+function seedStopSummary(root: string, name: string, index: number, reason = 'session-stop'): void {
+  writeFileSync(join(root, RUNS_DIR, name), JSON.stringify({
+    generated_at: '2026-09-11T02:16:42+0800',
+    run_id: name.replace(/\.json$/, ''),
+    reason,
+    active_plan: '',
+    active_contract: '',
+    active_review: '',
+    active_notes: '',
+    checks_file: '.ai/harness/checks/latest.json',
+    handoff_file: '.ai/harness/handoff/current.md',
+    policy_file: '.ai/harness/policy.json',
+    context_map_file: '.ai/context/context-map.json',
+  }));
+  age(root, name, index);
+}
+
+/** Mirrors `scripts/verify-sprint.sh`'s frozen acceptance snapshot. */
+function seedAcceptanceSnapshot(root: string, name: string, index: number): void {
+  writeFileSync(join(root, RUNS_DIR, name), JSON.stringify({
+    schema: 'repo-harness-run-trace.v1',
+    status: 'pass',
+    source: 'verify-sprint',
+    run_id: 'run-20260829T025442-29360',
+    run_file: `${RUNS_DIR}/${name}`,
+  }));
+  age(root, name, index);
+}
+
+/** Mirrors `evidence/verification-execution.ts`'s ledger-bound run record. */
+function seedVerificationRecord(root: string, executionId: string, index: number): string {
+  const name = `verification-${executionId}.json`;
+  writeFileSync(join(root, RUNS_DIR, name), JSON.stringify({
+    protocol: 1,
+    kind: 'verification_execution_record',
+    execution_id: executionId,
+    cache_key: 'sha256:deadbeef',
+    result: { id: 'focused-regression', passed: true, execution_id: executionId },
+  }));
+  age(root, name, index);
+  return name;
 }
 
 function remaining(root: string): string[] {
@@ -36,12 +70,11 @@ function remaining(root: string): string[] {
 }
 
 describe('run summary retention', () => {
-  test('keeps the newest N and removes the rest', () => {
+  test('keeps the newest N Stop summaries and removes the rest', () => {
     const root = fixture();
-    seedChecks(root, { status: 'pass' });
-    for (let index = 0; index < 5; index++) seedRun(root, `run-${index}.json`, index);
+    for (let index = 0; index < 5; index++) seedStopSummary(root, `run-${index}.json`, index);
 
-    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 2 });
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 2 });
 
     expect(result.scanned).toBe(5);
     expect([...result.removed].sort()).toEqual([
@@ -51,76 +84,97 @@ describe('run summary retention', () => {
     expect(result.retained).toBe(2);
   });
 
-  test('a run file pinned by a checks projection survives past the bound', () => {
+  test('a ledger-bound verification execution record is never a candidate', () => {
     const root = fixture();
-    for (let index = 0; index < 5; index++) seedRun(root, `run-${index}.json`, index);
-    // The oldest entry is the one verify-sprint froze for acceptance finalization.
-    seedChecks(root, { run_file: `${RUNS_DIR}/run-4.json` });
+    // Oldest file in the directory, and the only one a count-only or
+    // newest-N-by-name rule would delete first.
+    const record = seedVerificationRecord(root, 'vx-0c2998f10e2847ccbb86', 99);
+    for (let index = 0; index < 3; index++) seedStopSummary(root, `run-${index}.json`, index);
 
-    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 1 });
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 0 });
 
-    expect(result.pinned).toBe(1);
-    expect(remaining(root)).toEqual(['run-0.json', 'run-4.json']);
-    expect(result.removed).not.toContain(`${RUNS_DIR}/run-4.json`);
+    expect(result.foreign).toBe(1);
+    expect(result.scanned).toBe(3);
+    expect(remaining(root)).toEqual([record]);
+    expect(result.removed).not.toContain(`${RUNS_DIR}/${record}`);
   });
 
-  test('every checks projection in the directory contributes pins', () => {
+  test("verify-sprint's frozen acceptance snapshot is never a candidate", () => {
     const root = fixture();
-    for (let index = 0; index < 4; index++) seedRun(root, `run-${index}.json`, index);
-    seedChecks(root, { run_file: `${RUNS_DIR}/run-3.json` });
-    seedChecks(root, { run_file: `${RUNS_DIR}/run-2.json` }, 'change-assessment.latest.json');
+    // Shares Stop's `run-` prefix, so only the record shape separates them.
+    seedAcceptanceSnapshot(root, 'run-20260829T025442-29360-operator-board.json', 99);
+    for (let index = 0; index < 3; index++) seedStopSummary(root, `run-${index}.json`, index);
 
-    sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 0 });
+    sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 0 });
 
-    expect(remaining(root)).toEqual(['run-2.json', 'run-3.json']);
+    expect(remaining(root)).toEqual(['run-20260829T025442-29360-operator-board.json']);
   });
 
-  test('an unreadable checks projection cancels the sweep instead of widening it', () => {
+  test('an unparseable or unrecognized record is left alone, not deleted', () => {
     const root = fixture();
-    for (let index = 0; index < 3; index++) seedRun(root, `run-${index}.json`, index);
-    writeFileSync(join(root, '.ai/harness/checks/latest.json'), '{ truncated');
+    writeFileSync(join(root, RUNS_DIR, 'run-truncated.json'), '{ truncated');
+    // The operator-report shape: a run_id, but none of the projection paths.
+    writeFileSync(join(root, RUNS_DIR, 'run-report.json'), JSON.stringify({ run_id: 'x', command: 'bun test', exit_code: 0 }));
+    writeFileSync(join(root, RUNS_DIR, 'run-array.json'), '[]');
+    seedStopSummary(root, 'run-0.json', 0);
 
-    expect(() => sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 0 }))
-      .toThrow('unreadable checks projection cannot prove its run pin');
-    expect(remaining(root)).toEqual(['run-0.json', 'run-1.json', 'run-2.json']);
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 0 });
+
+    expect(result.foreign).toBe(3);
+    expect(result.removed).toEqual([`${RUNS_DIR}/run-0.json`]);
+    expect(remaining(root)).toEqual(['run-array.json', 'run-report.json', 'run-truncated.json']);
   });
 
-  test('a symlinked run entry is reported, never unlinked', () => {
+  test('a run summary with an operator-supplied reason is still a candidate', () => {
     const root = fixture();
-    seedChecks(root, { status: 'pass' });
+    // `reason` is free-form text set by whoever refreshed the projection; this
+    // repository's own history holds ~190 distinct values. Matching one value
+    // would leave every other summary unreclaimable.
+    seedStopSummary(root, 'run-0.json', 0, 'session-stop');
+    seedStopSummary(root, 'run-1.json', 1, 'repo-harness-migration-verify');
+    seedStopSummary(root, 'run-2.json', 2, 'C4 shipped via PR #226; main at 8134a2af');
+
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 0 });
+
+    expect(result.scanned).toBe(3);
+    expect(result.foreign).toBe(0);
+    expect(remaining(root)).toEqual([]);
+  });
+
+  test('a symlinked entry is reported, never unlinked or followed', () => {
+    const root = fixture();
     const outside = join(root, 'outside.json');
-    writeFileSync(outside, '{}');
+    writeFileSync(outside, JSON.stringify({ run_id: 'outside' }));
     symlinkSync(outside, join(root, RUNS_DIR, 'run-link.json'));
-    seedRun(root, 'run-0.json', 0);
+    seedStopSummary(root, 'run-0.json', 0);
 
-    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 0 });
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 0 });
 
     expect(result.skipped).toEqual(['run-link.json: not a regular file']);
     expect(existsSync(outside)).toBe(true);
     expect(remaining(root)).toEqual(['run-link.json']);
   });
 
-  test('only .json files directly in the runs directory are candidates', () => {
+  test('only .json files directly in the runs directory are read', () => {
     const root = fixture();
-    seedChecks(root, { status: 'pass' });
-    seedRun(root, 'run-0.json', 0);
+    seedStopSummary(root, 'run-0.json', 0);
     writeFileSync(join(root, RUNS_DIR, 'hook-events.jsonl'), '{}\n');
+    writeFileSync(join(root, RUNS_DIR, 'verification-vx-abc.log'), 'diagnostics\n');
     mkdirSync(join(root, RUNS_DIR, 'bash-output'));
     writeFileSync(join(root, RUNS_DIR, 'bash-output', 'run-nested.json'), '{}');
 
-    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 0 });
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 0 });
 
     expect(result.scanned).toBe(1);
-    expect(remaining(root).sort()).toEqual(['bash-output', 'hook-events.jsonl']);
+    expect(remaining(root)).toEqual(['bash-output', 'hook-events.jsonl', 'verification-vx-abc.log']);
     expect(existsSync(join(root, RUNS_DIR, 'bash-output', 'run-nested.json'))).toBe(true);
   });
 
   test('a dry run reports the same selection without deleting', () => {
     const root = fixture();
-    seedChecks(root, { status: 'pass' });
-    for (let index = 0; index < 3; index++) seedRun(root, `run-${index}.json`, index);
+    for (let index = 0; index < 3; index++) seedStopSummary(root, `run-${index}.json`, index);
 
-    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE, retain: 1, dryRun: true });
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 1, dryRun: true });
 
     expect(result.removed.length).toBe(2);
     expect(result.reclaimedBytes).toBeGreaterThan(0);
@@ -130,23 +184,35 @@ describe('run summary retention', () => {
   test('a missing runs directory is not an error', () => {
     const root = fixture();
     rmSync(join(root, RUNS_DIR), { recursive: true, force: true });
-    expect(sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE }).scanned).toBe(0);
+    expect(sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR }).scanned).toBe(0);
   });
 
   test('the default bound is the exported retention count', () => {
     const root = fixture();
-    seedChecks(root, { status: 'pass' });
-    for (let index = 0; index < RUN_SUMMARY_RETENTION_COUNT + 3; index++) seedRun(root, `run-${index}.json`, index);
+    for (let index = 0; index < RUN_SUMMARY_RETENTION_COUNT + 3; index++) seedStopSummary(root, `run-${index}.json`, index);
 
-    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, checksFile: CHECKS_FILE });
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR });
 
     expect(result.removed.length).toBe(3);
     expect(result.retained).toBe(RUN_SUMMARY_RETENTION_COUNT);
   });
 
+  test('foreign records never consume the retention window', () => {
+    const root = fixture();
+    // Newer than every Stop summary: a rule that counted them would evict one.
+    for (let index = 0; index < 5; index++) seedVerificationRecord(root, `vx-newer-${index}`, -index - 1);
+    for (let index = 0; index < 3; index++) seedStopSummary(root, `run-${index}.json`, index);
+
+    const result = sweepRunSummaries({ repoRoot: root, runsDir: RUNS_DIR, retain: 3 });
+
+    expect(result.removed).toEqual([]);
+    expect(result.retained).toBe(3);
+    expect(result.foreign).toBe(5);
+  });
+
   test('a runs directory outside the repository is refused', () => {
     const root = fixture();
-    expect(() => sweepRunSummaries({ repoRoot: root, runsDir: '../escape', checksFile: CHECKS_FILE }))
+    expect(() => sweepRunSummaries({ repoRoot: root, runsDir: '../escape' }))
       .toThrow('path traversal is not allowed');
   });
 });

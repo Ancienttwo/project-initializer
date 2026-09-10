@@ -1,21 +1,46 @@
 # Notes: evidence-gc-retention
 
-## Why the pin set exists
+## Why retention identifies rather than excludes
 
-The obvious retention rule for `.ai/harness/runs/*.json` is "keep the newest N".
-That rule is wrong here, and the reason is not visible from the runs directory.
+The obvious rule for `.ai/harness/runs/*.json` is "keep the newest N". It is
+wrong, and the reason is not visible from the runs directory: three writers share
+it, and two of them produce durable evidence.
 
-`scripts/verify-sprint.sh:1009` writes a frozen acceptance snapshot into the same
-directory that `stop-handler.ts:436` writes Stop summaries into, and lines
-913-937 read that exact file back at finalization through `.run_file` in a checks
-projection. Both filenames start with `run-`, so no filename rule separates the
-frozen snapshot from disposable Stop history. Deleting the snapshot leaves an
-acceptance that cannot finalize and has no operator exit.
+- `stop-handler.ts:436` writes `${runId}.json`, disposable session history.
+- `verify-sprint.sh:1009` freezes an acceptance snapshot whose exact path a
+  checks projection records in `.run_file` and reads back at finalization
+  (`verify-sprint.sh:913-937`). It shares Stop's `run-` prefix.
+- `verification-execution.ts:919-921` writes an immutable
+  `verification-${executionId}.json` that the ledger binds by sha256.
+  `readValidRunResult:507-510` treats a missing file as an absent baseline, so
+  `baselineResult:574-580` fails a `baseline_with_delta` criterion permanently --
+  a rerun only mints a new execution id, and the only escape is editing the
+  contract, which discards the whole `criterion_reuse` cache.
 
-The asymmetry decides the failure mode: unbounded growth has a recovery path
-(`repo-harness run evidence-gc`), a stranded acceptance does not. So an
-unreadable checks projection cancels the whole sweep rather than narrowing the
-pin set.
+The first implementation protected only the second class, with a pin set read
+from `.ai/harness/checks/*.json#.run_file`. That was wrong twice over: it never
+reached the verification records at all, and it read only the top-level
+`run_file`, missing the nested
+`.contract.report.verification_evaluation.results[].run_file` that newer
+verify-sprint projections emit.
+
+The rule now runs the other direction. The sweep deletes only what it can
+positively identify as Stop's own record, by the shape `stop-handler.ts:471-481`
+writes: a `run_id` plus the four resolved projection paths (`checks_file`,
+`handoff_file`, `policy_file`, `context_map_file`). Every field there is a
+pointer the next Stop recomputes, which is what makes the record disposable;
+the other two shapes carry results. Everything else -- including a shape a
+fourth writer adds later -- belongs to its owner.
+
+An earlier attempt keyed on `reason: "session-stop"` instead. Measuring this
+repository's own runs directory killed it: `reason` is free-form operator text
+with ~190 distinct values there (2373 records say `repo-harness-migration-verify`,
+one says `C4 shipped via PR #226`), so that rule would have left 2670 run
+summaries unreclaimable forever. Classified by shape, the same directory is 5898
+run summaries, 33 verify-sprint traces, and 12 operator reports. This removes the pin set, the
+dependency on the checks directory, and the failure mode where one corrupt checks
+projection silently disabled retention (two of about twenty repositories on this
+machine had one).
 
 ## Why the sweep is fail-open at the Stop call site but fail-closed in the helper
 
@@ -23,19 +48,31 @@ Stop already treats checkpoint publication as best-effort for the same reason:
 reclaiming disk must never be the thing that fails a Stop. The helper is
 operator-invoked, so it reports and exits non-zero instead.
 
-## Deviation from the plan
+## Deviations from the plan
 
-The plan placed the module at `src/effects/harness/run-summary-retention.ts`.
-It landed at `src/effects/run-summary-retention.ts`, next to `hook-event-log.ts`
--- the module that already owns retention for the other unbounded file in the
-same directory. A new `harness/` directory would have separated the two owners
-of one surface for no gain.
+- The module landed at `src/effects/run-summary-retention.ts`, not
+  `src/effects/harness/...`, next to `hook-event-log.ts` -- the module that
+  already owns retention for the other unbounded file in the same directory.
+- The plan's pin set was replaced by positive identification, per the reasoning
+  above. The plan's `Falsifier` named exactly this check ("grep every `runs_dir`
+  / `run_file` consumer and confirm each is either a writer or the checks-pinned
+  readback"); `verification-execution.ts:507` is a third kind, and running that
+  grep properly is what produced the current rule.
+- `scripts/evidence-gc.ts` no longer carries its own copy of the checkpoint
+  directory naming rule; `checkpoint-store.ts` exports
+  `isCheckpointDirectoryName` so the reporter cannot drift from the selection
+  the store's own retention makes.
 
-## Open question
+## Open questions
 
-`runs/hook-events.jsonl.archive` holds up to 256 MB per repository and was
-measured at 216 MB here. That is the declared bound working as designed, and the
-operator decided this round not to change it. Revisit only if per-repository
-telemetry retention becomes a real cost across many repositories.
+- `runs/hook-events.jsonl.archive` holds up to 256 MB per repository and was
+  measured at 216 MB here. That is the declared bound working as designed, and
+  the operator decided this round not to change it.
+- `runs/verification-*.log` failure diagnostics have no retention owner. They are
+  never candidates (not `.json`), so they accumulate. Left as-is: they are small
+  and tied to failed checks, not to every Stop.
+- `resolveInsideRepo` is purely lexical, so a `runs_dir` that is itself a symlink
+  out of the repository would be traversed. `checkpoint-store.ts` has the same
+  posture; changing one without the other would be inconsistent.
 
-> **Substantive Change SHA256**: `sha256:3a6be62693421c5b443d265115b07f2531dbe1aaae0ab36e5f34069db4572feb`
+> **Substantive Change SHA256**: `sha256:108606a0d7495285db85873a39eafbd375c3e9abf916f002e7beb18a6577daac`

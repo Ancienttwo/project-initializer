@@ -11,46 +11,68 @@
  * `HOOK_LOG_ARCHIVE_SEGMENTS` rather than adding a policy surface no second
  * consumer has asked for.
  *
- * The one non-obvious rule is the pin set. `scripts/verify-sprint.sh` freezes a
- * run snapshot at `--prepare-acceptance` and reads that exact file back at
- * finalization through `.run_file` in a checks projection. Both that snapshot
- * and Stop's own summaries live in this directory under the same `run-` prefix,
- * so a filename rule cannot separate them -- only the checks projections can.
- * Deleting a pinned snapshot strands an acceptance with no operator exit, so an
- * unreadable checks projection cancels the whole sweep instead of narrowing the
- * pin set: unbounded growth has a recovery path (`repo-harness run evidence-gc`),
- * a stranded acceptance does not.
+ * The non-obvious rule is which files the count applies to. Three writers share
+ * this directory, and two of them produce durable evidence that a filename rule
+ * cannot tell apart from Stop churn:
+ *
+ * - `stop-handler.ts` writes `${runId}.json`, disposable session history.
+ * - `scripts/verify-sprint.sh` freezes an acceptance snapshot whose exact path a
+ *   checks projection records in `.run_file` and reads back at finalization.
+ *   Its `runId` prefix is the same as Stop's.
+ * - `evidence/verification-execution.ts` writes an immutable
+ *   `verification-${executionId}.json` that the evidence ledger binds by
+ *   sha256; `readValidRunResult` treats a missing file as an absent baseline,
+ *   which fails a `baseline_with_delta` criterion permanently, because a rerun
+ *   only ever mints a new execution id.
+ *
+ * Deleting either evidence class strands an acceptance with no operator exit, so
+ * this sweep never reasons about what to keep. It deletes only files whose
+ * content is the run-summary record `stop-handler.ts` itself writes: a `run_id`
+ * plus the four resolved projection paths. Every field in that record is a
+ * pointer recomputed from live policy on the next Stop, which is what makes the
+ * record disposable; the other two shapes carry results. Anything else in the
+ * directory -- including a shape a fourth writer adds later -- belongs to its
+ * own owner and is left alone.
+ *
+ * The discriminator is the shape, not `reason`. `reason` is free-form operator
+ * text (this repository's own history holds ~190 distinct values), so matching
+ * on one value would leave every other run summary unreclaimable forever.
  */
 import { lstatSync, readdirSync, readFileSync, statSync, unlinkSync, type Dirent } from 'fs';
-import { dirname, join } from 'path';
+import { join } from 'path';
 import { resolveInsideRepo } from './path-safety';
 
-/** Runs of Stop history retained beyond the pinned set. */
+/** Runs of Stop history retained. */
 export const RUN_SUMMARY_RETENTION_COUNT = 200;
+
+/** The resolved projection paths every Stop run summary carries; see
+ * `stop-handler.ts`'s `runSummaryContent`. Present together only in that
+ * record. */
+const STOP_SUMMARY_PATH_FIELDS = ['checks_file', 'handoff_file', 'policy_file', 'context_map_file'] as const;
 
 export interface RunSummaryRetentionInput {
   readonly repoRoot: string;
   /** Repo-relative, as resolved by the single `harness.runs_dir` reader. */
   readonly runsDir: string;
-  /** Repo-relative checks projection file; its directory is the pin source. */
-  readonly checksFile: string;
   readonly retain?: number;
   readonly dryRun?: boolean;
 }
 
 export interface RunSummaryRetentionResult {
+  /** Files positively identified as Stop summaries. */
   readonly scanned: number;
-  readonly pinned: number;
+  /** Files left alone because they are not Stop summaries. */
+  readonly foreign: number;
   readonly retained: number;
   /** Repo-relative paths removed, or that a dry run would remove. */
   readonly removed: readonly string[];
   readonly reclaimedBytes: number;
-  /** Entries left alone with the reason, and any abort cause. */
+  /** Entries a fault prevented this sweep from classifying or removing. */
   readonly skipped: readonly string[];
 }
 
 const EMPTY: RunSummaryRetentionResult = {
-  scanned: 0, pinned: 0, retained: 0, removed: [], reclaimedBytes: 0, skipped: [],
+  scanned: 0, foreign: 0, retained: 0, removed: [], reclaimedBytes: 0, skipped: [],
 };
 
 function resolveOrThrow(repoRoot: string, relativePath: string): string {
@@ -61,39 +83,18 @@ function resolveOrThrow(repoRoot: string, relativePath: string): string {
   return result.path;
 }
 
-/**
- * Every `.run_file` a checks projection currently points at, normalized to the
- * repo-relative form the projections themselves record. Throws when any
- * projection in the directory cannot be read or parsed -- see the module doc.
- */
-function pinnedRunFiles(repoRoot: string, checksDir: string): ReadonlySet<string> {
-  const pinned = new Set<string>();
-  let entries: readonly string[];
+/** True only for a record with Stop's own run-summary shape. */
+function isStopSummary(text: string): boolean {
+  let parsed: unknown;
   try {
-    entries = readdirSync(checksDir).filter(name => name.endsWith('.json'));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return pinned;
-    throw error;
+    parsed = JSON.parse(text);
+  } catch {
+    return false;
   }
-  for (const name of entries) {
-    const path = join(checksDir, name);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readFileSync(path, 'utf8'));
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(`unreadable checks projection cannot prove its run pin: ${name}: ${detail}`);
-    }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
-    const runFile = (parsed as { run_file?: unknown }).run_file;
-    if (typeof runFile !== 'string' || !runFile) continue;
-    const normalized = runFile.replace(/\\/g, '/').replace(/^\.\//, '');
-    pinned.add(normalized);
-    // A projection may record the basename-relative form when it was written
-    // from inside the runs directory; pin both readings of the same datum.
-    pinned.add(normalized.split('/').pop()!);
-  }
-  return pinned;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  const record = parsed as Record<string, unknown>;
+  if (typeof record.run_id !== 'string' || record.run_id === '') return false;
+  return STOP_SUMMARY_PATH_FIELDS.every((field) => typeof record[field] === 'string');
 }
 
 interface Candidate {
@@ -105,16 +106,15 @@ interface Candidate {
 }
 
 /**
- * Removes run summaries outside the pinned set and the newest `retain` entries.
- * Only regular `*.json` files directly inside `runsDir` are ever considered:
- * subdirectories (`bash-output/`, coordination state) and the rotated hook
- * telemetry log own their own lifecycles.
+ * Removes Stop run summaries beyond the newest `retain`. Only regular `*.json`
+ * files directly inside `runsDir` are ever read: subdirectories
+ * (`bash-output/`, coordination state), the rotated hook telemetry log, and
+ * verification failure `.log` diagnostics own their own lifecycles.
  */
 export function sweepRunSummaries(input: RunSummaryRetentionInput): RunSummaryRetentionResult {
   const retain = input.retain ?? RUN_SUMMARY_RETENTION_COUNT;
   if (retain < 0) throw new Error('run summary retention count must not be negative');
   const runsDir = resolveOrThrow(input.repoRoot, input.runsDir);
-  const checksDir = resolveOrThrow(input.repoRoot, dirname(input.checksFile));
 
   let names: readonly string[];
   try {
@@ -124,9 +124,9 @@ export function sweepRunSummaries(input: RunSummaryRetentionInput): RunSummaryRe
     throw error;
   }
 
-  const pinned = pinnedRunFiles(input.repoRoot, checksDir);
   const skipped: string[] = [];
   const candidates: Candidate[] = [];
+  let foreign = 0;
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
     const absolute = join(runsDir, name);
@@ -141,21 +141,20 @@ export function sweepRunSummaries(input: RunSummaryRetentionInput): RunSummaryRe
       skipped.push(`${name}: not a regular file`);
       continue;
     }
-    candidates.push({
-      name,
-      relative: `${input.runsDir}/${name}`,
-      absolute,
-      mtimeMs: entry.mtimeMs,
-      size: entry.size,
-    });
+    let text: string;
+    try {
+      text = readFileSync(absolute, 'utf8');
+    } catch (error) {
+      skipped.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
+    if (!isStopSummary(text)) { foreign++; continue; }
+    candidates.push({ name, relative: `${input.runsDir}/${name}`, absolute, mtimeMs: entry.mtimeMs, size: entry.size });
   }
 
-  const live = candidates.filter(c => pinned.has(c.relative) || pinned.has(c.name));
-  const prunable = candidates
-    .filter(c => !pinned.has(c.relative) && !pinned.has(c.name))
-    .sort((left, right) => right.mtimeMs - left.mtimeMs);
-
-  const obsolete = prunable.slice(retain);
+  const obsolete = candidates
+    .sort((left, right) => right.mtimeMs - left.mtimeMs)
+    .slice(retain);
   const removed: string[] = [];
   let reclaimedBytes = 0;
   for (const candidate of obsolete) {
@@ -165,13 +164,6 @@ export function sweepRunSummaries(input: RunSummaryRetentionInput): RunSummaryRe
       continue;
     }
     try {
-      // Re-stat under the same no-follow rule the scan used: a symlink swapped
-      // in after the scan must not authorize an unlink outside the runs tree.
-      const current = lstatSync(candidate.absolute);
-      if (!current.isFile()) {
-        skipped.push(`${candidate.name}: not a regular file`);
-        continue;
-      }
       unlinkSync(candidate.absolute);
       removed.push(candidate.relative);
       reclaimedBytes += candidate.size;
@@ -182,7 +174,7 @@ export function sweepRunSummaries(input: RunSummaryRetentionInput): RunSummaryRe
 
   return {
     scanned: candidates.length,
-    pinned: live.length,
+    foreign,
     retained: candidates.length - removed.length,
     removed,
     reclaimedBytes,

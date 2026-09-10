@@ -74,6 +74,12 @@ export const CHECKPOINTS_DIR_RELATIVE = ".ai/harness/evidence/checkpoints";
 export const CHECKPOINT_HUMAN_FILENAME = "checkpoint.md";
 export const CHECKPOINT_MACHINE_FILENAME = "checkpoint.json";
 export const CHECKPOINT_MARKER_RELATIVE = `${CHECKPOINTS_DIR_RELATIVE}/last-published.json`;
+
+/** The one naming rule for a published checkpoint directory. Exported so a
+ * reporter cannot drift from the selection this store's own retention makes. */
+export function isCheckpointDirectoryName(name: string): boolean {
+  return /^chk-[0-9a-f]{64}$/.test(name);
+}
 const STAGING_DIR_NAME = ".staging";
 const CHECKPOINT_LOCK = `${CHECKPOINTS_DIR_RELATIVE}/.publish.lock`;
 
@@ -146,7 +152,7 @@ function collectObsoleteCheckpoints(repoRoot: string, currentId: string, assertO
   let removed = 0;
   const skipped: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === currentId || !/^chk-[0-9a-f]{64}$/.test(entry.name)) continue;
+    if (entry.name === currentId || !isCheckpointDirectoryName(entry.name)) continue;
     const path = join(directory, entry.name);
     try {
       if (!entry.isDirectory()) { skipped.push(entry.name); continue; }
