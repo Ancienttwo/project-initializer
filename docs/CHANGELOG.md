@@ -179,6 +179,15 @@ it rather than beside it.
 
 ### Fixed
 
+- **Recovery checkpoints keep only the current snapshot.** Repeated Stop events
+  no longer accumulate full-history copies; publication preserves the current
+  checkpoint before collecting old cache directories, while the raw evidence
+  ledger and blobs remain intact. Concurrent recovery reads follow a changed
+  publication marker, and interrupted collection can resume.
+- **Task Message drafts survive refresh and browser restarts.** The operator
+  board restores browser-local text with its original message ID and fence;
+  stale drafts still require the existing explicit rebind before sending.
+
 - **Delegated Codex output now follows its actual JSONL wire.** Contribution
   collection decodes one complete `codex exec --json` turn and parses only its
   final agent message. Test shims emit the same JSONL shape, raw-marker output is

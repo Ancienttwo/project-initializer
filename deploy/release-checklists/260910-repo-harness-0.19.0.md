@@ -172,3 +172,24 @@ Not started. When the owner authorizes publication:
    tarball integrity, tag, installed CLI, and installed hook runtime.
 5. Refresh the selected Bun-global runtime and confirm `repo-harness --version`
    reports `0.19.0`.
+
+## Approved retention and draft follow-through (2026-09-10)
+
+The owner approved commit, publication and Bun-global runtime refresh after
+local composer/checkpoint acceptance. PR #388 already merged the version
+metadata; npm and the selected global installation still report 0.18.0.
+This approval supersedes the preparation-only public-action boundary above.
+
+- Integration base: `16f6581f55f89277d9cff315cca439fbfcc5128a`.
+- Scope supplement: browser-local Task Message recovery, current-only recovery
+  checkpoint retention, durable publication before collection, and one shared
+  recovery reader projected into the standalone helper.
+- Source evidence: `plans/archive/plan-20260910-1608-operator-composer-draft.md`.
+- Release follow-through: `plans/plan-20260910-1742-retention-release-0-19-0.md`.
+- Separate archctx journal-read source remains in its isolated worktree and is
+  not part of this package release.
+- Release gate, exact CI, registry publication and installed-runtime readback:
+  pending. Registry identity currently returns E401; the owner has been asked
+  to restore npm login. No publication or installed-runtime success is claimed.
+- Skill effectiveness evidence remains unavailable. Existing Waza/CodeGraph
+  update flags do not change the source or packaged runtime being released.

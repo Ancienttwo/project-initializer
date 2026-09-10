@@ -28,7 +28,7 @@ const ASSETS_HOOKS_DIR = join(ROOT, "assets/hooks");
 
 // The repository resolver imports the canonical core. Its packaged projection
 // is intentionally standalone and is source-hash/drift checked separately.
-const INTENTIONALLY_DIVERGENT = ["capability-resolver.ts"];
+const INTENTIONALLY_DIVERGENT = ["capability-resolver.ts", "recovery-view-cli.ts"];
 
 setDefaultTimeout(30000);
 

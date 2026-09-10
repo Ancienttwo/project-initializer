@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, spyOn } from "bun:test";
 import {
   existsSync,
   mkdirSync,
@@ -7,8 +7,10 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "fs";
+import * as fs from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 
@@ -21,6 +23,7 @@ import {
   CHECKPOINT_MACHINE_FILENAME,
   CHECKPOINTS_DIR_RELATIVE,
   CheckpointResolutionError,
+  pruneCheckpointCache,
   publishCheckpoint,
   publishCheckpointFromLedger,
   resolveCheckpointMarkerPath,
@@ -297,6 +300,146 @@ describe("checkpoint-store: staged-install atomicity", () => {
       expect(resolveLastPublishedCheckpoint(repoRoot)).toEqual({ found: false });
       expect(existsSync(resolveCheckpointsDir(repoRoot))).toBe(true);
       expect(readdirSync(resolveCheckpointsDir(repoRoot)).filter((name) => name !== ".staging")).toEqual([]);
+    });
+  });
+});
+
+describe("checkpoint-store: bounded cache", () => {
+  test("changed accepted sets retain only the current checkpoint and preserve raw event evidence", () => {
+    withTempRepo("checkpoint-retention", (repoRoot) => {
+      seedGenesis(repoRoot);
+      const events: EvidenceEventRecord[] = [];
+      for (let i = 0; i < 8; i++) {
+        events.push(seedEvent(repoRoot, { marker: String(i) }));
+        const result = publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+        expect(result.status).toBe("published");
+        if (result.status !== "published") throw new Error("publish failed");
+        expect(readdirSync(resolveCheckpointsDir(repoRoot)).filter(name => /^chk-/.test(name))).toEqual([result.checkpointId]);
+        const current = resolveLastPublishedCheckpoint(repoRoot);
+        expect(current.found).toBe(true);
+        if (current.found) expect(current.resolved.projection.covered_event_count).toBe(i + 1);
+        expect(readAcceptedEvents(repoRoot).accepted).toEqual(events);
+      }
+    });
+  });
+});
+
+describe("checkpoint-store: retention safety", () => {
+  test("collection resumes after an interrupted unlink without retaining partial owned directories forever", () => {
+    withTempRepo("checkpoint-partial-gc", repoRoot => {
+      seedGenesis(repoRoot);
+      seedEvent(repoRoot);
+      const prior = publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+      if (prior.status !== "published") throw new Error("publish failed");
+      const priorDir = join(resolveCheckpointsDir(repoRoot), prior.checkpointId);
+      seedEvent(repoRoot, { marker: "new" });
+      const unlink = fs.unlinkSync;
+      const removals = spyOn(fs, "unlinkSync").mockImplementation(path => {
+        if (String(path) === join(priorDir, CHECKPOINT_HUMAN_FILENAME)) throw new Error("simulated unlink failure");
+        unlink(path);
+      });
+      try {
+        const result = publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+        expect(result.status).toBe("published");
+        if (result.status === "published") expect(result.retention.skipped.length).toBe(1);
+        expect(readdirSync(priorDir)).toEqual([CHECKPOINT_HUMAN_FILENAME]);
+      } finally { removals.mockRestore(); }
+      expect(pruneCheckpointCache(repoRoot)).toEqual({ removed: 1, skipped: [] });
+      expect(existsSync(priorDir)).toBe(false);
+    });
+  });
+
+  test("a failed durability barrier preserves the previous checkpoint during publish and explicit collection", () => {
+    withTempRepo("checkpoint-fsync-failure", repoRoot => {
+      seedGenesis(repoRoot);
+      seedEvent(repoRoot);
+      const prior = publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+      if (prior.status !== "published") throw new Error("publish failed");
+      const markerBefore = readFileSync(resolveCheckpointMarkerPath(repoRoot), "utf8");
+      seedEvent(repoRoot, { marker: "new" });
+      const sync = spyOn(fs, "fsyncSync").mockImplementation(() => { throw new Error("simulated fsync failure"); });
+      try {
+        expect(() => publishCheckpointFromLedger(repoRoot, FIXED_NOW)).toThrow("simulated fsync failure");
+        expect(readFileSync(resolveCheckpointMarkerPath(repoRoot), "utf8")).toBe(markerBefore);
+        const directories = readdirSync(resolveCheckpointsDir(repoRoot));
+        expect(() => pruneCheckpointCache(repoRoot)).toThrow("simulated fsync failure");
+        expect(readdirSync(resolveCheckpointsDir(repoRoot))).toEqual(directories);
+        expect(existsSync(join(resolveCheckpointsDir(repoRoot), prior.checkpointId))).toBe(true);
+      } finally { sync.mockRestore(); }
+    });
+  });
+
+  test("an unchanged current checkpoint does not rewrite the marker or stage bytes", () => {
+    withTempRepo("checkpoint-unchanged", repoRoot => {
+      seedGenesis(repoRoot);
+      seedEvent(repoRoot);
+      publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+      const marker = resolveCheckpointMarkerPath(repoRoot);
+      const before = statSync(marker);
+      const writes = spyOn(fs, "writeFileSync");
+      try {
+        publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+        const paths = writes.mock.calls.map(call => String(call[0]));
+        expect(paths.some(path => path.includes("/stage-") || path.includes("last-published.json"))).toBe(false);
+        expect(statSync(marker).ino).toBe(before.ino);
+        expect(statSync(marker).mtimeMs).toBe(before.mtimeMs);
+      } finally { writes.mockRestore(); }
+    });
+  });
+
+  test("collection preserves unexpected contents, symlinks and staging, and refuses a dangling marker", () => {
+    withTempRepo("checkpoint-owned-only", repoRoot => {
+      seedGenesis(repoRoot);
+      seedEvent(repoRoot);
+      const published = publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+      if (published.status !== "published") throw new Error("publish failed");
+      const root = resolveCheckpointsDir(repoRoot);
+      const unrelated = join(root, `chk-${"a".repeat(64)}`);
+      mkdirSync(unrelated);
+      writeFileSync(join(unrelated, "user-file"), "keep");
+      const linked = join(root, `chk-${"b".repeat(64)}`);
+      symlinkSync(unrelated, linked);
+      const staging = join(root, ".staging", "stage-unowned");
+      mkdirSync(staging);
+      writeFileSync(join(staging, "partial"), "keep");
+      const retained = pruneCheckpointCache(repoRoot);
+      expect(retained.removed).toBe(0);
+      expect(retained.skipped.length).toBe(2);
+      expect(readFileSync(join(unrelated, "user-file"), "utf8")).toBe("keep");
+      expect(existsSync(join(staging, "partial"))).toBe(true);
+      const marker = resolveCheckpointMarkerPath(repoRoot);
+      const original = JSON.parse(readFileSync(marker, "utf8"));
+      writeFileSync(marker, JSON.stringify({ ...original, machine_path: ".ai/harness/missing.json" }));
+      expect(() => pruneCheckpointCache(repoRoot)).toThrow(CheckpointResolutionError);
+      expect(existsSync(join(root, published.checkpointId))).toBe(true);
+    });
+  });
+
+  test("a reader survives collection between its marker read and opening the superseded files", () => {
+    withTempRepo("checkpoint-read-race", repoRoot => {
+      seedGenesis(repoRoot);
+      seedEvent(repoRoot);
+      const prior = publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+      if (prior.status !== "published") throw new Error("publish failed");
+      const marker = resolveCheckpointMarkerPath(repoRoot);
+      const read = fs.readFileSync;
+      let raced = false;
+      const reads = spyOn(fs, "readFileSync").mockImplementation(((...args: Parameters<typeof fs.readFileSync>) => {
+        const bytes = read(...args);
+        if (String(args[0]) === marker && !raced) {
+          raced = true;
+          seedEvent(repoRoot, { marker: "new" });
+          publishCheckpointFromLedger(repoRoot, FIXED_NOW);
+          expect(existsSync(join(resolveCheckpointsDir(repoRoot), prior.checkpointId))).toBe(false);
+        }
+        return bytes;
+      }) as typeof fs.readFileSync);
+      try {
+        const result = resolveLastPublishedCheckpoint(repoRoot);
+        expect(raced).toBe(true);
+        expect(result.found).toBe(true);
+        if (result.found) expect(result.resolved.projection.covered_event_count).toBe(2);
+      } finally { reads.mockRestore(); }
     });
   });
 });
