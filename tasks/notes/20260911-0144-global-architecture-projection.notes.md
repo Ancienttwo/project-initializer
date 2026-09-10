@@ -35,3 +35,11 @@ External review on b2fc5332 (official codex-plugin 1.0.5) returned needs-attenti
 > **Substantive Change SHA256**: `sha256:bd1db64699a6fc2530da1414eeccec48a0afe2e556a3167bab7f5824e0a46741`
 
 > **Substantive Change SHA256**: `sha256:184044c09055fa355d6800e611adf2f80c0178d59f25703af2cc4c283bb62e59`
+
+## CI fixture delta after external-review correction
+
+CI run 34516726468 passed Governance and all three MCP platform checks but failed four helper fixture cases. The readiness call now needs a real CLI; bundled helper fixtures omitted it, and copied source fixtures omitted runtime.gitignore and node_modules. The fixture setup now supplies the template and checkout dependencies, and the bundled helper explicitly selects the checkout CLI. No product code or check threshold changed.
+
+All four failing cases pass with the installed repo-harness removed from PATH (4 pass, 136 assertions; /tmp/global-ci-path-fixture-final.log). The prior 25/25 prepare result at 0186ded0 remains baseline evidence; this test-only delta has its own focused evidence. No external acceptance or final CI pass is claimed for the new commit.
+
+> **Substantive Change SHA256**: `sha256:b9da34c4d0f78bd6a548e7cc1a87e2bbae9eb81669a67fc899871f784293aee0`
