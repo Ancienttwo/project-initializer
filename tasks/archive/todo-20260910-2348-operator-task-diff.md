@@ -1,7 +1,13 @@
+> **Archived**: 2026-09-10 23:48
+> **Related Plan**: plans/archive/plan-20260910-2225-operator-task-diff.md
+> **Outcome**: Completed
+> **Source Plan**: (none)
+> **Parent Run ID**: run-20260910-2348
+
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-10 17:43
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
