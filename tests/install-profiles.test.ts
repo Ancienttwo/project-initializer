@@ -23,9 +23,23 @@ import {
   rollbackInstallProfile,
 } from '../src/cli/installer/install-profile';
 import { buildManagedHooks } from '../src/cli/installer/managed-entries';
+import { parseSkillSurfaceCatalog, probeExpectations } from '../src/core/skill-surface/catalog';
 
 const ROOT = join(import.meta.dir, '..');
 const CLI = join(ROOT, 'src/cli/index.ts');
+
+// probeInstalledComponents() derives the planning-integrations evidence set
+// from the catalog, so a fixture that hard-codes one facade's SKILL.md goes
+// stale the moment a second planning facade is declared. Read the same
+// catalog the probe reads.
+const PLANNING_CAPABILITY_PATHS = (() => {
+  const resolution = parseSkillSurfaceCatalog(
+    readFileSync(join(ROOT, 'assets/skill-commands/manifest.json'), 'utf-8'),
+    { declared: true, profileComponents: PROFILE_COMPONENTS },
+  );
+  if (resolution.status !== 'valid') throw new Error('skill-surface manifest is invalid');
+  return probeExpectations(resolution.catalog).planningCapabilityPaths;
+})();
 
 function withHome(run: (env: NodeJS.ProcessEnv) => void): void {
   const home = mkdtempSync(join(tmpdir(), 'repo-harness-profile-'));
@@ -74,7 +88,7 @@ function writeManagedHostSurfaces(
   writePath(join(source, 'src/core/workflow/profile.ts'), '// managed\n');
   writePath(join(source, 'src/cli/tools/codegraph.ts'), '// managed\n');
   if (profile === 'full') {
-    writePath(join(source, 'assets/skills/repo-harness-product/SKILL.md'), '# managed\n');
+    for (const relative of PLANNING_CAPABILITY_PATHS) writePath(join(source, relative), '# managed\n');
     for (const skill of ['think', 'hunt', 'check', 'health', 'mermaid']) {
       writePath(join(home, '.codex', 'skills', skill, 'SKILL.md'), '# external\n');
     }
@@ -808,7 +822,7 @@ describe('install profiles', () => {
     // fixture helper), then upgrade in place without a prior removal step.
     writePath(join(source, 'src/core/workflow/profile.ts'), '// managed\n');
     writePath(join(source, 'src/cli/tools/codegraph.ts'), '// managed\n');
-    writePath(join(source, 'assets/skills/repo-harness-product/SKILL.md'), '# managed\n');
+    for (const relative of PLANNING_CAPABILITY_PATHS) writePath(join(source, relative), '# managed\n');
     for (const skill of ['think', 'hunt', 'check', 'health', 'mermaid']) {
       writePath(join(env.HOME!, '.codex', 'skills', skill, 'SKILL.md'), '# external\n');
     }

@@ -74,7 +74,7 @@ Run focused new skill/helper tests and existing named skill manifest/profile/ins
 - **Stop condition**: Named focused tests/integrity checks pass and one review has no blocking findings.
 - **Rollback surface**: Revert scoped skill/catalog/tests; no grants or provider calls were made outside disposable fixtures.
 
-> **Substantive Change SHA256**: `sha256:d08723e9a22d619c1da0aafe6d18c00723b28d9805ebccb46ceb84038f479fd8`
+> **Substantive Change SHA256**: `sha256:e53e86c4c200c788d7e404f81a0d3e1117e072c24f2407434299c32c6f8f0e2d`
 
 ## Acceptance Notes
 
