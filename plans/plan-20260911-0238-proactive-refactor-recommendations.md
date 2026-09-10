@@ -118,17 +118,11 @@ With execution activation off, a fixture scan yields a real structural observati
 # Verification
 Focused configuration/observer/Stop/CLI regression plus existing refactor activation/shadow/provider tests. Actual 0.5.10 two-module cycle fixture verifies low-level candidates. Run repository required integrity/type checks and init dry-run. No full-suite or benchmark matrix is required for this bounded observation feature.
 
-# Task Breakdown
-- [ ] Capture approved scope and contract.
-- [ ] Implement global observation settings, shared discovery report and CLI, one-shot Stop recommendation delivery.
-- [ ] Validate disabled/default behavior, deadline, dedupe, incomplete facts, two-repo settings and unchanged execution gates.
-- [ ] Review changes, record evidence, submit independent stacked PR without merge/release.
-
 ## Annotations
 <!-- [NOTE]: prefixed inline. Claude processes all and revises. -->
 
 ## Task Breakdown
-- [ ] Capture approved scope and contract.
-- [ ] Implement global observation settings, shared discovery report and CLI, one-shot Stop recommendation delivery.
-- [ ] Validate disabled/default behavior, deadline, dedupe, incomplete facts, two-repo settings and unchanged execution gates.
+- [x] Capture approved scope and contract.
+- [x] Implement global observation settings, shared discovery report and CLI, one-shot Stop recommendation delivery.
+- [x] Validate disabled/default behavior, deadline, dedupe, incomplete facts, two-repo settings and unchanged execution gates.
 - [ ] Review changes, record evidence, submit independent stacked PR without merge/release.

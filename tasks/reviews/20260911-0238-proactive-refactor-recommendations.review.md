@@ -14,26 +14,26 @@
 
 ## Human Review Card
 
-- Verdict: pending
-- Change type: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | frontend
+- Verdict: native specialist findings fixed; external acceptance pending
+- Change type: code-change
 - Intended files changed:
 - Actual files changed:
 - Commands passed:
-- Residual risks:
+- Residual risks: Automatic observation needs an existing model and complete code facts; ledger capacity pauses delivery.
 - Reviewer action required: inspect diff and card
-- Rollback:
+- Rollback: Revert the separate feature PR; global architecture configuration has its own base PR.
 
 ## Mode Evidence
 
-- Selected route:
-- P1/P2/P3 evidence:
+- Selected route: Parent P1/P2/P3 with native read-only architecture and security/adversarial reviewers.
+- P1/P2/P3 evidence: Plan and implementation notes describe global configuration ownership, measured scan path, and user execution boundary.
 - Root cause or plan evidence:
 
 ## Verification Evidence
 
 - Waza `/check` run:
 - Commands run:
-- Manual checks:
+- Manual checks: Real 0.5.10 indexed cycle fixture yielded three observations through CLI and Stop, then no immediate repeated Stop decision.
 - Supporting artifacts:
 - Implementation notes reviewed:
 - Run snapshot:
@@ -51,11 +51,11 @@
 > **Issued At**: pending
 
 - Summary: No AcceptanceReceipt has been recorded.
-- Findings: none
+- Findings: Native security review found 64-entry dedupe eviction; corrected to a non-evicting 4096-entry ledger with fail-closed capacity. Architecture review found a stale test path; corrected. Neither specialist report is an external AcceptanceReceipt.
 
 ## Behavior Diff Notes
 
-- ...
+- Proactive observation is enabled globally; Agent presents evidence and asks the user. Execution activation and approved-plan authority remain unchanged.
 
 ## Residual Risks / Follow-ups
 
