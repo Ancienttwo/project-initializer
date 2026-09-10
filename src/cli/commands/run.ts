@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { listHelperIds, listHelpers, runHelper } from '../../effects/runtime/helper-runner';
 
 export const RUN_HELP_MAX_HELPERS = 60;
-export const RUN_HELP_MAX_LINES = 83;
+export const RUN_HELP_MAX_LINES = 84;
 
 export const RUN_HELP_GROUPS = [
   {
@@ -67,6 +67,7 @@ export const RUN_HELP_GROUPS = [
       'check-task-workflow',
       'maintenance-triage',
       'heartbeat-triage',
+      'evidence-gc',
     ],
   },
   {

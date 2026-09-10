@@ -157,6 +157,18 @@ export interface CampaignCodexPreparation {
   identity: CampaignRuntimeIdentity;
   deadline_ms: number;
 }
+/** Journal creation is the exclusive fence before any container create request. */
+export function assertCampaignPreparationRetryable(preparation: CampaignCodexPreparation, worktree: string): void {
+  const common = commonDirectory(worktree, preparation.deadline_ms);
+  for (const identity of [{ ...preparation.identity, phase: 'version' }, preparation.identity]) {
+    try { lstatSync(campaignContainerDirectory(common, identity)); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    throw new Error('campaign preparation has a container journal; reconciliation required');
+  }
+}
 /** Preparation may have a probe alone or probe plus an unstarted workload. */
 export async function reconcileCampaignCodexPreparation(preparation: CampaignCodexPreparation, worktree: string) {
   const common = commonDirectory(worktree, Date.now() + 5000);

@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync, mkdirSync, symlinkSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { dirname, join } from 'path';
 import { tmpdir } from 'os';
 import type { EffectiveState } from '../src/core/state/types';
 import { runStopHandler as runStopHandlerRuntime, type StopProjectionTarget } from '../src/cli/hook/stop-handler';
+import { RUN_SUMMARY_RETENTION_COUNT } from '../src/effects/run-summary-retention';
 import { consumePendingPostEditEvents, readPendingPostEditEvents } from '../src/cli/hook/mutation-observed';
 import { advanceArchitectureDriftCursor, computeArchitectureDriftChangedSet, readArchitectureDriftCursor } from '../src/cli/hook/architecture-drift';
 
@@ -1252,5 +1253,75 @@ describe('runStopHandler', () => {
     })}\n`);
     policyRun(1);
     expect(readFileSync(join(policyRoot, '.ai/harness/events.jsonl'), 'utf8').trim().split('\n')).toHaveLength(2);
+  });
+});
+
+describe('stop bounds its own run summary history', () => {
+  const RUNS_DIR = '.ai/harness/runs';
+
+  function age(cwd: string, name: string, index: number): void {
+    const seconds = 1_600_000_000 - index * 60;
+    utimesSync(join(cwd, RUNS_DIR, name), seconds, seconds);
+  }
+
+  function seedSummary(cwd: string, name: string, index: number): void {
+    writeFileSync(join(cwd, RUNS_DIR, name), JSON.stringify({
+      run_id: name, reason: 'session-stop',
+      checks_file: '.ai/harness/checks/latest.json', handoff_file: '.ai/harness/handoff/current.md',
+      policy_file: '.ai/harness/policy.json', context_map_file: '.ai/context/context-map.json',
+    }));
+    age(cwd, name, index);
+  }
+
+  test('durable evidence in the runs directory survives a sweep that exceeds the bound', () => {
+    const cwd = fixture();
+    mkdirSync(join(cwd, RUNS_DIR), { recursive: true });
+    // The two records a filename rule cannot separate from Stop churn: a frozen
+    // acceptance snapshot sharing Stop's `run-` prefix, and a ledger-bound
+    // verification execution record. Both are the oldest files present.
+    writeFileSync(join(cwd, RUNS_DIR, 'run-20260829T025442-29360-operator-board.json'), JSON.stringify({
+      schema: 'repo-harness-run-trace.v1', source: 'verify-sprint', status: 'pass',
+    }));
+    age(cwd, 'run-20260829T025442-29360-operator-board.json', RUN_SUMMARY_RETENTION_COUNT + 20);
+    writeFileSync(join(cwd, RUNS_DIR, 'verification-vx-0c2998f10e2847ccbb86.json'), JSON.stringify({
+      protocol: 1, kind: 'verification_execution_record', execution_id: 'vx-0c2998f10e2847ccbb86',
+    }));
+    age(cwd, 'verification-vx-0c2998f10e2847ccbb86.json', RUN_SUMMARY_RETENTION_COUNT + 10);
+    for (let index = 0; index < RUN_SUMMARY_RETENTION_COUNT + 5; index++) {
+      seedSummary(cwd, `run-history-${index}.json`, index);
+    }
+
+    const result = runStopHandler({
+      collector: collector(cwd, () => canonicalState()),
+      env: { HOOK_RUN_ID: 'stop-retention-run' },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(cwd, RUNS_DIR, 'verification-vx-0c2998f10e2847ccbb86.json'))).toBe(true);
+    expect(existsSync(join(cwd, RUNS_DIR, 'run-20260829T025442-29360-operator-board.json'))).toBe(true);
+    expect(existsSync(join(cwd, RUNS_DIR, 'stop-retention-run.json'))).toBe(true);
+    // Both durable records plus the retained window, which holds this Stop's
+    // own summary as its newest entry.
+    const survivors = readdirSync(join(cwd, RUNS_DIR)).filter((name) => name.endsWith('.json'));
+    expect(survivors).toHaveLength(RUN_SUMMARY_RETENTION_COUNT + 2);
+    expect(survivors).toContain('run-history-0.json');
+    expect(survivors).not.toContain(`run-history-${RUN_SUMMARY_RETENTION_COUNT + 4}.json`);
+  });
+
+  test('a retention fault never fails Stop', () => {
+    const cwd = fixture();
+    mkdirSync(join(cwd, RUNS_DIR), { recursive: true });
+    seedSummary(cwd, 'run-history-0.json', 0);
+    // A directory named like a summary: the sweep reports it and moves on.
+    mkdirSync(join(cwd, RUNS_DIR, 'run-directory.json'));
+
+    const result = runStopHandler({
+      collector: collector(cwd, () => canonicalState()),
+      env: { HOOK_RUN_ID: 'stop-retention-fault-run' },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(cwd, RUNS_DIR, 'run-directory.json'))).toBe(true);
+    expect(existsSync(join(cwd, RUNS_DIR, 'stop-retention-fault-run.json'))).toBe(true);
   });
 });
