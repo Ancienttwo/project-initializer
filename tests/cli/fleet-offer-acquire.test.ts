@@ -399,9 +399,19 @@ describe('fleet offers CLI', () => {
       expect(token).toContain(`task=${fixture.task}\n`);
 
       writeFileSync(join(envelope.worktree_path, 'src/index.ts'), 'export const business = true;\n');
-      const verify = () => runHelper({ helper: 'verify-sprint', args: ['--prepare-acceptance'],
-        cwd: envelope.worktree_path, trustedPackage: true, stdio: 'pipe',
-      });
+      // A clean runtime cannot borrow the developer's globally installed hook CLI.
+      const verifierBun = join(fixture.root, process.platform === 'win32' ? 'bun.exe' : 'bun');
+      cpSync(process.execPath, verifierBun);
+      const verify = () => {
+        const run = spawnSync(verifierBun, ['-e',
+          `import { runHelper } from ${JSON.stringify(join(CWD, 'src/effects/runtime/helper-runner.ts'))}; console.log(JSON.stringify(runHelper(${JSON.stringify({
+            helper: 'verify-sprint', args: ['--prepare-acceptance'], cwd: envelope.worktree_path,
+            trustedPackage: true, stdio: 'pipe',
+          })})));`,
+        ], { cwd: envelope.worktree_path, encoding: 'utf8' });
+        expect(run.status, run.stderr).toBe(0);
+        return JSON.parse(run.stdout) as ReturnType<typeof runHelper>;
+      };
       const snapshot = () => {
         const runs = join(envelope.worktree_path, '.ai/harness/runs');
         const files = readdirSync(runs).filter(path => path.startsWith('run-') && path.endsWith('.json')).sort();

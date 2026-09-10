@@ -1,24 +1,14 @@
-> **Archived**: 2026-09-10 05:16
-> **Related Plan**: plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md
-> **Outcome**: Completed
-> **Lifecycle**: contract
-> **Parent Run ID**: run-20260910-0516
-> **Archive Projection V1**: `plans/plan-20260910-0431-campaign-acceptance-preflight.md` => `plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md`
-> **Archive Projection V1**: `tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md` => `tasks/archive/notes-20260910-0516-campaign-acceptance-preflight.md`
-> **Archive Projection V1**: `tasks/contracts/20260910-0431-campaign-acceptance-preflight.contract.md` => `tasks/archive/contract-20260910-0516-campaign-acceptance-preflight.md`
-> **Archive Projection V1**: `tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md` => `tasks/archive/review-20260910-0516-campaign-acceptance-preflight.md`
-
 # Task Contract: campaign-acceptance-preflight
 
-> **Status**: Fulfilled
-> **Plan**: plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md
+> **Status**: Active
+> **Plan**: plans/plan-20260910-0431-campaign-acceptance-preflight.md
 > **Task Profile**: bugfix
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-10 04:31
-> **Review File**: `tasks/archive/review-20260910-0516-campaign-acceptance-preflight.md`
-> **Notes File**: `tasks/archive/notes-20260910-0516-campaign-acceptance-preflight.md`
+> **Review File**: `tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md`
+> **Notes File**: `tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -47,17 +37,17 @@ A valid admitted contract or fresh acquisition still causes canonical scope/meta
 
 ## Root Cause Evidence
 
-- root_cause: src/cli/commands/campaign.ts runCampaignPlanningPreflight omits canonical verification metadata, and src/effects/fleet/acquire.ts defaultProject reruns authoring projection after proof freeze, rewriting tracked artifacts outside business allowed_paths.
+- root_cause: src/effects/runtime/helper-runner.ts also omitted its package hook CLI from protected child environments, relying on an ambient global installation; src/cli/commands/campaign.ts runCampaignPlanningPreflight omits canonical verification metadata, and src/effects/fleet/acquire.ts defaultProject reruns authoring projection after proof freeze, rewriting tracked artifacts outside business allowed_paths.
 - repro: bun test tests/cli/campaign-acceptance-preflight.test.ts tests/cli/fleet-offer-acquire.test.ts
 - regression_guard: tests/cli/campaign-acceptance-preflight.test.ts
 - pre_fix_failure_artifact: tasks/evidence/campaign-acceptance-preflight-pre-fix.log
 
 ## Workflow Inventory
 
-- Source plan: `plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md`
+- Source plan: `plans/plan-20260910-0431-campaign-acceptance-preflight.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/archive/review-20260910-0516-campaign-acceptance-preflight.md`
-- Notes file: `tasks/archive/notes-20260910-0516-campaign-acceptance-preflight.md`
+- Review file: `tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md`
+- Notes file: `tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -81,21 +71,24 @@ A valid admitted contract or fresh acquisition still causes canonical scope/meta
 allowed_paths:
   - src/cli/commands/campaign.ts
   - src/effects/fleet/acquire.ts
+  - src/effects/runtime/helper-runner.ts
   - scripts/verify-contract.sh
   - assets/templates/helpers/verify-contract.sh
   - tests/cli/campaign-acceptance-preflight.test.ts
   - tests/cli/campaign-planning.test.ts
   - tests/cli/fleet-offer-acquire.test.ts
   - tests/fleet-acquire-concurrency.test.ts
+  - tests/helpers/historical-campaign-lifecycle.ts
   - tests/characterization/repair-campaign-authority-freeze.test.ts
   - tasks/evidence/campaign-review-artifact-pre-fix.log
+  - tasks/evidence/campaign-packaged-hook-pre-fix.log
   - docs/researches/20260910-campaign-acceptance-preflight.md
-  - plans/archive/plan-20260910-0431-campaign-acceptance-preflight.md
+  - plans/plan-20260910-0431-campaign-acceptance-preflight.md
   - tasks/todos.md
   - tasks/evidence/campaign-acceptance-preflight-pre-fix.log
-  - tasks/archive/contract-20260910-0516-campaign-acceptance-preflight.md
-  - tasks/archive/review-20260910-0516-campaign-acceptance-preflight.md
-  - tasks/archive/notes-20260910-0516-campaign-acceptance-preflight.md
+  - tasks/contracts/20260910-0431-campaign-acceptance-preflight.contract.md
+  - tasks/reviews/20260910-0431-campaign-acceptance-preflight.review.md
+  - tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md
 ```
 
 ## Evidence Requirements
@@ -151,7 +144,7 @@ exit_criteria:
     - docs/spec.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/archive/notes-20260910-0516-campaign-acceptance-preflight.md
+    - tasks/notes/20260910-0431-campaign-acceptance-preflight.notes.md
 ```
 
 ## Verification Plan
@@ -341,6 +334,162 @@ exit_criteria:
       "inputs": {
         "env": []
       }
+    },
+    {
+      "id": "fixture-campaign-finish-failure-audit",
+      "kind": "package_test",
+      "path": "tests/campaign-finish-failure-audit.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-brc10-lifecycle",
+      "kind": "package_test",
+      "path": "tests/effects/brc10-lifecycle.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-brc6a-admission",
+      "kind": "package_test",
+      "path": "tests/effects/brc6a-admission.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-campaign-acquisition",
+      "kind": "package_test",
+      "path": "tests/effects/campaign-acquisition.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-campaign-closeout",
+      "kind": "package_test",
+      "path": "tests/effects/campaign-closeout.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-campaign-planning",
+      "kind": "package_test",
+      "path": "tests/effects/campaign-planning.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-campaign-settled-resume",
+      "kind": "package_test",
+      "path": "tests/effects/campaign-settled-resume.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-campaign-verifier-failure",
+      "kind": "package_test",
+      "path": "tests/effects/campaign-verifier-failure.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "fixture-campaign-worker",
+      "kind": "package_test",
+      "path": "tests/effects/campaign-worker.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "CI exposed the shared historical fixture admission dependency; this consumer must reach its existing lifecycle assertions with canonical metadata.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "cli-repo-root-normalization",
+      "kind": "package_test",
+      "path": "tests/cli/repo-root-normalization.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "The package-owned hook path must preserve repository routing and protected runtime platform contracts.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "windows-protected-helper-contract",
+      "kind": "package_test",
+      "path": "tests/unit/windows-protected-helper-platform-contract.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "The package-owned hook path must preserve repository routing and protected runtime platform contracts.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "windows-protected-helper-smoke",
+      "kind": "package_test",
+      "path": "tests/cli/windows-protected-helper-runtime-smoke.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "The package-owned hook path must preserve repository routing and protected runtime platform contracts.",
+      "inputs": {
+        "env": []
+      }
     }
   ]
 }
@@ -354,6 +503,7 @@ the intended coverage; do not infer that choice from paths or command text.
 
 - Functional behavior: canonical metadata and authored review availability are checked before claim and again in the fresh worktree; activation preserves frozen workflow bytes.
 - Edge cases: missing/duplicate metadata, missing review declaration/file, outside symlink, and parent-only uncommitted review are rejected without dispatch.
+- CI follow-up: run 34406126201 rejected the historical lifecycle fixture metadata and a clean packaged helper could not resolve its own hook CLI for Change Assessment. Reopen this same unpublished work-package; preserve original CI failure and validate the affected fixture consumers before another exact-head CI run.
 - Regression risks: final codex-plugin P2 review-artifact finding is reproduced and fixed; final delta validation includes the actual acquisition and campaign authority guards. Initial acceptance run run-20260910T045053-88650 remains evidence only for ae213ada before this bounded review fix.
 
 ## Rollback Point
