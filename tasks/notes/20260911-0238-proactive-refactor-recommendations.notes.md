@@ -50,3 +50,7 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 ## Verification and delivery boundary
 
 Frozen implementation at b251dbca passed all 12 declared commands (63 focused tests plus the global bootstrap test, typecheck and required integrity checks). The enclosing prepare gate identified an empty Change Assessment oracle list; this contract metadata is now bound to focused-regression. No product code or timing thresholds changed. PR #408 is stacked on #401; formal external acceptance remains pending.
+
+After synchronizing base fixture-only correction 42193bb3, the stacked PR compare range has the following binding. Feature implementation is unchanged from the 17/17 prepare baseline at a484e8d7; base fixture delta passed its four focused cases.
+
+> **Substantive Change SHA256**: `sha256:3e3c74da463e29cc5a120b6bd5dea2b59c3accd298727782072f9f3a514d3374`
