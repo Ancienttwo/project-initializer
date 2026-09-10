@@ -11,11 +11,14 @@
  * `HOOK_LOG_ARCHIVE_SEGMENTS` rather than adding a policy surface no second
  * consumer has asked for.
  *
- * The non-obvious rule is which files the count applies to. Three writers share
- * this directory, and two of them produce durable evidence that a filename rule
- * cannot tell apart from Stop churn:
+ * The non-obvious rule is which files the count applies to. Several writers
+ * share this directory, and two of them produce durable evidence that a
+ * filename rule cannot tell apart from Stop churn:
  *
- * - `stop-handler.ts` writes `${runId}.json`, disposable session history.
+ * - `stop-handler.ts` and `workflow_write_run_summary` in
+ *   `assets/hooks/lib/workflow-state.sh` both write `${runId}.json` in the same
+ *   shape -- disposable session history. The shell writer is the larger
+ *   producer by volume and supplies the free-form `reason` values.
  * - `scripts/verify-sprint.sh` freezes an acceptance snapshot whose exact path a
  *   checks projection records in `.run_file` and reads back at finalization.
  *   Its `runId` prefix is the same as Stop's.
@@ -45,9 +48,9 @@ import { resolveInsideRepo } from './path-safety';
 /** Runs of Stop history retained. */
 export const RUN_SUMMARY_RETENTION_COUNT = 200;
 
-/** The resolved projection paths every Stop run summary carries; see
- * `stop-handler.ts`'s `runSummaryContent`. Present together only in that
- * record. */
+/** The resolved projection paths every run summary carries; see
+ * `stop-handler.ts`'s `runSummaryContent` and `workflow_write_run_summary`.
+ * Present together only in that record. */
 const STOP_SUMMARY_PATH_FIELDS = ['checks_file', 'handoff_file', 'policy_file', 'context_map_file'] as const;
 
 export interface RunSummaryRetentionInput {

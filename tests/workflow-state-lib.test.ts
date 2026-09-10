@@ -658,3 +658,58 @@ describe("workflow-state shared library", () => {
   }, 30_000);
 
 });
+
+describe("run summary shape is one authoring contract", () => {
+  const SHAPE_FIELDS = [
+    "generated_at", "run_id", "reason",
+    "active_plan", "active_contract", "active_review", "active_notes",
+    "checks_file", "handoff_file", "policy_file", "context_map_file",
+  ] as const;
+
+  function writeRunSummary(withJq: boolean): Record<string, unknown> {
+    const cwd = mkdtempSync(join(tmpdir(), "run-summary-shape-"));
+    try {
+      mkdirSync(join(cwd, ".ai/harness/runs"), { recursive: true });
+      writeFileSync(join(cwd, ".ai/harness/policy.json"), "{}\n");
+      const env = fixtureEnv();
+      env.HOOK_RUN_ID = "shape-test";
+      if (!withJq) {
+        // A PATH holding only the coreutils the fallback branch needs proves
+        // the branch actually runs, instead of silently taking the jq path.
+        const bin = mkdtempSync(join(tmpdir(), "run-summary-bin-"));
+        for (const tool of ["date", "cat", "mkdir", "rm", "dirname", "basename", "sed", "grep", "awk", "head", "tail", "printf", "ls", "tr", "id", "uname", "mktemp", "stat", "sort", "find", "wc"]) {
+          const resolved = spawnSync("command", ["-v", tool], { shell: true, encoding: "utf-8" }).stdout.trim();
+          if (resolved) symlinkSync(resolved, join(bin, tool));
+        }
+        env.PATH = bin;
+        // Guard against a vacuous pass: if jq stayed reachable, both cases
+        // would take the jq branch and the fallback would go untested.
+        const probe = spawnSync("/bin/bash", ["-c", "command -v jq"], { env, encoding: "utf-8" });
+        expect(probe.stdout.trim()).toBe("");
+      }
+      // Absolute interpreter: the jq-less case replaces PATH entirely.
+      const result = spawnSync("/bin/bash", ["-c",
+        `source "${join(ROOT, "assets/hooks/lib/workflow-state.sh")}"; workflow_write_run_summary "shape-test-reason"`,
+      ], { cwd, env, encoding: "utf-8" });
+      expect(result.status, result.stderr).toBe(0);
+      const files = readdirSync(join(cwd, ".ai/harness/runs")).filter((name) => name.endsWith(".json"));
+      expect(files).toHaveLength(1);
+      return JSON.parse(readFileSync(join(cwd, ".ai/harness/runs", files[0]!), "utf-8")) as Record<string, unknown>;
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }
+
+  // `run-summary-retention.ts` identifies a deletable record by this exact
+  // shape. A branch that emits fewer fields makes that host's summaries
+  // permanently unreclaimable, so both branches must agree.
+  test("both the jq and jq-less branches emit the full record shape", () => {
+    for (const withJq of [true, false]) {
+      const record = writeRunSummary(withJq);
+      expect(Object.keys(record).sort()).toEqual([...SHAPE_FIELDS].sort());
+      for (const field of SHAPE_FIELDS) expect(typeof record[field]).toBe("string");
+      expect(record.run_id).toBe("shape-test");
+      expect(record.reason).toBe("shape-test-reason");
+    }
+  });
+});

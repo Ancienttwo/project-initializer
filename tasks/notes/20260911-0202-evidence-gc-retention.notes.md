@@ -6,7 +6,10 @@ The obvious rule for `.ai/harness/runs/*.json` is "keep the newest N". It is
 wrong, and the reason is not visible from the runs directory: three writers share
 it, and two of them produce durable evidence.
 
-- `stop-handler.ts:436` writes `${runId}.json`, disposable session history.
+- `stop-handler.ts:436` writes `${runId}.json`, disposable session history, and
+  `workflow_write_run_summary` (`assets/hooks/lib/workflow-state.sh:1314`) writes
+  the identical shape. The shell writer is the larger producer by volume and is
+  where the free-form `reason` values come from.
 - `verify-sprint.sh:1009` freezes an acceptance snapshot whose exact path a
   checks projection records in `.run_file` and reads back at finalization
   (`verify-sprint.sh:913-937`). It shares Stop's `run-` prefix.
@@ -75,4 +78,30 @@ operator-invoked, so it reports and exits non-zero instead.
   out of the repository would be traversed. `checkpoint-store.ts` has the same
   posture; changing one without the other would be inconsistent.
 
-> **Substantive Change SHA256**: `sha256:108606a0d7495285db85873a39eafbd375c3e9abf916f002e7beb18a6577daac`
+## Why the shell writer's jq-less branch changed
+
+Making the shape the discriminator gives the record one contract, so the two
+branches of `workflow_write_run_summary` had to agree. The fallback at
+`assets/hooks/lib/workflow-state.sh:1355` emitted 5 of the 11 fields, omitting
+`policy_file` and `context_map_file`, so on a host without jq every summary
+would have been permanently unreclaimable -- and re-parsed on every Stop
+forever. It fails safe (under-deletes), which is why it was not a blocker, but
+leaving it would have meant two authoring contracts for one record shape.
+
+`tests/workflow-state-lib.test.ts` covers both branches. The jq-less case runs
+under a PATH holding only the coreutils the branch needs, with a probe asserting
+`jq` is unreachable so the case cannot pass vacuously; reverting the fallback to
+its 5-field form fails that test.
+
+## Projection sources touched
+
+`docs/reference-configs/` is generated from `assets/reference-configs/`
+(`scripts/sync-reference-configs.ts`). The first cut wrote the new
+`## Evidence Retention` section straight into the projection, which reddened the
+governance gate and would have been silently deleted by the next
+`bun run sync:reference-configs`. `check:reference-configs` is the third member
+of the `check:hooks` / `check:helpers` family and was missing from the root
+`Required Checks` block; it is now listed there in both `CLAUDE.md` and
+`AGENTS.md`.
+
+> **Substantive Change SHA256**: `sha256:9ca9180d9fe3216e4eb50bb3701040326130a5e5f76577bbbc5932918d31ae60`

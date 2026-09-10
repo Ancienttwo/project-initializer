@@ -1352,8 +1352,11 @@ workflow_write_run_summary() {
     return 0
   fi
 
+  # Same field set as the jq branch above: run-summary retention identifies this
+  # record by its shape, so a short fallback would make every jq-less host's
+  # summaries permanently unreclaimable.
   cat > "$output_file" <<EOF_RUN
-{"generated_at":"$(workflow_json_escape "$(date '+%Y-%m-%dT%H:%M:%S%z')")","run_id":"$(workflow_json_escape "$run_id")","reason":"$(workflow_json_escape "$reason")","checks_file":"$(workflow_json_escape "$(workflow_checks_file)")","handoff_file":"$(workflow_json_escape "$(workflow_handoff_file)")"}
+{"generated_at":"$(workflow_json_escape "$(date '+%Y-%m-%dT%H:%M:%S%z')")","run_id":"$(workflow_json_escape "$run_id")","reason":"$(workflow_json_escape "$reason")","active_plan":"$(workflow_json_escape "${active_plan:-}")","active_contract":"$(workflow_json_escape "${active_contract:-}")","active_review":"$(workflow_json_escape "${active_review:-}")","active_notes":"$(workflow_json_escape "${active_notes:-}")","checks_file":"$(workflow_json_escape "$(workflow_checks_file)")","handoff_file":"$(workflow_json_escape "$(workflow_handoff_file)")","policy_file":"$(workflow_json_escape "$(workflow_policy_file)")","context_map_file":"$(workflow_json_escape "$(workflow_context_map_file)")"}
 EOF_RUN
 }
 

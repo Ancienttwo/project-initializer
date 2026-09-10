@@ -129,6 +129,51 @@ contains the generated operator-helper projection. Keep the two declared asset
 manifests aligned with `bun run sync:hooks`, and validate the typed route
 registry with `bun test` and `repo-harness init --repo . --dry-run`.
 
+## Evidence Retention
+
+`.ai/harness/runs/` has four record writers plus assorted operator reports, and
+only one shape is disposable history:
+
+| File | Writer | Retention owner |
+| --- | --- | --- |
+| `${runId}.json` carrying the four resolved projection paths | Stop (`stop-handler.ts`) and `workflow_write_run_summary` in `assets/hooks/lib/workflow-state.sh` | `run-summary-retention.ts`, at the end of every Stop: newest `RUN_SUMMARY_RETENTION_COUNT` |
+| `${runId}-${contractSlug}.json` (`schema: repo-harness-run-trace.v1`) | `verify-sprint.sh` | none; a checks projection reads it back at acceptance finalization |
+| `verification-${executionId}.json` / `.log` | `verification-execution.ts` | none; immutable, bound by sha256 in the evidence ledger |
+| `hook-events.jsonl` | hook telemetry | `hook-event-log.ts`, on rotation: 8 MB segments, 256 MB or 32 archived segments |
+| ad-hoc `*.json` reports | operator scripts | none; each report owns its own file |
+
+Evidence checkpoints under `.ai/harness/evidence/checkpoints/` are owned by
+`checkpoint-store.ts`, which keeps only the checkpoint the published marker
+names and prunes inside every successful publish.
+
+The two unowned classes are durable evidence, not leaks. A frozen acceptance
+snapshot shares Stop's `run-` prefix, and a missing verification record makes
+`readValidRunResult` report an absent baseline, which fails a
+`baseline_with_delta` criterion permanently because a rerun only mints a new
+execution id. Retention therefore never reasons about what to keep: it deletes
+only records with Stop's own run-summary shape -- a `run_id` plus
+`checks_file`, `handoff_file`, `policy_file`, and `context_map_file`, every one
+a pointer the next Stop recomputes -- and leaves every other shape to its owner.
+The shape, not `reason`: that field is free-form operator text.
+
+Checkpoint retention was added in 0.19.0. A repository upgraded from an earlier
+version carries a checkpoint per Stop, each one a whole-ledger snapshot -- on a
+long-running repository that reaches multiple gigabytes. The next successful Stop
+after the upgrade prunes the entire backlog on its own, so no action is normally
+required.
+
+Run `repo-harness run evidence-gc` when that Stop will not come:
+
+```bash
+repo-harness run evidence-gc --repo . --dry-run   # report reclaimable bytes
+repo-harness run evidence-gc --repo .             # apply the same policies now
+```
+
+It applies the two policies above and never defines its own. Use it for a
+repository whose ledger was reset (publication skips quietly with no ledger), one
+that no longer runs the harness, or when the space is needed before the next
+Stop. It exits non-zero and names every entry it could not reclaim.
+
 ## Verification Checklist
 
 After handler or workflow-contract changes, run:

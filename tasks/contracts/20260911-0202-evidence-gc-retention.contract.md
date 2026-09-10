@@ -49,7 +49,11 @@ reclaims obsolete evidence in a repo the Stop path can no longer heal.
   `src/cli/hook/stop-handler.ts` (one call site), `scripts/evidence-gc.ts` (new)
   and its helper registration in `assets/workflow-contract.v1.json`,
   `.ai/harness/workflow-contract.json`, and `src/cli/commands/run.ts`; focused
-  tests; upgrade documentation for pre-0.19.0 backlogs.
+  tests; upgrade documentation for pre-0.19.0 backlogs in
+  `assets/reference-configs/`. Also `workflow_write_run_summary`'s jq-less
+  branch in `assets/hooks/lib/workflow-state.sh`: it writes the same record this
+  contract now identifies by shape, and its short fallback would make every
+  jq-less host's summaries permanently unreclaimable.
 - Out of scope: `src/effects/hook-event-log.ts` retention constants. The 256 MB /
   32-segment archive cap is already bounded and works as designed; the operator
   decided this round not to change it. Also out of scope: any change to the
@@ -213,6 +217,28 @@ exit_criteria:
       "cost": "normal",
       "evidence_policy": "current_exact",
       "necessity": "Proves the Stop call site keeps a checks-pinned acceptance snapshot and never fails Stop on a retention fault.",
+      "inputs": { "env": [] }
+    },
+    {
+      "id": "run-summary-shape-authority",
+      "kind": "package_test",
+      "path": "tests/workflow-state-lib.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Proves both branches of the shell run-summary writer emit the shape retention identifies, so a jq-less host is not permanently unreclaimable.",
+      "inputs": { "env": [] }
+    },
+    {
+      "id": "reference-config-projection-drift",
+      "kind": "command",
+      "command": "bun run check:reference-configs",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "This contract edits assets/reference-configs/; the check is the drift gate for that projection pair.",
       "inputs": { "env": [] }
     },
     {

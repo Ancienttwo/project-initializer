@@ -131,15 +131,16 @@ registry with `bun test` and `repo-harness init --repo . --dry-run`.
 
 ## Evidence Retention
 
-`.ai/harness/runs/` has three writers, and only one of them produces disposable
-history:
+`.ai/harness/runs/` has four record writers plus assorted operator reports, and
+only one shape is disposable history:
 
 | File | Writer | Retention owner |
 | --- | --- | --- |
-| `${runId}.json` carrying the four resolved projection paths | Stop | `run-summary-retention.ts`, at the end of every Stop: newest `RUN_SUMMARY_RETENTION_COUNT` |
+| `${runId}.json` carrying the four resolved projection paths | Stop (`stop-handler.ts`) and `workflow_write_run_summary` in `assets/hooks/lib/workflow-state.sh` | `run-summary-retention.ts`, at the end of every Stop: newest `RUN_SUMMARY_RETENTION_COUNT` |
 | `${runId}-${contractSlug}.json` (`schema: repo-harness-run-trace.v1`) | `verify-sprint.sh` | none; a checks projection reads it back at acceptance finalization |
 | `verification-${executionId}.json` / `.log` | `verification-execution.ts` | none; immutable, bound by sha256 in the evidence ledger |
 | `hook-events.jsonl` | hook telemetry | `hook-event-log.ts`, on rotation: 8 MB segments, 256 MB or 32 archived segments |
+| ad-hoc `*.json` reports | operator scripts | none; each report owns its own file |
 
 Evidence checkpoints under `.ai/harness/evidence/checkpoints/` are owned by
 `checkpoint-store.ts`, which keeps only the checkpoint the published marker
