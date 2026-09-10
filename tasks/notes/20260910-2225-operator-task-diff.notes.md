@@ -36,9 +36,22 @@ Final PR comparison against origin/main:
 
 Semantic acceptance remains blocked: `/tmp/operator-diff-plugin-review.json` is stale_scope and `/tmp/operator-diff-plugin-final.json` is review_budget_exhausted. The existing one-attempt circuit policy was preserved. All 11 declared verification commands passed at run-20260910T231010-87128. An explicit owner waiver is still required; merge authorization is not a waiver.
 
-Owner explicitly approved the typed user waiver and continuation. A temporary Windows fixture diagnostic records the exact binding values before the unavailable read; it must be removed after proving the refusal point and before final acceptance.
+Owner explicitly approved the typed user waiver and continuation. Windows diagnostics were used only to prove the refusal point and removed before final acceptance.
 
 > **Substantive Change SHA256**: `sha256:cfa91fb2c3556a7e9b8445e87ca81bf7a2697956e984b7f875312e81b99fe757`
 
 Integrated origin/main a8b56203 (PR #396) before final acceptance; App/i18n merged cleanly and the generated projection is regenerated from the new base.
 > **Substantive Change SHA256**: `sha256:47a8ecda15a04c08ebe66ec39ac87385896a1a8dcf81364bf20cdb84ebd3e758`
+
+Root Cause Evidence (Windows binding):
+- root_cause: Node realpath retains RUNNER~1 while Git reports runneradmin; string equality rejected two names for the same physical directory.
+- repro: Windows CI run 34497113070, `/tmp/operator-diff-win-binding.log` line 346 records the short owner/realpath and long Git topology/common directory; valid reads then fail unavailable.
+- regression_guard: existing real Git reader cases in the Windows/macOS/Linux matrix retain valid binding, foreign worktree rejection and prunable sibling coverage.
+- pre_fix_failure_artifact: `/tmp/operator-diff-win-binding.log` (9 failing reader tests).
+
+The reader compares directory device/inode identities (requiring directories and nonzero IDs) for Git common-dir, topology and top-level; it still requires the stored owner path to equal its own realpath and preserves all claim/task/branch fences. This handles multiple path spellings without interpreting them as separate repositories. The helper has three consumers protecting the same physical-directory invariant; no dependency is added.
+
+> **Substantive Change SHA256**: `sha256:9fe221ed94ee8a64f4128ae02d51fb7d0002a96f32294ce3d0b0ba5547afcbb5`
+
+Current integrated PR subject:
+> **Substantive Change SHA256**: `sha256:7b8dd61ba31adb08d533d05f7a31c74913e7e0f568f2a68ad2936d290a0a1221`

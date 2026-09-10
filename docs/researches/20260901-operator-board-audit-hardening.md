@@ -54,3 +54,5 @@ Synchronous authority and Git operations run in a disposable worker so the HTTP 
 The structural route inventory still has exactly one write: Task Message. No new dependency, editing, commit, merge, publication history, or TeamAI integration is introduced. The new core file owns the HTTP payload/decoder; the effect file owns local read authority; the worker isolates blocking reads; `TaskDiff.tsx` owns only the on-demand display lifecycle. Focused real-Git, HTTP worker/route and browser tests cover these boundaries.
 
 Task diff also refuses assume-unchanged index entries instead of presenting incomplete tracked changes. The production worker disables Git lazy fetching for diff and canonical authority reads; missing local objects fail unavailable without downloading them.
+
+Git/Node paths can retain different Windows short and long spellings. Task diff validates common-directory, topology and top-level through nonzero device/inode directory identity, while retaining the original canonical owner-path and claim/task/branch fences.

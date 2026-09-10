@@ -1,11 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import { TASK_DIFF_MAX_BYTES, TASK_DIFF_MAX_UNTRACKED, isTaskDiffRequest, type OperatorTaskDiff, type OperatorTaskDiffRequest, type TaskDiffFailure } from '../../core/operator/task-diff';
 import { lookupCanonicalTask } from '../../core/state/coordination-identity';
 import { resolveGitCommonDirectory } from '../git/common-directory';
 import { readWorktreeTopology } from '../git/worktree-topology';
 import { readRepoHarnessRegistryStrictSnapshot } from '../repo-registry';
-import { safeRealpath } from '../state/collect-state-inputs';
 import { readActiveSprintPath, readCanonicalTargetRef } from '../state/collect-board-inputs';
 import { readCanonicalSprint, resolveRepoIdentity } from '../state/coordination-canonical-source';
 import { readLease } from '../state/coordination-lease-store';
@@ -53,6 +52,19 @@ function refuseAssumeUnchanged(cwd: string): void {
   if (entries.split('\0').some(entry => /^[a-z] /.test(entry))) return refuse('index_unsupported');
 }
 
+// Windows short/long path spellings can survive realpath. Bind physical directories.
+function sameDirectory(left: string, right: string): boolean {
+  try {
+    const a = statSync(left, { bigint: true });
+    const b = statSync(right, { bigint: true });
+    return a.isDirectory() && b.isDirectory() && a.ino !== 0n && b.ino !== 0n
+      && a.dev === b.dev && a.ino === b.ino;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 /** Synchronous local authority/Git reads run only in the cancellable worker. */
 export function readOperatorTaskDiff(input: OperatorTaskDiffRequest & { readonly env?: NodeJS.ProcessEnv }): OperatorTaskDiff {
   try {
@@ -75,10 +87,10 @@ export function readOperatorTaskDiff(input: OperatorTaskDiffRequest & { readonly
       if (owner.claim_id !== input.claim_id || owner.generation !== input.generation || owner.task_revision !== input.task_revision
         || owner.target_ref !== targetRef || owner.sprint_path !== sprintPath) return refuse('stale');
       const worktree = realpathSync(owner.execution_worktree);
-      if (worktree !== owner.execution_worktree || resolveGitCommonDirectory(root) !== resolveGitCommonDirectory(worktree)) return refuse('unavailable');
-      const entry = readWorktreeTopology(root).worktrees.find(w => safeRealpath(w.path) === worktree);
+      if (worktree !== owner.execution_worktree || !sameDirectory(resolveGitCommonDirectory(root), resolveGitCommonDirectory(worktree))) return refuse('unavailable');
+      const entry = readWorktreeTopology(root).worktrees.find(w => sameDirectory(w.path, worktree));
       if (!entry || entry.branch !== `refs/heads/${owner.branch}` || entry.detached) return refuse('unavailable');
-      if (realpathSync(git(worktree, ['rev-parse', '--show-toplevel']).trim()) !== worktree
+      if (!sameDirectory(git(worktree, ['rev-parse', '--show-toplevel']).trim(), worktree)
         || git(worktree, ['symbolic-ref', 'HEAD']).trim() !== entry.branch) return refuse('unavailable');
       return { root, worktree, base: canonical.commit, targetRef, branch: owner.branch, lease: lease.raw };
     };
