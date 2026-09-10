@@ -43,3 +43,11 @@ CI run 34516726468 passed Governance and all three MCP platform checks but faile
 All four failing cases pass with the installed repo-harness removed from PATH (4 pass, 136 assertions; /tmp/global-ci-path-fixture-final.log). The prior 25/25 prepare result at 0186ded0 remains baseline evidence; this test-only delta has its own focused evidence. No external acceptance or final CI pass is claimed for the new commit.
 
 > **Substantive Change SHA256**: `sha256:b9da34c4d0f78bd6a548e7cc1a87e2bbae9eb81669a67fc899871f784293aee0`
+
+## Final acceptance follow-up
+
+P1: The protected helper runner owns executable identity and sanitizes PATH. P2: trusted runHelper -> verify-sprint -> global architecture readiness now needs the main CLI; only Hook CLI was previously bound, so a clean runtime could not resolve the command before emitting a snapshot. P3: bind src/cli/index.ts from the same trusted package through resolveFromDir, alongside Hook CLI. No caller override or repo-local executable is admitted.
+
+The existing fleet-acquire regression reproduced the missing-CLI error before this correction (/tmp/global-fleet-pre-fix.log). Its diagnostic assertion no longer reads a nonexistent snapshot before showing the actual error. The status fixture now expects the explicit missing-global-configuration reason instead of a retired repo policy reason. Both failures occurred on the CI heads of #401 and #408 and are within this authority cutover.
+
+> **Substantive Change SHA256**: `sha256:021b35f557a319a9ee097b501f5c24bb7fe45a6a04184c0ce4461aff742da400`
