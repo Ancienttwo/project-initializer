@@ -197,8 +197,6 @@ acknowledge_architecture_projection_publication() {
   local target_worktree="$1" publication_sha="$2" apply_mode changed_paths output
   local -a projection_cli=()
 
-  apply_mode="$(policy_get '.architecture.projection_apply' 'disabled')"
-  [[ "$apply_mode" == "automatic" ]] || return 0
   if ! changed_paths="$(git -C "$target_worktree" diff-tree --no-commit-id --name-only -r \
       "$publication_sha^" "$publication_sha")"; then
     echo "contract-worktree: could not inspect the publication tree for architecture projection output" >&2
@@ -221,6 +219,14 @@ acknowledge_architecture_projection_publication() {
     echo "contract-worktree: automatic projection publication acknowledgement requires the repo-harness CLI" >&2
     return 1
   fi
+
+  output="$(cd "$target_worktree" && "${projection_cli[@]}" architecture-projection policy --json)" || return 1
+  apply_mode="$(printf '%s' "$output" | jq -er '.applyMode')" || return 1
+  case "$apply_mode" in
+    disabled|manual) return 0 ;;
+    automatic) ;;
+    *) echo "contract-worktree: invalid global projection mode" >&2; return 1 ;;
+  esac
 
   if ! output="$(cd "$target_worktree" \
     && REPO_HARNESS_TARGET_REPO_ROOT="$target_worktree" \

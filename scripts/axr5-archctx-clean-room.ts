@@ -57,8 +57,12 @@ try {
       [koffiPlatform.name]: `file:${koffiPlatform.path}`,
     },
   }, null, 2)}\n`);
+  const hostHome = join(workspace, 'host-home');
+  mkdirSync(join(hostHome, '.repo-harness'), { recursive: true });
+  writeFileSync(join(hostHome, '.repo-harness/config.json'), JSON.stringify({ architecture: { projection_provider: 'archctx', projection_apply: 'manual' } }));
   const offlineEnv = {
     ...process.env,
+    HOME: hostHome,
     NPM_CONFIG_REGISTRY: 'http://127.0.0.1:9',
     BUN_CONFIG_REGISTRY: 'http://127.0.0.1:9',
   };
@@ -73,12 +77,6 @@ try {
   run('git', ['init'], fixtureRepo);
   writeFileSync(join(fixtureRepo, '.ai', 'harness', 'policy.json'), `${JSON.stringify({
     context: { capability_source: 'archcontext' },
-    architecture: {
-      projection_provider: 'archctx',
-      projection_apply: 'manual',
-      projection_version: VERSION,
-      projection_timeout_ms: 120000,
-    },
   }, null, 2)}\n`);
   mkdirSync(join(fixtureRepo, 'src', 'projection-fixture'), { recursive: true });
   writeFileSync(join(fixtureRepo, 'src', 'projection-fixture', 'index.ts'), 'export const projectionFixture = true;\n');

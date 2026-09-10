@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "fs";
+import { copyFileSync, symlinkSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { spawnSync } from "child_process";
@@ -7,13 +7,15 @@ import { spawnSync } from "child_process";
 const ROOT = join(import.meta.dir, "..");
 
 function run(cmd: string, args: string[], cwd: string) {
-  return spawnSync(cmd, args, { cwd, encoding: "utf-8" });
+  return spawnSync(cmd, args, { cwd, encoding: "utf-8", env: { ...process.env, REPO_HARNESS_CLI_BIN: join(cwd, "projection-cli"), HOME: join(cwd, "home") } });
 }
 
 function tmpRepo(fn: (cwd: string) => void): void {
   const cwd = mkdtempSync(join(tmpdir(), "architecture-sync-"));
   try {
     mkdirSync(join(cwd, "scripts"), { recursive: true });
+    mkdirSync(join(cwd, "home"), { recursive: true });
+    writeFileSync(join(cwd, "projection-cli"), `#!/bin/sh\nexec '${process.execPath}' '${join(ROOT, 'src/cli/index.ts')}' "$@"\n`, { mode: 0o755 });
     mkdirSync(join(cwd, ".ai/context"), { recursive: true });
     mkdirSync(join(cwd, ".ai/harness"), { recursive: true });
     mkdirSync(join(cwd, "apps/web"), { recursive: true });
@@ -202,10 +204,11 @@ describe("architecture sync gate", () => {
       mkdirSync(join(cwd, "src/cli"), { recursive: true });
       const statusFile = join(cwd, ".ai/harness/projection-status.json");
       const writeStatus = (unresolvedCandidates: number, invalidArtifacts = 0) => writeFileSync(statusFile, JSON.stringify({
-        projectionProvider: { state: "ready", reason: "fixture provider ready" },
+        projectionProvider: { provider: "archctx", state: "ready", reason: "fixture provider ready" },
+        apply: { mode: "automatic", enabled: true },
         acceptance: { unresolvedCandidates, invalidArtifacts },
       }));
-      writeFileSync(join(cwd, "src/cli/index.ts"), `process.stdout.write(await Bun.file(${JSON.stringify(statusFile)}).text());\n`);
+      writeFileSync(join(cwd, "src/cli/index.ts"), `process.stdout.write(process.argv[3] === "policy" ? JSON.stringify({ provider: "archctx", applyMode: "automatic" }) : await Bun.file(${JSON.stringify(statusFile)}).text());\n`);
       writeChangedFiles(cwd, ["apps/web/src/routes/account.tsx"]);
       expect(run("bash", ["scripts/architecture-queue.sh", "reindex"], cwd).status).toBe(0);
 
@@ -240,3 +243,35 @@ describe("architecture sync gate", () => {
     });
   }, 30_000);
 });
+
+
+test("global projection policy remains readable with Node and no jq", () => {
+  tmpRepo((cwd) => {
+    const bin = join(cwd, "bin");
+    mkdirSync(bin);
+    symlinkSync(process.execPath, join(bin, "bun"));
+    const node = spawnSync("which", ["node"], { encoding: "utf8" }).stdout.trim();
+    symlinkSync(node, join(bin, "node"));
+    expect(run("bash", ["scripts/architecture-queue.sh", "reindex"], cwd).status).toBe(0);
+    writePolicy(cwd, "advisory");
+    const result = spawnSync("/bin/bash", ["scripts/check-architecture-sync.sh", "--mode", "off", "--format", "json"], {
+      cwd, encoding: "utf8", env: { ...process.env, HOME: join(cwd, "home"), PATH: `${bin}:/usr/bin:/bin`, REPO_HARNESS_CLI_BIN: join(cwd, "projection-cli") },
+    });
+    if (result.status !== 0) throw new Error(result.stderr + result.stdout);
+    expect(result.stderr).not.toContain("jq: command not found");
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).projection.provider).toBe("disabled");
+    writeFileSync(join(cwd, "projection-cli"), `#!/bin/sh
+if [ "$2" = policy ]; then
+  printf '%s\\n' '{"provider":"archctx","applyMode":"automatic"}'
+else
+  printf '%s\\n' 'not-json'
+fi
+`, { mode: 0o755 });
+    const malformed = spawnSync("/bin/bash", ["scripts/check-architecture-sync.sh", "--mode", "off", "--format", "json"], {
+      cwd, encoding: "utf8", env: { ...process.env, HOME: join(cwd, "home"), PATH: `${bin}:/usr/bin:/bin`, REPO_HARNESS_CLI_BIN: join(cwd, "projection-cli") },
+    });
+    expect(malformed.status).toBe(1);
+    expect(malformed.stderr).toContain("invalid global projection readiness");
+  });
+}, 60000);

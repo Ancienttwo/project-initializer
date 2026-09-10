@@ -5958,7 +5958,7 @@ describe("Workflow helper scripts", () => {
       const tsDefaultPolicy = defaultPolicy("minimal-agentic", "en") as Record<string, any>;
       expect(fallbackPolicy.agentic_development.routing).toEqual(tsDefaultPolicy.agentic_development.routing);
       expect(readRefactorPolicy(fallbackPolicy).stages).toEqual(readRefactorPolicy({}).stages);
-      expect(fallbackPolicy.architecture.projection_version).toBe(readRefactorPolicy({}).stages.scan.provider_version);
+      expect(fallbackPolicy.architecture.projection_version).toBeUndefined();
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

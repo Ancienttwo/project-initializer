@@ -682,6 +682,26 @@ describe('durable architecture projection orchestration', () => {
     expect(architectureProjectionQueueState(f.repoRoot).pending).toBe(0);
   });
 
+  test('one host configuration drives durable projection jobs in two repos without policy overrides', () => {
+    const home = mkdtempSync(join(tmpdir(), 'global-projection-drain-'));
+    roots.push(home);
+    mkdirSync(join(home, '.repo-harness'));
+    writeFileSync(join(home, '.repo-harness/config.json'), JSON.stringify({ architecture: {
+      projection_provider: 'archctx', projection_apply: 'automatic', projection_failure_gate: 'advisory',
+    } }));
+    for (let index = 0; index < 2; index += 1) {
+      const f = fixture();
+      writeFileSync(join(f.repoRoot, '.ai/harness/policy.json'), '{}\n');
+      runMutationObserved({ collector: f.collector, input: JSON.stringify({ file_path: 'src/index.ts', session_id: `global-${index}` }) });
+      const calls = { count: 0 };
+      const result = drain(f.repoRoot, { env: { ...process.env, HOME: home }, consumerRoot: f.consumerRoot, run: successfulRunner(calls) });
+      expect(result.status).toBe('succeeded');
+      expect(result.acknowledgeSourceEvents).toBe(true);
+      expect(calls.count).toBe(1);
+      expect(architectureProjectionQueueState(f.repoRoot).pending).toBe(0);
+    }
+  });
+
   test('disabled provider does not spawn and leaves legacy architecture cascade authority to the caller', () => {
     const f = fixture();
     runMutationObserved({ collector: f.collector, input: JSON.stringify({ file_path: 'src/disabled.ts', session_id: 'disabled' }) });

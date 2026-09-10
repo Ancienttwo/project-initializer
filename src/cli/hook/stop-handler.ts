@@ -34,7 +34,7 @@ import {
 } from './architecture-drift';
 import { isImplementationSurfacePath } from '../../effects/review/diff-fingerprint';
 import { drainArchitectureProjectionJobs, type ArchitectureProjectionDrainResultV1 } from '../../effects/architecture/projection-orchestrator';
-import { loadArchitectureProjectionPolicy } from '../../effects/architecture/archctx-provider';
+import { loadArchitectureProjectionPolicy } from '../../effects/architecture/projection-config';
 import { publishArchitectureProjectionRestampForDrain } from '../../effects/architecture/restamp-publication';
 import { runMinimalChangeCli } from './minimal-change-cli';
 import {
@@ -792,7 +792,7 @@ export function runStopHandler(opts: StopHandlerInput): StopHandlerResult {
   if (journalSideEffectError) stderr.push(`[PostEditJournal] side effects failed: ${journalSideEffectError}\n`);
   let architectureGate: 'advisory' | 'strict' = 'advisory';
   try {
-    architectureGate = loadArchitectureProjectionPolicy(repoRoot).failureGate;
+    architectureGate = loadArchitectureProjectionPolicy(env).failureGate;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     architectureDrainError = architectureDrainError ? `${architectureDrainError}; projection policy invalid: ${message}` : `projection policy invalid: ${message}`;

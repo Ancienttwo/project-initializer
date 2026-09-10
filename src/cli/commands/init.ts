@@ -1,3 +1,5 @@
+import { readGlobalArchitectureConfiguration } from '../../effects/architecture/projection-config';
+import { inspectArchitectureProjectionReadiness } from '../../effects/architecture/archctx-provider';
 /**
  * Existing-repo harness bootstrap/update implementation.
  *
@@ -965,6 +967,23 @@ export function runInit(
     steps.push(withStepName(verifyStep, "verify repo harness", "repo-harness run check-task-workflow --strict"));
   } else {
     steps.push({ step: "verify repo harness", status: "skipped" });
+  }
+
+  if (apply && adoption.exitCode === 0 && mode !== 'minimal') {
+    try {
+      const { initialized } = readGlobalArchitectureConfiguration(commandEnv);
+      const readiness = inspectArchitectureProjectionReadiness(repoRoot, { env: commandEnv });
+      const provider = readiness.projectionProvider;
+      steps.push({
+        step: 'architecture projection readiness',
+        status: !initialized ? 'skipped' : provider.state === 'ready' || provider.state === 'disabled' ? 'ok' : 'failed',
+        detail: !initialized ? 'global architecture is not initialized; run repo-harness update once for this account' : provider.state === 'ready' && !readiness.apply.enabled
+          ? 'global provider ready; project architecture model is not ready for apply; run repo-harness architecture-projection status --json'
+          : provider.reason,
+      });
+    } catch (error) {
+      steps.push({ step: 'architecture projection readiness', status: 'failed', detail: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   const failed = steps.some((step) => step.status === "failed");

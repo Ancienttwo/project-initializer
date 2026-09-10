@@ -1,3 +1,4 @@
+import { ensureGlobalArchitectureProjection } from './architecture-configuration';
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from "fs";
 import { homedir, tmpdir, userInfo } from "os";
 import { delimiter, dirname, join, relative, resolve, sep } from "path";
@@ -1421,6 +1422,10 @@ export function runGlobalRuntimeSetup(
     steps.push(reconcileWithInstalledCandidate(opts, cwd, bunExecutable, env, target, profile));
     return finalizeRuntimeResult(steps);
   }
+
+  const architectureConfiguration = ensureGlobalArchitectureProjection(env);
+  steps.push(architectureConfiguration);
+  if (architectureConfiguration.status === 'failed') return finalizeRuntimeResult(steps);
 
   if (opts.syncSkill !== false) steps.push(syncRuntimeSkill(sourceRoot, profile, env));
   else steps.push({ step: "sync repo-harness skill runtime", status: "skipped", detail: "disabled" });

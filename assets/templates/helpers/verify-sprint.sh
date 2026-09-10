@@ -604,19 +604,22 @@ materialize_automatic_architecture_projection() {
   local changed_paths=("$@")
   local readiness result status projection_exit
 
-  [[ -f ".ai/harness/policy.json" ]] || return 0
+  ((${#changed_paths[@]} > 0)) || return 0
   command -v jq >/dev/null 2>&1 || {
     echo "verify-sprint: jq is required to resolve automatic architecture projection policy" >&2
     return 1
   }
-  jq -e '.architecture.projection_apply == "automatic"' ".ai/harness/policy.json" >/dev/null 2>&1 || return 0
-  ((${#changed_paths[@]} > 0)) || return 0
 
   resolve_architecture_projection_cli || return 1
   if ! readiness="$("${ARCHITECTURE_PROJECTION_CLI[@]}" architecture-projection status --json)"; then
     echo "verify-sprint: automatic architecture projection readiness check failed" >&2
     return 1
   fi
+  case "$(printf '%s' "$readiness" | jq -r '.apply.mode')" in
+    disabled|manual) return 0 ;;
+    automatic) ;;
+    *) echo "verify-sprint: invalid global projection mode" >&2; return 1 ;;
+  esac
   if ! printf '%s' "$readiness" | jq -e '.apply.mode == "automatic" and .apply.enabled == true' >/dev/null 2>&1; then
     printf '%s\n' "$readiness" >&2
     echo "verify-sprint: automatic architecture projection is configured but not ready" >&2

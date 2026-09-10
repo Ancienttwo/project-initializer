@@ -85,12 +85,12 @@ describe("AXR7 repo-harness architecture consumer", () => {
     expect(manifest.provenance?.projectionInputDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  test("keeps the self-hosted consumer in automatic apply with strict gates", () => {
+  test("keeps project freshness strict without authoring host projection preferences", () => {
     const policy = JSON.parse(readFileSync(join(ROOT, ".ai", "harness", "policy.json"), "utf8"));
     expect(policy.context.capability_source).toBe("archcontext");
-    expect(policy.architecture.projection_provider).toBe("archctx");
-    expect(policy.architecture.projection_apply).toBe("automatic");
-    expect(policy.architecture.projection_failure_gate).toBe("strict");
+    expect(policy.architecture.projection_provider).toBeUndefined();
+    expect(policy.architecture.projection_apply).toBeUndefined();
+    expect(policy.architecture.projection_failure_gate).toBeUndefined();
     expect(policy.architecture.freshness_gate).toBe("strict");
     expect(policy.architecture.diagram_skill).toBe("mermaid");
     expect(policy.architecture.vendoring_policy).toBe("do-not-vendor-diagram-skill-assets");

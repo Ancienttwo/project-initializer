@@ -1,3 +1,4 @@
+import { loadArchitectureProjectionPolicy } from './projection-config';
 import {
   PROJECTION_REQUEST_VERSION,
   type ArchitectureProjectionPolicy,
@@ -7,7 +8,6 @@ import {
 import {
   architectureProjectionOwnedPaths,
   captureArchitectureProjectionSnapshot,
-  loadArchitectureProjectionPolicy,
   runArchitectureProjection,
   type ArchitectureProjectionProviderDiagnostic,
   type ArchctxProviderOptions,
@@ -72,7 +72,7 @@ export function drainArchitectureProjectionJobs(
   const observedPaths = events.flatMap((event) => event.changed_paths);
   let policy: ArchitectureProjectionPolicy;
   try {
-    policy = options.policy ?? loadArchitectureProjectionPolicy(root);
+    policy = options.policy ?? loadArchitectureProjectionPolicy(options.env);
   } catch (error) {
     return failPreflight(root, events, observedPaths, now, null, error, options.acceptedChange);
   }
