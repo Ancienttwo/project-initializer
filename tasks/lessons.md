@@ -13,6 +13,12 @@
 ## Active Lessons
 
 - Date: 2026-09-09
+- Triggered by correction: projection receipts naming bc2328db were called stale while this checkout's HEAD/main actually remained at bc2328db; only origin/main had advanced.
+- Mistake pattern: treating remote-tracking movement, generation stamps, and the executing checkout's identity as interchangeable evidence of a late writer.
+- Prevention rule: align HEAD/main/origin reflogs with receipt timestamps and actual manifest content before attributing a reverse write. A noop receipt is not a filesystem write trace; generation timestamp order is not Git ancestry.
+- Where to apply next time: projection incident diagnosis; evidence and limits in `docs/researches/20260909-projection-manifest-writer-investigation.md`.
+
+- Date: 2026-09-09
 - Triggered by correction: a workflow-evidence digest failure in the combined CI gate suppressed the functional test run.
 - Mistake pattern: making functional failure visibility depend on unrelated governance checks passing first.
 - Prevention rule: run governance and functional/package checks in independent hosted jobs; keep `Required / CI` as an `always()` aggregate that accepts only success from every dependency. Preserve the complete local/release gate through `scripts/check-ci.sh` with no arguments.
