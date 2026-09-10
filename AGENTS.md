@@ -61,13 +61,15 @@ This repository self-hosts the `repo-harness` contract; the former `repo-harness
 Verification is risk-scoped. The active task contract's JSON `Verification Plan`
 owns executable checks; `exit_criteria` owns artifact requirements. Run focused
 tests for every changed behavior. The following repository-integrity checks are required for
-substantive repository changes; `check:hooks` and `check:helpers` catch a
-projection edited without its authoring source in `scripts/`, so that drift fails
-here instead of only in `scripts/check-ci.sh governance`:
+substantive repository changes; `check:hooks`, `check:helpers`, and
+`check:reference-configs` catch a projection edited without its authoring source
+in `scripts/`, `assets/hooks/`, or `assets/reference-configs/`, so that drift
+fails here instead of only in `scripts/check-ci.sh governance`:
 
 ```bash
 bun run check:hooks
 bun run check:helpers
+bun run check:reference-configs
 bash scripts/check-deploy-sql-order.sh
 bash scripts/check-architecture-sync.sh
 bash scripts/check-task-sync.sh

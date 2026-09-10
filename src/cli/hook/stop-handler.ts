@@ -38,6 +38,7 @@ import { drainArchitectureProjectionJobs, type ArchitectureProjectionDrainResult
 import { loadArchitectureProjectionPolicy } from '../../effects/architecture/projection-config';
 import { publishArchitectureProjectionRestampForDrain } from '../../effects/architecture/restamp-publication';
 import { runMinimalChangeCli } from './minimal-change-cli';
+import { sweepRunSummaries } from '../../effects/run-summary-retention';
 import {
   MINIMAL_CHANGE_AUDIT_RECEIPT_PATH,
   loadMinimalChangePolicy,
@@ -421,6 +422,7 @@ class StopProjectionBatch {
 function projection(repoRoot: string, activePlan: string | null, env: NodeJS.ProcessEnv, now: Date): {
   paths: ProjectionPaths;
   content: { handoff: string; resume: string; event: string; runSummary: string };
+  retention: { runsDir: string };
 } {
   // EPC-07: handoff/resume content now comes from the single recovery
   // materializer (src/effects/evidence/recovery-materializer.ts) instead of
@@ -482,6 +484,7 @@ function projection(repoRoot: string, activePlan: string | null, env: NodeJS.Pro
   return {
     paths: { handoff: context.paths.handoff, resume: context.paths.resume, events: context.paths.events, runSummary },
     content: { handoff: handoffContent, resume: resumeContent, event: eventContent, runSummary: runSummaryContent },
+    retention: { runsDir: context.paths.runsDir },
   };
 }
 
@@ -782,6 +785,15 @@ export function runStopHandler(opts: StopHandlerInput): StopHandlerResult {
     dependencies.afterProjectionWrite,
   ).commit();
   dependencies.observeProjectionTransaction?.();
+  try {
+    // Bounds the summary this Stop just wrote. Retention is fail-open here for
+    // the same reason checkpoint publication above is: reclaiming disk can
+    // never be the thing that fails a Stop. `repo-harness run evidence-gc` is
+    // the operator path when this quiet sweep cannot run.
+    sweepRunSummaries({ repoRoot, ...projected.retention });
+  } catch {
+    // Run-summary retention never blocks Stop.
+  }
 
   const stderr: string[] = [`[FinalizeHandoff] Refreshed ${projected.paths.handoff}.\n`];
   for (const warning of driftWarnings) stderr.push(`${warning}\n`);

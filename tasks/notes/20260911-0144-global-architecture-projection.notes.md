@@ -55,3 +55,7 @@ The existing fleet-acquire regression reproduced the missing-CLI error before th
 Acceptance base refreshed to main e238a73a after concurrent PRs landed. Their changes are target content, not this task scope.
 
 > **Substantive Change SHA256**: `sha256:ed46a46061112fc50f4a31e4e9c92615f22aa0da8e204ab66a91314274cd0911`
+
+Main advanced to 75410260 during CI. Merge retained upstream retention changes and the existing Stop runtime alias; only the import and todo timestamp conflicted.
+
+> **Substantive Change SHA256**: `sha256:890686feb12a80371cb0c63c656ac82cd4327f0b8ca5b438e54996e771b1fefd`
