@@ -1,7 +1,7 @@
 # Deferred Goal Ledger
 
 > **Status**: Backlog
-> **Updated**: (archive-workflow)
+> **Updated**: 2026-09-10
 > **Scope**: Medium/long-term goals deferred from active plan execution
 
 Current plan tasks live in the active plan's `## Task Breakdown`.
@@ -13,6 +13,8 @@ Audit evidence and closure rationale: `docs/researches/20260907-deferred-goal-le
 
 | Goal | Why Deferred | Tradeoff | Revisit Trigger |
 |------|--------------|----------|-----------------|
+| BRC14 — fresh GPT Pro main audit 与 exact-SHA 版本准入消费 | Owner 于 2026-09-10 禁止容器执行基底，而 campaign 的执行证据契约整条绑死容器 receipt（`scripts/contract-run.ts:181-183,234-239`、`src/effects/automation/campaign-worker.ts:140`、`src/core/automation/campaign-runtime.ts:20-21,51-73`、`src/effects/automation/campaign-runtime.ts:28-91,110-131`）；纯宿主机 BRC 路径未设计、未实作，fresh audit 与版本准入没有可运行的对应物 | fresh audit 从未执行，exact-SHA 准入未接线，group 2/3 sequencing 未验证；sprint 行以 Owner scope amendment 关闭，Phase A 的 audit 收口能力在纸面上存在但从未被证明 | Owner 决定宿主机 BRC 执行证据契约，或重新允许容器 worker |
+| BRC15 — Canary 1（model-free 故障集）与 activation ladder 推进 | 同一个执行基底冲突：Canary 1 的闭集错误词汇断言与 ladder 的每一级都绑定当前容器证据形状，换基底后旧观测不可跨基底复用；2026-09-09/10 的 9 个 campaign 均停在 worker preparation 之后 | Canary 1 未做，Canary 3 只做到「PR 自动生成 + 人工 merge」，自动 Issue closure/cleanup/fresh audit 未跑通；`development_campaign.mode` 停在 `off`，`active/manual` 未被真实 canary 证明 | Owner 决定宿主机 BRC 执行证据契约，或重新允许容器 worker |
 | Derive the claim-scope canonical fence from the lease record | The fleet collector still reads the main checkout's active-sprint marker to resolve a claim's canonical source, which is the wrong authority when the claim's own lease already names one | A worktree whose lease points at a different sprint than the main checkout's marker is observed against the wrong canonical row | A repository observed with two live sprints, or the next change to `readActiveSprintPath` callers |
 | Let R1 delivery and reachability contribute to the Fleet card `attention_owner` | Whether an unreachable Agent Runtime is the operator's problem or the agent's is a product contract decision, not an implementation detail of the card projection | A card whose runtime is unreachable reports `attention_owner: 'none'` unless another signal raises it | The Task Board defining who owns a stalled runtime |
 | Decide whether `addressed_to_current_claim` means more than `unread_count > 0` | The Fleet card currently derives it from the unread count alone, so it carries no independent fact; whether an unread message is addressed to the live claim is a Task Board product contract decision, not a projection detail | An operator reading the card cannot distinguish "there is unread mail" from "the current claimant is the addressee" | The Task Board defining per-claim addressing, or the next change to the card's inbox projection |

@@ -1,9 +1,9 @@
 # Sprint: GPT Pro-Seeded Bounded Repair Campaign (Phase A)
 
-> **Status**: Approved
+> **Status**: Done
 > **Slug**: `gpt-pro-seeded-repair-campaign`
 > **Created**: 2026-09-02 22:38
-> **Updated**: 2026-09-08 05:50
+> **Updated**: 2026-09-10 23:31
 > **Source PRD**: `plans/prds/20260902-2238-gpt-pro-seeded-repair-campaign.prd.md`
 > **Parent Design**: `plans/prds/20260828-2321-guarded-merge-unattended-automation.prd.md`
 > **Source Spec**: `docs/spec.md`
@@ -169,8 +169,8 @@ Ordered execution queue；保持依赖顺序。Mode `contract` 走完整 plan ->
 | 13 | 691bf0c1961cd506c2a3f63b031581d21445eb4f2f243356ade6cdb04e1aa812 | [x] | BRC9 — Campaign budget 与 attempt receipts（消费 #282/#287 子集） | contract | 消费已落地的 #282 与 #287 的 campaign 必要子集；未落地则该行 blocked。落地后断言：限额覆盖 campaign wall-clock deadline、controller step 数、GPT authoring rounds、成功 acquisition 数、provider 调用数、per-task repair cycles、连续 no-progress steps、连续 transient failures；每个 side effect 前先 reserve，reservation 后崩溃阻止二次消费，same-key 不 double charge；attempt 结果为闭集（completed / not_reproducible / user_blocked / external_blocked / transient_failure / permanent_failure / lease_lost / cancelled / reconciliation_required）；max retry 后 `campaign_retry_exhausted`；user 与 permanent blocker 不自动 retry；deterministic backoff；budget 耗尽在下一次 claim 或 dispatch 之前停止；无可验证 token usage 时不得声称执行 token hard limit | `plans/archive/plan-20260907-0348-brc9-transient-retry-consumption.md` |
 | 14 | fb27ce861a78e077dc9b72f64a607e51e8baaefbbec28bd99af92362b5d997c4 | [x] | BRC10 — Lease liveness 与 controller recovery（消费 #286） | contract | 消费已落地的 #286；未落地则该行 blocked。落地后断言：current owner 可 generation-fenced renew，旧 generation 不能续期；expiry 本身不等于 dead，不得仅凭超时或 PID 抢 Lease；active provider effect 与 completing/reviewing 状态保护 Lease；liveness unknown 只产生 attention 不产生 takeover；evidence-gated reclaim 走既有 steal 路径；两个 reclaimer 只有一个成功；controller crash 后可从 append-only journal 恢复且不制造双 owner | `plans/archive/plan-20260907-0554-brc10-lifecycle.md` |
 | 15 | e71d90886c21eff5e34cd9e8046c270c9f1972669faeb31b0db49d7cc344e806 | [x] | BRC13 — Issue closure 与 exact branch/worktree cleanup（人工 merge 之后） | contract | 顺序固定且不可调换：人工 merge → 验证 merge commit 可从 current main 到达 → 关闭 Issue → 删远程分支 → 移除本地 worktree → 删本地分支 → 持久化 `CampaignCleanupReceiptV1`；未 merge 不能以 `completed` 关闭；source Issue drift 阻止自动 close；一个 Issue 对应多个 Task 时全部完成才 close；本地证伪用 `not_planned` 并保留 falsifier 证据；closure comment 记录 campaign/group/slot、base main、exact Issue observation、disposition、merge SHA 或证据、本地验收结果；close 请求 persist-first，结果未知先 reconcile 不直接重试；远程分支只按 exact ref 删除，已不存在为幂等成功；dirty worktree 拒绝清理并返回 `cleanup_blocked_dirty_worktree`，foreign Lease 引用的 worktree 拒绝；merge 成功但 cleanup 失败时 group 进入 `cleanup_pending` 且不进入下一组 | `plans/archive/plan-20260907-1224-brc13-closeout.md` |
-| 16 | 4c28bc09a21de8d6047778b797cca0e07f4fb92604ae8f1bf09f15bb0afcf3a4 | [ ] | BRC14 — Fresh GPT Pro main audit 与 1/2/3 group sequencing | contract | audit 必须是新会话且不能是 authoring session；读 exact `final_main_sha` 并由本地校验 `observed_main_sha == expected_main_sha`；audit 必须消费 BRC6a 的版本读取证据；现有 `challenge_verified` 只证明抽样内容一致，即使全部命中也不能单独证明 exact main；缺少可验证 revision 证据时按 `unverified` 停止，不进入下一组；模型自述的 Connector 调用不构成证据（Connector 探针已证明 `verified` 这个 UI 观察等级在 oracle_browser 下不可达）；所有 slot（含 `unfilled`）在 audit 输入中被完整交代；audit 不得创建或修改 Issue、不得 reopen、不得把 follow-up 自动扩成 Group 4；`accepted` 才启动下一组，`accepted_with_followups` 不突破 `group_count`，`rejected` 停止且不自动 rollback main，`unverified` 不进入下一组但可在预算内有界重试；Group 2 基于 Group 1 final main、Group 3 基于 Group 2 final main；达到授权 group count 后 controller 进入 terminal |  |
-| 17 | b45c1b05078577dad30e0c57d8b48f075e969f9cfb9c44368b67c4c112fcec92 | [ ] | BRC15 — Canary 1/3 与 activation ladder（消费 Canary 2） | contract | Canary 1（model-free）：fake GitHub 与 fake GPT 覆盖 10 slot、第 7 项断线、duplicate slot、malformed metadata、issue edit drift、controller crash、cleanup crash、audit wrong SHA，全部收敛到闭集错误词汇且无一降级为 warning。Canary 2 由 BRC15a 单独执行并消费其完整观测记录；不得把抽样读回升级成 exact-SHA acceptance。Canary 3（active/manual merge）：一个 group、`max_parallel_tasks=2`（上限；记录实际串行/重叠，不要求重叠吞吐），PR 自动生成、merge 人工执行、Issue closure 与 cleanup 自动、fresh GPT audit 收口。Activation ladder 逐级不可跳级：`off → shadow → active/manual`，Phase A 到此为止，`auto-low-risk` 与 canary 4/5 属 Phase B |  |
+| 16 | 4c28bc09a21de8d6047778b797cca0e07f4fb92604ae8f1bf09f15bb0afcf3a4 | [x] | BRC14 — Fresh GPT Pro main audit 与 1/2/3 group sequencing | contract | audit 必须是新会话且不能是 authoring session；读 exact `final_main_sha` 并由本地校验 `observed_main_sha == expected_main_sha`；audit 必须消费 BRC6a 的版本读取证据；现有 `challenge_verified` 只证明抽样内容一致，即使全部命中也不能单独证明 exact main；缺少可验证 revision 证据时按 `unverified` 停止，不进入下一组；模型自述的 Connector 调用不构成证据（Connector 探针已证明 `verified` 这个 UI 观察等级在 oracle_browser 下不可达）；所有 slot（含 `unfilled`）在 audit 输入中被完整交代；audit 不得创建或修改 Issue、不得 reopen、不得把 follow-up 自动扩成 Group 4；`accepted` 才启动下一组，`accepted_with_followups` 不突破 `group_count`，`rejected` 停止且不自动 rollback main，`unverified` 不进入下一组但可在预算内有界重试；Group 2 基于 Group 1 final main、Group 3 基于 Group 2 final main；达到授权 group count 后 controller 进入 terminal | `docs/researches/20260910-brc1415-canary3-closeout.md` |
+| 17 | b45c1b05078577dad30e0c57d8b48f075e969f9cfb9c44368b67c4c112fcec92 | [x] | BRC15 — Canary 1/3 与 activation ladder（消费 Canary 2） | contract | Canary 1（model-free）：fake GitHub 与 fake GPT 覆盖 10 slot、第 7 项断线、duplicate slot、malformed metadata、issue edit drift、controller crash、cleanup crash、audit wrong SHA，全部收敛到闭集错误词汇且无一降级为 warning。Canary 2 由 BRC15a 单独执行并消费其完整观测记录；不得把抽样读回升级成 exact-SHA acceptance。Canary 3（active/manual merge）：一个 group、`max_parallel_tasks=2`（上限；记录实际串行/重叠，不要求重叠吞吐），PR 自动生成、merge 人工执行、Issue closure 与 cleanup 自动、fresh GPT audit 收口。Activation ladder 逐级不可跳级：`off → shadow → active/manual`，Phase A 到此为止，`auto-low-risk` 与 canary 4/5 属 Phase B | `docs/researches/20260910-brc1415-canary3-closeout.md` |
 
 ## Execution Dependencies Requiring Resolution
 
@@ -208,6 +208,23 @@ Owner 明确指示：“BRC6a可以关了，已证实可用”。据此以实际
 
 逐项 Acceptance 映射与原始 prompt、十个 Issue body、parser blob、budget admission/settlement 见 `docs/researches/20260908-brc15a-offline-metadata-replay.md`。结果为 **10/10 marker 覆盖，0/10 metadata 合格，无合格可采纳批次，修复价值未评估**。canonical observer 是配置失败，adoption 是 session 上游拒绝；补缺与下游 active 链路未覆盖，不记为通过。Owner 后续投入已收窄到 metadata 定因及既有安全前置条件。任务收口不修改 stopped campaign、不授予 active、不复用旧预算；BRC6a 保持 Owner-closed。
 
+## BRC14/BRC15 Owner scope amendment — 2026-09-10
+
+Owner 于 2026-09-10 禁止容器执行基底。campaign 的执行证据契约整条绑死容器 receipt（`scripts/contract-run.ts:181-183,234-239`、`src/effects/automation/campaign-worker.ts:140`、`src/core/automation/campaign-runtime.ts:20-21,51-73`、`src/effects/automation/campaign-runtime.ts:28-91,110-131`，行号相对 `9cc12bac`），纯宿主机 BRC 路径未设计、未实作。BRC14 与 BRC15 的 acceptance 建立在这条链上，换基底后没有可运行的对应物。
+
+据「Execution Dependencies Requiring Resolution」末条要求，本节即 explicit scope amendment 与 unmet-item record。完整观测、失败根因与不可变状态见 `docs/researches/20260910-brc1415-canary3-closeout.md`。
+
+| 项目 | 原本 acceptance | 实际状态 | 去向 |
+|------|-----------------|----------|------|
+| BRC14 fresh GPT Pro main audit | 新会话 audit 读 exact `final_main_sha`，本地校验 `observed_main_sha == expected_main_sha` | 从未执行 | `tasks/todos.md` deferred goal |
+| BRC14 exact-SHA 版本准入消费 | audit 消费 BRC6a 的版本读取证据，缺证据按 `unverified` 停止 | 未接线 | `tasks/todos.md` deferred goal |
+| BRC14 group 1/2/3 sequencing | `accepted` 才启动下一组，Group 2 基于 Group 1 final main、Group 3 基于 Group 2 | 未验证，无 group 达到 `accepted` | `tasks/todos.md` deferred goal |
+| BRC15 Canary 1（model-free） | fake GitHub 与 fake GPT 覆盖 10 slot、第 7 项断线、duplicate slot、malformed metadata、issue edit drift、controller crash、cleanup crash、audit wrong SHA，全部收敛到闭集错误词汇 | 未做 | `tasks/todos.md` deferred goal |
+| BRC15 Canary 3（active/manual） | 一个 group、`max_parallel_tasks=2`，PR 自动生成、merge 人工执行、Issue closure 与 cleanup 自动、fresh GPT audit 收口 | 9 个 campaign 停在 worker preparation 之后；只做到 PR 自动生成 + 人工 merge；自动 closure/cleanup/fresh audit 未跑通 | 研究文档留档；重启需先定执行基底 |
+| BRC15 activation ladder | `off → shadow → active/manual` 逐级不可跳级，Phase A 到 `active/manual` 为止 | 停在 `off`，`active/manual` 未被真实 canary 证明 | `tasks/todos.md` deferred goal |
+
+campaign `byok-brc1415-20260910-host-verification` 已 `stop`（revision 4，event `sha256:4a402198a483fccd58f37c7a5f4d10b1489a53fee4e477ec04934398bfe78452`，observed_at `2026-09-10T15:26:03.277Z`），lease 已 released，grant 自然到期，immutable preparation 记录保留。产品侧 PR byok-sdk#182 由 Owner 人工 squash 合入，#177 人工关闭、#178 以 `not planned` 关闭 —— 这些是人工动作，不构成 campaign 验收。本次收口不授予 active、不修改运行时 gate、不复用旧预算。
+
 ## Execution Log
 
 Keep this section last; `repo-harness run sprint-backlog complete-task` appends rows here.
@@ -231,3 +248,5 @@ Keep this section last; `repo-harness run sprint-backlog complete-task` appends 
 | 2026-09-07 14:59 | BRC13 — Issue closure 与 exact branch/worktree cleanup（人工 merge 之后） | `plans/archive/plan-20260907-1224-brc13-closeout.md` | done |
 | 2026-09-08 05:02 | BRC6a — Readback evidence boundary correction（覆盖 BRC6/BRC14） | (none) | done |
 | 2026-09-08 05:50 | BRC15a — Real GPT shadow canary 与价值观测 | `docs/researches/20260907-brc15a-real-shadow-canary.md` | done |
+| 2026-09-10 23:31 | BRC14 — Fresh GPT Pro main audit 与 1/2/3 group sequencing | `docs/researches/20260910-brc1415-canary3-closeout.md` | done |
+| 2026-09-10 23:31 | BRC15 — Canary 1/3 与 activation ladder（消费 Canary 2） | `docs/researches/20260910-brc1415-canary3-closeout.md` | done |
