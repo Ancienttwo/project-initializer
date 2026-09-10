@@ -47,7 +47,7 @@ Execution remains off while a complete provider observation produces exactly one
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"focused-regression","kind":"deterministic_test","paths":["*"]}]}
 ```
 
 ## Acceptance Policy

@@ -46,3 +46,7 @@ Promote a candidate to `tasks/lessons.md`, `docs/researches/`, or harness asset 
 - Promote to harness asset files only after verification across more than one task or fixture.
 
 > **Substantive Change SHA256**: `sha256:4ab9e6caa040b348869df71df436641b397043a4484539eb2042f8310820602c`
+
+## Verification and delivery boundary
+
+Frozen implementation at b251dbca passed all 12 declared commands (63 focused tests plus the global bootstrap test, typecheck and required integrity checks). The enclosing prepare gate identified an empty Change Assessment oracle list; this contract metadata is now bound to focused-regression. No product code or timing thresholds changed. PR #408 is stacked on #401; formal external acceptance remains pending.
