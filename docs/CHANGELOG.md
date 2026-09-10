@@ -4,7 +4,21 @@ All notable changes to this skill are documented here.
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-09-11
+
+### Added
+
+- **Proactive refactor recommendations.** Normal Stop and `refactor recommendations --repo <root> --json` surface measured opportunities. The Agent explains evidence, inferred benefit and risk, then asks the user whether to proceed. Observation does not create plans, accept recommendations or enable execution.
+- **One global architecture projection configuration.** Global install/update initializes shared projection preferences once. Repository init reports readiness; CLI, Stop and helper consumers read the same per-user authority.
+- **Repository-scoped Operator boards and fenced worktree diffs.** The selected repository scopes the board, while task diffs remain read-only and bound to the requested worktree identity.
+- **Bounded auto-campaign turns and explicit stale-registry pruning.** Campaign turns retain their approval, budget and evidence boundaries; registry pruning is an explicit operator action.
+- **Evidence reclaim tooling.** Stop bounds only its own recomputable summaries, preserving verifier execution records. The reclaim path reports and removes only data owned by its retention policy.
+
 ### Fixed
+
+- Campaign preparation retries the identical admitted request only before runtime effects, without renewing its deadline.
+- Protected helper execution binds the main CLI and Hook CLI to the same trusted package for architecture readiness.
+- Recommendation delivery retains prior identities; ledger exhaustion pauses delivery explicitly instead of repeating old prompts.
 
 - **Fleet and bundled cross-review upgrades honor installation ownership.**
   Unchanged files recorded in the installation manifest can now upgrade to a
@@ -20,6 +34,12 @@ All notable changes to this skill are documented here.
   affected repository to fill missing defaults; explicit malformed values must
   be corrected deliberately. Global runtime refresh alone does not update
   repository policy.
+
+### Upgrade notes
+
+Run `repo-harness update` once to initialize the global architecture and recommendation settings. Projection execution settings now come from `~/.repo-harness/config.json`; repository-local execution keys no longer control projection. Explicit global disabled choices are preserved. Recommendations require an existing architecture model and complete code facts. Refactor execution still requires explicit user approval and the normal execution gates.
+
+BRC native-host execution is not enabled by this release; its execution contract remains deferred.
 
 ## [0.19.0] - 2026-09-10
 
@@ -960,7 +980,6 @@ front of agents at the two moments it matters (WP3).
   to 5s with its `timedOut === false` fence unchanged; and a `Bun.sleep(100)`
   race there becomes an event race on the production drain-then-release
   ordering, which also gains a vacuity guard the sleep version lacked.
-
 
 ## [0.13.0] - 2026-08-04
 
