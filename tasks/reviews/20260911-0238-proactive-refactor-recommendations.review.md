@@ -8,9 +8,9 @@
 > **Last Updated**: 2026-09-11 02:38
 > **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: sha256:fde67d4f55ab22f03cdeefdfdd976c641fed016d27432fdcac5e48673a6c3f27
+> **Reviewed Subject SHA256**: sha256:b028a720c0bb4d1fe6a91b8fab43788813ea8f574516ac065cbb5d30e1f8c24a
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: 7541026031d74e46bd5b6a65c653fcff31b0e6ce
+> **Reviewed Target Revision**: 9563083c8fcbbdbf2b88a2d76b5dc5e0a1ac1142
 
 ## Human Review Card
 
@@ -44,11 +44,11 @@
 > **Reviewer**: User
 > **Source**: user-waiver
 > **Actor**: kito
-> **Reviewed Subject SHA256**: sha256:fde67d4f55ab22f03cdeefdfdd976c641fed016d27432fdcac5e48673a6c3f27
+> **Reviewed Subject SHA256**: sha256:b028a720c0bb4d1fe6a91b8fab43788813ea8f574516ac065cbb5d30e1f8c24a
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: 7541026031d74e46bd5b6a65c653fcff31b0e6ce
-> **Verification Evidence SHA256**: sha256:00ead8a389057e71f59f11b469148ed13b44383dbe7844f8bd4acbd65f818790
-> **Issued At**: 2026-09-10T20:17:44.380Z
+> **Reviewed Target Revision**: 9563083c8fcbbdbf2b88a2d76b5dc5e0a1ac1142
+> **Verification Evidence SHA256**: sha256:c537895656a1391352add0e5f27f198eb1dde5542789a0dd5d6a58c852acefdc
+> **Issued At**: 2026-09-10T20:55:02.013Z
 
 - Summary: Owner explicitly requested merge after being informed that final acceptance is recorded as user_waiver; CI remains required.
 - Findings: none

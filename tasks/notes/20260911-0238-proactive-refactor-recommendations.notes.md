@@ -70,3 +70,9 @@ Official codex-plugin review approved beacd220 against base 76b05000 with zero f
 Owner-accepted base compare binding:
 
 > **Substantive Change SHA256**: `sha256:fa594bc54244c2e29ffede088c8d3e5d1b68777869df428ce8ad700fe243587e`
+
+## Main publication boundary
+
+PR #401 was squash-merged as 9563083c. Merging that published baseline into this branch resolved only repeated-history conflicts: the resulting complete tree is identical to the passing CI subject 4b68c9be. The PR now targets main. Refresh acceptance for the new target using the existing owner grant; CI remains required.
+
+> **Substantive Change SHA256**: `sha256:fc6e1ac0ece02c467bdf41dbc7dd844edf770bb9eb943fa138313cf377f28f6a`
