@@ -22,3 +22,8 @@ The user additionally requested a v0.19 proactive refactoring discovery check af
 Final review delta: malformed Node readiness now exits nonzero instead of emitting a synthetic provider/apply pair. Both Node-only valid-policy and corrupt-readiness checks pass. Remote main advanced from 8fc92c08 to 09e4a4d0 with only a projection manifest rebind (#400); the branch incorporates that manifest-only update before final prepared evidence. External current-target merge acceptance remains pending.
 
 > **Substantive Change SHA256**: `sha256:bee75aaab8faa2213b92fd281c0193a9112052c8671193105f515d3a6cf38f43`
+
+PR merge-base evidence (09e4a4d0; source unchanged from final passing preparation):
+> **Substantive Change SHA256**: `sha256:b5bc1f792456ca2603e9413400a749aa6b6d3b342d0498af285f13abde339c4d`
+
+Final preparation: 25/25 checks passed, run `run-20260911T021315-69480-20260911-0144-global-architecture-projection.json`, evidence event `evt-01M268DR3704SJRDCK8X8WPH5X`. PR #401 is open as draft pending external acceptance.
