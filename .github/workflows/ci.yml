@@ -161,7 +161,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: MCP path security and protected helper platform tests
+      - name: MCP path security, protected helper, and checkpoint durability platform tests
         env:
           REPO_HARNESS_WINDOWS_PROTECTED_HELPER_SMOKE: "1"
         run: >-
@@ -174,6 +174,7 @@ jobs:
           tests/cli/mcp-stdio.test.ts
           tests/effects/fleet-collector-process.test.ts
           tests/cli/windows-protected-helper-runtime-smoke.test.ts
+          tests/evidence-checkpoint.test.ts
 
   # Stable aggregate context for branch protection. Binding protection to the
   # individual jobs means the matrix OS list is part of the protection rule:

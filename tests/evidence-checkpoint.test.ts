@@ -1,5 +1,6 @@
 import { describe, expect, test, spyOn } from "bun:test";
 import {
+  constants,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,7 +13,7 @@ import {
 } from "fs";
 import * as fs from "fs";
 import { tmpdir } from "os";
-import { dirname, join } from "path";
+import { dirname, join, sep } from "path";
 
 import type { EvidenceEventRecord, SubjectIdentity, TrustClass } from "../src/core/evidence/types";
 import { appendEvidenceEvent, appendGenesisRecord, readAcceptedEvents } from "../src/effects/evidence/event-log";
@@ -26,6 +27,7 @@ import {
   pruneCheckpointCache,
   publishCheckpoint,
   publishCheckpointFromLedger,
+  checkpointSyncPlan,
   resolveCheckpointMarkerPath,
   resolveCheckpointsDir,
   resolveLastPublishedCheckpoint,
@@ -380,7 +382,7 @@ describe("checkpoint-store: retention safety", () => {
       try {
         publishCheckpointFromLedger(repoRoot, FIXED_NOW);
         const paths = writes.mock.calls.map(call => String(call[0]));
-        expect(paths.some(path => path.includes("/stage-") || path.includes("last-published.json"))).toBe(false);
+        expect(paths.some(path => path.includes("stage-") || path.includes("last-published.json"))).toBe(false);
         expect(statSync(marker).ino).toBe(before.ino);
         expect(statSync(marker).mtimeMs).toBe(before.mtimeMs);
       } finally { writes.mockRestore(); }
@@ -441,6 +443,30 @@ describe("checkpoint-store: retention safety", () => {
         if (result.found) expect(result.resolved.projection.covered_event_count).toBe(2);
       } finally { reads.mockRestore(); }
     });
+  });
+});
+
+describe("checkpoint-store: platform durability plan", () => {
+  const noFollow = constants.O_NOFOLLOW ?? 0;
+
+  test("win32 flushes files through a writable handle and performs no directory fsync", () => {
+    const plan = checkpointSyncPlan("win32");
+    // FlushFileBuffers rejects a read-only handle (EPERM) and cannot flush a
+    // directory handle at all, so the Windows plan must differ in exactly
+    // these two ways -- otherwise publication throws and Stop swallows it.
+    expect(plan.syncDirectories).toBe(false);
+    expect(plan.fileOpenFlags & constants.O_RDWR).toBe(constants.O_RDWR);
+    expect(plan.fileOpenFlags & noFollow).toBe(0);
+  });
+
+  test("posix keeps the read-only, symlink-refusing handle and the directory fsync", () => {
+    for (const platform of ["darwin", "linux"]) {
+      const plan = checkpointSyncPlan(platform);
+      expect(plan.syncDirectories).toBe(true);
+      expect(plan.fileOpenFlags & constants.O_RDWR).toBe(0);
+      expect(plan.fileOpenFlags & noFollow).toBe(noFollow);
+      expect(plan.fileOpenFlags).toBe(constants.O_RDONLY | noFollow);
+    }
   });
 });
 
@@ -682,7 +708,7 @@ describe("checkpoint-store: human view filename is never read back", () => {
     const offenders: string[] = [];
     for (const root of roots) {
       for (const absPath of listFiles(root.dir, root.exts)) {
-        const relPath = absPath.slice(REPO_ROOT.length + 1);
+        const relPath = absPath.slice(REPO_ROOT.length + 1).split(sep).join("/");
         if (relPath === STORE_MODULE) continue;
         const content = readFileSync(absPath, "utf-8");
         if (content.includes(CHECKPOINT_HUMAN_FILENAME)) offenders.push(relPath);

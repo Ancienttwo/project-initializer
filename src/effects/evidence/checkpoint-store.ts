@@ -92,22 +92,52 @@ export interface CheckpointRetentionResult {
   readonly skipped: readonly string[];
 }
 
-function syncCheckpointPath(path: string): void {
+export interface CheckpointSyncPlan {
+  readonly fileOpenFlags: number;
+  readonly syncDirectories: boolean;
+}
+
+/**
+ * Durability is the same policy on every platform -- flush the published
+ * bytes before anything may collect the previous copy -- but the syscall
+ * boundary differs. On win32 fsync is `FlushFileBuffers`, which needs a
+ * handle opened with write access (a read-only handle fails EPERM) and
+ * cannot flush a directory handle at all; NTFS journals the rename metadata
+ * a POSIX directory fsync would cover, so Windows durability is "flush the
+ * file, skip the directory". `O_NOFOLLOW` does not exist on win32. Kept a
+ * pure function of the platform string so both branches stay asserted from
+ * any host; the failure it prevents is a thrown EPERM that Stop swallows,
+ * which would silently stop checkpoint publication on Windows.
+ */
+export function checkpointSyncPlan(platform: string): CheckpointSyncPlan {
+  if (platform === "win32") return { fileOpenFlags: constants.O_RDWR, syncDirectories: false };
+  return { fileOpenFlags: constants.O_RDONLY | constants.O_NOFOLLOW, syncDirectories: true };
+}
+
+const CHECKPOINT_SYNC = checkpointSyncPlan(process.platform);
+
+function syncCheckpointFile(path: string): void {
+  const fd = openSync(path, CHECKPOINT_SYNC.fileOpenFlags);
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function syncCheckpointDirectory(path: string): void {
+  if (!CHECKPOINT_SYNC.syncDirectories) return;
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
 function persistCheckpointDirectory(repoRoot: string, checkpointId: string): void {
   const directory = join(resolveCheckpointsDir(repoRoot), checkpointId);
-  syncCheckpointPath(join(directory, CHECKPOINT_MACHINE_FILENAME));
-  syncCheckpointPath(join(directory, CHECKPOINT_HUMAN_FILENAME));
-  syncCheckpointPath(directory);
-  syncCheckpointPath(resolveCheckpointsDir(repoRoot));
+  syncCheckpointFile(join(directory, CHECKPOINT_MACHINE_FILENAME));
+  syncCheckpointFile(join(directory, CHECKPOINT_HUMAN_FILENAME));
+  syncCheckpointDirectory(directory);
+  syncCheckpointDirectory(resolveCheckpointsDir(repoRoot));
 }
 
 function persistCheckpointMarker(repoRoot: string): void {
-  syncCheckpointPath(resolveCheckpointMarkerPath(repoRoot));
-  syncCheckpointPath(resolveCheckpointsDir(repoRoot));
+  syncCheckpointFile(resolveCheckpointMarkerPath(repoRoot));
+  syncCheckpointDirectory(resolveCheckpointsDir(repoRoot));
 }
 
 /** Only the current marker is live. The append-only ledger owns audit history. */

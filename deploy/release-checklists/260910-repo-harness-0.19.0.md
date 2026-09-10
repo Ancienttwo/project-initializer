@@ -191,3 +191,22 @@ This approval supersedes the preparation-only public-action boundary above.
   Publication and installed-runtime success remain unclaimed until readback.
 - Skill effectiveness evidence remains unavailable. Existing Waza/CodeGraph
   update flags do not change the source or packaged runtime being released.
+
+## Release gate outcome (2026-09-10)
+
+- Execution `vx-29d11f7e074c48acb914` failed on one test
+  (`tests/effects/campaign-authoring-resume.test.ts`, `automation_budget_clock_regression`,
+  clock regressed 21 ms). It stays recorded as a failed run.
+- Root cause: macOS `timed` ran an NTP SYNC at 2026-09-10 20:49:09.454 local and
+  stepped the wall clock back between the `publishAutomationBudget` and
+  `reserveAutomationBudgetAdmission` samples (unified log evidence). The source
+  sampling order was verified correct and left unchanged.
+- Focused rerun of that file: 26/26 passed. Forced rerun
+  `vx-09c0b0b29f8e49cdb6fa` passed (exit 0, 44 minutes) with the force reason
+  recorded. Branch CI run 34479638051 was green.
+- Codex acceptance review then REJECTED the candidate: checkpoint fsync used
+  read-only handles, which fails on Windows (`FlushFileBuffers` needs write
+  access and cannot flush directories), silently stopping checkpoint publication
+  there. Fixed on this branch, with the Windows CI matrix now running
+  `tests/evidence-checkpoint.test.ts`.
+- npm publication and installed-runtime readback: still pending.
