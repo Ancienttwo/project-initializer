@@ -1,8 +1,33 @@
 #!/usr/bin/env bun
+// @generated-from src/effects/evidence/checkpoint-snapshot.ts sha256:3d8fc2f7291fb51077a3a4f3585def86ddf96dfca1b6a9a360b064304abc499d
+// Regenerate with scripts/sync-helper-sources.ts; do not edit by hand.
+/**
+ * Read immutable checkpoint bytes selected by the published marker. Collection
+ * may unlink a superseded directory between those two reads. Only an observed
+ * marker replacement permits reacquisition; an unchanged dangling/corrupt
+ * marker remains an error. Both packaged and standalone readers use this code.
+ */
+export function readCheckpointSnapshot<T>(
+  readMarker: () => string | null,
+  readSnapshot: (marker: string) => T,
+): T | null {
+  let marker = readMarker();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (marker === null) return null;
+    try {
+      return readSnapshot(marker);
+    } catch (error) {
+      const current = readMarker();
+      if (current === marker || current === null) throw error;
+      marker = current;
+    }
+  }
+  throw new Error("checkpoint publication changed repeatedly while acquiring a snapshot");
+}
 // Standalone helper: materializes the handoff/resume recovery views (and
 // optionally the Codex-global packet) from the last-published checkpoint
 // plus live workflow context. Self-contained by necessity -- this file is
-// distributed to adopting downstream repos (mirrored byte-identically to
+// distributed to adopting downstream repos (projected with the shared reader to
 // assets/templates/helpers/recovery-view-cli.ts) which never receive this
 // package's own src/ tree, so it imports Node/Bun builtins only and
 // duplicates (by inspection, kept consistent with) the rendering logic in
@@ -19,6 +44,7 @@
 // never fabricates an evidence claim -- any read/parse failure degrades to
 // the same typed "unavailable" state a renderer shows honestly.
 import { createHash } from "crypto";
+
 import { execFileSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { basename, dirname, join } from "path";
@@ -415,17 +441,21 @@ type Evidence =
 /** Best-effort, gracefully-degrading checkpoint read -- see module doc. */
 function resolveEvidence(repoRoot: string): Evidence {
   const markerPath = join(repoRoot, ".ai/harness/evidence/checkpoints/last-published.json");
-  const markerText = readTextOrNull(markerPath);
-  if (markerText === null) return { available: false, reason: "no-checkpoint" };
   try {
-    const marker = JSON.parse(markerText) as Record<string, unknown>;
-    if (typeof marker.checkpoint_id !== "string" || typeof marker.machine_path !== "string") {
-      return { available: false, reason: "checkpoint-invalid", detail: "marker missing required field" };
-    }
-    const machineText = readTextOrNull(join(repoRoot, marker.machine_path));
-    if (machineText === null) {
-      return { available: false, reason: "checkpoint-invalid", detail: `checkpoint file missing: ${marker.machine_path}` };
-    }
+    const snapshot = readCheckpointSnapshot(
+      () => readTextOrNull(markerPath),
+      markerText => {
+        const marker = JSON.parse(markerText) as Record<string, unknown>;
+        if (typeof marker.checkpoint_id !== "string" || typeof marker.machine_path !== "string") {
+          throw new Error("marker missing required field");
+        }
+        const machineText = readTextOrNull(join(repoRoot, marker.machine_path));
+        if (machineText === null) throw new Error(`checkpoint file missing: ${marker.machine_path}`);
+        return { marker, machineText };
+      },
+    );
+    if (snapshot === null) return { available: false, reason: "no-checkpoint" };
+    const { marker, machineText } = snapshot;
     const projection = JSON.parse(machineText) as Record<string, unknown>;
     if (projection.checkpoint_id !== marker.checkpoint_id) {
       return { available: false, reason: "checkpoint-invalid", detail: "checkpoint_id mismatch" };

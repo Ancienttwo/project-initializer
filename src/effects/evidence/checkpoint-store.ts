@@ -33,9 +33,18 @@
  */
 import { createHash, randomBytes } from "crypto";
 import {
+  closeSync,
+  constants,
   existsSync,
+  fsyncSync,
   mkdirSync,
+  lstatSync,
+  readdirSync,
+  realpathSync,
+  rmdirSync,
+  unlinkSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -44,6 +53,9 @@ import {
 import { dirname, join } from "path";
 import { resolveInsideRepo } from "../path-safety";
 import { readAcceptedEvents } from "./event-log";
+import { resolveLogPath } from "./paths";
+import { readCheckpointSnapshot } from "./checkpoint-snapshot";
+import { acquireExclusiveDirectoryLock } from "../locking/exclusive-directory-lock";
 import { canonicalize } from "../../core/evidence/canonical-json";
 import {
   buildCheckpointProjection,
@@ -63,6 +75,111 @@ export const CHECKPOINT_HUMAN_FILENAME = "checkpoint.md";
 export const CHECKPOINT_MACHINE_FILENAME = "checkpoint.json";
 export const CHECKPOINT_MARKER_RELATIVE = `${CHECKPOINTS_DIR_RELATIVE}/last-published.json`;
 const STAGING_DIR_NAME = ".staging";
+const CHECKPOINT_LOCK = `${CHECKPOINTS_DIR_RELATIVE}/.publish.lock`;
+
+function withCheckpointLock<T>(repoRoot: string, operation: (assertOwned: () => void) => T): T {
+  const lock = acquireExclusiveDirectoryLock(realpathSync(repoRoot), CHECKPOINT_LOCK, {
+    reclaimStaleEmptyDirectory: true,
+  });
+  try {
+    lock.assertOwned();
+    return operation(() => lock.assertOwned());
+  } finally { lock.release(); }
+}
+
+export interface CheckpointRetentionResult {
+  readonly removed: number;
+  readonly skipped: readonly string[];
+}
+
+export interface CheckpointSyncPlan {
+  readonly fileOpenFlags: number;
+  readonly syncDirectories: boolean;
+}
+
+/**
+ * Durability is the same policy on every platform -- flush the published
+ * bytes before anything may collect the previous copy -- but the syscall
+ * boundary differs. On win32 fsync is `FlushFileBuffers`, which needs a
+ * handle opened with write access (a read-only handle fails EPERM) and
+ * cannot flush a directory handle at all; NTFS journals the rename metadata
+ * a POSIX directory fsync would cover, so Windows durability is "flush the
+ * file, skip the directory". `O_NOFOLLOW` does not exist on win32. Kept a
+ * pure function of the platform string so both branches stay asserted from
+ * any host; the failure it prevents is a thrown EPERM that Stop swallows,
+ * which would silently stop checkpoint publication on Windows.
+ */
+export function checkpointSyncPlan(platform: string): CheckpointSyncPlan {
+  if (platform === "win32") return { fileOpenFlags: constants.O_RDWR, syncDirectories: false };
+  return { fileOpenFlags: constants.O_RDONLY | constants.O_NOFOLLOW, syncDirectories: true };
+}
+
+const CHECKPOINT_SYNC = checkpointSyncPlan(process.platform);
+
+function syncCheckpointFile(path: string): void {
+  const fd = openSync(path, CHECKPOINT_SYNC.fileOpenFlags);
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function syncCheckpointDirectory(path: string): void {
+  if (!CHECKPOINT_SYNC.syncDirectories) return;
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function persistCheckpointDirectory(repoRoot: string, checkpointId: string): void {
+  const directory = join(resolveCheckpointsDir(repoRoot), checkpointId);
+  syncCheckpointFile(join(directory, CHECKPOINT_MACHINE_FILENAME));
+  syncCheckpointFile(join(directory, CHECKPOINT_HUMAN_FILENAME));
+  syncCheckpointDirectory(directory);
+  syncCheckpointDirectory(resolveCheckpointsDir(repoRoot));
+}
+
+function persistCheckpointMarker(repoRoot: string): void {
+  syncCheckpointFile(resolveCheckpointMarkerPath(repoRoot));
+  syncCheckpointDirectory(resolveCheckpointsDir(repoRoot));
+}
+
+/** Only the current marker is live. The append-only ledger owns audit history. */
+function collectObsoleteCheckpoints(repoRoot: string, currentId: string, assertOwned: () => void): CheckpointRetentionResult {
+  const directory = resolveCheckpointsDir(repoRoot);
+  let removed = 0;
+  const skipped: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === currentId || !/^chk-[0-9a-f]{64}$/.test(entry.name)) continue;
+    const path = join(directory, entry.name);
+    try {
+      if (!entry.isDirectory()) { skipped.push(entry.name); continue; }
+      const children = readdirSync(path).sort();
+      const owned = [CHECKPOINT_MACHINE_FILENAME, CHECKPOINT_HUMAN_FILENAME].sort();
+      // A killed collector may have already unlinked one or both owned files.
+      if (children.some(name => !owned.includes(name))
+        || children.some(name => !lstatSync(join(path, name)).isFile())) {
+        skipped.push(entry.name);
+        continue;
+      }
+      assertOwned();
+      // Unlink only the two owned files: an unexpected child is never recursively deleted.
+      for (const name of children) unlinkSync(join(path, name));
+      rmdirSync(path);
+      removed++;
+    } catch (error) {
+      skipped.push(`${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return { removed, skipped };
+}
+
+/** Explicit maintenance uses the same validated marker and lock as publication. */
+export function pruneCheckpointCache(repoRoot: string): CheckpointRetentionResult {
+  return withCheckpointLock(repoRoot, assertOwned => {
+    const current = resolveLastPublishedCheckpoint(repoRoot);
+    if (!current.found) return { removed: 0, skipped: [] };
+    persistCheckpointDirectory(repoRoot, current.resolved.checkpointId);
+    persistCheckpointMarker(repoRoot);
+    return collectObsoleteCheckpoints(repoRoot, current.resolved.checkpointId, assertOwned);
+  });
+}
 
 function resolveOrThrow(repoRoot: string, relativePath: string): string {
   const result = resolveInsideRepo(repoRoot, relativePath);
@@ -254,7 +371,7 @@ export interface PublishCheckpointBytesInput {
 }
 
 export type PublishCheckpointResult =
-  | { readonly status: "published"; readonly checkpointId: string; readonly idempotent: boolean; readonly contentHash: string }
+  | { readonly status: "published"; readonly checkpointId: string; readonly idempotent: boolean; readonly contentHash: string; readonly retention: CheckpointRetentionResult }
   | { readonly status: "rejected"; readonly reason: string; readonly detail: string };
 
 /**
@@ -265,43 +382,42 @@ export type PublishCheckpointResult =
  * corrupt or mismatched bytes.
  */
 export function publishCheckpoint(input: PublishCheckpointBytesInput): PublishCheckpointResult {
+  return withCheckpointLock(input.repoRoot, assertOwned => publishCheckpointLocked(input, assertOwned));
+}
+
+function publishCheckpointLocked(input: PublishCheckpointBytesInput, assertOwned: () => void): PublishCheckpointResult {
+  const validation = validateStagedCheckpoint(input.checkpointId, input.machineJson, input.humanMarkdown);
+  if (!validation.ok) return { status: "rejected", reason: validation.reason, detail: validation.detail };
   const checkpointsDir = resolveCheckpointsDir(input.repoRoot);
-  const stagingRoot = join(checkpointsDir, STAGING_DIR_NAME);
-  mkdirSync(stagingRoot, { recursive: true });
-  const stagingDir = mkdtempSync(join(stagingRoot, "stage-"));
-
+  const targetDir = join(checkpointsDir, input.checkpointId);
+  const idempotent = isCompleteCheckpointDir(targetDir, input.checkpointId);
+  let stagingDir: string | null = null;
   try {
-    writeFileSync(join(stagingDir, CHECKPOINT_MACHINE_FILENAME), input.machineJson, { mode: 0o600 });
-    writeFileSync(join(stagingDir, CHECKPOINT_HUMAN_FILENAME), input.humanMarkdown, { mode: 0o600 });
-
-    const validation = validateStagedCheckpoint(input.checkpointId, input.machineJson, input.humanMarkdown);
-    if (!validation.ok) {
-      rmDirSafe(stagingDir);
-      return { status: "rejected", reason: validation.reason, detail: validation.detail };
-    }
-
-    const targetDir = join(checkpointsDir, input.checkpointId);
-    let idempotent = false;
-    if (existsSync(targetDir)) {
-      if (isCompleteCheckpointDir(targetDir, input.checkpointId)) {
-        // Idempotent republish of an unchanged accepted set (or a
-        // hand-edit-free re-run): content is already correct in place;
-        // discard the redundant staging copy rather than churn a rename.
-        idempotent = true;
-        rmDirSafe(stagingDir);
-      } else {
-        // A leftover partial/corrupt directory from a previously crashed
-        // publish attempt at this exact content-addressed id, OR a hand
-        // edit of the published human view. The freshly staged copy already
-        // validated above, so it safely replaces whatever is there.
-        rmDirSafe(targetDir);
-        renameSync(stagingDir, targetDir);
-      }
-    } else {
+    if (!idempotent) {
+      const stagingRoot = join(checkpointsDir, STAGING_DIR_NAME);
+      mkdirSync(stagingRoot, { recursive: true });
+      stagingDir = mkdtempSync(join(stagingRoot, "stage-"));
+      writeFileSync(join(stagingDir, CHECKPOINT_MACHINE_FILENAME), input.machineJson, { mode: 0o600 });
+      writeFileSync(join(stagingDir, CHECKPOINT_HUMAN_FILENAME), input.humanMarkdown, { mode: 0o600 });
+      assertOwned();
+      if (existsSync(targetDir)) rmDirSafe(targetDir);
       renameSync(stagingDir, targetDir);
+      stagingDir = null;
     }
-
-    writeMarker(input.repoRoot, {
+    // Atomic visibility alone cannot authorize deleting the last durable copy.
+    // Also seals an existing directory created by an older publisher.
+    persistCheckpointDirectory(input.repoRoot, input.checkpointId);
+    const markerText = readTextOrNull(resolveCheckpointMarkerPath(input.repoRoot));
+    let alreadyCurrent = false;
+    try {
+      const marker = JSON.parse(markerText ?? "null") as CheckpointMarker | null;
+      alreadyCurrent = marker?.checkpoint_id === input.checkpointId
+        && marker.machine_path === `${CHECKPOINTS_DIR_RELATIVE}/${input.checkpointId}/${CHECKPOINT_MACHINE_FILENAME}`
+        && marker.human_path === `${CHECKPOINTS_DIR_RELATIVE}/${input.checkpointId}/${CHECKPOINT_HUMAN_FILENAME}`
+        && marker.content_hash === validation.projection.provenance.content_hash;
+    } catch { /* A validated publication repairs a malformed marker. */ }
+    assertOwned();
+    if (!alreadyCurrent) writeMarker(input.repoRoot, {
       schema_version: 1,
       checkpoint_id: input.checkpointId,
       checkpoint_dir: `${CHECKPOINTS_DIR_RELATIVE}/${input.checkpointId}`,
@@ -310,16 +426,12 @@ export function publishCheckpoint(input: PublishCheckpointBytesInput): PublishCh
       content_hash: validation.projection.provenance.content_hash,
       published_at: new Date().toISOString(),
     });
-
-    return {
-      status: "published",
-      checkpointId: input.checkpointId,
-      idempotent,
-      contentHash: validation.projection.provenance.content_hash,
-    };
-  } catch (error) {
-    rmDirSafe(stagingDir);
-    throw error;
+    persistCheckpointMarker(input.repoRoot);
+    const retention = collectObsoleteCheckpoints(input.repoRoot, input.checkpointId, assertOwned);
+    return { status: "published", checkpointId: input.checkpointId, idempotent,
+      contentHash: validation.projection.provenance.content_hash, retention };
+  } finally {
+    if (stagingDir) rmDirSafe(stagingDir);
   }
 }
 
@@ -344,18 +456,17 @@ export function publishCheckpointFromLedger(
   repoRoot: string,
   now?: () => Date,
 ): PublishCheckpointFromLedgerResult {
-  const { genesis, accepted } = readAcceptedEvents(repoRoot);
-  if (!genesis) return { status: "skipped", reason: "no-ledger" };
-
-  const projection = buildCheckpointProjection({ worktreeId: genesis.worktree_id, now }, accepted);
-  const machineJson = `${JSON.stringify(projection, null, 2)}\n`;
-  const humanMarkdown = renderCheckpointMarkdown(projection);
-
-  return publishCheckpoint({
-    repoRoot,
-    checkpointId: projection.checkpoint_id,
-    machineJson,
-    humanMarkdown,
+  if (!existsSync(resolveLogPath(repoRoot))) return { status: "skipped", reason: "no-ledger" };
+  return withCheckpointLock(repoRoot, assertOwned => {
+    const { genesis, accepted } = readAcceptedEvents(repoRoot);
+    if (!genesis) return { status: "skipped", reason: "no-ledger" };
+    const projection = buildCheckpointProjection({ worktreeId: genesis.worktree_id, now }, accepted);
+    return publishCheckpointLocked({
+      repoRoot,
+      checkpointId: projection.checkpoint_id,
+      machineJson: `${JSON.stringify(projection, null, 2)}\n`,
+      humanMarkdown: renderCheckpointMarkdown(projection),
+    }, assertOwned);
   });
 }
 
@@ -387,50 +498,55 @@ export type ResolveLastPublishedCheckpointResult =
  */
 export function resolveLastPublishedCheckpoint(repoRoot: string): ResolveLastPublishedCheckpointResult {
   const markerPath = resolveCheckpointMarkerPath(repoRoot);
-  const markerText = readTextOrNull(markerPath);
-  if (markerText === null) return { found: false };
+  const snapshot = readCheckpointSnapshot(
+    () => readTextOrNull(markerPath),
+    markerText => {
+      let marker: unknown;
+      try {
+        marker = JSON.parse(markerText);
+      } catch (error) {
+        throw new CheckpointResolutionError(
+          "marker-malformed",
+          `checkpoint marker at ${CHECKPOINT_MARKER_RELATIVE} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      if (
+        !isRecord(marker) ||
+        typeof marker.checkpoint_id !== "string" ||
+        typeof marker.machine_path !== "string" ||
+        typeof marker.human_path !== "string"
+      ) {
+        throw new CheckpointResolutionError(
+          "marker-malformed",
+          `checkpoint marker at ${CHECKPOINT_MARKER_RELATIVE} is missing a required field`,
+        );
+      }
 
-  let marker: unknown;
-  try {
-    marker = JSON.parse(markerText);
-  } catch (error) {
-    throw new CheckpointResolutionError(
-      "marker-malformed",
-      `checkpoint marker at ${CHECKPOINT_MARKER_RELATIVE} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (
-    !isRecord(marker) ||
-    typeof marker.checkpoint_id !== "string" ||
-    typeof marker.machine_path !== "string" ||
-    typeof marker.human_path !== "string"
-  ) {
-    throw new CheckpointResolutionError(
-      "marker-malformed",
-      `checkpoint marker at ${CHECKPOINT_MARKER_RELATIVE} is missing a required field`,
-    );
-  }
+      let machinePath: string;
+      let humanPath: string;
+      try {
+        machinePath = resolveOrThrow(repoRoot, marker.machine_path);
+        humanPath = resolveOrThrow(repoRoot, marker.human_path);
+      } catch (error) {
+        throw new CheckpointResolutionError(
+          "marker-malformed",
+          `checkpoint marker at ${CHECKPOINT_MARKER_RELATIVE} names an unsafe path: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      const machineText = readTextOrNull(machinePath);
+      const humanText = readTextOrNull(humanPath);
+      if (machineText === null || humanText === null) {
+        throw new CheckpointResolutionError(
+          "checkpoint-missing",
+          `checkpoint marker points at ${marker.checkpoint_id}, but its files are missing on disk`,
+        );
+      }
 
-  let machinePath: string;
-  let humanPath: string;
-  try {
-    machinePath = resolveOrThrow(repoRoot, marker.machine_path);
-    humanPath = resolveOrThrow(repoRoot, marker.human_path);
-  } catch (error) {
-    throw new CheckpointResolutionError(
-      "marker-malformed",
-      `checkpoint marker at ${CHECKPOINT_MARKER_RELATIVE} names an unsafe path: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  const machineText = readTextOrNull(machinePath);
-  const humanText = readTextOrNull(humanPath);
-  if (machineText === null || humanText === null) {
-    throw new CheckpointResolutionError(
-      "checkpoint-missing",
-      `checkpoint marker points at ${marker.checkpoint_id}, but its files are missing on disk`,
-    );
-  }
-
+      return { marker: marker as { checkpoint_id: string; machine_path: string; human_path: string }, machineText, humanText };
+    },
+  );
+  if (snapshot === null) return { found: false };
+  const { marker, machineText, humanText } = snapshot;
   const validation = validateStagedCheckpoint(marker.checkpoint_id, machineText, humanText);
   if (!validation.ok) {
     throw new CheckpointResolutionError(

@@ -6,8 +6,8 @@
       "name": "repo-harness",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
-        "archctx": "0.5.9",
-        "archctx-contracts": "0.5.9",
+        "archctx": "0.5.10",
+        "archctx-contracts": "0.5.10",
         "commander": "^15.0.0",
         "express": "^5.2.1",
       },
@@ -227,9 +227,9 @@
 
     "ajv-formats": ["ajv-formats@3.0.1", "", { "dependencies": { "ajv": "^8.0.0" } }, "sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ=="],
 
-    "archctx": ["archctx@0.5.9", "", { "dependencies": { "@colbymchenry/codegraph": "1.5.0", "@node-rs/jieba": "^2.0.1", "koffi": "3.1.6" }, "bin": { "archctx": "bin/archctx.mjs" } }, "sha512-W7z2Seqa4xFIbBpYKdUA1e+Uc0YnhCd8PHW2Lh1cD4/tbVQBdeQ16d/uSx+v6s0G33vyKMU3t3anR7UcHgFxdg=="],
+    "archctx": ["archctx@0.5.10", "", { "dependencies": { "@colbymchenry/codegraph": "1.5.0", "@node-rs/jieba": "^2.0.1", "koffi": "3.1.6" }, "bin": { "archctx": "bin/archctx.mjs" } }, "sha512-SlkjdpeYqTwWNfKy1rSoVk5nMjNlVuCFTT4kDjAK8nvdcetmmvjIgS3LXlCj7WxH4U6S9vmPEsSekgXxJErCrQ=="],
 
-    "archctx-contracts": ["archctx-contracts@0.5.9", "", {}, "sha512-sQ9gQ5EOJ1nafdp+vQDG44QX7QfCmZ1pOxXiwL8ioPEYQkY3fts0JTBX9CiBbV69eFfoHm2fHb1nKunHZH7tXQ=="],
+    "archctx-contracts": ["archctx-contracts@0.5.10", "", {}, "sha512-E3kcM00S4JDe9ZsDUfk8Z/DQ9ZKf+E1A8ZANJrem2yVbJ+/++/WIvI55aRr6YT/j3x5j4gqLa49XBJWpcpjjrA=="],
 
     "body-parser": ["body-parser@2.3.0", "", { "dependencies": { "bytes": "^3.1.2", "content-type": "^2.0.0", "debug": "^4.4.3", "http-errors": "^2.0.1", "iconv-lite": "^0.7.2", "on-finished": "^2.4.1", "qs": "^6.15.2", "raw-body": "^3.0.2", "type-is": "^2.1.0" } }, "sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw=="],
 

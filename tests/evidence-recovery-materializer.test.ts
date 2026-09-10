@@ -213,7 +213,7 @@ describe("recovery-view-cli.ts: standalone end-to-end", () => {
       expect(run("git", ["add", "-A"], cwd).status).toBe(0);
       expect(run("git", ["commit", "-q", "-m", "init"], cwd).status).toBe(0);
 
-      const first = run("bun", [join(REPO_ROOT, "scripts/recovery-view-cli.ts"), "--cwd", cwd, "--reason", "first-run"], cwd);
+      const first = run("bun", [join(REPO_ROOT, "assets/templates/helpers/recovery-view-cli.ts"), "--cwd", cwd, "--reason", "first-run"], cwd);
       expect(first.status).toBe(0);
       const handoffPath = join(cwd, ".ai/harness/handoff/current.md");
       const resumePath = join(cwd, ".ai/harness/handoff/resume.md");
