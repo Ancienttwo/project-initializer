@@ -13,8 +13,20 @@
   `refactor`, `collaboration`, `external-source`) plus `claude-review` and
   offline `uninstall`. It also replaces tmux with herdr as the peer-terminal
   runtime and untracks `tasks/current.md`.
-- Publish status: **prepared, not published**. No tag, no npm publish, no
-  global runtime mutation has been performed for this version.
+- Publish status: **published** (2026-09-10T16:14:23.963Z UTC).
+  - Merge commit: `a8b5620308a3d2123e4e4c1dc59ad2f34883fe2f` (PR #396 merged into
+    `main` as a merge commit, preserving the branch head `c9e05f27b3527469` in
+    `main`'s ancestry).
+  - Tag: `v0.19.0`, annotated tag object
+    `03b5eae2a7a1515aeba79909436afda7e7d7a4e1`, pointing at
+    `a8b5620308a3d2123e4e4c1dc59ad2f34883fe2f`.
+  - npm: `repo-harness@0.19.0`, dist-tag `latest: 0.19.0`,
+    integrity `sha512-oZ1PUQIdcnFWSUesy6Z4o/vDhLuOdjmIDvP/P8/n13OonbdKhMum+I66MEMjIeXYZVmVlBmvUOKkUVDVYNR/yw==`,
+    shasum `94ca3e059ef1d766e948f56a82d44d3d7b011850`.
+  - `bun run check:release-published`: OK — registry, dist-tag, tarball, tag, and
+    local version files agree (runtime evidence receipt
+    `sha256:6ee79ddfc9dd2f55e9323a6950c6be38ef4eef161e440f63fe8a018e1c464005`).
+  - Bun-global runtime refreshed: `repo-harness --version` reports `0.19.0`.
 
 ## Release Content
 
@@ -136,9 +148,9 @@ requires a sprint backlog schema migration.
 | `bun scripts/check-skill-version.ts` | recorded at candidate time |
 | `bash scripts/check-task-workflow.sh --strict` | recorded at candidate time |
 | `bun src/cli/index.ts init --repo . --dry-run` | recorded at candidate time |
-| `bun run check:release` | not run in this prep pass |
-| `bun run smoke:tarball-install` | not run in this prep pass |
-| GitHub Required/CI on release PR | not opened |
+| `bun run check:release` | pass (exit 0) at merge commit `a8b56203`: 5209 pass, 53 skip, 0 fail across 416 files; `[release] OK: npm package gate passed.` |
+| `bun run smoke:tarball-install` | pass (exit 0): `repo-harness-0.19.0.tgz` installs, serves the packaged Operator, and packaged CLI bins start |
+| GitHub Required/CI on release PR | pass: PR #396 head `c9e05f27b3527469` — Governance, Test, MCP path matrix (ubuntu/macos/windows), and `Required / CI` all SUCCESS |
 
 ### Skill eval evidence
 
@@ -159,15 +171,22 @@ requires a sprint backlog schema migration.
 
 ## Publish Follow-through
 
-The owner authorized the following delivery steps; final gate results remain pending:
+The owner authorized the following delivery steps; all five are complete:
 
-1. Merge the reviewed release PR into `main`.
-2. Create tag `v0.19.0` at the merged commit and push it.
-3. Publish `repo-harness@0.19.0` to npm.
-4. Run `bun run check:release-published` to bind registry metadata, dist-tag,
-   tarball integrity, tag, installed CLI, and installed hook runtime.
-5. Refresh the selected Bun-global runtime and confirm `repo-harness --version`
-   reports `0.19.0`.
+1. Done — PR #396 merged into `main` as merge commit
+   `a8b5620308a3d2123e4e4c1dc59ad2f34883fe2f`.
+2. Done — annotated tag `v0.19.0` (tag object
+   `03b5eae2a7a1515aeba79909436afda7e7d7a4e1`) created at that commit and pushed
+   to `origin`.
+3. Done — `repo-harness@0.19.0` published to npm through Web Auth at
+   2026-09-10T16:14:23.963Z UTC; `latest` now resolves to `0.19.0`.
+4. Done — `bun run check:release-published` passed: registry, dist-tag, tarball,
+   tag, and local version files agree. The first attempt returned E404 because
+   registry replication had not caught up; the recorded pass is the rerun.
+5. Done — Bun-global runtime reinstalled at `repo-harness@0.19.0`;
+   `repo-harness --version` reports `0.19.0`, `~/.bun/bin/repo-harness` resolves
+   to the global `src/cli/index.ts`, and `~/.bun/bin/repo-harness-hook` resolves
+   to the packaged `dist/hook-entry.js`.
 
 ## Approved retention and draft follow-through (2026-09-10)
 
@@ -209,4 +228,6 @@ This approval supersedes the preparation-only public-action boundary above.
   access and cannot flush directories), silently stopping checkpoint publication
   there. Fixed on this branch, with the Windows CI matrix now running
   `tests/evidence-checkpoint.test.ts`.
-- npm publication and installed-runtime readback: still pending.
+- npm publication and installed-runtime readback: complete. See the publish
+  status above for the merge commit, tag object, registry metadata, and the
+  installed-runtime readback.
