@@ -1228,8 +1228,8 @@
       "outputDigest": "sha256:966f7438cd7b385cb411a2ef8c2de18c0b1e71eb067941c97375a4b284a873b9",
       "verifiedAgainst": {
         "branch": "codex/retention-release-0-19-0",
-        "commit": "0f347c0bb0c1934e2cd8772568cf144a65e344d5",
-        "committedAt": "2026-09-10T18:47:38+08:00"
+        "commit": "18c2ca1c866e8e53b3253862c9b7c11f1b9d7841",
+        "committedAt": "2026-09-10T19:01:11+08:00"
       }
     },
     {
@@ -1248,8 +1248,8 @@
       "outputDigest": "sha256:beaaa466d51cbd8f929fd6acd6645c6f5136cccf539f09b63a273e5ab38519fa",
       "verifiedAgainst": {
         "branch": "codex/retention-release-0-19-0",
-        "commit": "0f347c0bb0c1934e2cd8772568cf144a65e344d5",
-        "committedAt": "2026-09-10T18:47:38+08:00"
+        "commit": "18c2ca1c866e8e53b3253862c9b7c11f1b9d7841",
+        "committedAt": "2026-09-10T19:01:11+08:00"
       }
     },
     {
@@ -1267,9 +1267,9 @@
       "sourceDigest": "sha256:654f7236e2e51fd19e64129d48fe05f974f3172f6f69c671a78f31ba896198ae",
       "outputDigest": "sha256:a148fc8868cf1e59ce9fe25484555aff2c06e611ed559c709c045b9cde19ab0a",
       "verifiedAgainst": {
-        "branch": "codex/campaign-acceptance-preflight",
-        "commit": "0da73e0f550d1a040c6509b12fccb1378807d703",
-        "committedAt": "2026-09-10T04:21:51+08:00"
+        "branch": "codex/retention-release-0-19-0",
+        "commit": "18c2ca1c866e8e53b3253862c9b7c11f1b9d7841",
+        "committedAt": "2026-09-10T19:01:11+08:00"
       }
     },
     {

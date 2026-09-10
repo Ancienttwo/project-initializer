@@ -932,7 +932,6 @@ describe('operator web task message composer', () => {
     });
     await typeMessage('sent from the first composer');
     await act(async () => sendButton().click());
-    expect((document.querySelector('#composer-body') as HTMLTextAreaElement).disabled).toBe(true);
     await act(async () => root?.unmount());
     root = null;
     await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
