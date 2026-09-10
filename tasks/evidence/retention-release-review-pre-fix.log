@@ -1,0 +1,41 @@
+Actual workflow generator pre-fix failure
+
+bun test v1.4.0 (34cbb9a40)
+
+tests/helper-scripts.test.ts:
+58 | 
+59 | function stage(value: unknown, name: "scan" | "verify", expectedFeatures: readonly string[]): RefactorProviderStage {
+60 |   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`policy.refactor.stages.${name} must be an object`);
+61 |   const input = value as Record<string, unknown>;
+62 |   if (Object.keys(input).some((key) => !["provider_version", "required_features"].includes(key))) throw new Error(`policy.refactor.stages.${name} contains an unknown field`);
+63 |   if (input.provider_version !== REFACTOR_PROVIDER_VERSION) throw new Error(`policy.refactor.stages.${name}.provider_version must be ${REFACTOR_PROVIDER_VERSION}`);
+                                                                                                                                                                       ^
+error: policy.refactor.stages.scan.provider_version must be 0.5.10
+      at stage (/Users/ancienttwo/Projects/repo-harness-wt-retention-release/src/core/refactor/policy.ts:63:163)
+      at readRefactorPolicy (/Users/ancienttwo/Projects/repo-harness-wt-retention-release/src/core/refactor/policy.ts:103:21)
+      at <anonymous> (/Users/ancienttwo/Projects/repo-harness-wt-retention-release/tests/helper-scripts.test.ts:5960:14)
+(fail) Workflow helper scripts > ensure-task-workflow should create a draft plan when none exists [631.79ms]
+
+ 0 pass
+ 154 filtered out
+ 1 fail
+ 9 expect() calls
+Ran 1 test across 1 file. [672.00ms]
+
+Delayed acknowledgement pre-fix failure
+
+tests/operator-web/operator-interactions.test.tsx:
+929 |     await act(async () => acknowledge());
+930 |     await act(async () => root?.unmount());
+931 |     root = null;
+932 |     await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+933 |     await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+934 |     expect((document.querySelector('#composer-body') as HTMLTextAreaElement | null)?.value).toBe('newer unsent text');
+                                                                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "newer unsent text"
+Received: undefined
+
+      at <anonymous> (/Users/ancienttwo/Projects/repo-harness-wt-retention-release/tests/operator-web/operator-interactions.test.tsx:934:93)
+(fail) operator web task message composer > a delayed acknowledgement preserves a newer draft saved after remount [179.50ms]

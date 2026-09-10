@@ -18,6 +18,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { spawn, spawnSync } from "child_process";
 import { ROOT_CAUSE_FIXTURE_CASES } from "./fixtures/root-cause/expected-results";
+import { readRefactorPolicy } from "../src/core/refactor/policy";
 import { defaultPolicy } from "../src/core/adoption/standard-plan";
 import { fixtureTaskId } from './helpers/sprint-fixture';
 
@@ -5956,6 +5957,8 @@ describe("Workflow helper scripts", () => {
       const fallbackPolicy = JSON.parse(readFileSync(join(cwd, ".ai/harness/policy.json"), "utf-8"));
       const tsDefaultPolicy = defaultPolicy("minimal-agentic", "en") as Record<string, any>;
       expect(fallbackPolicy.agentic_development.routing).toEqual(tsDefaultPolicy.agentic_development.routing);
+      expect(readRefactorPolicy(fallbackPolicy).stages).toEqual(readRefactorPolicy({}).stages);
+      expect(fallbackPolicy.architecture.projection_version).toBe(readRefactorPolicy({}).stages.scan.provider_version);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

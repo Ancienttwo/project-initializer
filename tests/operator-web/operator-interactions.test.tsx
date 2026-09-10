@@ -61,6 +61,17 @@ function installDom(wide = false): void {
       dispatchEvent: () => true,
     }),
   });
+  const lockQueues = new Map<string, Promise<unknown>>();
+  Object.defineProperty(window.navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: (name: string, callback: () => unknown) => {
+        const result = (lockQueues.get(name) ?? Promise.resolve()).then(callback);
+        lockQueues.set(name, result.catch(() => undefined));
+        return result;
+      },
+    },
+  });
   Object.assign(globalThis, {
     window,
     document: window.document,
@@ -908,6 +919,45 @@ describe('operator web task message composer', () => {
     expect(composerToggle().getAttribute('aria-expanded')).toBe('false');
     await act(async () => composerToggle().click());
     expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  test('a delayed acknowledgement preserves a newer draft saved after remount', async () => {
+    let acknowledge!: () => void;
+    const submitted: TaskMessageRequestV1[] = [];
+    await openComposerFor(fixtureTasks.blocked.task_label, stableSnapshot, {
+      sendMessage: async (request) => {
+        submitted.push(request);
+        await new Promise<void>((resolve) => { acknowledge = resolve; });
+      },
+    });
+    await typeMessage('sent from the first composer');
+    await act(async () => sendButton().click());
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement).disabled).toBe(true);
+    await act(async () => root?.unmount());
+    root = null;
+    await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    await typeMessage('newer unsent text');
+    await act(async () => acknowledge());
+    await act(async () => root?.unmount());
+    root = null;
+    await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement | null)?.value).toBe('newer unsent text');
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.body).toBe('sent from the first composer');
+  });
+
+  test('keeps saved text when cross-tab storage locking is unavailable', async () => {
+    await openComposerFor(fixtureTasks.blocked.task_label);
+    await typeMessage('saved before locking became unavailable');
+    const card = stableSnapshot.repositories[0]!.cards.find((entry) => entry.task_id === fixtureTasks.blocked.task_id)!;
+    const key = `repo-harness:task-message-draft:v1:${taskKey(card)}`;
+    const saved = window.localStorage.getItem(key);
+    Object.defineProperty(window.navigator, 'locks', { configurable: true, value: undefined });
+    await typeMessage('still available in the editor');
+    expect(window.localStorage.getItem(key)).toBe(saved);
+    expect(composerPanel()?.textContent).toContain('Draft recovery could not be updated');
   });
 
   test('isolates drafts by repository and task, and removes explicitly emptied text', async () => {

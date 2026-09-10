@@ -15,6 +15,13 @@ it rather than beside it.
 
 ### Breaking
 
+- Repositories that explicitly pin ArchContext must update
+  `.ai/harness/policy.json` fields `architecture.projection_version`,
+  `refactor.stages.scan.provider_version`, and
+  `refactor.stages.verify.provider_version` to `0.5.10`, together with their
+  package-local `archctx` and `archctx-contracts` dependencies. `init` preserves
+  explicit repository settings; the runtime rejects older refactor pins.
+
 - **`herdr` >= 0.9.0 replaces `tmux` as the peer-terminal runtime.** tmux
   support and its readiness probes are removed from
   `scripts/check-agent-tooling.sh`; the pin lives in

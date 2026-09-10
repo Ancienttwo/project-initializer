@@ -1589,12 +1589,29 @@ function Composer({
 
   const beginDraft = () => ({ message_id: crypto.randomUUID(), fence: observedFence });
 
-  const saveDraft = (nextDraft: ComposerDraft | null, nextBody: string) => {
+  const saveDraft = async (
+    nextDraft: ComposerDraft | null,
+    nextBody: string,
+    acknowledged?: ComposerDraft & { body: string },
+  ) => {
     try {
-      if (nextDraft === null || nextBody.length === 0) window.localStorage.removeItem(storageKey);
-      else window.localStorage.setItem(storageKey, JSON.stringify({
-        message_id: nextDraft.message_id, fence: nextDraft.fence, body: nextBody,
-      }));
+      // Every writer shares this origin/task lock: an old ACK may only remove
+      // the exact submitted draft, never text another tab saved in the meantime.
+      await window.navigator.locks.request(storageKey, () => {
+        if (acknowledged) {
+          const saved = readComposerDraft(storageKey);
+          if (saved.failed) throw new Error('Saved draft is unreadable');
+          if (saved.value === null || saved.value.message_id !== acknowledged.message_id
+            || saved.value.body !== acknowledged.body
+            || saved.value.fence.expected_task_revision !== acknowledged.fence.expected_task_revision
+            || saved.value.fence.expected_claim_id !== acknowledged.fence.expected_claim_id
+            || saved.value.fence.expected_generation !== acknowledged.fence.expected_generation) return;
+        }
+        if (nextDraft === null || nextBody.length === 0) window.localStorage.removeItem(storageKey);
+        else window.localStorage.setItem(storageKey, JSON.stringify({
+          message_id: nextDraft.message_id, fence: nextDraft.fence, body: nextBody,
+        }));
+      });
       setStorageWarning(null);
     } catch {
       setStorageWarning('composer.draftSaveFailed');
@@ -1643,7 +1660,7 @@ function Composer({
       });
       // A stored message is a new message: the retry id is spent, the draft is
       // gone, and the next snapshot owns what the operator sees next.
-      saveDraft(null, '');
+      await saveDraft(null, '', { ...draft, body });
       setBody('');
       setDraft(null);
       setStaleFailure(null);
@@ -1698,6 +1715,7 @@ function Composer({
           <textarea
             className="composer__body"
             id="composer-body"
+            disabled={sending}
             rows={4}
             value={body}
             placeholder={t('composer.bodyPlaceholder')}
