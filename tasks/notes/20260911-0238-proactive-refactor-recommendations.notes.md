@@ -54,3 +54,7 @@ Frozen implementation at b251dbca passed all 12 declared commands (63 focused te
 After synchronizing base fixture-only correction 42193bb3, the stacked PR compare range has the following binding. Feature implementation is unchanged from the 17/17 prepare baseline at a484e8d7; base fixture delta passed its four focused cases.
 
 > **Substantive Change SHA256**: `sha256:3e3c74da463e29cc5a120b6bd5dea2b59c3accd298727782072f9f3a514d3374`
+
+Current stacked compare binding after protected-runtime base correction:
+
+> **Substantive Change SHA256**: `sha256:c409fb9c3b278f7d2d931b7bf34fbed30919149b9066797583d45a1a1273e32f`
