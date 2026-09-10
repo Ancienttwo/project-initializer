@@ -22,7 +22,7 @@ import { LeaseLivenessStoreError, readLeaseLiveness, renewLeaseLiveness } from '
 
 import { campaignRuntimeRecordKey, type CampaignCodexInvocation } from '../../core/automation/campaign-runtime';
 import { campaignAttemptOutcome } from '../../core/automation/campaign-runtime';
-import { prepareCampaignCodexInvocation, assertCampaignInvocationExecutable, observeCampaignCodexTerminal, observeCampaignCodexInterruption, parseCampaignVerifierResponse, observeCampaignCodexPreparationInterruption, type CampaignCodexPreparation } from './campaign-runtime';
+import { prepareCampaignCodexInvocation, assertCampaignPreparationRetryable, assertCampaignInvocationExecutable, observeCampaignCodexTerminal, observeCampaignCodexInterruption, parseCampaignVerifierResponse, observeCampaignCodexPreparationInterruption, type CampaignCodexPreparation } from './campaign-runtime';
 
 type Acquisition = Extract<ScheduledEngineerAcquireResult, { ok: true }>;
 export interface CampaignWorkerSelector {
@@ -175,12 +175,31 @@ export function bindCampaignWorker(input: {
     async prepareChild(role: 'worker' | 'verifier', prompt: string, deadline: number): Promise<CampaignCodexInvocation> {
       if (input.provider !== 'codex-exec') throw new Error('campaign provider mode is not selected');
       validate();
-      const preparation = { deadline_ms: Math.min(deadline, Date.parse(budget.deadline_at)),
+      const candidate = { deadline_ms: Math.min(deadline, Date.parse(budget.deadline_at)),
         identity: { dispatch_id: selector.dispatch_id, role, task_id: work.task_id, task_revision: work.task_revision, claim_id: work.claim_id, lease_generation: work.generation, binding_generation: offer.binding_generation } };
-      withCampaignPlanningLock(root, intent, () => {
+      const preparation = withCampaignPlanningLock(root, intent, () => {
         assertNotRetired();
-        if (readPlanningRecord(root, intent, runtimeKey(role, 'preparation'))) throw new Error('campaign preparation already admitted; reconciliation required');
-        persistPlanningRecord(root, intent, runtimeKey(role, 'preparation'), preparation);
+        const prior = readPlanningRecord<CampaignCodexPreparation>(root, intent, runtimeKey(role, 'preparation'));
+        if (prior) {
+          if (role !== 'worker' || read('launch') || read('final') || read('child-worker') || read('child-verifier')
+            || readPlanningRecord(root, intent, runtimeKey('verifier', 'preparation'))
+            || (['worker', 'verifier'] as const).some(child => (['intent', 'started', 'terminal'] as const).some(phase => readPlanningRecord(root, intent, runtimeKey(child, phase))))
+            || readAutomationReservationByKey(root, budget.automation_run_id, key(selector.dispatch_id, 'attempt'), input.env)) {
+            throw new Error('campaign preparation already admitted; reconciliation required');
+          }
+          if (!exact(Object.keys(prior).sort(), ['deadline_ms', 'identity']) || !exact(prior.identity, candidate.identity)) {
+            throw new Error('campaign preparation identity differs');
+          }
+          // A retry's caller bound cannot replace or extend the immutable effect window.
+          if (!Number.isSafeInteger(prior.deadline_ms) || !Number.isSafeInteger(candidate.deadline_ms)
+            || prior.deadline_ms <= Date.now() || prior.deadline_ms > candidate.deadline_ms) {
+            throw new Error('campaign original preparation deadline is expired or outside the caller bound');
+          }
+          assertCampaignPreparationRetryable(prior, work.worktree_path);
+          return prior;
+        }
+        persistPlanningRecord(root, intent, runtimeKey(role, 'preparation'), candidate);
+        return candidate;
       });
       const invocation = await prepareCampaignCodexInvocation({ ...preparation, repo_root: root, worktree: work.worktree_path, prompt_path: prompt, env: input.env });
       withCampaignPlanningLock(root, intent, () => {
