@@ -1,16 +1,16 @@
 # Task Review: campaign-reconciliation-recovery
 
-> **Status**: Pending
+> **Status**: Accepted
 > **Plan**: plans/plan-20260910-1553-campaign-reconciliation-recovery.md
 > **Contract**: tasks/contracts/20260910-1553-campaign-reconciliation-recovery.contract.md
 > **Notes File**: tasks/notes/20260910-1553-campaign-reconciliation-recovery.notes.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Last Updated**: 2026-09-10 15:54
-> **Recommendation**: fail
+> **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:fc76d24930b017370c0ef78a9699c9c5a7335725d944f22a4f52cb4ae8517d88
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
+> **Reviewed Target Revision**: 16f6581f55f89277d9cff315cca439fbfcc5128a
 
 ## Human Review Card
 
@@ -47,17 +47,17 @@
 
 ## Acceptance Receipt Projection
 
-> **Disposition**: unavailable
-> **Reviewer**: unavailable
-> **Source**: unavailable
+> **Disposition**: external_pass
+> **Reviewer**: Codex
+> **Source**: codex-plugin
 > **Actor**: not-applicable
-> **Reviewed Subject SHA256**: pending
+> **Reviewed Subject SHA256**: sha256:fc76d24930b017370c0ef78a9699c9c5a7335725d944f22a4f52cb4ae8517d88
 > **Reviewed Subject Scope**: normalized-final-content
-> **Reviewed Target Revision**: pending
-> **Verification Evidence SHA256**: pending
-> **Issued At**: pending
+> **Reviewed Target Revision**: 16f6581f55f89277d9cff315cca439fbfcc5128a
+> **Verification Evidence SHA256**: sha256:532e1c900cff31a94b48ea698270a4ef64aedd4a58fc8c7e377bb04c4bb30f90
+> **Issued At**: 2026-09-10T10:01:29.899Z
 
-- Summary: No AcceptanceReceipt has been recorded.
+- Summary: Official Codex plugin approved the exact frozen 19-path subject fc76d24930b017370c0ef78a9699c9c5a7335725d944f22a4f52cb4ae8517d88 against origin/main 16f6581f; no findings. Parent canonical verification passed all 17 declared checks.
 - Findings: none
 
 ## Behavior Diff Notes
