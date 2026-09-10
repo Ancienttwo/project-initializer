@@ -4,6 +4,23 @@ All notable changes to this skill are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Fleet and bundled cross-review upgrades honor installation ownership.**
+  Unchanged files recorded in the installation manifest can now upgrade to a
+  newer package; unowned or user-modified content remains protected. Bundled
+  skills synchronize their entire trees, including updated and retired
+  references, with rollback on copy failure. `deep-worker` is included in
+  installation transaction capture and fleet completeness checks.
+- **Herdr repository configuration is seeded and diagnosed correctly.**
+  TypeScript repository adoption now supplies the canonical Herdr version pin.
+  Missing or malformed `external_tooling.herdr.min_version` reports
+  `configuration-error` instead of runtime `unavailable`, while strict readiness
+  still fails closed. After upgrading, run `repo-harness init --repo .` in an
+  affected repository to fill missing defaults; explicit malformed values must
+  be corrected deliberately. Global runtime refresh alone does not update
+  repository policy.
+
 ## [0.19.0] - 2026-09-10
 
 The release grows a second layer on top of the file-backed session contract:
