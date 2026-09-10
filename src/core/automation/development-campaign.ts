@@ -113,7 +113,8 @@ const TRANSITIONS: Readonly<Record<DevelopmentCampaignOperation, readonly (Devel
   accept_group: ['group_auditing'],
   complete: ['group_accepted'],
   complete_with_followups: ['group_accepted'],
-  stop: NON_TERMINAL,
+  // A final operator acknowledgment preserves expiry history without reopening execution.
+  stop: [...NON_TERMINAL, 'authorization_expired'],
   exhaust_budget: NON_TERMINAL,
   require_human_attention: NON_TERMINAL,
   require_reconciliation: NON_TERMINAL,

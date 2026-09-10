@@ -135,6 +135,18 @@ describe('development campaign Git-common-dir journal', () => {
       expect(readDevelopmentCampaignStatus(expired.root, 'campaign-1', expired.env).current).toMatchObject({ revision: 1, state: 'authorized' });
       expect(() => appendDevelopmentCampaignEvent({ repo_root: expired.root, campaign_id: 'campaign-1', expected_current_sha256: expiredCreated.current.current_sha256, idempotency_key: 'prepare-after-expiry', operation: 'prepare_group', observed_at: '2028-09-05T00:00:00.000Z', env: expired.env })).toThrow('campaign authorization expired');
       expect(appendDevelopmentCampaignEvent({ repo_root: expired.root, campaign_id: 'campaign-1', expected_current_sha256: expiredCreated.current.current_sha256, idempotency_key: 'expire-after-expiry', operation: 'expire_authorization', observed_at: '2028-09-05T00:00:00.000Z', env: expired.env }).current).toMatchObject({ revision: 2, state: 'authorization_expired' });
+      const expiredState = readDevelopmentCampaignStatus(expired.root, 'campaign-1', expired.env);
+      const eventBytes = JSON.stringify(expiredState.events);
+      const stopRequest = { repo_root: expired.root, campaign_id: 'campaign-1', expected_current_sha256: expiredState.current.current_sha256,
+        idempotency_key: 'acknowledge-expired-stop', operation: 'stop' as const, observed_at: '2028-09-05T00:00:01.000Z', env: expired.env };
+      const stopped = appendDevelopmentCampaignEvent(stopRequest);
+      expect(stopped.current).toMatchObject({ revision: 3, state: 'stopped' });
+      expect(JSON.stringify(readDevelopmentCampaignStatus(expired.root, 'campaign-1', expired.env).events.slice(0, 2))).toBe(eventBytes);
+      expect(appendDevelopmentCampaignEvent(stopRequest)).toEqual(stopped);
+      expect(readDevelopmentCampaignStatus(expired.root, 'campaign-1', expired.env).events.map(event => event.operation))
+        .toEqual(['authorize', 'expire_authorization', 'stop']);
+      expect(existsSync(join(expired.root, '.git/repo-harness/automation-budget'))).toBe(false);
+
     } finally {
       Date.now = originalNow;
     }

@@ -9,6 +9,8 @@ import {
   listAutomationBudgetRuns,
   readAutomationBudgetBoardSlice,
   repairAutomationBudgetDrift,
+  repairAutomationReconciliation,
+  type RepairAutomationReconciliationInput,
 } from '../../effects/automation/budget-store';
 import {
   AutomationGrantStoreError,
@@ -163,6 +165,24 @@ export function buildAutomationCommand(): Command {
       } catch (error) {
         outputError(error);
       }
+    });
+  budget.command('repair-reconciliation')
+    .description('Preview an exact malformed-evidence repair; --apply records its full reserved charge')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--from <path>', 'JSON with run, reservation, expected record digest, outcome, corrected evidence and repair reason')
+    .option('--apply', 'Append the immutable repair receipt and usage event')
+    .action((raw: { repo: string; from: string; apply?: boolean }) => {
+      try {
+        const request = JSON.parse(readFileSync(raw.from, 'utf8')) as Record<string, unknown>;
+        const fields = ['automation_run_id', 'reservation_sha256', 'expected_reconciliation_sha256', 'outcome', 'evidence_refs', 'repair_reason'];
+        if (!request || typeof request !== 'object' || Array.isArray(request)
+          || JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(fields.sort())) {
+          throw new AutomationArgumentError('--from must contain exactly the reconciliation repair request fields');
+        }
+        const result = repairAutomationReconciliation({ ...request, repo_root: canonicalRepoPath(raw.repo),
+          mode: raw.apply ? 'apply' : 'dry_run' } as RepairAutomationReconciliationInput);
+        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      } catch (error) { outputError(error); }
     });
   const grant = new Command('grant').description('Operator-owned automation authorization grants');
   grant

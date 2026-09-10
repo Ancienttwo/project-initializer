@@ -15,6 +15,7 @@ import { basename, dirname, join } from 'path';
 import { spawnSync as spawnCli } from 'child_process';
 import {
   automationDigest,
+  canonicalAutomationJson,
   automationOperationReservation,
   buildAutomationBudget,
   emptyAutomationMetricVector,
@@ -36,6 +37,7 @@ import {
   readAutomationBudgetBoardSlice,
   readAutomationBudgetStatus,
   reconcileAutomationReservation,
+  repairAutomationReconciliation,
   requireUnattendedAutomationRunBudget,
   reserveAutomationBudget,
   AUTOMATION_BUDGET_STORE_RELATIVE_ROOT,
@@ -1869,4 +1871,180 @@ describe('issue #282 — a limit increase needs a new authorized revision', () =
     expect(published.current.state).toBe('active');
     expect(published.current.consumed.successful_acquisitions).toBe(1);
   });
+});
+
+describe('reconciliation recovery', () => {
+  function pending(run: string, expires = false) {
+    at('2026-09-03T00:00:10.000Z');
+    const repo = repoFixture();
+    const budget = makeBudget({ run, ...(expires ? { limits: { ...BASE_LIMITS, max_wall_clock_seconds: 60 } } : {}) });
+    publishBudget(repo, budget);
+    const reservation = reserveAutomationBudget({ repo_root: repo, automation_run_id: budget.automation_run_id,
+      expected_budget_sha256: budget.budget_sha256, idempotency_key: run, operation: 'provider_invocation',
+      unit_kind: 'execute', unit_id: 'wp-1', attempt: 1, provider: 'codex' });
+    const directory = join(repo, '.git', AUTOMATION_BUDGET_STORE_RELATIVE_ROOT, 'runs', budget.automation_run_id);
+    const input = { repo_root: repo, reservation, resolution: 'reconciled_reserved' as const,
+      outcome: 'provider_failure' as const, reason: 'Provider result was lost after dispatch.',
+      evidence_refs: [{ ref: 'provider-run:codex/interrupted', sha256: hex('interrupted') }] };
+    return { repo, budget, reservation, directory, input };
+  }
+
+  test('invalid evidence publishes no reconciliation and a corrected retry settles once', () => {
+    const f = pending('invalid-evidence-recovery');
+    const record = join(f.directory, 'reconciliations', `${f.reservation.reservation_sha256}.json`);
+    const before = readFileSync(join(f.directory, 'current.json'), 'utf8');
+    expect(() => reconcileAutomationReservation({ ...f.input,
+      evidence_refs: [{ ...f.input.evidence_refs[0]!, sha256: `sha256:${hex('interrupted')}` }] })).toThrow('64-character lowercase sha256');
+    expect(existsSync(record)).toBe(false);
+    expect(readFileSync(join(f.directory, 'current.json'), 'utf8')).toBe(before);
+    const settled = reconcileAutomationReservation(f.input);
+    expect(existsSync(record)).toBe(true);
+    expect(settled.event.consumed).toEqual(f.reservation.reserved);
+    expect(reconcileAutomationReservation(f.input).event.event_sha256).toBe(settled.event.event_sha256);
+    expect(readAutomationBudgetStatus(f.repo, f.budget.automation_run_id).current.event_count).toBe(1);
+    resumeAutoClock();
+  });
+
+  test('late settlement preserves the original exhaustion receipt and terminal projection', () => {
+    const f = pending('late-settlement-recovery', true);
+    at('2026-09-03T00:02:00.000Z');
+    repairAutomationBudgetDrift({ repo_root: f.repo, automation_run_id: f.budget.automation_run_id });
+    const stop = readFileSync(join(f.directory, 'stop-receipt.json'), 'utf8');
+    const settled = reconcileAutomationReservation(f.input);
+    expect(settled.current.state).toBe('budget_exhausted');
+    expect(settled.current.stop_receipt_sha256).toBe(JSON.parse(stop).stop_receipt_sha256);
+    const status = readAutomationBudgetStatus(f.repo, f.budget.automation_run_id);
+    expect(status.drift).toBe('none');
+    expect(status.current.open_reservation_sha256s).toEqual([]);
+    expect(status.current.consumed).toEqual(f.reservation.reserved);
+    expect(readFileSync(join(f.directory, 'stop-receipt.json'), 'utf8')).toBe(stop);
+    expect(() => reserveAutomationBudget({ repo_root: f.repo, automation_run_id: f.budget.automation_run_id,
+      expected_budget_sha256: f.budget.budget_sha256, idempotency_key: 'cannot-reopen', operation: 'provider_invocation',
+      unit_kind: 'execute', unit_id: 'wp-1', attempt: 2, provider: 'codex' })).toThrow();
+    resumeAutoClock();
+  });
+  function poisoned(run: string, resolution = 'reconciled_reserved', valid = false) {
+    const f = pending(run, true);
+    const original = { protocol: 1, kind: 'repo-harness-automation-reconciliation',
+      automation_run_id: f.budget.automation_run_id, reservation_sha256: f.reservation.reservation_sha256,
+      resolution, reason: f.input.reason, reconciled_at: '2026-09-03T00:00:10.000Z',
+      evidence_refs: [{ ...f.input.evidence_refs[0]!, sha256: valid ? hex('interrupted') : `sha256:${hex('interrupted')}` }] };
+    const record = join(f.directory, 'reconciliations', `${f.reservation.reservation_sha256}.json`);
+    const originalBytes = `${JSON.stringify(original)}\n`;
+    writeFileSync(record, originalBytes, { flag: 'wx' });
+    const request = { automation_run_id: f.budget.automation_run_id, reservation_sha256: f.reservation.reservation_sha256,
+      expected_reconciliation_sha256: createHash('sha256').update(originalBytes).digest('hex'),
+      outcome: f.input.outcome, evidence_refs: f.input.evidence_refs, repair_reason: 'Correct the digest from the original provider evidence bytes.' };
+    return { ...f, record, originalBytes, request, repairPath: join(f.directory, 'reconciliations', 'repairs', `${f.reservation.reservation_sha256}.json`) };
+  }
+
+  function diskSnapshot(directory: string): Record<string, string> {
+    return Object.fromEntries(readdirSync(directory, { recursive: true, withFileTypes: true })
+      .filter(entry => entry.isFile()).map(entry => {
+        const path = join(entry.parentPath, entry.name);
+        return [path, readFileSync(path, 'utf8')];
+      }));
+  }
+
+  test('operator preview writes nothing; exact apply and replay preserve history and charge once', () => {
+    const f = poisoned('operator-repair');
+    at('2026-09-03T00:02:00.000Z');
+    repairAutomationBudgetDrift({ repo_root: f.repo, automation_run_id: f.budget.automation_run_id });
+    const before = diskSnapshot(f.directory);
+    const preview = repairAutomationReconciliation({ ...f.request, repo_root: f.repo, mode: 'dry_run' });
+    expect(preview.dry_run).toBe(true);
+    expect(preview.event.resolution).toBe('reconciled_reserved');
+    expect(preview.event.consumed).toEqual(f.reservation.reserved);
+    expect(diskSnapshot(f.directory)).toEqual(before);
+    const result = repairAutomationReconciliation({ ...f.request, repo_root: f.repo, mode: 'apply' });
+    expect(result.commit?.current).toMatchObject({ state: 'budget_exhausted', event_count: 1, open_reservation_sha256s: [] });
+    expect(result.event.evidence_refs.at(-1)?.sha256).toBe(result.repair_receipt.receipt_sha256);
+    expect(readFileSync(f.record, 'utf8')).toBe(f.originalBytes);
+    expect(readFileSync(join(f.directory, 'stop-receipt.json'), 'utf8')).toBe(before[join(f.directory, 'stop-receipt.json')]);
+    const after = diskSnapshot(f.directory);
+    const replay = repairAutomationReconciliation({ ...f.request, repo_root: f.repo, mode: 'apply' });
+    expect(replay.replayed).toBe(true);
+    expect(replay.event.event_sha256).toBe(result.event.event_sha256);
+    expect(diskSnapshot(f.directory)).toEqual(after);
+    expect(readAutomationBudgetStatus(f.repo, f.budget.automation_run_id).drift).toBe('none');
+    expect(() => reconcileAutomationReservation(f.input)).toThrow();
+    expect(() => appendAutomationUsage({ ...f.input, outcome: 'completed' })).toThrow('was reconciled as reconciled_reserved');
+    for (const change of [
+      { expected_reconciliation_sha256: hex('different-record') },
+      { repair_reason: 'A different operator decision' },
+      { outcome: 'no_progress' as const },
+      { evidence_refs: [{ ...f.input.evidence_refs[0]!, sha256: hex('different-evidence') }] },
+    ]) expect(() => repairAutomationReconciliation({ ...f.request, ...change, repo_root: f.repo, mode: 'apply' })).toThrow();
+    expect(diskSnapshot(f.directory)).toEqual(after);
+    resumeAutoClock();
+  });
+
+  test('an interrupted repair resumes its exact receipt without rewriting the poisoned decision', () => {
+    const f = poisoned('repair-interrupted');
+    const preview = repairAutomationReconciliation({ ...f.request, repo_root: f.repo, mode: 'dry_run' });
+    mkdirSync(dirname(f.repairPath));
+    const receipt = `${canonicalAutomationJson(preview.repair_receipt)}\n`;
+    writeFileSync(f.repairPath, receipt, { flag: 'wx' });
+    at('2026-09-03T00:00:20.000Z');
+    const result = repairAutomationReconciliation({ ...f.request, repo_root: f.repo, mode: 'apply' });
+    expect(result.event.consumed).toEqual(f.reservation.reserved);
+    expect(readFileSync(f.repairPath, 'utf8')).toBe(receipt);
+    expect(readFileSync(f.record, 'utf8')).toBe(f.originalBytes);
+    expect(readAutomationBudgetStatus(f.repo, f.budget.automation_run_id)).toMatchObject({ drift: 'none', current: { event_count: 1, open_reservation_sha256s: [] } });
+    resumeAutoClock();
+  });
+
+  test('operator recovery rejects valid decisions, cheaper resolutions and changed evidence references without writes', () => {
+    for (const [resolution, valid] of [['reconciled_reserved', true], ['reconciled_not_started', false], ['reconciled_observed', false]] as const) {
+      const f = poisoned(`refuse-${resolution}-${valid}`, resolution, valid);
+      const before = diskSnapshot(f.directory);
+      expect(() => repairAutomationReconciliation({ ...f.request, repo_root: f.repo, mode: 'apply' })).toThrow();
+      expect(diskSnapshot(f.directory)).toEqual(before);
+    }
+    const f = poisoned('refuse-reference');
+    const before = diskSnapshot(f.directory);
+    for (const change of [
+      { expected_reconciliation_sha256: hex('wrong') },
+      { evidence_refs: [{ ref: 'provider-run:another-call', sha256: hex('interrupted') }] },
+      { evidence_refs: [{ ref: f.input.evidence_refs[0]!.ref, sha256: `sha256:${hex('interrupted')}` }] },
+      { outcome: 'invented' as 'provider_failure' },
+      { reservation_sha256: hex('missing') },
+    ]) expect(() => repairAutomationReconciliation({ ...f.request, ...change, repo_root: f.repo, mode: 'apply' })).toThrow();
+    expect(diskSnapshot(f.directory)).toEqual(before);
+    resumeAutoClock();
+  });
+
+  test('operator recovery refuses an existing charge without its repair receipt', () => {
+    const f = pending('existing-charge');
+    reconcileAutomationReservation(f.input);
+    const record = join(f.directory, 'reconciliations', `${f.reservation.reservation_sha256}.json`);
+    const original = JSON.parse(readFileSync(record, 'utf8'));
+    original.evidence_refs[0].sha256 = `sha256:${hex('interrupted')}`;
+    const raw = JSON.stringify(original);
+    writeFileSync(record, raw);
+    const before = diskSnapshot(f.directory);
+    expect(() => repairAutomationReconciliation({ repo_root: f.repo, mode: 'apply', automation_run_id: f.budget.automation_run_id,
+      reservation_sha256: f.reservation.reservation_sha256, expected_reconciliation_sha256: createHash('sha256').update(raw).digest('hex'),
+      outcome: f.input.outcome, evidence_refs: f.input.evidence_refs, repair_reason: 'No second charge.' })).toThrow('cannot replace existing usage');
+    expect(diskSnapshot(f.directory)).toEqual(before);
+    resumeAutoClock();
+  });
+
+  test('operator CLI previews by default and requires explicit apply for a durable repair', () => {
+    const f = poisoned('repair-cli');
+    const requestPath = join(f.repo, 'repair-request.json');
+    writeFileSync(requestPath, JSON.stringify(f.request));
+    const args = [CLI_ENTRY, 'automation', 'budget', 'repair-reconciliation', '--repo', f.repo, '--from', requestPath];
+    const before = diskSnapshot(f.directory);
+    const preview = spawnCli(process.execPath, args, { cwd: CLI_ROOT, encoding: 'utf8', env: process.env });
+    expect(preview.status, preview.stderr).toBe(0);
+    expect(JSON.parse(preview.stdout).dry_run).toBe(true);
+    expect(diskSnapshot(f.directory)).toEqual(before);
+    const applied = spawnCli(process.execPath, [...args, '--apply'], { cwd: CLI_ROOT, encoding: 'utf8', env: process.env });
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(JSON.parse(applied.stdout)).toMatchObject({ dry_run: false, commit: { current: { state: 'budget_exhausted', event_count: 1, open_reservation_sha256s: [] } } });
+    expect(readFileSync(f.record, 'utf8')).toBe(f.originalBytes);
+    resumeAutoClock();
+  });
+
 });

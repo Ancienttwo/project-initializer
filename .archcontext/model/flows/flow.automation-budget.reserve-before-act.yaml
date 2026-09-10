@@ -28,7 +28,7 @@ outcomes:
         label: Append the authoritative usage event for the exact reservation
         evidence:
           entrypointId: entrypoint.automation-budget.append
-          sourceSymbol: commitUsage
+          sourceSymbol: prepareUsageCommit
           sinkId: sink.automation-budget.usage-event
       - id: chain-ledger
         from: budget
@@ -36,7 +36,7 @@ outcomes:
         label: Chain the append-only ledger digest so no earlier event can be edited out
         evidence:
           entrypointId: entrypoint.automation-budget.append
-          sourceSymbol: commitUsage
+          sourceSymbol: publishUsageCommit
           sinkId: sink.automation-budget.ledger-chain
     terminal:
       participant: budget
