@@ -33,3 +33,5 @@ Windows CI exposed pre-existing directory-fsync EPERM in the lease writer used d
 
 Final PR comparison against origin/main:
 > **Substantive Change SHA256**: `sha256:ac9b456e5de8653da7be32b11d42cd8b8c9fd738d80293b8c4a1d40d5f2aacb4`
+
+Semantic acceptance remains blocked: `/tmp/operator-diff-plugin-review.json` is stale_scope and `/tmp/operator-diff-plugin-final.json` is review_budget_exhausted. The existing one-attempt circuit policy was preserved. All 11 declared verification commands passed at run-20260910T231010-87128. An explicit owner waiver is still required; merge authorization is not a waiver.
