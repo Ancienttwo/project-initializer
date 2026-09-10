@@ -1141,3 +1141,37 @@ repo-harness run check-brain-manifest
 repo-harness run sync-brain-docs --all
 repo-harness run sync-brain-docs --check
 ```
+
+
+## Proactive refactor recommendations
+
+`~/.repo-harness/config.json#refactor_recommendations` contains `{ "enabled": true }`
+by default. Global install/update initializes the setting once and preserves an
+explicit disabled choice. Repositories do not need another enable switch.
+
+At normal Stop, repo-harness observes ArchContext structural candidates when a
+project model is present. It uses the packaged exact provider contract and
+existing lifecycle readback; it does not require or change execution activation.
+Only complete, non-truncated code facts with unambiguous ownership produce a
+recommendation. The observer never creates an index or model on the user's behalf.
+
+The Agent receives at most three candidates and is instructed to explain the
+measured evidence, inferred benefit and risk, then ask the user whether to
+proceed, defer or decline. No author, recommendation record/acceptance,
+Work Package, program or code edit is triggered by observation. User approval
+uses the normal approved-plan workflow and its existing execution gates.
+
+Observation gets at most ten seconds within Stop's existing twenty-second
+shared work budget, with a five-minute scan cooldown. A delivery ledger retains up to 4096
+recommendation identity/fingerprint pairs without eviction. At capacity, automatic
+delivery pauses with an explicit diagnostic; existing identities remain suppressed.
+The explicit CLI still permits observation without consuming delivery history. The one-shot
+Stop continuation ends after presenting the choice; waiting for an answer does
+not hold Stop in a loop. State and the last observation are stored in the ignored
+`.ai/harness/runs/refactor-recommendations.json`; they are delivery evidence,
+not user approval or upstream recommendation status.
+
+`repo-harness refactor recommendations --repo <root> --json` explicitly reads
+current opportunities through the same observer, without consuming Stop's
+delivery history or requiring `refactor discover`'s author activation. It returns
+readiness/error status when evidence is unavailable; it never invents a candidate.

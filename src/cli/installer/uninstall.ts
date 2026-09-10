@@ -180,8 +180,8 @@ export function runUserUninstall(opts: UninstallOptions): UninstallResult {
       assertConfigurationPath(path, env);
       if (existsSync(path)) {
         const data = object(read(path));
-        if ('brainRoot' in data || 'protectedHelperRuntime' in data || 'architecture' in data) {
-          delete data.brainRoot; delete data.protectedHelperRuntime; delete data.architecture;
+        if ('brainRoot' in data || 'protectedHelperRuntime' in data || 'architecture' in data || 'refactor_recommendations' in data) {
+          delete data.brainRoot; delete data.protectedHelperRuntime; delete data.architecture; delete data.refactor_recommendations;
           change(path, Object.keys(data).length ? `${JSON.stringify(data, null, 2)}\n` : null, 'repo-harness brain/helper/architecture configuration; data directories retained');
         }
       }

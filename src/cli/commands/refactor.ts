@@ -1,3 +1,4 @@
+import { observeRefactorRecommendations } from '../../effects/refactor/recommendations';
 import { Command } from 'commander';
 import { canonicalRepoPath } from '../../effects/repo-registry';
 import { readFileSync } from 'fs';
@@ -125,6 +126,17 @@ export function runRefactorActivationStatus(raw: { readonly repo?: string }): vo
 
 export function buildRefactorCommand(shadowDependencies: RefactorShadowDependencies = {}): Command {
   const command = new Command('refactor').description('Operate the authorized refactor program state machine');
+  command.command('recommendations')
+    .description('Read measured opportunities for an Agent to discuss with the user; never execute')
+    .option('--repo <path>', 'Repository root', '.')
+    .requiredOption('--json', 'Output measured recommendations and readiness')
+    .action((options: { repo: string }) => {
+      try {
+        const value = observeRefactorRecommendations(canonicalRepoPath(options.repo));
+        output(value);
+        if (value.status === 'unavailable' || value.status === 'proof_required') process.exitCode = 1;
+      } catch (error) { outputError(error); }
+    });
   command.command('discover')
     .description('Scan, select and assess one local agent proposal within shadow boundaries')
     .option('--repo <path>', 'Repository root', '.')

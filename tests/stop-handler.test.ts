@@ -1256,6 +1256,24 @@ describe('runStopHandler', () => {
   });
 });
 
+test('Stop delivers refactor recommendations as one user decision, including lite, without recursive delivery', () => {
+  for (const profile of ['lite', 'standard'] as const) {
+    const cwd = fixture(); let calls = 0;
+    const dependencies = { observeRefactorRecommendations: () => {
+      calls++;
+      return { schemaVersion: 'repo-harness.refactor-recommendations/v1' as const, status: 'recommended' as const, requiresUserDecision: true as const, totalCandidates: 1,
+        candidates: [{ recommendationId: 'r1', fingerprint: 'sha256:fixture', kind: 'cycle' as const, affectedNodeIds: ['a', 'b'], confidence: 'high', risk: 'medium', uncertainty: 'low', explanation: ['Measured cycle'], evidenceBindingIds: ['b1'] }] };
+    } };
+    const result = runStopHandler({ collector: collector(cwd, () => canonicalState({ profile })), dependencies });
+    expect(JSON.parse(result.stdout).decision).toBe('block');
+    expect(JSON.parse(result.stdout).reason).toContain('Ask whether the user wants to proceed, defer or decline');
+    expect(JSON.parse(result.stdout).reason).toContain('Do not execute a refactor');
+    const continuation = runStopHandler({ collector: collector(cwd, () => canonicalState({ profile })), dependencies, input: '{"stop_hook_active":true}' });
+    expect(continuation.stdout).toBe(''); expect(calls).toBe(1);
+    expect(existsSync(join(cwd, 'plans'))).toBe(false);
+  }
+});
+
 describe('stop bounds its own run summary history', () => {
   const RUNS_DIR = '.ai/harness/runs';
 
