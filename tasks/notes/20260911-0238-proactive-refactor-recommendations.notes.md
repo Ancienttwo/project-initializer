@@ -66,3 +66,7 @@ Final stacked base synchronized to 76b05000 (main e238a73a incorporated).
 Official codex-plugin review approved beacd220 against base 76b05000 with zero findings. Review subject: sha256:4940895c75a757cbe9be3fb59232054611bb819e34eddd2ea233220f89fc8c2b. The subsequent base synchronization retained upstream run-summary retention and both test blocks; that merge delta is locally verified separately. The earlier approval is not an exact-current-subject AcceptanceReceipt.
 
 > **Substantive Change SHA256**: `sha256:d5aeb5683c3436efb293787c5c47b3116345763bda840a7f20a16e4c7a3a6fa5`
+
+Owner-accepted base compare binding:
+
+> **Substantive Change SHA256**: `sha256:fa594bc54244c2e29ffede088c8d3e5d1b68777869df428ce8ad700fe243587e`
