@@ -1,7 +1,8 @@
 import * as revisionAdmission from '../../src/effects/automation/campaign-revision-admission';
+import * as campaignRuntime from '../../src/effects/automation/campaign-runtime';
 import { afterEach, expect, test, spyOn } from 'bun:test';
 import { spawnSync } from 'child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { historicalPlanningFixture, installHistoricalBoundDispatch, installHistoricalAttempt, installHistoricalFinal } from '../helpers/historical-campaign-lifecycle';
 import { ensureCampaignAuthoringBudget, readAutomationBudgetStatus, appendAutomationUsage, readAutomationUsageForResult } from '../../src/effects/automation/budget-store';
@@ -13,6 +14,9 @@ import { issueBatchGroupStoreRoot } from '../../src/effects/automation/issue-bat
 import { canonicalMessageBytes, canonicalMessageDigest } from '../../src/core/messages/mechanics';
 import { processSprintDependencies, releaseSprintCommand } from '../../src/effects/state/coordination-sprint';
 import { readLease } from '../../src/effects/state/coordination-lease-store';
+import { campaignRuntimeRecordKey } from '../../src/core/automation/campaign-runtime';
+import { campaignContainerDirectory } from '../../src/effects/automation/campaign-container';
+import { resolveGitCommonDirectory } from '../../src/effects/git/common-directory';
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })));
 async function acquired() {
@@ -28,6 +32,61 @@ function budgetStatus(f: Awaited<ReturnType<typeof acquired>>) {
   const budget = ensureCampaignAuthoringBudget({ repo_root: f.root, authorization: f.authorization, env: f.env }).budget;
   return readAutomationBudgetStatus(f.root, budget.automation_run_id, f.env).current;
 }
+
+test('pre-journal preparation failure can retry without extending its deadline or charging an attempt', async () => {
+  const f = await acquired(); const before = budgetStatus(f);
+  const admission = spyOn(revisionAdmission, 'requireCampaignActiveAdmission').mockImplementation(() => {});
+  const calls: number[] = [];
+  const prepare = spyOn(campaignRuntime, 'prepareCampaignCodexInvocation').mockImplementation(async input => {
+    calls.push(input.deadline_ms);
+    throw new Error('Docker context transport unavailable before journal creation');
+  });
+  const previousHome = process.env.REPO_HARNESS_HOME;
+  process.env.REPO_HARNESS_HOME = f.home;
+  try {
+    const worker = bindCampaignWorker({ ...workerInput(f), provider: 'codex-exec' });
+    const deadline = Date.now() + 30000;
+    await expect(worker.prepareChild('worker', 'prompt.md', deadline)).rejects.toThrow('transport unavailable');
+    const recordKey = campaignRuntimeRecordKey(f.result.worker_handoff.dispatch_id, 'worker', 'preparation');
+    const original = readPlanningRecord(f.root, f.intent, recordKey);
+    expect(original).not.toBeNull();
+    await expect(worker.prepareChild('worker', 'prompt.md', deadline + 30000)).rejects.toThrow('transport unavailable');
+    expect(calls).toEqual([deadline, deadline]);
+    expect(readPlanningRecord(f.root, f.intent, recordKey)).toEqual(original);
+    expect(budgetStatus(f)).toEqual(before);
+    expect(readPlanningRecord(f.root, f.intent, canonicalMessageDigest({ dispatch: f.result.worker_handoff.dispatch_id, part: 'launch' }).slice(7))).toBeNull();
+    expect(readPlanningRecord(f.root, f.intent, campaignRuntimeRecordKey(f.result.worker_handoff.dispatch_id, 'worker', 'intent'))).toBeNull();
+    await expect(worker.prepareChild('worker', 'prompt.md', deadline - 1)).rejects.toThrow('deadline');
+    expect(calls).toHaveLength(2);
+  } finally {
+    admission.mockRestore(); prepare.mockRestore();
+    if (previousHome === undefined) delete process.env.REPO_HARNESS_HOME; else process.env.REPO_HARNESS_HOME = previousHome;
+  }
+});
+
+test.each(['version', 'worker'] as const)('an existing %s journal blocks preparation retry before any provider call', async phase => {
+  const f = await acquired();
+  const admission = spyOn(revisionAdmission, 'requireCampaignActiveAdmission').mockImplementation(() => {});
+  const prepare = spyOn(campaignRuntime, 'prepareCampaignCodexInvocation').mockRejectedValue(new Error('pre-journal failure'));
+  const previousHome = process.env.REPO_HARNESS_HOME;
+  process.env.REPO_HARNESS_HOME = f.home;
+  try {
+    const worker = bindCampaignWorker({ ...workerInput(f), provider: 'codex-exec' });
+    const deadline = Date.now() + 30000;
+    await expect(worker.prepareChild('worker', 'prompt.md', deadline)).rejects.toThrow('pre-journal failure');
+    const stored = readPlanningRecord<campaignRuntime.CampaignCodexPreparation>(f.root, f.intent,
+      campaignRuntimeRecordKey(f.result.worker_handoff.dispatch_id, 'worker', 'preparation'))!;
+    const common = resolveGitCommonDirectory(f.worktree);
+    const directory = campaignContainerDirectory(common, phase === 'version' ? { ...stored.identity, phase } : stored.identity);
+    mkdirSync(directory);
+    await expect(worker.prepareChild('worker', 'prompt.md', deadline)).rejects.toThrow('journal');
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(existsSync(directory)).toBe(true);
+  } finally {
+    admission.mockRestore(); prepare.mockRestore();
+    if (previousHome === undefined) delete process.env.REPO_HARNESS_HOME; else process.env.REPO_HARNESS_HOME = previousHome;
+  }
+});
 
 test('historical Claim cannot authorize a new handoff, launch, reservation or attempt', async () => {
   const f = await acquired(); const before = budgetStatus(f);
