@@ -132,6 +132,7 @@ function repository(
 ): OperatorFleetRepositoryV1 {
   return {
     repository_id: repositoryId,
+    display_name: repositoryId,
     access_mode: 'read_write',
     status: 'ok',
     snapshot_consistency: 'stable',
@@ -194,7 +195,7 @@ const stableRepositories: readonly OperatorFleetRepositoryV1[] = [
 ];
 
 export const stableSnapshot: OperatorFleetSnapshotV1 = {
-  protocol: 4,
+  protocol: 5,
   kind: 'operator_fleet_snapshot',
   registry_revision: `sha256:${'e'.repeat(64)}`,
   sequence: 18,

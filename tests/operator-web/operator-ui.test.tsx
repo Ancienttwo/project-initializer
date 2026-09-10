@@ -47,7 +47,7 @@ describe('operator web control board', () => {
       'External',
       'Done',
     )).toBe(true);
-    expect(markup).toContain('protocol 4');
+    expect(markup).toContain('protocol 5');
     expect(markup).toContain('observe-only · one write: task message');
   });
 
@@ -56,7 +56,8 @@ describe('operator web control board', () => {
 
     expect(markup).toContain(fixtureTasks.available.task_label);
     expect(markup).toContain(fixtureTasks.blocked.task_label);
-    expect(markup).toContain(fixtureTasks.console.task_label);
+    expect(markup).not.toContain(fixtureTasks.console.task_label);
+    expect(renderStable({ ...stableSnapshot, repositories: [...stableSnapshot.repositories].reverse() })).toContain(fixtureTasks.console.task_label);
     expect(markup).not.toContain(fixtureTasks.available.task_id);
     expect(markup).not.toContain(fixtureTasks.blocked.task_id);
   });
@@ -77,9 +78,10 @@ describe('operator web control board', () => {
 
     expect(markup).toContain('The base branch moved after verification');
     expect(markup).toContain('base_moved_since_verification');
-    expect(markup).toContain('no progress');
+    const consoleMarkup = renderStable({ ...stableSnapshot, repositories: [...stableSnapshot.repositories].reverse() });
+    expect(consoleMarkup).toContain('no progress');
     expect(markup).toContain('1 unread');
-    expect(markup).toContain('2 unread');
+    expect(consoleMarkup).toContain('2 unread');
   });
 
   // `available` carries no blocker and no stall, so unread is its primary cause;
@@ -160,7 +162,7 @@ describe('operator web control board', () => {
     );
 
     expect(markup).toContain('protocol — · sequence —');
-    expect(markup).not.toContain('protocol 4');
+    expect(markup).not.toContain('protocol 5');
   });
 
   test('keeps empty, changed-during-read, and repo-degraded semantics explicit', () => {

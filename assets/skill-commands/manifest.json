@@ -160,6 +160,25 @@
       "retirementCandidate": null
     },
     {
+      "name": "auto-campaign",
+      "kind": "facade",
+      "source": "assets/skills/auto-campaign",
+      "provider": null,
+      "hosts": [
+        "claude",
+        "codex"
+      ],
+      "profiles": [
+        "full"
+      ],
+      "discoverability": "profile-facade",
+      "component": "planning-integrations",
+      "requires": [],
+      "mutatesRepoByDefault": true,
+      "summary": "Explicit conversational entrypoint for one bounded repair campaign turn using the standard grant budget; preserves runtime authority and stops for human merge.",
+      "retirementCandidate": null
+    },
+    {
       "name": "repo-harness-cross-review",
       "kind": "provider-skill",
       "source": "assets/skills/repo-harness-cross-review",
@@ -389,7 +408,8 @@
         "repo-harness-check",
         "repo-harness-product",
         "repo-harness-ship",
-        "obsidian-memory"
+        "obsidian-memory",
+        "auto-campaign"
       ]
     },
     "externalSkillsByProfile": {

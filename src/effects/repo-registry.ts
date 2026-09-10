@@ -672,3 +672,48 @@ export function restoreRepoHarnessRegistryEntries(
   };
   return opts.dryRun ? apply() : withRegistryMutationLock(repoHarnessRegisteredReposPath(opts.env), apply);
 }
+
+/** Explicit operator cleanup; unreadable paths are not proof of absence. */
+export function pruneRepoHarnessRegistry(opts: {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly apply?: boolean;
+  readonly expectedRevision?: string;
+  readonly repoIds?: readonly string[];
+} = {}) {
+  if (opts.apply && !/^sha256:[0-9a-f]{64}$/.test(opts.expectedRevision ?? '')) {
+    throw new Error('--apply requires --expected-revision from the preview');
+  }
+  const inspect = (snapshot: RepoHarnessRegistryStrictSnapshot) => {
+    if (opts.expectedRevision !== undefined && opts.expectedRevision !== snapshot.registryRevision) {
+      throw new Error('registry revision changed; preview again before applying');
+    }
+    const selected = opts.repoIds === undefined ? null : new Set(opts.repoIds);
+    for (const id of selected ?? []) {
+      if (!snapshot.repos.some(repo => repo.id === id)) throw new Error(`unknown registered repo id: ${id}`);
+    }
+    const candidates: RepoHarnessRegisteredRepo[] = [];
+    const skipped: { id: string; path: string; reason: string }[] = [];
+    for (const repo of snapshot.repos) {
+      if (selected !== null && !selected.has(repo.id)) continue;
+      try {
+        lstatSync(repo.path);
+        skipped.push({ id: repo.id, path: repo.path, reason: 'path_present' });
+      } catch (error) {
+        if (isNodeError(error) && error.code === 'ENOENT') candidates.push(repo);
+        else skipped.push({ id: repo.id, path: repo.path, reason: isNodeError(error) ? error.code ?? 'probe_failed' : 'probe_failed' });
+      }
+    }
+    const removed = opts.apply ? candidates : [];
+    const ids = new Set(removed.map(repo => repo.id));
+    const authorizationRevision = snapshot.authorizationRevision + (removed.length > 0 ? 1 : 0);
+    if (removed.length > 0) {
+      writeRegistryFile(snapshot.registryPath, snapshot.repos.filter(repo => !ids.has(repo.id)), authorizationRevision);
+    }
+    return { registry_path: snapshot.registryPath, registry_revision: snapshot.registryRevision,
+      applied: opts.apply === true, authorization_revision: authorizationRevision,
+      candidates, removed, skipped, remaining_count: snapshot.repos.length - removed.length };
+  };
+  return opts.apply
+    ? withRepoHarnessRegistryAuthorizationLock({ env: opts.env }, inspect)
+    : inspect(readRepoHarnessRegistryStrictSnapshot({ env: opts.env, adoptedOnly: false }));
+}

@@ -49,7 +49,7 @@ import type {
  * module's literal type, so a drift from the core constant fails typecheck
  * here rather than at runtime.
  */
-export const OPERATOR_FLEET_PAYLOAD_PROTOCOL: OperatorFleetSnapshotV1['protocol'] = 4;
+export const OPERATOR_FLEET_PAYLOAD_PROTOCOL: OperatorFleetSnapshotV1['protocol'] = 5;
 
 /**
  * The collaboration protocol the browser transport accepts, restated for the
@@ -235,7 +235,7 @@ export function projectSnapshotViewState(snapshot: OperatorFleetSnapshotV1): Ope
   return { kind, snapshot } as OperatorSnapshotViewState;
 }
 
-export function allCards(snapshot: OperatorFleetSnapshotV1): readonly OperatorFleetCardV1[] {
+export function allCards(snapshot: Pick<OperatorFleetSnapshotV1, 'repositories'>): readonly OperatorFleetCardV1[] {
   return snapshot.repositories.flatMap((repository) => repository.cards);
 }
 
@@ -538,6 +538,7 @@ function decodeCard(value: unknown, repositoryId: string): OperatorFleetCardV1 {
 function decodeRepository(value: unknown): OperatorFleetRepositoryV1 {
   const repository = requireRecord(value);
   const repositoryId = requireString(repository.repository_id);
+  const displayName = requireString(repository.display_name);
   const accessMode = requireOneOf(repository.access_mode, ['read_only', 'read_write'] as const);
   const status = requireOneOf(repository.status, ['ok', 'unreadable'] as const);
   const snapshotConsistency = requireOneOf(repository.snapshot_consistency, SNAPSHOT_CONSISTENCIES);
@@ -550,6 +551,7 @@ function decodeRepository(value: unknown): OperatorFleetRepositoryV1 {
   if (cardChanged && snapshotConsistency === 'stable') throw new OperatorPayloadError();
   return Object.freeze({
     repository_id: repositoryId,
+    display_name: displayName,
     access_mode: accessMode,
     status,
     snapshot_consistency: snapshotConsistency,

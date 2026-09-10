@@ -335,11 +335,11 @@ describe("skill-surface catalog: the real manifest.json on disk", () => {
   // addition, bringing the live surface to 11 repo-owned + 6 external.
   // obsidian-memory is the second repo-owned addition (a facade projected to
   // both hosts by every profile), bringing it to 12 repo-owned + 6 external.
-  test("covers all 12 repo-owned sources plus the 8 external skills (20 packages)", () => {
+  test("covers all 13 repo-owned sources plus the 8 external skills (21 packages)", () => {
     if (resolution.status !== "valid") throw new Error("expected valid catalog");
-    expect(resolution.catalog.packages.length).toBe(20);
+    expect(resolution.catalog.packages.length).toBe(21);
     const repoOwned = resolution.catalog.packages.filter((p) => p.kind !== "external");
-    expect(repoOwned.length).toBe(12);
+    expect(repoOwned.length).toBe(13);
     const external = resolution.catalog.packages.filter((p) => p.kind === "external");
     expect(external.map((p) => p.name).sort()).toEqual([
       "check", "health", "hunt", "mermaid", "obsidian-cli", "obsidian-markdown", "reverse-skill-router", "think",
@@ -420,7 +420,7 @@ describe("skill-surface catalog: target post-cutover discovery matrix", () => {
       "repo-harness-plan", "repo-harness-check", "obsidian-memory",
     ]);
     expect(facadesForProfile(catalog, "full")).toEqual([
-      "repo-harness-plan", "repo-harness-check", "repo-harness-product", "repo-harness-ship", "obsidian-memory",
+      "repo-harness-plan", "repo-harness-check", "repo-harness-product", "repo-harness-ship", "obsidian-memory", "auto-campaign",
     ]);
   });
 
@@ -535,7 +535,7 @@ describe("skill-surface catalog: target post-cutover discovery matrix", () => {
     const { repoHarnessSkills, externalSkills } = mutationPathSkillNames(catalog);
     expect(repoHarnessSkills).toEqual([
       "repo-harness", "repo-harness-plan", "repo-harness-check", "repo-harness-product", "repo-harness-ship",
-      "obsidian-memory",
+      "obsidian-memory", "auto-campaign",
     ]);
     expect(externalSkills).toEqual([
       "repo-harness-cross-review", "think", "hunt", "check", "health", "mermaid", "reverse-skill-router",
@@ -554,6 +554,7 @@ describe("skill-surface catalog: target post-cutover discovery matrix", () => {
     expect(expectations.planningSkillNames).toEqual(["think", "hunt", "check", "health", "mermaid"]);
     expect(expectations.planningCapabilityPaths).toEqual([
       "assets/skills/repo-harness-product/SKILL.md",
+      "assets/skills/auto-campaign/SKILL.md",
     ]);
     expect(expectations.crossModel).toEqual(["repo-harness-cross-review"]);
   });
