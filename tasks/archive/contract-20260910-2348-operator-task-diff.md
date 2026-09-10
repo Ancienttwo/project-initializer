@@ -1,13 +1,23 @@
+> **Archived**: 2026-09-10 23:48
+> **Related Plan**: plans/archive/plan-20260910-2225-operator-task-diff.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260910-2348
+> **Archive Projection V1**: `plans/plan-20260910-2225-operator-task-diff.md` => `plans/archive/plan-20260910-2225-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/notes/20260910-2225-operator-task-diff.notes.md` => `tasks/archive/notes-20260910-2348-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-2225-operator-task-diff.contract.md` => `tasks/archive/contract-20260910-2348-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-2225-operator-task-diff.review.md` => `tasks/archive/review-20260910-2348-operator-task-diff.md`
+
 # Task Contract: operator-task-diff
 
-> **Status**: Active
-> **Plan**: plans/plan-20260910-2225-operator-task-diff.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260910-2225-operator-task-diff.md
 > **Task Profile**: code-change
 > **Workflow Profile**: strict
 > **Owner**: ancienttwo
 > **Capability ID**: root
-> **Review File**: `tasks/reviews/20260910-2225-operator-task-diff.review.md`
-> **Notes File**: `tasks/notes/20260910-2225-operator-task-diff.notes.md`
+> **Review File**: `tasks/archive/review-20260910-2348-operator-task-diff.md`
+> **Notes File**: `tasks/archive/notes-20260910-2348-operator-task-diff.md`
 
 ## Goal
 
@@ -42,9 +52,9 @@ allowed_paths:
   - tests/operator-web/operator-task-diff.test.tsx
   - docs/researches/20260901-operator-board-audit-hardening.md
   - plans/
-  - tasks/contracts/20260910-2225-operator-task-diff.contract.md
-  - tasks/reviews/20260910-2225-operator-task-diff.review.md
-  - tasks/notes/20260910-2225-operator-task-diff.notes.md
+  - tasks/archive/contract-20260910-2348-operator-task-diff.md
+  - tasks/archive/review-20260910-2348-operator-task-diff.md
+  - tasks/archive/notes-20260910-2348-operator-task-diff.md
 ```
 
 ## Change Assessment

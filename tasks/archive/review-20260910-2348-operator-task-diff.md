@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 23:48
+> **Related Plan**: plans/archive/plan-20260910-2225-operator-task-diff.md
+> **Outcome**: Completed
+> **Lifecycle**: review
+> **Parent Run ID**: run-20260910-2348
+> **Archive Projection V1**: `plans/plan-20260910-2225-operator-task-diff.md` => `plans/archive/plan-20260910-2225-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/notes/20260910-2225-operator-task-diff.notes.md` => `tasks/archive/notes-20260910-2348-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-2225-operator-task-diff.contract.md` => `tasks/archive/contract-20260910-2348-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-2225-operator-task-diff.review.md` => `tasks/archive/review-20260910-2348-operator-task-diff.md`
+
 # Task Review: operator-task-diff
 
 > **Status**: Accepted
-> **Plan**: plans/plan-20260910-2225-operator-task-diff.md
-> **Contract**: tasks/contracts/20260910-2225-operator-task-diff.contract.md
-> **Notes File**: tasks/notes/20260910-2225-operator-task-diff.notes.md
+> **Plan**: plans/archive/plan-20260910-2225-operator-task-diff.md
+> **Contract**: tasks/archive/contract-20260910-2348-operator-task-diff.md
+> **Notes File**: tasks/archive/notes-20260910-2348-operator-task-diff.md
 > **Checks File**: .ai/harness/checks/latest.json
 > **Recommendation**: pass
 > **Review Rubric Version**: 2

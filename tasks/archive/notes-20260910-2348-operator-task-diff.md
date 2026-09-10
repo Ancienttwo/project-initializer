@@ -1,3 +1,13 @@
+> **Archived**: 2026-09-10 23:48
+> **Related Plan**: plans/archive/plan-20260910-2225-operator-task-diff.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260910-2348
+> **Archive Projection V1**: `plans/plan-20260910-2225-operator-task-diff.md` => `plans/archive/plan-20260910-2225-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/notes/20260910-2225-operator-task-diff.notes.md` => `tasks/archive/notes-20260910-2348-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-2225-operator-task-diff.contract.md` => `tasks/archive/contract-20260910-2348-operator-task-diff.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-2225-operator-task-diff.review.md` => `tasks/archive/review-20260910-2348-operator-task-diff.md`
+
 # Task diff merge decisions
 
 Configured external filters are refused instead of silently disabling transformations; fsmonitor is disabled for every new-reader Git invocation. This preserves explicit comparison semantics.
