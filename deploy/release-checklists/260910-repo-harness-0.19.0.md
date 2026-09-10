@@ -3,13 +3,9 @@
 - Date: 2026-09-10
 - Package: `repo-harness@0.19.0`
 - Base release: `v0.18.0` (`cc06b67f55fa`)
-- Product source range: `v0.18.0..1c8ce670` (467 commits, ~210k inserted lines).
-  The branch was first cut at `fd675687` (464 commits) and rebased onto
-  `1c8ce670` when `main` advanced during review. The three added commits are one
-  CI workflow change (#387) and one campaign capability (#385, settled-failed
-  adopted resume), the latter folded into the changelog's campaign entry.
-- Release-prep branch: `codex/release-0-19-0`
-- Candidate commit: bound by the release PR Head after the metadata commit
+- Integration base: `16f6581f55f89277d9cff315cca439fbfcc5128a`.
+- Release branch: `codex/retention-release-0-19-0`.
+- Candidate commit: bound by the release PR head and final verification receipt.
 - Release scope: minor with breaking behavior. The range grows a second product
   layer on top of the file-backed session contract — authorized programs that
   hold their own authorization, budget ledger, task offers, and renewable
@@ -122,15 +118,15 @@ requires a sprint backlog schema migration.
 
 ## Authority Boundary
 
-- This candidate changes release metadata and documentation only; product
-  implementation is the already accepted source range on `main` at `fd675687`.
+- This candidate adds the reviewed browser draft recovery and checkpoint
+  retention fixes to the prepared 0.19.0 source, and pins archctx and
+  archctx-contracts to the published 0.5.10 packages.
 - npm `latest`, tag `v0.19.0`, tarball metadata, source commit, version files,
   and installed runtime must resolve to one immutable release.
-- Registry publication, tag creation, merge, and global runtime mutation are
-  **not** authorized by this filing. They require a separate explicit owner
-  decision.
+- The owner authorized merge, tag, npm publication through Web Auth, and the
+  selected Bun-global runtime update after the required gates pass.
 
-## Candidate Gate Evidence
+## Metadata Preparation Evidence (PR #388)
 
 | Gate | Candidate result |
 | --- | --- |
@@ -163,7 +159,7 @@ requires a sprint backlog schema migration.
 
 ## Publish Follow-through
 
-Not started. When the owner authorizes publication:
+The owner authorized the following delivery steps; final gate results remain pending:
 
 1. Merge the reviewed release PR into `main`.
 2. Create tag `v0.19.0` at the merged commit and push it.
@@ -186,10 +182,12 @@ This approval supersedes the preparation-only public-action boundary above.
   recovery reader projected into the standalone helper.
 - Source evidence: `plans/archive/plan-20260910-1608-operator-composer-draft.md`.
 - Release follow-through: `plans/plan-20260910-1742-retention-release-0-19-0.md`.
-- Separate archctx journal-read source remains in its isolated worktree and is
-  not part of this package release.
+- The owner separately approved archctx 0.5.10. PR #154 passed all ten CI
+  jobs and merged at `dc4fcc3d9ee7e70f66654d934f50a55f30381cf2`. Both packages
+  are published as 0.5.10 through Web Auth; registry tarballs match the tested
+  artifacts byte for byte. This release fixes both provider pins to 0.5.10.
 - Release gate, exact CI, registry publication and installed-runtime readback:
-  pending. Registry identity currently returns E401; the owner has been asked
-  to restore npm login. No publication or installed-runtime success is claimed.
+  pending. The owner selected npm Web Auth and completed login as `ancienttwo`.
+  Publication and installed-runtime success remain unclaimed until readback.
 - Skill effectiveness evidence remains unavailable. Existing Waza/CodeGraph
   update flags do not change the source or packaged runtime being released.

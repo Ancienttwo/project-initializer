@@ -9,22 +9,25 @@
 > **Rollback Surface**: Scoped source revert and explicit runtime package selection
 > **Workflow Profile**: strict
 > **Execution Mode**: worktree
-> **Substantive Change SHA256**: `sha256:3497b5579c19694af3c161fcf8d946d18f1655462295f1700f5f595a338a5dd0`
+> **Task Contract**: `tasks/contracts/20260910-1742-retention-release-0-19-0.contract.md`
+> **Task Review**: `tasks/reviews/20260910-1742-retention-release-0-19-0.review.md`
+> **Implementation Notes**: `tasks/notes/20260910-1742-retention-release-0-19-0.notes.md`
+> **Substantive Change SHA256**: `sha256:116e8c58cc2c1d29aea3f503da8ea3f41f1613075c21b48b1769b6c3b5febf3b`
 
 # Release repo-harness 0.19.0 with bounded checkpoints
 
 ## Scope and decision
-The user approved publishing the already reviewed composer and checkpoint changes and refreshing the Bun-global runtime. The registry and installed package are 0.18.0; 0.19.0 metadata was merged in PR #388 but remains unpublished. Keep 0.19.0 and supplement its existing release record. The archctx journal-read worktree remains a separate local deliverable.
+The user approved publishing the already reviewed composer and checkpoint changes and refreshing the Bun-global runtime. The registry and installed package are 0.18.0; 0.19.0 metadata was merged in PR #388 but remains unpublished. Keep 0.19.0 and supplement its existing release record. The user subsequently approved archctx 0.5.10 publication; publish that separate package first, then pin it for this release.
 
 P1: package.json and assets/skill-version.json own version 0.19.0; docs/CHANGELOG.md and deploy/release-checklists/260910-repo-harness-0.19.0.md describe it. The existing reviewed source delta owns checkpoint publication/collection and browser draft restoration. Global CLI and hook resolve into the Bun-global installed package.
 P2: scoped patch -> reviewed commit/PR -> required CI -> merged immutable source -> npm tarball/tag -> registry readback -> Bun-global install -> CLI/hook and repeated-checkpoint proof.
-P3: reuse source review and focused evidence from the archived implementation plan, preserving the exact code. Keep current checkpoint durable before collection; retain raw ledger/blob authority; preserve original draft fence. Execute the explicit full release gate once for the frozen source and use the same candidate tarball for publish/readback. Registry authentication currently returns E401; continue safe preparation while the user restores it. No manual installed-package patch or archctx publication.
+P3: reuse source review and focused evidence from the archived implementation plan, preserving the exact code. Keep current checkpoint durable before collection; retain raw ledger/blob authority; preserve original draft fence. Execute the explicit full release gate once for the frozen source and use the same candidate tarball for publish/readback. The owner completed npm Web Auth login and requests Web Auth for each publication. No manual installed-package patch. archctx publication remains owned by its separate worktree and contract.
 
 ## Scope paths
 All 16 copied implementation/research/archive paths from the prior plan, docs/CHANGELOG.md, deploy/release-checklists/260910-repo-harness-0.19.0.md, this plan, and ignored build/runtime evidence. No version bump is needed.
 
 ## Task Breakdown
-- [ ] Freeze owned implementation and release notes, preserving existing reviewed source.
+- [x] Freeze owned implementation and release notes, preserving existing reviewed source.
 - [ ] Run the explicit release gate and record scoped/root/package evidence.
 - [ ] Commit and open the scoped release PR; merge after required CI passes.
 - [ ] Publish 0.19.0, verify registry/tag/tarball, and install the same release in Bun-global.
@@ -47,3 +50,7 @@ All 16 copied implementation/research/archive paths from the prior plan, docs/CH
 
 ## Verification
 The full release gate is mandatory in scripts/check-npm-release.sh and runs both governance and functional lanes plus tarball installation. Expected 10-20 minutes. Earlier focused tests/review remain baseline evidence only for their original source; they do not claim full-suite coverage. Execute through verify-sprint --prepare-acceptance with an explicit expensive Verification Plan criterion; root integrity checks are included in the release gate. Publication then uses check:release-published and a bounded installed-store publication/reader smoke. Full skill-effectiveness evaluation is unavailable and is not claimed.
+
+## Published provider boundary
+
+archctx and archctx-contracts 0.5.10 are published through Web Auth. Registry downloads match the tested artifacts byte for byte; the clean registry-installed Node 24 journal probe creates no snapshots. The dependency lock changed only those two packages. Exact provider pins and existing fixtures are updated. The worktree CodeGraph index is initialized and synchronized for the final architecture projection check.

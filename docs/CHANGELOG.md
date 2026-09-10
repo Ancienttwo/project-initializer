@@ -179,6 +179,9 @@ it rather than beside it.
 
 ### Fixed
 
+- **ArchContext 0.5.10 avoids workspace scans during projection retries.** The
+  pinned provider reads prior committed writes directly from its journal, so
+  large ignored runtime caches do not delay that lookup.
 - **Recovery checkpoints keep only the current snapshot.** Repeated Stop events
   no longer accumulate full-history copies; publication preserves the current
   checkpoint before collecting old cache directories, while the raw evidence
