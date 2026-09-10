@@ -6,7 +6,7 @@
 - Release branch: `codex/release-0191`
 - Pinned integration candidate: `03516106dc843b694241023097a85ab89ee30807` (PR #408; contains PR #401 merge `9563083c8fcbbdbf2b88a2d76b5dc5e0a1ac1142`). Publication requires main to contain equivalent product content after #408 merges.
 - Candidate identity: final release PR head and prepared verification receipt.
-- Publish status: **not published; preparation in progress**.
+- Publish status: **not published; release blocked**.
 - Dependency authority: `archctx` and `archctx-contracts` remain exactly `0.5.10`.
 
 ## Release Content
@@ -44,3 +44,12 @@ BRC native-host execution is not enabled by this release; its execution contract
 ## Publication Boundary
 
 Do not publish until the merged release source, full gate, exact package and release approval are ready. This preparation does not create npm versions, tags, GitHub releases or global installations.
+
+## Recorded Outcome
+
+- PR #401 merged as `9563083c8fcbbdbf2b88a2d76b5dc5e0a1ac1142`; PR #408 merged as `3ea6e4531054557449f5d558b0855750791a4f1a`. Both required CI checks passed, including the retried Windows job.
+- The #408 merge and pinned source `03516106` share tree `67b3abaece63e9e19492efce86d87db03e6c966a`. Merging main into the release branch changed no files.
+- Full release gate on `7fc8f5bd` **failed**: its 3,598,202 ms process budget expired during the full test suite. The log also records two failures before timeout: `tests/architecture-projection-provider.test.ts:245` and `tests/unit/hook-entry-single-file-bundle.test.ts:206`, both missing the fixture's `descendant.pid`. These observations do not prove a production cleanup defect; root-cause diagnosis is outstanding.
+- Packed installation smoke was not reached. No retained candidate tarball or package-install pass is claimed.
+- Evidence event: `evt-01M26NDGV8XAJTWAXSBEFVBF0Y`; local diagnostics: `.ai/harness/runs/verification-vx-597e891cefc94c99a3a7.log`. Full run snapshot: `.ai/harness/runs/run-20260911T050102-20358-20260911-0454-release-0191.json`.
+- Hold: resolve the two process-tree fixture failures and the release-gate execution budget/coverage before publication. No automatic full rerun or out-of-scope fix was performed.
