@@ -13,6 +13,7 @@
  * rather than a hand-maintained list.
  */
 import { describe, expect, test } from 'bun:test';
+import { createHash } from 'crypto';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
@@ -26,6 +27,7 @@ const HELPERS_DIR = join(ROOT, 'assets', 'templates', 'helpers');
  * to catch.
  */
 const NOT_BYTE_COPIES: ReadonlyMap<string, string> = new Map([
+  ['recovery-view-cli.ts', 'generated standalone projection of the canonical checkpoint snapshot reader'],
   [
     'capability-resolver.ts',
     // The assets copy is a generated standalone Bun projection of
@@ -81,6 +83,14 @@ describe('helper projection drift', () => {
       const helper = readFileSync(join(HELPERS_DIR, name));
       expect(script.equals(helper), `${name} is now byte-identical; drop it from NOT_BYTE_COPIES`).toBe(false);
     }
+  });
+
+  test('the recovery helper includes the exact canonical snapshot reader with its source digest', () => {
+    const reader = readFileSync(join(ROOT, 'src/effects/evidence/checkpoint-snapshot.ts'), 'utf8');
+    const helper = readFileSync(join(HELPERS_DIR, 'recovery-view-cli.ts'), 'utf8');
+    expect(helper).toContain(`@generated-from src/effects/evidence/checkpoint-snapshot.ts sha256:${createHash('sha256').update(reader).digest('hex')}`);
+    expect(helper).toContain(reader.trimEnd());
+    expect(helper).not.toContain('from "../src/');
   });
 
   test('the verification budget constant matches across both helper copies', () => {

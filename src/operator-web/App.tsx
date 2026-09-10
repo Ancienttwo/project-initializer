@@ -1479,6 +1479,35 @@ function blockedMessage(block: Exclude<ComposerBlock, null>, t: OperatorTranslat
   return t('composer.blockedEmpty');
 }
 
+interface ComposerDraft {
+  readonly message_id: string;
+  readonly fence: TaskMessageFenceV1;
+}
+
+function readComposerDraft(key: string): { value: (ComposerDraft & { body: string }) | null; failed: boolean } {
+  if (typeof window === 'undefined') return { value: null, failed: false };
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return { value: null, failed: false };
+    const value = JSON.parse(raw);
+    const fence = value?.fence;
+    // Storage is editor state, never authority. Missing fields cannot be
+    // reconstructed from a newer card; transport still validates the envelope.
+    if (!value || Object.keys(value).length !== 3 || typeof value.body !== 'string' || value.body.length === 0
+      || typeof value.message_id !== 'string' || value.message_id.length === 0
+      || !fence || Object.keys(fence).length !== 3
+      || typeof fence.expected_task_revision !== 'string' || fence.expected_task_revision.length === 0
+      || !(fence.expected_claim_id === null && fence.expected_generation === null
+        || typeof fence.expected_claim_id === 'string' && fence.expected_claim_id.length > 0
+          && Number.isSafeInteger(fence.expected_generation) && fence.expected_generation > 0)) {
+      return { value: null, failed: true };
+    }
+    return { value, failed: false };
+  } catch {
+    return { value: null, failed: true };
+  }
+}
+
 /**
  * The board's only write affordance.
  *
@@ -1507,9 +1536,14 @@ function Composer({
   readonly sendMessage: (request: TaskMessageRequestV1) => Promise<void>;
   readonly t: OperatorTranslate;
 }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<{ readonly message_id: string; readonly fence: TaskMessageFenceV1 } | null>(null);
-  const [body, setBody] = useState('');
+  const storageKey = `repo-harness:task-message-draft:v1:${taskKey(card)}`;
+  const [restored] = useState(() => readComposerDraft(storageKey));
+  const [open, setOpen] = useState(restored.value !== null || restored.failed);
+  const [draft, setDraft] = useState<ComposerDraft | null>(restored.value);
+  const [body, setBody] = useState(restored.value?.body ?? '');
+  const [storageWarning, setStorageWarning] = useState<OperatorMessageKey | null>(
+    restored.failed ? 'composer.draftRestoreFailed' : null,
+  );
   const [sending, setSending] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
   const [error, setError] = useState<OperatorApiErrorV1 | null>(null);
@@ -1556,6 +1590,35 @@ function Composer({
 
   const beginDraft = () => ({ message_id: crypto.randomUUID(), fence: observedFence });
 
+  const saveDraft = async (
+    nextDraft: ComposerDraft | null,
+    nextBody: string,
+    acknowledged?: ComposerDraft & { body: string },
+  ) => {
+    try {
+      // Every writer shares this origin/task lock: an old ACK may only remove
+      // the exact submitted draft, never text another tab saved in the meantime.
+      await window.navigator.locks.request(storageKey, () => {
+        if (acknowledged) {
+          const saved = readComposerDraft(storageKey);
+          if (saved.failed) throw new Error('Saved draft is unreadable');
+          if (saved.value === null || saved.value.message_id !== acknowledged.message_id
+            || saved.value.body !== acknowledged.body
+            || saved.value.fence.expected_task_revision !== acknowledged.fence.expected_task_revision
+            || saved.value.fence.expected_claim_id !== acknowledged.fence.expected_claim_id
+            || saved.value.fence.expected_generation !== acknowledged.fence.expected_generation) return;
+        }
+        if (nextDraft === null || nextBody.length === 0) window.localStorage.removeItem(storageKey);
+        else window.localStorage.setItem(storageKey, JSON.stringify({
+          message_id: nextDraft.message_id, fence: nextDraft.fence, body: nextBody,
+        }));
+      });
+      setStorageWarning(null);
+    } catch {
+      setStorageWarning('composer.draftSaveFailed');
+    }
+  };
+
   const toggle = () => {
     if (!open && draft === null) {
       setDraft(beginDraft());
@@ -1566,7 +1629,9 @@ function Composer({
 
   const rebind = () => {
     if (!recoveryEnabled || recovery !== 'rebind') return;
-    setDraft(beginDraft());
+    const nextDraft = beginDraft();
+    saveDraft(nextDraft, body);
+    setDraft(nextDraft);
     setError(null);
     setStaleFailure(null);
     setSentAt(null);
@@ -1574,7 +1639,9 @@ function Composer({
 
   const startWithNewMessageId = () => {
     if (!recoveryEnabled || recovery !== 'new_message_id' || draft === null) return;
-    setDraft({ ...draft, message_id: crypto.randomUUID() });
+    const nextDraft = { ...draft, message_id: crypto.randomUUID() };
+    saveDraft(nextDraft, body);
+    setDraft(nextDraft);
     setError(null);
     setSentAt(null);
   };
@@ -1594,6 +1661,7 @@ function Composer({
       });
       // A stored message is a new message: the retry id is spent, the draft is
       // gone, and the next snapshot owns what the operator sees next.
+      await saveDraft(null, '', { ...draft, body });
       setBody('');
       setDraft(null);
       setStaleFailure(null);
@@ -1648,12 +1716,15 @@ function Composer({
           <textarea
             className="composer__body"
             id="composer-body"
+            disabled={sending}
             rows={4}
             value={body}
             placeholder={t('composer.bodyPlaceholder')}
             onChange={(event) => {
+              const nextDraft = draft ?? beginDraft();
+              saveDraft(nextDraft, event.target.value);
               if (draft === null) {
-                setDraft(beginDraft());
+                setDraft(nextDraft);
                 setSentAt(null);
               }
               setBody(event.target.value);
@@ -1670,6 +1741,7 @@ function Composer({
                 : `${t('composer.fenceTask', { consistency })} · rev ${fence.expected_task_revision}`}
           </p>
           {block !== null && <p className="composer__blocked" role="status">{blockedMessage(block, t)}</p>}
+          {storageWarning && <p className="composer__error" role="alert">{t(storageWarning)}</p>}
           {error && (
             <div className="composer__error" role="alert">
               <p>{OWNER_GONE_CODES.includes(error.code) ? t('composer.ownerGone') : <ApiErrorText error={error} t={t} />}</p>

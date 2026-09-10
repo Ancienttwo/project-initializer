@@ -15,6 +15,13 @@ it rather than beside it.
 
 ### Breaking
 
+- Repositories that explicitly pin ArchContext must update
+  `.ai/harness/policy.json` fields `architecture.projection_version`,
+  `refactor.stages.scan.provider_version`, and
+  `refactor.stages.verify.provider_version` to `0.5.10`, together with their
+  package-local `archctx` and `archctx-contracts` dependencies. `init` preserves
+  explicit repository settings; the runtime rejects older refactor pins.
+
 - **`herdr` >= 0.9.0 replaces `tmux` as the peer-terminal runtime.** tmux
   support and its readiness probes are removed from
   `scripts/check-agent-tooling.sh`; the pin lives in
@@ -178,6 +185,18 @@ it rather than beside it.
   match user input rather than instruct an agent.
 
 ### Fixed
+
+- **ArchContext 0.5.10 avoids workspace scans during projection retries.** The
+  pinned provider reads prior committed writes directly from its journal, so
+  large ignored runtime caches do not delay that lookup.
+- **Recovery checkpoints keep only the current snapshot.** Repeated Stop events
+  no longer accumulate full-history copies; publication preserves the current
+  checkpoint before collecting old cache directories, while the raw evidence
+  ledger and blobs remain intact. Concurrent recovery reads follow a changed
+  publication marker, and interrupted collection can resume.
+- **Task Message drafts survive refresh and browser restarts.** The operator
+  board restores browser-local text with its original message ID and fence;
+  stale drafts still require the existing explicit rebind before sending.
 
 - **Delegated Codex output now follows its actual JSONL wire.** Contribution
   collection decodes one complete `codex exec --json` turn and parses only its

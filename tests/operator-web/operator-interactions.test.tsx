@@ -61,6 +61,17 @@ function installDom(wide = false): void {
       dispatchEvent: () => true,
     }),
   });
+  const lockQueues = new Map<string, Promise<unknown>>();
+  Object.defineProperty(window.navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: (name: string, callback: () => unknown) => {
+        const result = (lockQueues.get(name) ?? Promise.resolve()).then(callback);
+        lockQueues.set(name, result.catch(() => undefined));
+        return result;
+      },
+    },
+  });
   Object.assign(globalThis, {
     window,
     document: window.document,
@@ -866,6 +877,166 @@ describe('operator web task message composer', () => {
     await act(async () => composerToggle().click());
   }
 
+  test('restores a draft after remount with the original retry identity and stale fence', async () => {
+    const requests: TaskMessageRequestV1[] = [];
+    const props = {
+      initialLocale: 'en' as const,
+      sendMessage: async (request: TaskMessageRequestV1) => {
+        requests.push(request);
+        if (requests.length === 1) throw new Error('response lost');
+      },
+    };
+    await openComposerFor(fixtureTasks.blocked.task_label, stableSnapshot, props);
+    await typeMessage('检查 original owner');
+    await act(async () => sendButton().click());
+    await act(async () => root?.unmount());
+    root = null;
+
+    const newer: OperatorFleetSnapshotV1 = {
+      ...stableSnapshot,
+      repositories: stableSnapshot.repositories.map((repository) => ({
+        ...repository,
+        cards: repository.cards.map((card) => ({
+          ...card,
+          task_revision: 'c'.repeat(64),
+          claim_id: '00000000-0000-4000-8000-000000000001',
+          generation: 99,
+        })),
+      })),
+    };
+    await mount(<OperatorApp initialState={projectSnapshotViewState(newer)} {...props} />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement | null)?.value)
+      .toBe('检查 original owner');
+    expect(requests).toHaveLength(1);
+    await act(async () => sendButton().click());
+    expect(requests[1]).toEqual(requests[0]);
+
+    await act(async () => root?.unmount());
+    root = null;
+    await mount(<OperatorApp initialState={projectSnapshotViewState(newer)} {...props} />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect(composerToggle().getAttribute('aria-expanded')).toBe('false');
+    await act(async () => composerToggle().click());
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  test('a delayed acknowledgement preserves a newer draft saved after remount', async () => {
+    let acknowledge!: () => void;
+    const submitted: TaskMessageRequestV1[] = [];
+    await openComposerFor(fixtureTasks.blocked.task_label, stableSnapshot, {
+      sendMessage: async (request) => {
+        submitted.push(request);
+        await new Promise<void>((resolve) => { acknowledge = resolve; });
+      },
+    });
+    await typeMessage('sent from the first composer');
+    await act(async () => sendButton().click());
+    await act(async () => root?.unmount());
+    root = null;
+    await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    await typeMessage('newer unsent text');
+    await act(async () => acknowledge());
+    await act(async () => root?.unmount());
+    root = null;
+    await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement | null)?.value).toBe('newer unsent text');
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.body).toBe('sent from the first composer');
+  });
+
+  test('keeps saved text when cross-tab storage locking is unavailable', async () => {
+    await openComposerFor(fixtureTasks.blocked.task_label);
+    await typeMessage('saved before locking became unavailable');
+    const card = stableSnapshot.repositories[0]!.cards.find((entry) => entry.task_id === fixtureTasks.blocked.task_id)!;
+    const key = `repo-harness:task-message-draft:v1:${taskKey(card)}`;
+    const saved = window.localStorage.getItem(key);
+    Object.defineProperty(window.navigator, 'locks', { configurable: true, value: undefined });
+    await typeMessage('still available in the editor');
+    expect(window.localStorage.getItem(key)).toBe(saved);
+    expect(composerPanel()?.textContent).toContain('Draft recovery could not be updated');
+  });
+
+  test('isolates drafts by repository and task, and removes explicitly emptied text', async () => {
+    await openComposerFor(fixtureTasks.blocked.task_label);
+    await typeMessage('keep in this repository and task');
+    const original = stableSnapshot.repositories[0]!.cards.find((card) => card.task_id === fixtureTasks.blocked.task_id)!;
+    const key = `repo-harness:task-message-draft:v1:${taskKey(original)}`;
+    const saved = window.localStorage.getItem(key);
+    expect(saved).not.toBeNull();
+
+    for (const differentRepository of [false, true]) {
+      await act(async () => root?.unmount());
+      root = null;
+      const snapshot = differentRepository ? {
+        ...stableSnapshot,
+        repositories: stableSnapshot.repositories.map((repository) => ({
+          ...repository,
+          repository_id: `${repository.repository_id}-other`,
+          cards: repository.cards.map((card) => ({ ...card, repository_id: `${card.repository_id}-other` })),
+        })),
+      } : stableSnapshot;
+      await mount(<OperatorApp initialState={projectSnapshotViewState(snapshot)} initialLocale="en" />);
+      await act(async () => buttonWithText(differentRepository ? fixtureTasks.blocked.task_label : fixtureTasks.available.task_label).click());
+      expect(composerToggle().getAttribute('aria-expanded')).toBe('false');
+      await act(async () => composerToggle().click());
+      expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('');
+      expect(window.localStorage.getItem(key)).toBe(saved);
+    }
+
+    await act(async () => root?.unmount());
+    root = null;
+    await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('keep in this repository and task');
+    await typeMessage('');
+    expect(window.localStorage.getItem(key)).toBeNull();
+  });
+
+  test('refuses malformed saved identity instead of rebuilding it from the current card', async () => {
+    const card = stableSnapshot.repositories[0]!.cards.find((entry) => entry.task_id === fixtureTasks.blocked.task_id)!;
+    const key = `repo-harness:task-message-draft:v1:${taskKey(card)}`;
+    const fence = { expected_task_revision: card.task_revision, expected_claim_id: card.claim_id, expected_generation: card.generation };
+    for (const saved of [
+      '{broken',
+      JSON.stringify({ body: 'missing identity' }),
+      JSON.stringify({ body: 'incoherent fence', message_id: 'saved-id', fence: { ...fence, expected_claim_id: null } }),
+      JSON.stringify({ body: 'unexpected field', message_id: 'saved-id', fence: { ...fence, repository_id: 'different-repository' } }),
+    ]) {
+      window.localStorage.setItem(key, saved);
+      let sent = false;
+      await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" sendMessage={async () => { sent = true; }} />);
+      await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+      expect(composerPanel()?.textContent).toContain('saved draft could not be restored');
+      expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('');
+      expect(sendButton().disabled).toBe(true);
+      expect(sent).toBe(false);
+      expect(window.localStorage.getItem(key)).toBe(saved);
+      await act(async () => root?.unmount());
+      root = null;
+    }
+  });
+
+  test('reports storage failures while keeping the in-memory message usable', async () => {
+    const requests: TaskMessageRequestV1[] = [];
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw new Error('storage denied'); },
+    });
+    await mount(<OperatorApp initialState={projectSnapshotViewState(stableSnapshot)} initialLocale="en" sendMessage={async (request) => { requests.push(request); }} />);
+    await act(async () => buttonWithText(fixtureTasks.blocked.task_label).click());
+    expect(composerPanel()?.textContent).toContain('saved draft could not be restored');
+    await typeMessage('still send this message');
+    expect(composerPanel()?.textContent).toContain('Draft recovery could not be updated');
+    expect((document.querySelector('#composer-body') as HTMLTextAreaElement).value).toBe('still send this message');
+    await act(async () => sendButton().click());
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.body).toBe('still send this message');
+    expect(composerPanel()?.textContent).toContain('Draft recovery could not be updated');
+  });
+
   test('coalesces a post-send refresh behind an in-flight Fleet snapshot without overlap', async () => {
     const pending: Array<{
       readonly resolve: (snapshot: OperatorFleetSnapshotV1) => void;
@@ -1202,6 +1373,14 @@ describe('operator web task message composer', () => {
     await act(async () => buttonWithText('Refresh').click());
     expect(paneText()).toContain(`rev ${initialCard.task_revision}`);
     await act(async () => buttonWithText('Rebind to current snapshot').click());
+
+    const saved = JSON.parse(window.localStorage.getItem(`repo-harness:task-message-draft:v1:${taskKey(initialCard)}`)!);
+    expect(saved.message_id).not.toBe(originalId);
+    expect(saved.fence).toEqual({
+      expected_task_revision: `${initialCard.task_revision}-next`,
+      expected_claim_id: 'claim-current-owner',
+      expected_generation: (initialCard.generation ?? 0) + 1,
+    });
 
     expect(sendButton().disabled).toBe(false);
     expect((document.querySelector('#composer-body') as unknown as HTMLTextAreaElement).value)
