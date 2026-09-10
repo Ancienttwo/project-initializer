@@ -1,5 +1,7 @@
 # Reconciliation recovery decisions
 
+Owner approval: Codex conversation `01a089b3-6b92-72e2-ba20-da48ab37c465`, user message `msg_01a08a7b-c10c-78d0-a5c3-9cd1722610f3`, received `2026-09-10T08:42:41.300Z`, text `批准`. This approves the described architecture update, external review, PR/CI and subsequent live repair/stop/continuation. Controlled root context files, the context map and the capability request are included only as outputs of the approved canonical architecture refresh.
+
 > **Substantive Change SHA256**: `sha256:6e76a034456be82648b4addd8e8290e4edd9ade24fec3b77893575498ed5e642`
 
 The original reservation/reconciliation/expiry receipts are immutable. The explicit repair uses the original raw-record digest, validates replacement evidence and the complete event first, then records the repair and single charge. Terminal acknowledgment appends stop after expiry and never reopens execution. This avoids replacement-schema migration and keeps the existing strict continuation gate.

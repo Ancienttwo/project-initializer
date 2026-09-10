@@ -69,6 +69,10 @@ If malformed input can already be corrected through an ordinary exact replay wit
 
 ```yaml
 allowed_paths:
+  - AGENTS.md
+  - CLAUDE.md
+  - .ai/context/context-map.json
+  - docs/architecture/requests/runtime-harness-automation-budget.md
   - .archcontext/model/nodes/capability.runtime-harness.automation-budget.yaml
   - .archcontext/model/flows/flow.automation-budget.reserve-before-act.yaml
   - src/effects/automation/budget-store.ts
