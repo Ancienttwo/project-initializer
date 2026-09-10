@@ -144,10 +144,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Covers global preferences, delivery and capacity boundaries, Stop recursion and uninstall ownership.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -160,10 +157,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Exercises the real global setup entrypoint with seeded preferences.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -176,10 +170,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Validates shared configuration and observer types.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -192,10 +183,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required hook projection integrity.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -208,10 +196,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required helper projection integrity.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -224,10 +209,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Canonical reference documentation mirror integrity.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -240,10 +222,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required repository integrity.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -256,10 +235,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required architecture integrity.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -272,10 +248,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required substantive-change digest binding.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -288,10 +261,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required workflow integrity.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -304,10 +274,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required adoption state inventory.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     },
     {
@@ -320,10 +287,7 @@ exit_criteria:
       "evidence_policy": "current_exact",
       "necessity": "Required adoption dry-run without mutation.",
       "inputs": {
-        "env": [
-          "REPO_HARNESS_DIFF_BASE",
-          "REPO_HARNESS_DIFF_MODE"
-        ]
+        "env": []
       }
     }
   ]
