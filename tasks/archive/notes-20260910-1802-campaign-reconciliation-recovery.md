@@ -57,3 +57,9 @@ Read-only source and live-record inspection confirmed that the third campaign ha
 ## Canonical validation result
 
 Frozen source `18a5b692` completed all 17 declared checks with current-exact evidence (30/30 contract checks including artifacts), without timeouts or subject drift. Run `run-20260910T173914-45088-20260910-1553-campaign-reconciliation-recovery` retains this execution evidence. Change Assessment then correctly refused the empty oracle declaration for the new prepared-event interface. The declaration now binds the already executed `budget-store` deterministic test to its owning source path; no test, criterion, timeout or production source changed. Re-preparation should consume these exact execution records.
+
+## CI publication range
+
+> **Substantive Change SHA256**: `sha256:1a6e7e7b55f303cfb8da833f9d2933d4683ed07009fa946bce20acca32a7b402`
+
+PR #395 CI evaluates the synthetic merge into base `16f6581f`, rather than the branch fork at `3c570360`. The exact merge-ref checkout `5c95a200` reproduces this publication digest; its source, tests, model and architecture output bytes are identical to the reviewed branch. This additional binding covers that CI range without changing the implementation or replacing its existing acceptance evidence. The complete Governance script passed on that merge-ref checkout after this binding. The failed Governance run was canceled before restarting CI for this metadata correction.
