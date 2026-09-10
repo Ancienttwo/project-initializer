@@ -241,7 +241,7 @@ export interface WorklistGroup {
   readonly count: number;
 }
 
-export function groupWorklist(snapshot: OperatorFleetSnapshotV1): readonly WorklistGroup[] {
+export function groupWorklist(snapshot: Pick<OperatorFleetSnapshotV1, 'repositories'>): readonly WorklistGroup[] {
   const buckets = new Map<WorklistGroupId, OperatorFleetCardV1[]>(
     WORKLIST_GROUP_ORDER.map((id) => [id, []]),
   );
@@ -356,9 +356,13 @@ function StatusBar({
   locale,
   onLocale,
   onRefresh,
+  repositoryId,
+  onRepository,
   t,
 }: {
   readonly snapshot: OperatorFleetSnapshotV1 | null;
+  readonly repositoryId: string;
+  readonly onRepository: (id: string) => void;
   readonly stale: boolean;
   readonly busy: boolean;
   readonly locale: OperatorLocale;
@@ -394,6 +398,17 @@ function StatusBar({
         </span>
       </div>
       <div className="operator-statusbar__actions">
+        <label className="repository-switch">
+          <span>{t('field.repository')}</span>
+          <select aria-label={t('repository.select')} value={repositoryId} onChange={(event) => onRepository(event.target.value)} disabled={!snapshot?.repositories.length}>
+            <option value="" disabled>{t('repository.select')}</option>
+            {snapshot?.repositories.map((repo) => (
+              <option key={repo.repository_id} value={repo.repository_id}>
+                {repo.display_name}{snapshot.repositories.filter((other) => other.display_name === repo.display_name).length > 1 ? ` · ${repo.repository_id}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
         <button className="operator-button operator-button--secondary" type="button" onClick={onRefresh} disabled={busy}>
           <Icon name="refresh" size={15} />
           <span>{busy ? t('status.refreshing') : t('status.refresh')}</span>
@@ -586,7 +601,7 @@ function Worklist({
   onSelect,
   t,
 }: {
-  readonly snapshot: OperatorFleetSnapshotV1;
+  readonly snapshot: Pick<OperatorFleetSnapshotV1, 'repositories'>;
   readonly selectedKey: string | null;
   readonly onSelect: (card: OperatorFleetCardV1) => void;
   readonly t: OperatorTranslate;
@@ -693,7 +708,7 @@ function Worklist({
   );
 }
 
-function StageMatrix({ snapshot, t }: { readonly snapshot: OperatorFleetSnapshotV1; readonly t: OperatorTranslate }) {
+function StageMatrix({ snapshot, t }: { readonly snapshot: Pick<OperatorFleetSnapshotV1, 'repositories'>; readonly t: OperatorTranslate }) {
   return (
     <div className="stage-matrix__scroll">
       <table className="stage-matrix">
@@ -707,7 +722,7 @@ function StageMatrix({ snapshot, t }: { readonly snapshot: OperatorFleetSnapshot
         <tbody>
           {snapshot.repositories.map((repository) => (
             <tr key={repository.repository_id}>
-              <th scope="row">{repository.repository_id}</th>
+              <th scope="row">{repository.display_name}</th>
               {OPERATOR_COLUMNS.map((column) => (
                 <td key={column.id}>{repository.cards.filter((card) => card.column === column.id).length}</td>
               ))}
@@ -723,7 +738,7 @@ function RepositoryHealth({
   snapshot,
   t,
 }: {
-  readonly snapshot: OperatorFleetSnapshotV1;
+  readonly snapshot: Pick<OperatorFleetSnapshotV1, 'repositories'>;
   readonly t: OperatorTranslate;
 }) {
   return (
@@ -733,7 +748,7 @@ function RepositoryHealth({
         return (
           <article className={`repository-row repository-row--${repoStatus}`} key={repository.repository_id}>
             <div className="repository-row__main">
-              <strong>{repository.repository_id}</strong>
+              <strong>{repository.display_name}</strong>
               <span>
                 {t(`repo.accessMode.${repository.access_mode}` as OperatorMessageKey)} · {t('repo.tasks', { count: repository.cards.length })}
               </span>
@@ -1816,6 +1831,7 @@ function useWideLayout(): boolean {
 
 function DetailPane({
   snapshot,
+  visibleRepositories,
   card,
   repository,
   collaboration,
@@ -1828,6 +1844,7 @@ function DetailPane({
   t,
 }: {
   readonly snapshot: OperatorFleetSnapshotV1 | null;
+  readonly visibleRepositories: readonly OperatorFleetRepositoryV1[];
   readonly card: OperatorFleetCardV1 | null;
   readonly repository: OperatorFleetRepositoryV1 | null;
   readonly collaboration: CollaborationViewState;
@@ -1944,10 +1961,10 @@ function DetailPane({
           ) : snapshot ? (
             <>
               <p className="detail-quiet">{t('detail.overviewHint')}</p>
-              <StageMatrix snapshot={snapshot} t={t} />
+              <StageMatrix snapshot={{ repositories: visibleRepositories }} t={t} />
               <section className="detail-block" aria-labelledby="detail-health-heading">
                 <h3 className="detail-eyebrow" id="detail-health-heading">{t('detail.repositoryHealth')}</h3>
-                <RepositoryHealth snapshot={snapshot} t={t} />
+                <RepositoryHealth snapshot={{ repositories: visibleRepositories }} t={t} />
               </section>
             </>
           ) : null}
@@ -2007,6 +2024,8 @@ function FatalState({ error, onRetry, t }: { readonly error: OperatorApiErrorV1;
   );
 }
 
+export const OPERATOR_REPOSITORY_STORAGE_KEY = 'repo-harness:operator-repository';
+
 interface Selection {
   readonly key: string;
   readonly revision: string;
@@ -2023,6 +2042,10 @@ export function OperatorApp({
 }: OperatorAppProps) {
   const initial = initialState ?? (initialSnapshot ? stateFromSnapshot(initialSnapshot) : { kind: 'loading', previous: null } as const);
   const [state, setState] = useState<OperatorSnapshotViewState>(initial);
+  const [repositoryId, setRepositoryId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try { return localStorage.getItem(OPERATOR_REPOSITORY_STORAGE_KEY); } catch { return null; }
+  });
   const [selection, setSelection] = useState<Selection | null>(null);
   const [collaboration, setCollaboration] = useState<CollaborationViewState>(
     initialCollaboration ?? { kind: 'idle' },
@@ -2034,6 +2057,19 @@ export function OperatorApp({
   const refreshQueued = useRef(false);
   const stateRef = useRef<OperatorSnapshotViewState>(initial);
   const snapshot = snapshotForState(state);
+  const activeRepositoryId = repositoryId ?? snapshot?.repositories[0]?.repository_id ?? '';
+  const activeRepository = snapshot?.repositories.find((repo) => repo.repository_id === activeRepositoryId) ?? null;
+  const visibleRepositories = useMemo(() => activeRepository ? [activeRepository] : [], [activeRepository]);
+  useEffect(() => {
+    if (!activeRepository) return;
+    setRepositoryId(activeRepository.repository_id);
+    try { localStorage.setItem(OPERATOR_REPOSITORY_STORAGE_KEY, activeRepository.repository_id); } catch { /* Browser storage is optional UI preference. */ }
+  }, [activeRepository]);
+  const switchRepository = (id: string) => {
+    setRepositoryId(id);
+    setSelection(null);
+    setCollaboration({ kind: 'idle' });
+  };
   const busy = state.kind === 'loading';
   const stateKind = state.kind;
 
@@ -2084,7 +2120,7 @@ export function OperatorApp({
   }, []);
 
   const selectedCard = selection && snapshot
-    ? allCards(snapshot).find((card) => taskKey(card) === selection.key) ?? null
+    ? activeRepository?.cards.find((card) => taskKey(card) === selection.key) ?? null
     : null;
   const revisionChangedFrom = selectedCard && selection && selectedCard.task_revision !== selection.revision
     ? selection.revision
@@ -2157,6 +2193,8 @@ export function OperatorApp({
     >
       <StatusBar
         snapshot={snapshot}
+        repositoryId={activeRepository?.repository_id ?? ''}
+        onRepository={switchRepository}
         stale={stateKind === 'stale'}
         busy={busy}
         locale={locale}
@@ -2172,8 +2210,10 @@ export function OperatorApp({
               : snapshot ? (
                 snapshotViewKind(snapshot) === 'empty'
                   ? <EmptyFleet t={t} />
+                  : !activeRepository ? <p role="status">{t('repository.select')}</p>
                   : <Worklist
-                    snapshot={snapshot}
+                    key={activeRepository.repository_id}
+                    snapshot={{ repositories: visibleRepositories }}
                     selectedKey={selection?.key ?? null}
                     onSelect={selectCard}
                     t={t}
@@ -2182,7 +2222,9 @@ export function OperatorApp({
         </main>
         {(wideLayout || selectedCard) && state.kind !== 'fatal' && (
           <DetailPane
+            key={activeRepository?.repository_id ?? 'none'}
             snapshot={snapshot}
+            visibleRepositories={visibleRepositories}
             card={selectedCard}
             repository={selectedRepository}
             collaboration={collaboration}

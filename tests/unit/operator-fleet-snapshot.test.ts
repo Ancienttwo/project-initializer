@@ -64,7 +64,7 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
     const projected = projectOperatorFleetSnapshot(source);
 
     expect(projected).toMatchObject({
-      protocol: source.protocol,
+      protocol: 5,
       kind: 'operator_fleet_snapshot',
       registry_revision: source.registry_revision,
       sequence: source.sequence,
@@ -74,6 +74,7 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
       source_snapshot_sha256: source.snapshot_sha256,
     });
     expect(projected.repositories[0]?.cards).toEqual(source.repositories[0]?.cards);
+    expect(projected.repositories[0]?.display_name).toBe('repo-a');
     expect(JSON.stringify(projected)).not.toContain('repo_root');
     expect(JSON.stringify(projected)).not.toContain('/private/workspaces');
     expect(JSON.stringify(projected)).not.toContain('provider stderr');
@@ -216,7 +217,7 @@ describe('OperatorFleetSnapshotV1 browser projection', () => {
       'repositories', 'sequence', 'snapshot_consistency', 'source_snapshot_sha256',
     ]);
     expect(Object.keys(projected.repositories[0] ?? {}).sort()).toEqual([
-      'access_mode', 'cards', 'error', 'repository_id', 'snapshot_consistency', 'status',
+      'access_mode', 'cards', 'display_name', 'error', 'repository_id', 'snapshot_consistency', 'status',
     ]);
     expect(Object.keys(projected.repositories[0]?.cards[0] ?? {}).sort()).toEqual([
       'attention_owner', 'blocker_codes', 'claim_id', 'column', 'error', 'execution_readiness',
