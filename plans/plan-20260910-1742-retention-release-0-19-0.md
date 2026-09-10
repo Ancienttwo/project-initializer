@@ -12,7 +12,7 @@
 > **Task Contract**: `tasks/contracts/20260910-1742-retention-release-0-19-0.contract.md`
 > **Task Review**: `tasks/reviews/20260910-1742-retention-release-0-19-0.review.md`
 > **Implementation Notes**: `tasks/notes/20260910-1742-retention-release-0-19-0.notes.md`
-> **Substantive Change SHA256**: `sha256:eb4103f9ac629eccb61100119c21d9da69148202622d0490ecc9c855899cd62e`
+> **Substantive Change SHA256**: `sha256:c4c901f84f4701206ec9506f406db5d0acca7f3488989b8fb79ca90c159c3e27`
 
 # Release repo-harness 0.19.0 with bounded checkpoints
 
