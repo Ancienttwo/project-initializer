@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { spawnSync } from "child_process";
+
+import { installProfileHostMutationPaths } from "../src/cli/installer/install-profile";
+
+import { recordInstallOwnership } from "./helpers/install-ownership";
 
 const ROOT = join(import.meta.dir, "..");
 const SCRIPT = join(ROOT, "scripts/install-agent-fleet.sh");
@@ -95,6 +99,7 @@ function prepareInstallerRuntime(home: string, sourceDir: string) {
   mkdirSync(join(packageRoot, "scripts"), { recursive: true });
   mkdirSync(join(packageRoot, "agents"), { recursive: true });
   cpSync(SCRIPT, runtimeScript);
+  symlinkSync(join(ROOT, "src"), join(packageRoot, "src"), "dir");
   chmodSync(runtimeScript, 0o755);
   cpSync(sourceDir, join(packageRoot, "agents/fleet"), { recursive: true });
   return { packageRoot, runtimeScript };
@@ -119,6 +124,35 @@ function runInstaller(
 }
 
 describe("install-agent-fleet", () => {
+  test("upgrades receipt-owned fleet files and preserves subsequent user edits", () => {
+    const { root, home } = setupFakeHome("fleet-owned-upgrade");
+    const env = { ...process.env, HOME: home };
+    try {
+      expect(runInstaller(home, FLEET_SOURCE_DIR).status).toBe(0);
+      const paths = AGENTS.flatMap(agent => [join(home, ".claude/agents", `${agent}.md`), join(home, ".codex/agents", `${agent}.toml`)]);
+      recordInstallOwnership(paths, env);
+      for (const path of paths) expect(installProfileHostMutationPaths(env)).toContain(path);
+      const next = join(root, "next");
+      cpSync(FLEET_SOURCE_DIR, next, { recursive: true });
+      for (const agent of AGENTS) {
+        const file = join(next, `${agent}.md`);
+        writeFileSync(file, readFileSync(file, "utf8") + "\nUpdated role instruction.\n");
+      }
+      const result = runInstaller(home, next);
+      expect(result.status).toBe(0);
+      recordInstallOwnership(paths, env);
+      for (const host of [".claude", ".codex"]) {
+        const file = join(home, host, "agents", `deep-worker.${host === ".claude" ? "md" : "toml"}`);
+        expect(readFileSync(file, "utf8")).toContain("Updated role instruction.");
+        writeFileSync(file, readFileSync(file, "utf8") + "\n# User edit\n");
+      }
+      const blocked = runInstaller(home, FLEET_SOURCE_DIR);
+      expect(blocked.status).toBe(1);
+      expect(blocked.stdout).toContain("deep-worker.md: drift");
+      expect(blocked.stdout).toContain("deep-worker.toml: drift");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   test("fresh install writes claude .md byte-identical to source and codex .toml byte-identical to golden", () => {
     const { root, home } = setupFakeHome("install-agent-fleet-fresh");
     try {

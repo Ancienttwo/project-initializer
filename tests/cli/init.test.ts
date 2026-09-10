@@ -1,3 +1,4 @@
+import { recordInstallOwnership } from "../helpers/install-ownership";
 import { describe, expect, test } from "bun:test";
 import {
   existsSync,
@@ -1246,6 +1247,40 @@ describe("bundled host runtimes", () => {
       "---\nname: claude-plan\n---\n",
     );
   }
+
+  test.each(["skill", "reference"])("upgrades owned bundled trees (%s) and rejects user drift", change => {
+    const tmp = join(tmpdir(), `cross-review-owned-${Date.now()}`);
+    const source = join(tmp, "source"), home = join(tmp, "home");
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };
+    try {
+      makeSource(source);
+      mkdirSync(home, { recursive: true });
+      const fakeBin = join(tmp, "bin");
+      mkdirSync(fakeBin, { recursive: true });
+      env.REPO_HARNESS_CLAUDE_EXECUTABLE = writeReadyOfficialCodexPluginCli(fakeBin, home);
+      const reference = join(source, "assets/skills/repo-harness-cross-review/reference.md");
+      writeFileSync(reference, "old reference");
+      expect(syncCrossReviewSkills(source, "both", env).every(step => step.status === "ok")).toBe(true);
+      const paths = [".claude", ".codex"].map(host => join(home, host, "skills/repo-harness-cross-review"));
+      recordInstallOwnership(paths, env);
+      if (change === "skill") writeFileSync(join(source, "assets/skills/repo-harness-cross-review/SKILL.md"), "---\nname: repo-harness-cross-review\n---\nUpdated instructions\n");
+      rmSync(reference);
+      writeFileSync(join(source, "assets/skills/repo-harness-cross-review/new-reference.md"), "new reference");
+      expect(syncCrossReviewSkills(source, "both", env).every(step => step.status === "ok")).toBe(true);
+      recordInstallOwnership(paths, env);
+      for (const host of [".claude", ".codex"]) {
+        const dest = join(home, host, "skills/repo-harness-cross-review");
+        expect(existsSync(join(dest, "reference.md"))).toBe(false);
+        expect(readFileSync(join(dest, "new-reference.md"), "utf8")).toBe("new reference");
+        writeFileSync(join(dest, "new-reference.md"), "user edit");
+      }
+      const blocked = syncCrossReviewSkills(source, "both", env);
+      expect(blocked.filter(step => step.status === "failed")).toHaveLength(2);
+      for (const host of [".claude", ".codex"]) {
+        expect(readFileSync(join(home, host, "skills/repo-harness-cross-review/new-reference.md"), "utf8")).toBe("user edit");
+      }
+    } finally { rmSync(tmp, { recursive: true, force: true }); }
+  });
 
   test("installs repo-harness-cross-review on both hosts; claude-plan stays Codex-only", () => {
     const tmp = join(tmpdir(), `cross-review-both-${Date.now()}`);

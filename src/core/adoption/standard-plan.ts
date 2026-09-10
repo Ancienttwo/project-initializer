@@ -376,6 +376,16 @@ export function defaultPolicy(documentationProfile: string, documentationLanguag
       reference_resolver: "repo-harness docs path <doc-id>",
     },
     external_tooling: {
+      // Projection of the canonical repository pin; herdr-runtime-pin tests guard drift.
+      herdr: {
+        "min_version": "0.9.0",
+        "release_assets": {
+          "linux-x86_64": {
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-x86_64",
+            "sha256": "4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f"
+          }
+        }
+      },
       routing: {
         simple: "waza",
       },

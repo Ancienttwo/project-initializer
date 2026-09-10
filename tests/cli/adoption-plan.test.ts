@@ -21,6 +21,27 @@ function cleanup(path: string): void {
 }
 
 describe("canonical adoption plan", () => {
+  test("adoption supplies the Herdr pin to old repositories and preserves explicit floors", () => {
+    const repo = tempRepo();
+    const pin = JSON.parse(readFileSync(join(ROOT, ".ai/harness/policy.json"), "utf8")).external_tooling.herdr;
+    try {
+      mkdirSync(join(repo, ".ai/harness"), { recursive: true });
+      writeFileSync(join(repo, ".ai/harness/policy.json"), JSON.stringify({ external_tooling: { routing: { custom: "kept" } } }));
+      const plan = planAdoption({ repoRoot: repo, mode: "standard", apply: true });
+      const operation = plan.operations.find(op => op.path === ".ai/harness/policy.json");
+      if (!operation || operation.kind !== "writeFile") throw new Error("policy operation missing");
+      expect(JSON.parse(operation.content).external_tooling.herdr).toEqual(pin);
+      expect(applyAdoptionPlan(plan).ok).toBe(true);
+      const policy = JSON.parse(readFileSync(join(repo, ".ai/harness/policy.json"), "utf8"));
+      expect(policy.external_tooling.herdr).toEqual(pin);
+      policy.external_tooling.herdr.min_version = "99.0.0";
+      writeFileSync(join(repo, ".ai/harness/policy.json"), JSON.stringify(policy));
+      const next = planAdoption({ repoRoot: repo, mode: "standard" }).operations.find(op => op.path === ".ai/harness/policy.json");
+      if (!next || next.kind !== "writeFile") throw new Error("policy operation missing");
+      expect(JSON.parse(next.content).external_tooling.herdr.min_version).toBe("99.0.0");
+    } finally { cleanup(repo); }
+  });
+
   test("standard plan is a complete repo-local projection and does not install root helpers", () => {
     const repo = tempRepo();
     try {

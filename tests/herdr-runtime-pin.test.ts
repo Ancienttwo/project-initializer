@@ -1,3 +1,4 @@
+import { defaultPolicy } from "../src/core/adoption/standard-plan";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -65,6 +66,7 @@ describe("herdr runtime pin has one source of truth", () => {
 
   test("the downstream policy seed projects the same pin", () => {
     const herdr = readPolicy().external_tooling.herdr;
+    expect((defaultPolicy("minimal-agentic", "en").external_tooling as Record<string, unknown>).herdr).toEqual(herdr);
     const expected = JSON.stringify(herdr, null, 2)
       .split("\n")
       .map((line) => line.trim());

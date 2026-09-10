@@ -508,7 +508,7 @@ export function installProfileHostMutationPaths(env: NodeJS.ProcessEnv = process
   const home = env.HOME ?? homedir();
   const bunRoot = env.BUN_INSTALL ?? join(home, '.bun');
   const { repoHarnessSkills: skills, externalSkills } = catalogMutationPathSkillNames(loadSkillSurfaceCatalog());
-  const agents = ['explorer', 'deep-reasoner', 'fast-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator'];
+  const agents = ['explorer', 'deep-reasoner', 'fast-worker', 'deep-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator'];
   const paths = [
     join(bunRoot, 'bin', 'repo-harness'),
     join(bunRoot, 'bin', 'codegraph'),
@@ -626,7 +626,7 @@ function componentsForTransactionPath(path: string): readonly InstallComponent[]
       ? ['cross-model-acceptance']
       : ['planning-integrations'];
   }
-  if (/\/(?:\.codex|\.claude)\/agents\/(?:explorer|deep-reasoner|fast-worker|gatekeeper|root-cause-prover|harness-evaluator)\.(?:toml|md)$/.test(normalized)) {
+  if (/\/(?:\.codex|\.claude)\/agents\/(?:explorer|deep-reasoner|fast-worker|deep-worker|gatekeeper|root-cause-prover|harness-evaluator)\.(?:toml|md)$/.test(normalized)) {
     return name.startsWith('gatekeeper.') ? ['agent-fleet', 'verifier'] : ['agent-fleet'];
   }
   if (/\/(?:\.agents|\.codex|\.claude)\/rules\/(?:anti-patterns|chinese|durable-context|english)\.md$/.test(normalized)) {
@@ -951,7 +951,7 @@ function completeHostSkillSetEvidence(home: string, names: readonly string[]): s
 }
 
 function completeAgentFleetEvidence(home: string): string[] {
-  const agents = ['explorer', 'deep-reasoner', 'fast-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator'];
+  const agents = ['explorer', 'deep-reasoner', 'fast-worker', 'deep-worker', 'gatekeeper', 'root-cause-prover', 'harness-evaluator'];
   for (const [root, extension] of [[join(home, '.codex', 'agents'), '.toml'], [join(home, '.claude', 'agents'), '.md']] as const) {
     const paths = agents.map((agent) => join(root, `${agent}${extension}`));
     if (paths.every(existsSync)) return paths;

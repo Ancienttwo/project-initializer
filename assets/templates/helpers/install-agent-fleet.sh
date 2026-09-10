@@ -107,6 +107,10 @@ const CLAUDE_TARGET_DIR = path.join(HOME, ".claude", "agents");
 const CODEX_TARGET_DIR = path.join(HOME, ".codex", "agents");
 const USER_MANAGED_RECEIPT_PATH = path.join(HOME, ".repo-harness", "agent-fleet-user-managed.json");
 const SOURCE_DIR = process.env.REPO_HARNESS_AGENT_FLEET_SOURCE_DIR;
+const { readInstalledProfile, managedInstallSurfaceIsCurrent } = require(
+  path.join(SOURCE_DIR, "../../src/cli/installer/install-profile.ts"),
+);
+const installedProfile = readInstalledProfile();
 
 // A generated persona carries role identity only. The anti-extras execution
 // boundary belongs to the runtime task packet (SubagentStart context in
@@ -363,6 +367,13 @@ function compareAndWrite(targetPath, content, acceptedHash) {
   }
 
   if (acceptedHash === sha256(existing)) return "user-managed";
+
+  const owned = installedProfile?.ownership_manifest.find((surface) =>
+    surface.path === targetPath && surface.type === "managed-file");
+  if (owned && managedInstallSurfaceIsCurrent(owned)) {
+    fs.writeFileSync(targetPath, content);
+    return "installed";
+  }
 
   return "drift";
 }

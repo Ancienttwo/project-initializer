@@ -827,8 +827,12 @@ function detectRuntimeCapabilities(waza) {
     try {
       herdr.version = execFileSync(herdr.path, ["--version"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
       const reported = /^herdr (\d+\.\d+\.\d+)$/.exec(herdr.version)?.[1] ?? null;
-      if (!minVersion || !reported || !versionAtLeast(reported, minVersion)) herdr.status = "unavailable";
+      if (!reported || (minVersion && !versionAtLeast(reported, minVersion))) herdr.status = "unavailable";
     } catch (_) { herdr.status = "unavailable"; }
+  }
+  if (!minVersion) {
+    herdr.status = "configuration-error";
+    herdr.reason = `${HERDR_PIN_KEY}.min_version is missing or malformed; run repo-harness init --repo . to merge repository policy defaults, then verify the declared version requirement`;
   }
   return {
     herdr,
@@ -2005,8 +2009,8 @@ const report = {
 const strictFailures = [];
 if (strictReadiness && report.runtime_capabilities.herdr.status !== "present") {
   const pinned = report.runtime_capabilities.herdr.min_version;
-  const floor = pinned ? `herdr >=${pinned}` : `the herdr version pinned in ${HERDR_PIN_KEY} (pin missing or malformed)`;
-  strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install ${floor} and verify herdr --version`);
+  if (!pinned) strictFailures.push(`herdr configuration error: ${report.runtime_capabilities.herdr.reason}`);
+  else strictFailures.push(`herdr runtime is ${report.runtime_capabilities.herdr.status}; install herdr >=${pinned} and verify herdr --version`);
 }
 if (strictReadiness && ["missing", "partial"].includes(report.tools.codegraph.status)) {
   strictFailures.push(`CodeGraph readiness is ${report.tools.codegraph.status}: ${report.tools.codegraph.reason}`);
