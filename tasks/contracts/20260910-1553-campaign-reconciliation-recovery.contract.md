@@ -56,7 +56,7 @@ If malformed input can already be corrected through an ordinary exact replay wit
 ## Change Assessment
 
 ```json
-{"protocol":1,"oracles":[]}
+{"protocol":1,"oracles":[{"id":"budget-store","kind":"deterministic_test","paths":["src/effects/automation/budget-store.ts"]}]}
 ```
 
 ## Acceptance Policy

@@ -36,7 +36,7 @@
 - Installed runtime: fresh temp HOME, normal `npm pack` + Bun install, exact changed-source byte comparison, real installed CLI help and operator fixture; 1 pass / 6 assertions.
 - Composition probe: isolated usage-before-current crash, ordinary API interleaving and exact repair replay; 1 pass / 10 assertions.
 - Live dry-run: exact original record/evidence digests; all 14 run files byte-identical before/after; `commit: null`. No live campaign, grant, reservation, Issue or provider mutation occurred.
-- Canonical `verify-sprint --prepare-acceptance` stopped at architecture projection before acceptance freeze. There is no final canonical pass or ship claim.
+- Canonical run `run-20260910T173914-45088-20260910-1553-campaign-reconciliation-recovery` passed all 17 declared checks with exact evidence and no timeouts. Change Assessment required the explicit budget-store oracle mapping, now declared without changing tests or source. Final preparation and external acceptance remain pending.
 
 ## CLI Command Surface
 
