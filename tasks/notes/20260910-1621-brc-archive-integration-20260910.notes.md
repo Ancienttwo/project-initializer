@@ -16,7 +16,8 @@
 
 ## Deviations From Plan Or Spec
 
-- None. History-only merge strategy implements the planned current-main conflict disposition.
+- History-only merge strategy implements the planned current-main conflict disposition. Work-package acceptance covers the integration candidate; authorized remote publication and directory deletion follow only after that gate.
+- A new worktree initially lacked the repository-required CodeGraph index. Initial projection produced a proof-only candidate; after local index initialization, deterministic projection returned noop. Reconcile that exact setup-generated signal before final verification, without changing any product or architecture file.
 
 ## Tradeoffs Considered
 

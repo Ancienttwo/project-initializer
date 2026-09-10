@@ -120,8 +120,7 @@ Perform all integration in this dedicated worktree. Retain current main runtime 
 - [x] Freeze all inactive heads and dirty inventories; identify both protected active work locations.
 - [x] Commit unrecorded inactive changes, integrate all inactive histories, and preserve unique research/archived workflow evidence without reverting current product behavior.
 - [ ] Verify the final integration tree, document each head and conflict disposition, and obtain the single merge acceptance.
-- [ ] Push the integration branch and merge after exact-head required CI succeeds.
-- [ ] Remove only the frozen inactive branches/worktrees with unchanged identities; verify both active locations are intact and remote refs contain no retired branches.
+
 
 ## Verification
 Use the eight repository integrity checks from AGENTS.md, git diff --check, JSON validation for added evidence, and a redacted secret scan. Prove no product-path delta against the pinned main base. No local full suite is necessary for the intended history/documentation integration; GitHub required CI remains the merge gate. Scope additional local checks only to an observed final executable delta, if any. Freeze once before final acceptance and reuse unchanged evidence.
@@ -136,5 +135,8 @@ Every frozen inactive head is reachable from the final main integration; durable
 - [x] Freeze all inactive heads and dirty inventories; identify both protected active work locations.
 - [x] Commit unrecorded inactive changes, integrate all inactive histories, and preserve unique research/archived workflow evidence without reverting current product behavior.
 - [ ] Verify the final integration tree, document each head and conflict disposition, and obtain the single merge acceptance.
-- [ ] Push the integration branch and merge after exact-head required CI succeeds.
-- [ ] Remove only the frozen inactive branches/worktrees with unchanged identities; verify both active locations are intact and remote refs contain no retired branches.
+
+
+## Authorized operator follow-through
+
+The work-package acceptance and archive cover the frozen integration candidate. They do not claim publication or deletion has already happened. After acceptance, push the candidate, wait for exact-head required CI, merge with ancestry preserved, remove the unchanged frozen inactive refs/worktrees, and verify the two active locations remain intact. Report actual completion from remote Git and filesystem readback.
