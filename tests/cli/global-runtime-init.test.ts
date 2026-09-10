@@ -280,6 +280,7 @@ describe('install command global runtime bootstrap', () => {
         projection_provider: 'archctx', projection_apply: 'automatic', projection_failure_gate: 'advisory', projection_timeout_ms: 120000,
       });
       expect(result.steps.find((step) => step.step === 'global architecture projection')?.status).toBe('ok');
+      expect(JSON.parse(readFileSync(join(home, '.repo-harness/config.json'), 'utf8')).refactor_recommendations).toEqual({ enabled: true });
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

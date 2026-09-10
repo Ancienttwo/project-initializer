@@ -337,8 +337,16 @@ AcceptanceReceipt field.
 - **Task profile**: The declared execution shape of a contract (for example
   `code-change`) that determines which verification and delegation rules
   apply to that task.
+- **Proactive refactor recommendations**: Global `refactor_recommendations.enabled`
+  defaults to true and is initialized once by install/update. Normal Stop reads
+  measured structural opportunities and asks the Agent to explain evidence,
+  expected benefit and risk, then request the user's decision. Observation is
+  separate from Refactor Mode activation: it never authors a proposal, accepts
+  a recommendation, creates an execution task or edits code. User approval
+  enters the existing approved-plan workflow. Incomplete facts are reported,
+  never synthesized. Delivery is bounded and deduplicated.
 - **Refactor Mode**: The `off | shadow | active` operating mode under which
-  repo-harness consumes an external structural authority to discover and
+  repo-harness consumes an external structural authority to author, assess and
   execute refactors. It is a narrowed entry into the existing plan, contract,
   worktree, and ship flow, never a second workflow engine.
 - **Proposal Author**: The repo-harness-side agent or human that writes a

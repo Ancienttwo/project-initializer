@@ -1,3 +1,4 @@
+import { observeRefactorRecommendations, renderRefactorRecommendationDecision } from '../../effects/refactor/recommendations';
 /**
  * HRD-06 in-process Stop handler.
  *
@@ -96,6 +97,7 @@ export interface StopHandlerDependencies {
   readonly observeProjectionTransaction?: () => void;
   /** Narrow post-commit fault/observation seam; never driven by an env flag. */
   readonly afterProjectionWrite?: (target: StopProjectionTarget) => void;
+  readonly observeRefactorRecommendations?: typeof observeRefactorRecommendations;
   readonly drainArchitectureProjection?: (repoRoot: string, env: NodeJS.ProcessEnv) => ArchitectureProjectionDrainResultV1;
 }
 
@@ -855,9 +857,18 @@ export function runStopHandler(opts: StopHandlerInput): StopHandlerResult {
   const minimalGate = minimalChangeEnforceBlock(repoRoot, minimalPolicy, minimal, profile, stderr);
   if (minimalGate) return { ...minimalGate, stderr: stderr.join('') };
 
-  if (state?.workflow_profile === 'lite') {
+  function finishWithRecommendations(): StopHandlerResult {
+    const recommendation = (dependencies.observeRefactorRecommendations ?? observeRefactorRecommendations)(repoRoot, { env, consume: true, deadlineMs: deferredDeadlineMs, nowMs: wallClockMs });
+    const recommendationDecision = renderRefactorRecommendationDecision(recommendation);
+    if (recommendationDecision) return { ...block(recommendationDecision), stderr: stderr.join('') };
+    if (recommendation.status === 'proof_required' || (recommendation.status === 'unavailable' && recommendation.message !== 'repository architecture model is not initialized')) {
+      stderr.push(`[RefactorRecommendations] ${recommendation.status}: ${recommendation.message}\n`);
+    }
+
     return { exitCode: 0, stdout: '', stderr: stderr.join('') };
   }
+
+  if (state?.workflow_profile === 'lite') return finishWithRecommendations();
   if (unplannedImplementationPaths.length > 0) {
     const shown = unplannedImplementationPaths.slice(0, 3).join(', ');
     const more = unplannedImplementationPaths.length > 3 ? `, +${unplannedImplementationPaths.length - 3} more` : '';
@@ -884,5 +895,5 @@ export function runStopHandler(opts: StopHandlerInput): StopHandlerResult {
   );
   if (planGate) return { ...planGate, stderr: stderr.join('') };
 
-  return { exitCode: 0, stdout: '', stderr: stderr.join('') };
+  return finishWithRecommendations();
 }
