@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync, mkdirSync, symlinkSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { dirname, join } from 'path';
 import { tmpdir } from 'os';
 import type { EffectiveState } from '../src/core/state/types';
 import { runStopHandler, type StopProjectionTarget } from '../src/cli/hook/stop-handler';
+import { RUN_SUMMARY_RETENTION_COUNT } from '../src/effects/run-summary-retention';
 import { consumePendingPostEditEvents, readPendingPostEditEvents } from '../src/cli/hook/mutation-observed';
 import { advanceArchitectureDriftCursor, computeArchitectureDriftChangedSet, readArchitectureDriftCursor } from '../src/cli/hook/architecture-drift';
 
@@ -1247,5 +1248,63 @@ describe('runStopHandler', () => {
     })}\n`);
     policyRun(1);
     expect(readFileSync(join(policyRoot, '.ai/harness/events.jsonl'), 'utf8').trim().split('\n')).toHaveLength(2);
+  });
+});
+
+describe('stop bounds its own run summary history', () => {
+  const RUNS_DIR = '.ai/harness/runs';
+
+  function seedSummary(cwd: string, name: string, index: number): void {
+    const path = join(cwd, RUNS_DIR, name);
+    writeFileSync(path, JSON.stringify({ run_id: name }));
+    const seconds = 1_600_000_000 - index * 60;
+    utimesSync(path, seconds, seconds);
+  }
+
+  test('a checks-pinned acceptance snapshot survives a sweep that exceeds the bound', () => {
+    const cwd = fixture();
+    mkdirSync(join(cwd, RUNS_DIR), { recursive: true });
+    mkdirSync(join(cwd, '.ai/harness/checks'), { recursive: true });
+    // verify-sprint's frozen acceptance snapshot: the oldest file present, and
+    // therefore the first one a count-only bound would delete.
+    const pinned = `${RUNS_DIR}/run-prepared-acceptance.json`;
+    writeFileSync(join(cwd, '.ai/harness/checks/latest.json'), `${JSON.stringify({ run_file: pinned })}\n`);
+    seedSummary(cwd, 'run-prepared-acceptance.json', RUN_SUMMARY_RETENTION_COUNT + 10);
+    for (let index = 0; index < RUN_SUMMARY_RETENTION_COUNT + 5; index++) {
+      seedSummary(cwd, `run-history-${index}.json`, index);
+    }
+
+    const result = runStopHandler({
+      collector: collector(cwd, () => canonicalState()),
+      env: { HOOK_RUN_ID: 'stop-retention-run' },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(cwd, pinned))).toBe(true);
+    expect(existsSync(join(cwd, RUNS_DIR, 'stop-retention-run.json'))).toBe(true);
+    // The pinned snapshot sits outside the bound; the retained window holds the
+    // newest RUN_SUMMARY_RETENTION_COUNT entries, this Stop's own summary among them.
+    const survivors = readdirSync(join(cwd, RUNS_DIR)).filter((name) => name.endsWith('.json'));
+    expect(survivors).toHaveLength(RUN_SUMMARY_RETENTION_COUNT + 1);
+    expect(survivors).toContain('run-history-0.json');
+    expect(survivors).not.toContain(`run-history-${RUN_SUMMARY_RETENTION_COUNT + 4}.json`);
+  });
+
+  test('a retention fault never fails Stop', () => {
+    const cwd = fixture();
+    mkdirSync(join(cwd, RUNS_DIR), { recursive: true });
+    mkdirSync(join(cwd, '.ai/harness/checks'), { recursive: true });
+    // An unreadable checks projection cancels the sweep; Stop still completes.
+    writeFileSync(join(cwd, '.ai/harness/checks/latest.json'), '{ truncated');
+    seedSummary(cwd, 'run-history-0.json', 0);
+
+    const result = runStopHandler({
+      collector: collector(cwd, () => canonicalState()),
+      env: { HOOK_RUN_ID: 'stop-retention-fault-run' },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(cwd, RUNS_DIR, 'run-history-0.json'))).toBe(true);
+    expect(existsSync(join(cwd, RUNS_DIR, 'stop-retention-fault-run.json'))).toBe(true);
   });
 });

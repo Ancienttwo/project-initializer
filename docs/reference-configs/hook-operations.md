@@ -129,6 +129,40 @@ contains the generated operator-helper projection. Keep the two declared asset
 manifests aligned with `bun run sync:hooks`, and validate the typed route
 registry with `bun test` and `repo-harness init --repo . --dry-run`.
 
+## Evidence Retention
+
+Three files under `.ai/harness/` grow on every Stop, and each has its own
+retention owner that runs automatically:
+
+| Surface | Owner | Bound |
+| --- | --- | --- |
+| `evidence/checkpoints/` | `checkpoint-store.ts`, inside every successful publish | only the checkpoint the published marker names |
+| `runs/*.json` | `run-summary-retention.ts`, at the end of every Stop | pinned snapshots plus the newest `RUN_SUMMARY_RETENTION_COUNT` |
+| `runs/hook-events.jsonl` | `hook-event-log.ts`, on rotation | 8 MB segments, 256 MB or 32 archived segments |
+
+A run summary is pinned while a checks projection's `.run_file` points at it:
+`verify-sprint --prepare-acceptance` freezes a snapshot there and reads that
+exact file back at finalization. Retention therefore treats an unreadable checks
+projection as a reason to cancel the sweep, not to widen it.
+
+Checkpoint retention was added in 0.19.0. A repository upgraded from an earlier
+version carries a checkpoint per Stop, each one a whole-ledger snapshot -- on a
+long-running repository that reaches multiple gigabytes. The next successful Stop
+after the upgrade prunes the entire backlog on its own, so no action is normally
+required.
+
+Run `repo-harness run evidence-gc` when that Stop will not come:
+
+```bash
+repo-harness run evidence-gc --repo . --dry-run   # report reclaimable bytes
+repo-harness run evidence-gc --repo .             # apply the same policies now
+```
+
+It applies the two policies above and never defines its own. Use it for a
+repository whose ledger was reset (publication skips quietly with no ledger), one
+that no longer runs the harness, or when the space is needed before the next
+Stop. It exits non-zero and names every entry it could not reclaim.
+
 ## Verification Checklist
 
 After handler or workflow-contract changes, run:
