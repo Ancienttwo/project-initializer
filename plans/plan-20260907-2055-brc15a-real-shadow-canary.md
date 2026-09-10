@@ -1,6 +1,6 @@
 # Plan: BRC15a real GPT shadow canary
 
-> **Status**: Draft
+> **Status**: Executing
 > **Created**: 20260907-2055
 > **Slug**: brc15a-real-shadow-canary
 > **Planning Source**: waza-think
@@ -101,7 +101,7 @@ See captured planning output.
 
 Execute Sprint BRC15a's real GPT shadow observation through the existing budgeted product path. Record actual authoring, missing-slot follow-up, independent GitHub observation, adoption dry-run and the user's subsequent investment decision. No quality threshold or synthetic fixture count can substitute for these observations. BRC6a, BRC14 and BRC15 remain distinct acceptance boundaries.
 
-## Proposed concrete operator grant
+## Approved concrete operator grant
 
 - Target: new private `Ancienttwo/repo-harness-brc15a-canary-20260907`; never reuse `repo-harness-page` or another existing repository.
 - Local target: `/Users/ancienttwo/Projects/repo-harness-brc15a-canary-20260907`, created from tracked commit `33c5012e1185a695fdaf54a7bb84fc613cfb653b`, excluding all main working-tree changes. Create a fresh Git history so the canary setup push cannot publish historical refs. Retain source/capability files; omit workflow automation from the disposable target.
@@ -115,7 +115,7 @@ Execute Sprint BRC15a's real GPT shadow observation through the existing budgete
 
 ## P1/P2/P3 and constraints
 
-The product authority is ProgramAuthorizationV1 minted through `repo-harness automation grant mint`, then the existing campaign/budget stores. The proposal is not a minted grant. The operator must approve these concrete repository/account/limit values before external setup and minting.
+The product authority is ProgramAuthorizationV1 minted through `repo-harness automation grant mint`, then the existing campaign/budget stores. The proposal is not a minted grant. The user approved these concrete repository/account/limit values with “同意” on 2026-09-07; external setup and the exact bounded mint are authorized.
 
 The current authoring effect validates the repository's saved profile binding against the grant, persists IssueBatchIntent before Oracle, scans the prompt with gitleaks, and reserves the provider invocation. Adoption in shadow dry-run uses budgeted GitHub identity/page reads and immutable observation outcomes. Use that path directly; do not create Issues with gh or call an unbudgeted observation runner. Native CDP was used only for non-model login/tool inspection, not as an alternate authoring provider.
 
