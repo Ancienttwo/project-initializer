@@ -1212,3 +1212,63 @@ describe('operator serve command and HTTP boundary', () => {
     }
   });
 });
+
+describe('read-only task diff route', () => {
+  const path = `/api/v1/fleet/tasks/repo-a/${TASK_ID}/diff?task_revision=${TASK_REVISION}&claim_id=${CLAIM_ID}&generation=1`;
+  const result = {
+    protocol: 1 as const, kind: 'operator_task_diff' as const, repository_id: 'repo-a', task_id: TASK_ID,
+    task_revision: TASK_REVISION, claim_id: CLAIM_ID, generation: 1,
+    target_ref: 'main', branch: 'codex/task', base_sha: 'a'.repeat(40), head_sha: 'b'.repeat(40),
+    observed_at: '2026-09-10T00:00:00.000Z', patch: '', untracked_paths: [],
+  };
+  test('validates query/fence and reuses origin and method guards', async () => {
+    let calls = 0;
+    const server = await startOperatorServer({ port: 0, read_task_diff: async () => { calls++; return result; } });
+    try {
+      const response = await fetch(server.url+path); expect(response.status).toBe(200); expect(await response.json()).toEqual(result);
+      const head = await fetch(server.url+path, { method: 'HEAD' }); expect(head.status).toBe(200); expect(await head.text()).toBe('');
+      expect((await fetch(server.url+path+'&root=/tmp')).status).toBe(400);
+      expect((await fetch(server.url+path+'&generation=2')).status).toBe(400);
+      expect((await fetch(server.url+path, { headers: { Origin: 'https://example.com' } })).status).toBe(403);
+      expect((await fetch(server.url+path, { method: 'POST', headers: { Origin: server.url } })).status).toBe(405);
+      expect(calls).toBe(2);
+    } finally { await server.close(); }
+  });
+  test('caps concurrent reads, enforces deadline and aborts the injected reader', async () => {
+    let entered!: () => void; const started = new Promise<void>(resolve => { entered = resolve; });
+    let signal: AbortSignal | undefined;
+    const server = await startOperatorServer({ port: 0, max_concurrency: 1, timeout_ms: 1000,
+      read_task_diff: input => { signal = input.signal; entered(); return new Promise(() => {}); },
+    });
+    try {
+      const pending = fetch(server.url+path); await started;
+      expect(await (await fetch(server.url+path)).json()).toEqual({ code: 'busy' });
+      expect(await (await pending).json()).toEqual({ code: 'timeout' }); expect(signal?.aborted).toBe(true);
+    } finally { await server.close(); }
+  });
+  test('rejects mismatched reader payload', async () => {
+    const server = await startOperatorServer({ port: 0, read_task_diff: async () => ({ ...result, generation: 2 }) });
+    try { expect(await (await fetch(server.url+path)).json()).toEqual({ code: 'unavailable' }); }
+    finally { await server.close(); }
+  });
+});
+
+test('task diff disconnect and shutdown cancel active reads', async () => {
+  const path = `/api/v1/fleet/tasks/repo-a/${TASK_ID}/diff?task_revision=${TASK_REVISION}&claim_id=${CLAIM_ID}&generation=1`;
+  let entered!: () => void;
+  let stopped!: () => void;
+  let started = new Promise<void>(resolve => { entered = resolve; });
+  let cancelled = new Promise<void>(resolve => { stopped = resolve; });
+  const server = await startOperatorServer({ port: 0, read_task_diff: ({ signal }) => {
+    signal.addEventListener('abort', () => stopped(), { once: true }); entered(); return new Promise(() => {});
+  } });
+  try {
+    const abort = new AbortController();
+    const response = fetch(server.url+path, { signal: abort.signal }).catch(() => null);
+    await started; abort.abort(); await cancelled; await response;
+    started = new Promise<void>(resolve => { entered = resolve; });
+    cancelled = new Promise<void>(resolve => { stopped = resolve; });
+    const closing = fetch(server.url+path).catch(() => null);
+    await started; await server.close(); await cancelled; await closing;
+  } finally { await server.close(); }
+});
