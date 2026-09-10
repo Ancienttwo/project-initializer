@@ -1,14 +1,24 @@
+> **Archived**: 2026-09-10 16:47
+> **Related Plan**: plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md
+> **Outcome**: Completed
+> **Lifecycle**: contract
+> **Parent Run ID**: run-20260910-1647
+> **Archive Projection V1**: `plans/plan-20260910-1621-brc-archive-integration-20260910.md` => `plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md`
+> **Archive Projection V1**: `tasks/notes/20260910-1621-brc-archive-integration-20260910.notes.md` => `tasks/archive/notes-20260910-1647-brc-archive-integration-20260910.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-1621-brc-archive-integration-20260910.contract.md` => `tasks/archive/contract-20260910-1647-brc-archive-integration-20260910.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-1621-brc-archive-integration-20260910.review.md` => `tasks/archive/review-20260910-1647-brc-archive-integration-20260910.md`
+
 # Task Contract: brc-archive-integration-20260910
 
-> **Status**: Partial
-> **Plan**: plans/plan-20260910-1621-brc-archive-integration-20260910.md
+> **Status**: Fulfilled
+> **Plan**: plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md
 > **Task Profile**: docs-only
 > <!-- legal values: code-change | docs-only | ledger-closeout | migration | eval-only | delegated-run | bugfix (omit for legacy passthrough); see docs/reference-configs/sprint-contracts.md -->
 > **Owner**: ancienttwo
 > **Capability ID**: root
 > **Last Updated**: 2026-09-10 16:21
-> **Review File**: `tasks/reviews/20260910-1621-brc-archive-integration-20260910.review.md`
-> **Notes File**: `tasks/notes/20260910-1621-brc-archive-integration-20260910.notes.md`
+> **Review File**: `tasks/archive/review-20260910-1647-brc-archive-integration-20260910.md`
+> **Notes File**: `tasks/archive/notes-20260910-1647-brc-archive-integration-20260910.md`
 > **Exemplar**: `docs/reference-configs/contract-brief-example.md`
 
 ## Why
@@ -41,10 +51,10 @@ Not applicable: history and documentation consolidation.
 
 ## Workflow Inventory
 
-- Source plan: `plans/plan-20260910-1621-brc-archive-integration-20260910.md`
+- Source plan: `plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md`
 - Deferred-goal ledger: `tasks/todos.md`
-- Review file: `tasks/reviews/20260910-1621-brc-archive-integration-20260910.review.md`
-- Notes file: `tasks/notes/20260910-1621-brc-archive-integration-20260910.notes.md`
+- Review file: `tasks/archive/review-20260910-1647-brc-archive-integration-20260910.md`
+- Notes file: `tasks/archive/notes-20260910-1647-brc-archive-integration-20260910.md`
 - Checks file: `.ai/harness/checks/latest.json`
 - Run snapshots: `.ai/harness/runs/`
 - Scope gate: edit only paths listed under `allowed_paths`; update this contract before widening scope.
@@ -125,7 +135,7 @@ exit_criteria:
     - docs/researches/20260910-inactive-branch-consolidation.md
   artifacts_exist:
     - .ai/harness/checks/latest.json
-    - tasks/notes/20260910-1621-brc-archive-integration-20260910.notes.md
+    - tasks/archive/notes-20260910-1647-brc-archive-integration-20260910.md
 ```
 
 ## Verification Plan

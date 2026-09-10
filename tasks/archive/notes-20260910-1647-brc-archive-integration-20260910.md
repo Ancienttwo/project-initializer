@@ -1,9 +1,19 @@
+> **Archived**: 2026-09-10 16:47
+> **Related Plan**: plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md
+> **Outcome**: Completed
+> **Lifecycle**: notes
+> **Parent Run ID**: run-20260910-1647
+> **Archive Projection V1**: `plans/plan-20260910-1621-brc-archive-integration-20260910.md` => `plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md`
+> **Archive Projection V1**: `tasks/notes/20260910-1621-brc-archive-integration-20260910.notes.md` => `tasks/archive/notes-20260910-1647-brc-archive-integration-20260910.md`
+> **Archive Projection V1**: `tasks/contracts/20260910-1621-brc-archive-integration-20260910.contract.md` => `tasks/archive/contract-20260910-1647-brc-archive-integration-20260910.md`
+> **Archive Projection V1**: `tasks/reviews/20260910-1621-brc-archive-integration-20260910.review.md` => `tasks/archive/review-20260910-1647-brc-archive-integration-20260910.md`
+
 # Implementation Notes: inactive branch consolidation
 
 > **Status**: Active
-> **Plan**: plans/plan-20260910-1621-brc-archive-integration-20260910.md
-> **Contract**: tasks/contracts/20260910-1621-brc-archive-integration-20260910.contract.md
-> **Review**: tasks/reviews/20260910-1621-brc-archive-integration-20260910.review.md
+> **Plan**: plans/archive/plan-20260910-1621-brc-archive-integration-20260910.md
+> **Contract**: tasks/archive/contract-20260910-1647-brc-archive-integration-20260910.md
+> **Review**: tasks/archive/review-20260910-1647-brc-archive-integration-20260910.md
 > **Last Updated**: 2026-09-10
 > **Lifecycle**: notes
 
@@ -18,6 +28,8 @@
 
 - History-only merge strategy implements the planned current-main conflict disposition. Work-package acceptance covers the integration candidate; authorized remote publication and directory deletion follow only after that gate.
 - A new worktree initially lacked the repository-required CodeGraph index. Initial projection produced a proof-only candidate; after local index initialization, deterministic projection returned noop. Reconcile that exact setup-generated signal before final verification, without changing any product or architecture file.
+
+- The user reprioritized visible cleanup while final review was running. After all eight checks passed, pushed the exact integration commit and read back its remote SHA, then removed 19 inactive local branch refs, 18 worktree directories, and two legacy remote BRC refs. All 20 saved source heads remain ancestors of the remote integration commit. Main publication and removal of this temporary integration worktree remain the final follow-through.
 
 ## Tradeoffs Considered
 
