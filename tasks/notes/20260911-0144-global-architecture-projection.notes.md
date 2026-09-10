@@ -19,6 +19,6 @@ The provider process-tree timeout regression fails both here and on unmodified m
 The user additionally requested a v0.19 proactive refactoring discovery check after this PR; keep that evaluation separate from this implementation.
 
 
-Final review delta: malformed Node readiness now exits nonzero instead of emitting a synthetic provider/apply pair. Both Node-only valid-policy and corrupt-readiness checks pass. Remote main advanced from 8fc92c08 to 09e4a4d0 with only a projection manifest rebind (#400); this PR retains its fixed source base and does not claim current-target merge acceptance.
+Final review delta: malformed Node readiness now exits nonzero instead of emitting a synthetic provider/apply pair. Both Node-only valid-policy and corrupt-readiness checks pass. Remote main advanced from 8fc92c08 to 09e4a4d0 with only a projection manifest rebind (#400); the branch incorporates that manifest-only update before final prepared evidence. External current-target merge acceptance remains pending.
 
 > **Substantive Change SHA256**: `sha256:bee75aaab8faa2213b92fd281c0193a9112052c8671193105f515d3a6cf38f43`
