@@ -1,6 +1,6 @@
 # runtime-harness/automation-budget 架構文檔
 
-<!-- BEGIN ARCHCONTEXT:generated target="projection_target.entity.capability-runtime-harness-automation-budget" sourceDigest="sha256:010ee9ce2c7935ad6ab2aa5d30e2e0225c98fb708e29c221e146ff45b6b21610" rendererVersion="archcontext.docs-renderer/v4" outputDigest="sha256:9deae9f17a3ad75c541b1b0ca258721b329b5a4d9521eedfab8186eb635af91a" -->
+<!-- BEGIN ARCHCONTEXT:generated target="projection_target.entity.capability-runtime-harness-automation-budget" sourceDigest="sha256:543f7c79d43d479d08639c5792896807e7702751ffdaec1d57c4255d53223da4" rendererVersion="archcontext.docs-renderer/v4" outputDigest="sha256:4e22f748955143711e4ba6b02638a978e6a785040dd1cd5efc1747cdc79d1193" -->
 > **狀態**:`active`
 > **Capability ID**:`capability.runtime-harness.automation-budget`(kind `capability`)
 > **Matched Prefixes**:`src/core/automation/**`、`src/effects/automation/**`、`src/cli/commands/automation.ts`
@@ -26,7 +26,7 @@ flowchart LR
   classDef external fill:#7c2d12,color:#ffffff,stroke:#fed7aa,stroke-width:2px
 ```
 
-- Proof: `proven` (`sha256:bdd7a4de4f6b66369b1a1ba100dfc777b8d669e38a510f36abecd95ba55afdfa`).
+- Proof: `proven` (`sha256:c258b13dd96755bef873cc2402c7948150b1a917e2e643f38ce08590d3846fdd`).
 - Semantic nodes: `3`; declared relations: `2`.
 
 ### 1.2 模組職責表
@@ -35,7 +35,8 @@ flowchart LR
 | --- | --- | --- |
 | `entrypoint.automation-budget.reserve` | `src/effects/automation/budget-store.ts#reserveAutomationBudgetAdmission` | `sink.automation-budget.reservation-decision` → `src/core/automation/budget.ts#evaluateAutomationReservation` |
 | `entrypoint.automation-budget.reserve` | `src/effects/automation/budget-store.ts#persistStopReceipt` | `sink.automation-budget.stop-receipt` → `src/core/automation/budget.ts#sealAutomationStopReceipt` |
-| `entrypoint.automation-budget.append` | `src/effects/automation/budget-store.ts#commitUsage` | `sink.automation-budget.usage-event` → `src/core/automation/budget.ts#sealAutomationUsageEvent`、`sink.automation-budget.ledger-chain` → `src/core/automation/budget.ts#chainAutomationLedgerDigest` |
+| `entrypoint.automation-budget.append` | `src/effects/automation/budget-store.ts#prepareUsageCommit` | `sink.automation-budget.usage-event` → `src/core/automation/budget.ts#sealAutomationUsageEvent` |
+| `entrypoint.automation-budget.append` | `src/effects/automation/budget-store.ts#publishUsageCommit` | `sink.automation-budget.ledger-chain` → `src/core/automation/budget.ts#chainAutomationLedgerDigest` |
 | `entrypoint.automation-budget.project` | `src/effects/automation/budget-store.ts#readAutomationBudgetBoardSlice` | `sink.automation-budget.operator-slice` → `src/core/automation/projection.ts#projectAutomationBudgetSlice` |
 | `entrypoint.automation-controller.step` | `src/effects/automation/controller-run.ts#append` | `sink.automation-controller.journal` → `src/effects/automation/controller-store.ts#appendAutomationControllerEvent` |
 | `entrypoint.automation-controller.step` | `src/effects/automation/controller-run.ts#acquireNextControllerTask` | `sink.automation-controller.acquire` → `src/effects/engineers/scheduling-acquire-next.ts#acquireNextScheduledEngineerTask` |
@@ -60,7 +61,7 @@ flowchart LR
 
 ## 2. P2:端到端數據流
 
-> **Proof**: `proven` (`sha256:bdd7a4de4f6b66369b1a1ba100dfc777b8d669e38a510f36abecd95ba55afdfa`); selectors `8/8`.
+> **Proof**: `proven` (`sha256:c258b13dd96755bef873cc2402c7948150b1a917e2e643f38ce08590d3846fdd`); selectors `8/8`.
 
 ```mermaid
 %%{init: {"theme":"base","themeVariables":{"background":"#0d1117","actorBkg":"#312e81","actorBorder":"#c4b5fd","actorTextColor":"#ffffff","signalColor":"#e5e7eb","signalTextColor":"#e5e7eb","labelBoxBkgColor":"#4c1d95","labelBoxBorderColor":"#c4b5fd","labelTextColor":"#ffffff","noteBkgColor":"#78350f","noteBorderColor":"#fcd34d","noteTextColor":"#ffffff","sequenceNumberColor":"#ffffff"}}}%%

@@ -14,12 +14,12 @@
 
 ## Human Review Card
 
-- Verdict: blocked on final architecture and external acceptance; native source review found no blocking finding.
+- Verdict: pending final canonical and external acceptance; native source review found no blocking finding.
 - Change type: bugfix with operator recovery for malformed immutable evidence.
 - Actual changed boundary: budget preparation/publication, explicit reconciliation repair CLI/API, expired-to-stopped transition, exact model caller selectors, focused regression tests and recovery documentation.
 - Passed: TypeScript; hook/helper projection parity; SQL order; task sync; strict task workflow; project-state inspection; downstream init dry-run; installed-package repair CLI smoke.
 - Focused development run: 140 passed, 1 existing exact-Issue admission case hit the unchanged 60-second timeout, 739 assertions across 7 files. The exact case then passed once on clean baseline (19.59s) and once on this patch (10.31s), with the same timeout and 717 local Git commands each. The aggregate result remains a retained failed run; no patch regression was identified.
-- Architecture: source selector delta reviewed; current `entrypoint-changed` / `verified-flow-proof-changed` requires an exact human approval. No approval reference or AcceptanceReceipt has been fabricated.
+- Architecture: source selector delta reviewed; the owner approved the exact change; canonical apply produced proven 8/8 selectors and all old candidates were resolved through typed receipts. Formal external AcceptanceReceipt is still pending.
 - Rollback: before activation, revert this source slice. After a live operator apply, preserve original history and the new receipt/charge; never refund or delete ledger authority.
 
 ## Mode Evidence
@@ -66,4 +66,4 @@ Malformed new evidence fails before the immutable reconciliation is published. A
 
 ## Residual Risks / Follow-ups
 
-Obtain current architecture acceptance and the contract-frozen external review, then complete PR/CI before any live recovery. Preserve Issues #177/#178 and the existing grant boundary. A green native review or installed smoke is not a substitute for those remaining gates.
+Complete canonical verification and the contract-frozen external review, then complete PR/CI before any live recovery. Preserve Issues #177/#178 and the existing grant boundary. A green native review or installed smoke is not a substitute for those remaining gates.

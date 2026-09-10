@@ -2,7 +2,7 @@
 
 Owner approval: Codex conversation `01a089b3-6b92-72e2-ba20-da48ab37c465`, user message `msg_01a08a7b-c10c-78d0-a5c3-9cd1722610f3`, received `2026-09-10T08:42:41.300Z`, text `批准`. This approves the described architecture update, external review, PR/CI and subsequent live repair/stop/continuation. Controlled root context files, the context map and the capability request are included only as outputs of the approved canonical architecture refresh.
 
-> **Substantive Change SHA256**: `sha256:6e76a034456be82648b4addd8e8290e4edd9ade24fec3b77893575498ed5e642`
+> **Substantive Change SHA256**: `sha256:6759c460fd228345267bbbac2d75456ffb6b64957daeab6e7f41fa84395f875d`
 
 The original reservation/reconciliation/expiry receipts are immutable. The explicit repair uses the original raw-record digest, validates replacement evidence and the complete event first, then records the repair and single charge. Terminal acknowledgment appends stop after expiry and never reopens execution. This avoids replacement-schema migration and keeps the existing strict continuation gate.
 
@@ -31,3 +31,15 @@ The first proof-reconciliation attempt raced this task's package build adding ig
 The seven-file run finished with 140 pass / 1 timeout / 739 assertions in 389.49 seconds. The only failure was the unchanged exact-Issue admission case at its existing 60-second limit; the new combined recovery/continuation case passed. A bounded control ran that exact case once on clean baseline `3c570360` and once on this patch, preserving the same timeout and all assertions: baseline passed in 19.59 seconds, patch passed in 10.31 seconds. Each performed 717 local Git commands; the longest individual Git command was 139.49ms on baseline and 51.29ms on the patch. Thus the timeout did not reproduce and no patch regression was identified; the original failed aggregate log remains evidence, not relabeled as a clean suite pass. No source/test workaround was added. Logs and Git performance traces are `/tmp/campaign-reconciliation-recovery/{baseline,patch}-exact-60000.{log,git-trace}`.
 
 Typecheck and seven non-architecture root integrity checks passed. Strict architecture check remains blocked on the recorded acceptance candidates; final canonical acceptance, external review, PR/CI and live activation have not completed. The local checkpoint is a reviewable source boundary, not publication or campaign recovery.
+
+## Architecture acceptance
+
+The owner-approved architecture apply completed with receipt `sha256:9cba7a5d555ed6fbe562961c5ff20fc758b11066c15562bae30825ed544768db` and the exact user-message approval reference above. The generated capability proof is `proven`, selectors 8/8. Actual tracked outputs are the projection manifest, six index/diagram stamp updates, and automation-budget module documentation. Two old proof-only candidates were reconciled with current empty noops; two old semantic candidates were retired after strict ancestry and current-proof checks. Readiness reports 0 unresolved candidates and 0 invalid artifacts. The first apply attempt failed a CodeGraph handshake without writes; after an up-to-date index readback, the same approved request succeeded without changing timeouts.
+
+Final canonical verification includes the capability-declared budget driver e2e (two existing local fixture cases) in addition to the previously named seven files, so reserve-act-append exhaustion and operator stop-receipt parity are explicit. No real provider is used by these fixtures.
+
+## Approved continuation authority
+
+The owner separately approved the fresh-campaign recovery on 2026-09-10T09:34:48.768Z in message `msg_01a08aab-79bc-7143-8c73-a5a764f1ee27` (`批准`), responding to the concrete proposal to retain Issues #177/#178, stop the poisoned third campaign, and issue a new campaign-bound grant with only 39 provider calls and 44 agent turns/runner invocations. Other limits remain unchanged and expiry remains `2026-09-10T13:19:45.830Z`. This post-delivery operator authority does not widen the source patch into intent replacement or browser changes. Review and CI precede live source activation. Re-read remaining balances and state immediately before mutation; completed worker/verifier work remains SKIP.
+
+Read-only source and live-record inspection confirmed that the third campaign had already persisted a resume intent without supersedes at 15:23 HKT. Correct supersedes changes the immutable prompt/intent; omitting it conflicts with the verifier's existing continuation. No public same-campaign repair exists. The replacement campaign must supersede the acceptance campaign, not the poisoned third campaign, which never became the effective continuation.

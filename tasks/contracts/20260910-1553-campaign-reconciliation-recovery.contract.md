@@ -143,15 +143,7 @@ delegation:
 ```yaml
 exit_criteria:
   files_exist:
-    - docs/architecture/changelog.md
-  - docs/architecture/decisions/index.md
-  - docs/architecture/diagrams/architecture.likec4
-  - docs/architecture/diagrams/architecture.mmd
-  - docs/architecture/diagrams/architecture.structurizr.json
-  - docs/architecture/index.md
-  - docs/architecture/.projection-manifest.json
-  - docs/architecture/modules/runtime-harness/automation-budget.md
-  - docs/researches/20260910-reconciliation-recovery.md
+    - docs/researches/20260910-reconciliation-recovery.md
     - tasks/evidence/campaign-reconciliation-recovery-pre-fix.log
   artifacts_exist:
     - .ai/harness/checks/latest.json
@@ -198,6 +190,19 @@ exit_criteria:
       "cost": "normal",
       "evidence_policy": "current_exact",
       "necessity": "Covers the changed reconciliation, replay, locking, terminal or continuation contract.",
+      "inputs": {
+        "env": []
+      }
+    },
+    {
+      "id": "budget-driver-e2e",
+      "kind": "package_test",
+      "path": "tests/unit/issue-282-automation-budget-e2e.test.ts",
+      "cwd": ".",
+      "phase": "verification",
+      "cost": "normal",
+      "evidence_policy": "current_exact",
+      "necessity": "Capability-declared reserve-act-append driver proves late settlement cannot reopen the next acquisition and the operator projects the same stop receipt.",
       "inputs": {
         "env": []
       }
