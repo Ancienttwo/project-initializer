@@ -31,3 +31,5 @@ Final preparation: 25/25 checks passed, run `run-20260911T021315-69480-20260911-
 External review on b2fc5332 (official codex-plugin 1.0.5) returned needs-attention: downstream src/cli/index.ts could be executed without harness identity. Fixed by preferring an explicit CLI and requiring repo-harness package name/bin identity before selecting repository source. Downstream unrelated-CLI regression passes. One semantic review is consumed; no external_pass is claimed for the corrected subject.
 
 > **Substantive Change SHA256**: `sha256:b4805ba021e01c81d389b8bab10d788d2f3a553e831f5cbcae77463638e24cdc`
+
+> **Substantive Change SHA256**: `sha256:bd1db64699a6fc2530da1414eeccec48a0afe2e556a3167bab7f5824e0a46741`

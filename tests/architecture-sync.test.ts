@@ -289,7 +289,7 @@ test("downstream source CLI is never selected and explicit harness CLI wins", ()
     expect(existsSync(join(cwd, "wrong-cli-ran"))).toBe(false);
     const bin = join(cwd, "bin"); mkdirSync(bin);
     copyFileSync(join(cwd, "projection-cli"), join(bin, "repo-harness"));
-    const env = { ...process.env, HOME: join(cwd, "home"), PATH: `${bin}:${process.env.PATH}` };
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: join(cwd, "home"), PATH: `${bin}:${process.env.PATH}` };
     delete env.REPO_HARNESS_CLI_BIN;
     const installed = spawnSync("bash", args, { cwd, encoding: "utf8", env });
     expect(installed.status).toBe(0);
