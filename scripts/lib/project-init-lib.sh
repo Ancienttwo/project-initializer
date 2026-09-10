@@ -1564,7 +1564,7 @@ pi_write_harness_policy() {
     "projection_provider": "disabled",
     "projection_apply": "disabled",
     "projection_failure_gate": "advisory",
-    "projection_version": "0.5.9",
+    "projection_version": "0.5.10",
     "projection_timeout_ms": 120000,
     "freshness_gate": "advisory",
     "gate_min_severity": "medium",
@@ -1580,8 +1580,8 @@ pi_write_harness_policy() {
     "mode": "off",
     "provider": "archctx",
     "stages": {
-      "scan": { "provider_version": "0.5.9", "required_features": ["module-statistics-v1", "refactor-assessment-v1", "recommendation-v3"] },
-      "verify": { "provider_version": "0.5.9", "required_features": ["refactor-resolution-v1"] }
+      "scan": { "provider_version": "0.5.10", "required_features": ["module-statistics-v1", "refactor-assessment-v1", "recommendation-v3"] },
+      "verify": { "provider_version": "0.5.10", "required_features": ["refactor-resolution-v1"] }
     },
     "require_cutover_closure": true,
     "require_post_merge_measurement": false

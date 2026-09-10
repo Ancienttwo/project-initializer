@@ -85,6 +85,26 @@ function buildCapabilityProjection(): ProjectionFileRecord {
   };
 }
 
+function buildRecoveryProjection(): ProjectionFileRecord {
+  const readerPath = "src/effects/evidence/checkpoint-snapshot.ts";
+  const reader = readFileSync(join(REPO_ROOT, readerPath), "utf8");
+  const script = readFileSync(join(CANONICAL_ROOT, "recovery-view-cli.ts"), "utf8");
+  const importLine = 'import { readCheckpointSnapshot } from "../src/effects/evidence/checkpoint-snapshot";';
+  if (script.split(importLine).length !== 2) throw new Error("recovery helper must import the canonical snapshot reader exactly once");
+  const adapter = script.replace("#!/usr/bin/env bun\n", "").replace(importLine, "");
+  const sourceHash = createHash("sha256").update(reader).digest("hex");
+  return {
+    relPath: "recovery-view-cli.ts",
+    bytes: Buffer.from([
+      "#!/usr/bin/env bun",
+      `// @generated-from ${readerPath} sha256:${sourceHash}`,
+      "// Regenerate with scripts/sync-helper-sources.ts; do not edit by hand.",
+      reader.trimEnd(), adapter.trim(), "",
+    ].join("\n")),
+    mode: "100755",
+  };
+}
+
 function main(): void {
   const mode = parseMode(process.argv.slice(2));
   const contract = loadWorkflowContract(CONTRACT_PATH);
@@ -100,7 +120,9 @@ function main(): void {
     }
     return name === CAPABILITY_HELPER
       ? buildCapabilityProjection()
-      : readProjectionFile(CANONICAL_ROOT, name);
+      : name === "recovery-view-cli.ts"
+        ? buildRecoveryProjection()
+        : readProjectionFile(CANONICAL_ROOT, name);
   }).filter((file) => file !== null);
 
   const targetFiles = existsSync(TARGET_ROOT) ? collectProjectionFiles(TARGET_ROOT) : [];
