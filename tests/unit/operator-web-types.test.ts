@@ -21,7 +21,7 @@ const snapshotDigest = `sha256:${'c'.repeat(64)}`;
 
 function validFleetPayload(): Record<string, unknown> {
   return {
-    protocol: 4,
+    protocol: 5,
     kind: 'operator_fleet_snapshot',
     registry_revision: `sha256:${'d'.repeat(64)}`,
     sequence: 1,
@@ -29,6 +29,7 @@ function validFleetPayload(): Record<string, unknown> {
     snapshot_consistency: 'stable',
     repositories: [{
       repository_id: 'repo-1',
+      display_name: 'repo-1',
       access_mode: 'read_write',
       status: 'ok',
       snapshot_consistency: 'stable',
@@ -96,6 +97,14 @@ function validCollaborationPayload(): Record<string, unknown> {
 }
 
 describe('operator browser payload contracts', () => {
+  test('requires the named-repository protocol without accepting old or missing display names', () => {
+    expect(() => decodeOperatorFleetSnapshot({ ...validFleetPayload(), protocol: 4 })).toThrow();
+    const payload = validFleetPayload();
+    const repos = payload.repositories as Record<string, unknown>[];
+    delete repos[0]!.display_name;
+    expect(() => decodeOperatorFleetSnapshot(payload)).toThrow();
+    expect(decodeOperatorFleetSnapshot(validFleetPayload()).repositories[0]?.display_name).toBe('repo-1');
+  });
   test('accepts an addressable task and claim fence', () => {
     const decoded = decodeOperatorFleetSnapshot(validFleetPayload());
     const card = decoded.repositories[0]?.cards[0];

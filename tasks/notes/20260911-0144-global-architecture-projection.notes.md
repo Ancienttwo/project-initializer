@@ -51,3 +51,7 @@ P1: The protected helper runner owns executable identity and sanitizes PATH. P2:
 The existing fleet-acquire regression reproduced the missing-CLI error before this correction (/tmp/global-fleet-pre-fix.log). Its diagnostic assertion no longer reads a nonexistent snapshot before showing the actual error. The status fixture now expects the explicit missing-global-configuration reason instead of a retired repo policy reason. Both failures occurred on the CI heads of #401 and #408 and are within this authority cutover.
 
 > **Substantive Change SHA256**: `sha256:021b35f557a319a9ee097b501f5c24bb7fe45a6a04184c0ce4461aff742da400`
+
+Acceptance base refreshed to main e238a73a after concurrent PRs landed. Their changes are target content, not this task scope.
+
+> **Substantive Change SHA256**: `sha256:ed46a46061112fc50f4a31e4e9c92615f22aa0da8e204ab66a91314274cd0911`

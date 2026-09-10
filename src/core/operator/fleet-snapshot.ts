@@ -1,3 +1,4 @@
+import { basename } from 'path';
 import {
   FLEET_BOARD_PROTOCOL,
   fleetBoardErrorMessage,
@@ -33,6 +34,7 @@ export type OperatorFleetCardV1 = FleetBoardCardV1;
 
 export interface OperatorFleetRepositoryV1 {
   readonly repository_id: string;
+  readonly display_name: string;
   readonly access_mode: 'read_only' | 'read_write';
   readonly status: FleetRepositoryStatus;
   readonly snapshot_consistency: OperatorFleetSnapshotConsistency;
@@ -40,7 +42,8 @@ export interface OperatorFleetRepositoryV1 {
   readonly error: OperatorFleetErrorV1 | null;
 }
 
-export interface OperatorFleetSnapshotV1 extends Omit<FleetBoardSnapshotV1, 'kind' | 'repositories' | 'snapshot_sha256'> {
+export interface OperatorFleetSnapshotV1 extends Omit<FleetBoardSnapshotV1, 'protocol' | 'kind' | 'repositories' | 'snapshot_sha256'> {
+  readonly protocol: 5;
   readonly kind: 'operator_fleet_snapshot';
   readonly repositories: readonly OperatorFleetRepositoryV1[];
   /** Digest of the canonical source snapshot, not of this redacted document. */
@@ -116,6 +119,7 @@ function projectRepository(repository: FleetRepositoryBoardV1): OperatorFleetRep
   const error = repository.error;
   return Object.freeze({
     repository_id: repository.repository_id,
+    display_name: basename(repository.repo_root),
     access_mode: repository.access_mode,
     status: repository.status,
     snapshot_consistency: repository.snapshot_consistency,
@@ -133,7 +137,7 @@ function projectRepository(repository: FleetRepositoryBoardV1): OperatorFleetRep
  * Project the canonical Fleet read model into a browser-safe document.
  *
  * This function deliberately does not classify cards, recalculate counts, or
- * derive attention from labels.  The output keeps the Fleet protocol and
+ * derive attention from labels.  The output versions its browser contract separately and keeps the Fleet
  * digest so consumers can correlate the transport view with the source read
  * model while absolute paths and diagnostic causes stay server-side.
  */
@@ -147,7 +151,7 @@ export function projectOperatorFleetSnapshot(
   const repositories = Object.freeze(snapshot.repositories.map(projectRepository));
   const sourceSnapshotSha256 = snapshot.snapshot_sha256;
   return Object.freeze({
-    protocol: snapshot.protocol,
+    protocol: 5,
     kind: 'operator_fleet_snapshot',
     registry_revision: snapshot.registry_revision,
     sequence: snapshot.sequence,

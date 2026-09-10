@@ -109,6 +109,14 @@ code, .mono-value { font-family: var(--font-mono); }
 .statusbar-fact--age { font-family: var(--font-mono); }
 .statusbar-fact--age.is-stale { color: var(--danger-text); font-weight: 500; }
 .operator-statusbar__actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.repository-switch { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-muted); font-size: 12px; }
+.repository-switch select { width: clamp(150px, 19vw, 300px); max-width: 100%; min-height: 36px; padding: 6px 28px 6px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-strong); background: var(--surface-card); font: inherit; }
+.repository-switch select:focus-visible { outline: none; box-shadow: var(--ring); }
+@media (max-width: 600px) {
+  .operator-statusbar__actions { width: 100%; flex-wrap: wrap; margin-left: 0; }
+  .repository-switch { flex: 1 1 100%; }
+  .repository-switch select { flex: 1; width: 0; }
+}
 .locale-switch { display: inline-flex; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); }
 .locale-switch button { min-height: 36px; padding: 0 11px; border: 0; color: var(--text-muted); background: transparent; cursor: pointer; font-family: var(--font-mono); font-size: 12px; }
 .locale-switch button + button { border-left: 1px solid var(--border-subtle); }

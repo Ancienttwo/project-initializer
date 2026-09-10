@@ -54,7 +54,7 @@ const en = {
   'status.consistency.stable': 'stable',
   'status.consistency.changed_during_read': 'changed during read',
   'status.consistency.degraded': 'degraded',
-  'status.repositories': '{count} repos',
+  'status.repositories': 'Fleet · {count} repos',
   'status.unreadable': '{count} unreadable',
   'status.refresh': 'Refresh',
   'status.refreshing': 'Refreshing',
@@ -116,7 +116,7 @@ const en = {
   'execution.inline_ready': 'inline ready',
   'execution.unsupported': 'unsupported',
 
-  'detail.overviewTitle': 'Fleet overview',
+  'detail.overviewTitle': 'Repository overview',
   'detail.overviewHint': 'Select a task to see why it needs a decision.',
   'detail.matrixTitle': 'Tasks by repository and stage',
   'detail.matrixRepository': 'repository',
@@ -164,6 +164,7 @@ const en = {
   'detail.changedDuringRead': 'This task changed while the snapshot was read. Re-observe before acting.',
 
   'field.taskId': 'task id',
+  'repository.select': 'Select repository',
   'field.repository': 'repository',
   'field.revision': 'revision',
   'field.claim': 'claim',
@@ -496,7 +497,7 @@ const zh: Readonly<Record<OperatorMessageKey, string>> = {
   'status.consistency.stable': '稳定',
   'status.consistency.changed_during_read': '读取期间有变化',
   'status.consistency.degraded': '降级',
-  'status.repositories': '{count} 个仓库',
+  'status.repositories': 'Fleet · {count} 个仓库',
   'status.unreadable': '{count} 个读不到',
   'status.refresh': '刷新',
   'status.refreshing': '刷新中',
@@ -558,7 +559,7 @@ const zh: Readonly<Record<OperatorMessageKey, string>> = {
   'execution.inline_ready': '可内联执行',
   'execution.unsupported': '不支持',
 
-  'detail.overviewTitle': '舰队总览',
+  'detail.overviewTitle': '仓库总览',
   'detail.overviewHint': '选一个任务，看它为什么排在这里。',
   'detail.matrixTitle': '各仓库按阶段的任务数',
   'detail.matrixRepository': '仓库',
@@ -606,6 +607,7 @@ const zh: Readonly<Record<OperatorMessageKey, string>> = {
   'detail.changedDuringRead': '读快照的时候这个任务变过。动手之前先重新读一次。',
 
   'field.taskId': '任务 id',
+  'repository.select': '选择仓库',
   'field.repository': '仓库',
   'field.revision': 'revision',
   'field.claim': 'claim',
