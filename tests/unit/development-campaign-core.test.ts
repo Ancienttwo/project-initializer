@@ -46,3 +46,26 @@ test('completed_with_followups is canonical and refuses every later transition',
   for (const operation of ['prepare_group','complete','complete_with_followups','stop','exhaust_budget','require_human_attention','require_reconciliation','expire_authorization'] as const)
     expect(() => buildDevelopmentCampaignEvent({...event,revision:7,idempotency_key:'next',operation,previous_state:event.next_state,previous_event_sha256:event.event_sha256})).toThrow('cannot follow');
 });
+
+test('recovery acknowledges expiry with a terminal stop and never reopens execution', () => {
+  const campaign = definition();
+  const authorized = buildDevelopmentCampaignEvent({ campaign_id: campaign.campaign_id, revision: 1,
+    idempotency_key: 'authorize', operation: 'authorize', previous_state: null, evidence_refs: [],
+    observed_at: observedAt, previous_event_sha256: null });
+  const expired = buildDevelopmentCampaignEvent({ campaign_id: campaign.campaign_id, revision: 2,
+    idempotency_key: 'expiry', operation: 'expire_authorization', previous_state: authorized.next_state,
+    evidence_refs: [], observed_at: observedAt, previous_event_sha256: authorized.event_sha256 });
+  const stopped = buildDevelopmentCampaignEvent({ campaign_id: campaign.campaign_id, revision: 3,
+    idempotency_key: 'acknowledge-stop', operation: 'stop', previous_state: expired.next_state,
+    evidence_refs: [expired.event_sha256], observed_at: observedAt, previous_event_sha256: expired.event_sha256 });
+  expect(validateDevelopmentCampaignEvent(stopped).next_state).toBe('stopped');
+  expect(foldDevelopmentCampaignCurrent(campaign, [authorized, expired, stopped])).toMatchObject({ revision: 3, state: 'stopped' });
+  for (const operation of ['authorize', 'prepare_group', 'start_group', 'begin_group_audit', 'accept_group', 'complete', 'complete_with_followups', 'stop', 'exhaust_budget', 'require_human_attention', 'require_reconciliation', 'expire_authorization'] as const) {
+    expect(() => buildDevelopmentCampaignEvent({ campaign_id: campaign.campaign_id, revision: 4,
+      idempotency_key: `forbidden-${operation}`, operation, previous_state: 'stopped', evidence_refs: [],
+      observed_at: observedAt, previous_event_sha256: stopped.event_sha256 })).toThrow('cannot follow');
+    if (operation !== 'stop') expect(() => buildDevelopmentCampaignEvent({ campaign_id: campaign.campaign_id, revision: 3,
+      idempotency_key: `expired-${operation}`, operation, previous_state: 'authorization_expired', evidence_refs: [],
+      observed_at: observedAt, previous_event_sha256: expired.event_sha256 })).toThrow('cannot follow');
+  }
+});

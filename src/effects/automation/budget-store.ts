@@ -57,6 +57,7 @@ import {
   AUTOMATION_VERIFIED_USAGE_METRICS,
   CAMPAIGN_AUTOMATION_RESERVATION_KIND,
   automationEvidenceScheme,
+  assertAutomationEvidenceRef,
   automationOperationReservation,
   automationDigest,
   buildAutomationBudget,
@@ -249,6 +250,15 @@ export const AUTOMATION_RECORD_KINDS: readonly AutomationRecordKindV1[] = Object
     write_order: 'published after drift detection and before the usage event it decides',
     drift_faces: Object.freeze(['unconsumed_reconciliation'] as const),
     counted: true,
+  }),
+  Object.freeze({
+    id: 'reconciliation-repair',
+    relative_path: 'reconciliations/repairs',
+    scope: 'run' as const,
+    role: 'durable' as const,
+    write_order: 'operator-only evidence repair receipt precedes its usage event and is read on exact replay; usage remains the sole charge',
+    drift_faces: Object.freeze(['unconsumed_reconciliation'] as const),
+    counted: false,
   }),
   Object.freeze({
     id: 'campaign-terminal',
@@ -2462,17 +2472,24 @@ function consumedFor(
   return deriveAutomationConsumption(reservation.operation, outcome, reservation.reserved);
 }
 
-function commitUsage(
-  repoRoot: string,
+interface PreparedUsageCommit {
+  readonly event: AutomationUsageEventV1;
+  readonly status: AutomationBudgetStatusV1;
+  readonly replayed: boolean;
+}
+
+function prepareUsageCommit(
   paths: RunPaths,
   reservation: AutomationBudgetReservationV1,
   result: AutomationUsageResultV1,
   observedAt: string,
   resolution: AutomationUsageEventV1['resolution'],
-  inFlight: readonly AutomationInFlightAuthorityV1[],
-  env: NodeJS.ProcessEnv | undefined,
-): AutomationUsageCommitV1 {
-  const status = lockedStatus(repoRoot, paths, reservation.automation_run_id, observedAt, env);
+  status: AutomationBudgetStatusV1,
+): PreparedUsageCommit {
+  const storedReservation = parse(readRaw(join(paths.reservationsByDigest, `${reservation.reservation_sha256}.json`), 'automation reservation'), validateAutomationReservation, 'automation reservation');
+  if (canonicalAutomationJson(storedReservation) !== canonicalAutomationJson(reservation)) {
+    fail('automation_budget_store_conflict', 'usage reservation differs from stored authority');
+  }
   // A recorded reconciliation is the decision for this reservation, and it was
   // made durable before any event could be. A later plain append would
   // otherwise charge the caller's cheaper outcome over an operator's recorded
@@ -2492,7 +2509,7 @@ function commitUsage(
     if (canonicalAutomationJson(stored.consumed) !== canonicalAutomationJson(consumedFor(reservation, result.outcome, resolution))) {
       fail('automation_budget_store_conflict', 'a usage event for this reservation already exists with a different charge');
     }
-    return Object.freeze({ event: stored, current: status.current, stop_receipt: status.stop_receipt });
+    return { event: stored, status, replayed: true };
   }
   if (reservation.budget_sha256 !== status.current.budget_sha256) {
     fail('automation_budget_store_conflict', 'automation reservation was granted under a superseded budget revision');
@@ -2511,6 +2528,18 @@ function commitUsage(
     evidence_refs: result.evidence_refs,
     observed_at: observedAt,
   });
+  return { event, status, replayed: false };
+}
+
+function publishUsageCommit(
+  paths: RunPaths,
+  prepared: PreparedUsageCommit,
+  observedAt: string,
+  inFlight: readonly AutomationInFlightAuthorityV1[],
+): AutomationUsageCommitV1 {
+  const { event, status } = prepared;
+  if (prepared.replayed) return Object.freeze({ event, current: status.current, stop_receipt: status.stop_receipt });
+  const eventPath = join(paths.events, `${event.reservation_sha256}.json`);
   if (!writeExclusive(eventPath, bytes(event), 'automation usage event')) {
     fail('automation_budget_store_conflict', 'automation usage event was created concurrently');
   }
@@ -2520,7 +2549,7 @@ function commitUsage(
   const next = sealAutomationBudgetCurrent({
     automation_run_id: status.current.automation_run_id,
     budget_sha256: status.current.budget_sha256,
-    state: 'active',
+    state: status.stop_receipt === null ? 'active' : 'budget_exhausted',
     consumed,
     open_reserved: emptyAutomationMetricVector(),
     consecutive_no_progress_steps: streak,
@@ -2529,17 +2558,31 @@ function commitUsage(
     open_reservation_sha256s: [],
     event_count: status.current.event_count + 1,
     ledger_sha256: chainAutomationLedgerDigest(status.current.ledger_sha256, event.event_sha256),
-    stop_receipt_sha256: null,
+    stop_receipt_sha256: status.stop_receipt?.stop_receipt_sha256 ?? null,
     previous_current_sha256: status.current.current_sha256,
     updated_at: observedAt,
   });
   writeAtomic(paths.current, bytes(next), 'automation budget current');
   const refusal = exhaustionRefusal(status.budget, next, observedAt);
   if (refusal === null) {
-    return Object.freeze({ event, current: next, stop_receipt: null });
+    return Object.freeze({ event, current: next, stop_receipt: status.stop_receipt });
   }
   const stopped = persistStopReceipt(paths, status.budget, next, refusal, inFlight, observedAt);
   return Object.freeze({ event, current: stopped.current, stop_receipt: stopped.receipt });
+}
+
+function commitUsage(
+  repoRoot: string,
+  paths: RunPaths,
+  reservation: AutomationBudgetReservationV1,
+  result: AutomationUsageResultV1,
+  observedAt: string,
+  resolution: AutomationUsageEventV1['resolution'],
+  inFlight: readonly AutomationInFlightAuthorityV1[],
+  env: NodeJS.ProcessEnv | undefined,
+): AutomationUsageCommitV1 {
+  const status = lockedStatus(repoRoot, paths, reservation.automation_run_id, observedAt, env);
+  return publishUsageCommit(paths, prepareUsageCommit(paths, reservation, result, observedAt, resolution, status), observedAt, inFlight);
 }
 
 export function appendAutomationUsage(input: AppendAutomationUsageInput): AutomationUsageCommitV1 {
@@ -2674,7 +2717,12 @@ export function reconcileAutomationReservation(
   return withExclusiveDirectoryLock(paths.common, paths.lockRelative, () => {
     // Same rule: the run is classified before its reconciliation record lands,
     // so a corrupt run refuses without gaining a fourth durable record.
-    lockedStatus(repoRoot, paths, reservation.automation_run_id, reconciledAt, input.env);
+    const status = lockedStatus(repoRoot, paths, reservation.automation_run_id, reconciledAt, input.env);
+    const prepared = prepareUsageCommit(paths, reservation, input, reconciledAt, input.resolution, status);
+    if (prepared.replayed && (prepared.event.resolution !== input.resolution || prepared.event.outcome !== input.outcome
+      || canonicalAutomationJson(prepared.event.evidence_refs) !== canonicalAutomationJson(input.evidence_refs))) {
+      fail('automation_budget_store_conflict', 'reconciliation differs from the settled usage event');
+    }
     const evidence = {
       protocol: 1,
       kind: 'repo-harness-automation-reconciliation',
@@ -2695,8 +2743,110 @@ export function reconcileAutomationReservation(
         fail('automation_budget_store_conflict', 'this reservation was already reconciled with different evidence');
       }
     }
-    return commitUsage(repoRoot, paths, reservation, input, reconciledAt, input.resolution, input.in_flight_authority ?? [], input.env);
+    return publishUsageCommit(paths, prepared, reconciledAt, input.in_flight_authority ?? []);
   }, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
+}
+
+export interface RepairAutomationReconciliationInput extends AutomationUsageResultV1 {
+  readonly repo_root: string;
+  readonly automation_run_id: string;
+  readonly reservation_sha256: string;
+  readonly expected_reconciliation_sha256: string;
+  readonly repair_reason: string;
+  readonly mode: 'dry_run' | 'apply';
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+/**
+ * Explicit recovery of malformed evidence digests, never a change of decision.
+ * The original record remains immutable; only its full reserved charge can be
+ * completed. A repair receipt binds the original bytes to the supplied evidence
+ * and is itself referenced by the usage event, including after an interrupted apply.
+ */
+export function repairAutomationReconciliation(input: RepairAutomationReconciliationInput) {
+  if (input.mode !== 'dry_run' && input.mode !== 'apply') fail('automation_budget_store_invalid', 'reconciliation repair requires dry_run or apply');
+  if (!RUN_ID.test(input.reservation_sha256) || !RUN_ID.test(input.expected_reconciliation_sha256)) {
+    fail('automation_budget_store_invalid', 'reconciliation repair requires exact lowercase hex digests');
+  }
+  if (typeof input.repair_reason !== 'string' || input.repair_reason.trim().length === 0
+    || !Array.isArray(input.evidence_refs) || input.evidence_refs.length === 0) {
+    fail('automation_budget_store_invalid', 'reconciliation repair requires a reason and exact corrected evidence');
+  }
+  const corrected = input.evidence_refs.map((ref, index) => assertAutomationEvidenceRef(ref, `repair evidence_refs[${index}]`));
+  const repoRoot = resolve(input.repo_root);
+  const paths = runPaths(repoRoot, input.automation_run_id);
+  const perform = () => {
+    const now = automationStoreNow();
+    const status = readAutomationBudgetStatusAt(repoRoot, input.automation_run_id, now, input.env);
+    const reservation = parse(readRaw(join(paths.reservationsByDigest, `${input.reservation_sha256}.json`), 'automation reservation'), validateAutomationReservation, 'automation reservation');
+    if (reservation.reservation_sha256 !== input.reservation_sha256 || reservation.automation_run_id !== input.automation_run_id) {
+      fail('automation_budget_store_conflict', 'reconciliation repair reservation identity differs');
+    }
+    const raw = readRaw(join(paths.reconciliations, `${input.reservation_sha256}.json`), 'automation reconciliation');
+    if (createHash('sha256').update(raw).digest('hex') !== input.expected_reconciliation_sha256) {
+      fail('automation_budget_store_conflict', 'reconciliation repair expected record digest differs');
+    }
+    const original = parse(raw, (value: Record<string, unknown>) => value, 'automation reconciliation');
+    const fields = ['protocol', 'kind', 'automation_run_id', 'reservation_sha256', 'resolution', 'reason', 'evidence_refs', 'reconciled_at'];
+    if (!original || typeof original !== 'object' || Array.isArray(original)
+      || canonicalAutomationJson(Object.keys(original).sort()) !== canonicalAutomationJson(fields.sort())
+      || original.protocol !== 1 || original.kind !== 'repo-harness-automation-reconciliation'
+      || original.automation_run_id !== input.automation_run_id || original.reservation_sha256 !== input.reservation_sha256
+      || original.resolution !== 'reconciled_reserved' || typeof original.reason !== 'string' || original.reason.trim().length === 0
+      || typeof original.reconciled_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(original.reconciled_at)
+      || Number.isNaN(Date.parse(original.reconciled_at)) || !Array.isArray(original.evidence_refs)) {
+      fail('automation_budget_store_invalid', 'repair requires an intact reconciled_reserved decision with malformed evidence digests');
+    }
+    const oldRefs = original.evidence_refs as AutomationEvidenceRefV1[];
+    if (oldRefs.length !== corrected.length || oldRefs.some((ref, index) => !ref || ref.ref !== corrected[index]!.ref)) {
+      fail('automation_budget_store_conflict', 'reconciliation repair must preserve the original evidence references');
+    }
+    let malformed = false;
+    try { oldRefs.forEach((ref, index) => assertAutomationEvidenceRef(ref, `original evidence_refs[${index}]`)); }
+    catch { malformed = true; }
+    if (!malformed) fail('automation_budget_store_conflict', 'valid reconciliation evidence cannot be repaired');
+
+    const directory = join(paths.reconciliations, 'repairs');
+    const repairPath = join(directory, `${input.reservation_sha256}.json`);
+    const basis = {
+      protocol: 1, kind: 'repo-harness-automation-reconciliation-repair',
+      automation_run_id: input.automation_run_id, reservation_sha256: input.reservation_sha256,
+      reconciliation_sha256: input.expected_reconciliation_sha256,
+      repair_reason: input.repair_reason, outcome: input.outcome, evidence_refs: corrected,
+    };
+    let repair = { ...basis, repaired_at: now, receipt_sha256: automationDigest({ ...basis, repaired_at: now }) };
+    const existingRepair = existsSync(repairPath);
+    if (existingRepair) {
+      const stored = parse(readRaw(repairPath, 'reconciliation repair'), (value: typeof repair) => value, 'reconciliation repair');
+      const { receipt_sha256, repaired_at, ...storedBasis } = stored;
+      if (canonicalAutomationJson(storedBasis) !== canonicalAutomationJson(basis)
+        || typeof repaired_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(repaired_at)
+        || Number.isNaN(Date.parse(repaired_at)) || receipt_sha256 !== automationDigest({ ...storedBasis, repaired_at })) {
+        fail('automation_budget_store_conflict', 'reconciliation repair replay differs from its immutable receipt');
+      }
+      repair = stored;
+    }
+    const result = { outcome: input.outcome, evidence_refs: [...corrected,
+      { ref: `repo:automation-reconciliation-repair/${input.automation_run_id}/${input.reservation_sha256}`, sha256: repair.receipt_sha256 }] };
+    const prepared = prepareUsageCommit(paths, reservation, result, now, 'reconciled_reserved', status);
+    if (prepared.replayed && (!existingRepair || prepared.event.resolution !== 'reconciled_reserved'
+      || prepared.event.outcome !== input.outcome || canonicalAutomationJson(prepared.event.evidence_refs) !== canonicalAutomationJson(result.evidence_refs))) {
+      fail('automation_budget_store_conflict', 'reconciliation repair cannot replace existing usage');
+    }
+    if (input.mode === 'dry_run') return Object.freeze({ dry_run: true, replayed: prepared.replayed, repair_receipt: repair, event: prepared.event, commit: null });
+    // Input and all immutable replay checks precede even projection repair.
+    const locked = lockedStatus(repoRoot, paths, input.automation_run_id, now, input.env);
+    const final = prepareUsageCommit(paths, reservation, result, now, 'reconciled_reserved', locked);
+    ensureDirectory(paths.common, directory);
+    if (!writeExclusive(repairPath, bytes(repair), 'reconciliation repair')
+      && readRaw(repairPath, 'reconciliation repair') !== bytes(repair)) {
+      fail('automation_budget_store_conflict', 'reconciliation repair receipt was created concurrently');
+    }
+    const commit = publishUsageCommit(paths, final, now, []);
+    return Object.freeze({ dry_run: false, replayed: final.replayed, repair_receipt: repair, event: commit.event, commit });
+  };
+  if (input.mode === 'dry_run') return perform();
+  return withExclusiveDirectoryLock(paths.common, paths.lockRelative, perform, { reclaimStaleEmptyDirectory: true, reclaimStaleOwner: true });
 }
 
 export function listAutomationBudgetRuns(repoRoot: string): readonly string[] {
