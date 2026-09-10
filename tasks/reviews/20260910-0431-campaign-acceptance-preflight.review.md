@@ -8,7 +8,7 @@
 > **Last Updated**: 2026-09-10 04:31
 > **Recommendation**: pass
 > **Review Rubric Version**: 2
-> **Reviewed Subject SHA256**: sha256:3cdb656e0506da9eafc8fb1b845ea047b9c4fe5ea06ad5a48dad28dc3fff306c
+> **Reviewed Subject SHA256**: sha256:3e9550379875496636bb146e191984cdb71e49d13ae3df7a121f2ef544b71fac
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: 9fd8ca27950fd62f98e776e7a2b46cf6e6ff9578
 
@@ -44,13 +44,13 @@
 > **Reviewer**: User
 > **Source**: user-waiver
 > **Actor**: ancienttwo
-> **Reviewed Subject SHA256**: sha256:3cdb656e0506da9eafc8fb1b845ea047b9c4fe5ea06ad5a48dad28dc3fff306c
+> **Reviewed Subject SHA256**: sha256:3e9550379875496636bb146e191984cdb71e49d13ae3df7a121f2ef544b71fac
 > **Reviewed Subject Scope**: normalized-final-content
 > **Reviewed Target Revision**: 9fd8ca27950fd62f98e776e7a2b46cf6e6ff9578
-> **Verification Evidence SHA256**: sha256:344565dd69f0e4f4e6b195b91488778367b3d1e2e2e08cc59b5ce13fd21e984c
-> **Issued At**: 2026-09-09T21:15:39.255Z
+> **Verification Evidence SHA256**: sha256:7385835047adaed8d81027bf2093ebf13e517c68032ecdb44d8dec697f88dac7
+> **Issued At**: 2026-09-10T03:55:51.343Z
 
-- Summary: Owner approved the bounded campaign acceptance-preflight repair and continuation in this session after disclosure of the external P2. The missing-review finding was reproduced and fixed, the production delta passed security and architecture checks, and all 14 executable checks passed on d5f37846. This is owner acceptance after fixes, not a second external PASS and not a waiver of campaign execution evidence.
+- Summary: Owner approved continued completion of this source repair, including the disclosed clean-runtime packaged-hook blocker. External P2 was reproduced and fixed; the package-owned hook delta passed security review. All 26 executable checks passed on d1650b1f. This records owner acceptance after fixes, not a second external PASS and not a waiver of BRC campaign delivery or audit evidence.
 - Findings: none
 
 ## Behavior Diff Notes
