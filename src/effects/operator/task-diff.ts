@@ -19,7 +19,7 @@ function git(cwd: string, args: string[], allowNoMatch = false): string {
   try {
     const bytes = execFileSync('git', ['--no-pager', '-c', 'core.fsmonitor=false', ...args], {
       cwd, timeout: 5000, maxBuffer: TASK_DIFF_MAX_BYTES, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' },
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', GIT_NO_LAZY_FETCH: '1' },
     });
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     return text;
@@ -44,6 +44,13 @@ function refuseExternalFilters(cwd: string): void {
     effective.set(record.slice(0, separator), record.slice(separator + 1));
   }
   if ([...effective.values()].some(command => command !== '')) return refuse('filters_unsupported');
+}
+
+// Git omits worktree checks for assume-unchanged entries; never label that an empty diff.
+function refuseAssumeUnchanged(cwd: string): void {
+  const entries = git(cwd, ['ls-files', '-v', '-z']);
+  if (entries && !entries.endsWith('\0')) return refuse('unavailable');
+  if (entries.split('\0').some(entry => /^[a-z] /.test(entry))) return refuse('index_unsupported');
 }
 
 /** Synchronous local authority/Git reads run only in the cancellable worker. */
@@ -79,10 +86,12 @@ export function readOperatorTaskDiff(input: OperatorTaskDiffRequest & { readonly
     refuseExternalFilters(before.worktree);
     const head = git(before.worktree, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
     const patchArgs = ['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '--ignore-submodules=none', '--submodule=short', '--src-prefix=a/', '--dst-prefix=b/', before.base, '--'];
+    refuseAssumeUnchanged(before.worktree);
     const patch = git(before.worktree, patchArgs);
     const rawUntracked = git(before.worktree, ['ls-files', '--others', '--exclude-standard', '-z']);
     const untracked = rawUntracked === '' ? [] : rawUntracked.slice(0, -1).split('\0');
     if (untracked.length > TASK_DIFF_MAX_UNTRACKED) return refuse('too_large');
+    refuseAssumeUnchanged(before.worktree);
     // Re-observe content as well as ownership: HEAD alone misses agent edits.
     if (git(before.worktree, patchArgs) !== patch
       || git(before.worktree, ['ls-files', '--others', '--exclude-standard', '-z']) !== rawUntracked) return refuse('stale');

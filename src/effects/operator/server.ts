@@ -1937,7 +1937,10 @@ export async function startOperatorServer(
           .then(accept, () => finish('unavailable'));
       } else {
         try {
-          worker = new Worker(new URL('./task-diff-worker.ts', import.meta.url));
+          // Include canonical authority readers in the no-fetch boundary.
+          worker = new Worker(new URL('./task-diff-worker.ts', import.meta.url), {
+            env: { ...process.env, GIT_NO_LAZY_FETCH: '1', GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' },
+          });
           worker.onmessage = (event: MessageEvent<unknown>) => {
             const value = event.data as { ok?: unknown; snapshot?: unknown; code?: unknown } | null;
             if (value?.ok === true) accept(value.snapshot);

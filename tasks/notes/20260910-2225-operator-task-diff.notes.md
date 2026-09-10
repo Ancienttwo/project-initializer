@@ -13,3 +13,16 @@ Git-emitted paths are canonicalized before comparing with Node realpaths. The fo
 > **Substantive Change SHA256**: `sha256:2983d8e71f8d7bc3f680965b3ef5df88eccd62050a5a6f257d18bbc6a115a0f4`
 
 The first prepare-acceptance run lacked the isolated worktree's CodeGraph index. The existing required CodeGraph setup initialized/synced that index; deterministic projection then retained the same model and flow-proof digests and updated only generated provenance. The proof-only refresh signal is reconciled through the official command, not accepted as a semantic architecture change. The first official plugin invocation was rejected as stale_scope while generated provenance changed; it is not acceptance evidence. Final review runs only after the corrected subject and workflow authority are committed.
+
+Root Cause Evidence (Git observation cascade):
+- root_cause: diff lazily fetched missing promisor blobs and omitted assume-unchanged tracked entries.
+- repro: real Git missing blob invoked configured upload-pack marker; assume-unchanged edit returned an empty patch.
+- regression_guard: effect tests cover both states and the production worker missing a canonical sprint blob; worker environment disables lazy fetch for inherited authority readers too.
+- pre_fix_failure_artifact: `/tmp/operator-diff-cascade-prefix.log`, PRE_FIX_EXIT=1 for both reported cases; `/tmp/operator-diff-cascade-all.log` passes 12 real Git tests with 47 assertions.
+
+CI fixtures isolate system/global Git config. The hosted runners configure Git LFS globally; the intentional filter refusal was reached before unrelated test assertions. Product behavior still refuses configured external transformations, including unused commands. No host/global configuration was changed.
+
+> **Substantive Change SHA256**: `sha256:1a50bcbd36ca009d89c8bb22a566c200cc3982c40b043f3b4c94cfa19eefa51d`
+
+PR comparison against origin/main:
+> **Substantive Change SHA256**: `sha256:4a531f8ce0dcaff1090938e6c1772e18db0bd022cab6f5ed05c3ed3f5e1f25e4`

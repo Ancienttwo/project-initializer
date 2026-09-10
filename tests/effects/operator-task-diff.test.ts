@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,6 +11,22 @@ import { createLeaseDirectory, writeLeaseOwnerDurably } from '../../src/effects/
 import { fixtureTaskId } from '../helpers/sprint-fixture';
 
 const cleanup: string[] = [];
+let originalGitGlobal: string | undefined;
+let originalGitSystem: string | undefined;
+beforeEach(() => {
+  originalGitGlobal = process.env.GIT_CONFIG_GLOBAL;
+  originalGitSystem = process.env.GIT_CONFIG_NOSYSTEM;
+  const configHome = mkdtempSync(join(tmpdir(), 'operator-diff-config-')); cleanup.push(configHome);
+  const config = join(configHome, 'gitconfig'); writeFileSync(config, '');
+  process.env.GIT_CONFIG_GLOBAL = config;
+  process.env.GIT_CONFIG_NOSYSTEM = '1';
+});
+afterEach(() => {
+  if (originalGitGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+  else process.env.GIT_CONFIG_GLOBAL = originalGitGlobal;
+  if (originalGitSystem === undefined) delete process.env.GIT_CONFIG_NOSYSTEM;
+  else process.env.GIT_CONFIG_NOSYSTEM = originalGitSystem;
+});
 afterEach(() => { for (const path of cleanup.splice(0)) rmSync(path, { recursive: true, force: true }); });
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 function fixture() {
@@ -141,4 +157,48 @@ test('a different prunable worktree does not hide a valid task binding', () => {
   rmSync(missing, { recursive: true, force: true });
   expect(git(f.root, 'worktree', 'list', '--porcelain')).toContain('prunable');
   expect(readOperatorTaskDiff(f.input).base_sha).toBe(f.base);
+});
+
+
+test('assume-unchanged tracked entries cannot produce an empty observation', () => {
+  const f = fixture();
+  git(f.worktree, 'update-index', '--assume-unchanged', 'file.txt');
+  writeFileSync(join(f.worktree, 'file.txt'), 'hidden edit\n');
+  expect(() => readOperatorTaskDiff(f.input)).toThrow('index_unsupported');
+});
+
+test('missing promisor blobs fail without fetching or writing objects', () => {
+  const f = fixture();
+  const blob = git(f.root, 'rev-parse', 'HEAD:file.txt');
+  const object = join(f.root, '.git', 'objects', blob.slice(0, 2), blob.slice(2));
+  git(f.root, 'config', 'remote.origin.promisor', 'true');
+  git(f.root, 'config', 'remote.origin.url', f.root);
+  const marker = join(f.root, 'fetch-ran');
+  git(f.root, 'config', 'remote.origin.uploadpack', 'echo ran > fetch-ran; false');
+  rmSync(object);
+  writeFileSync(join(f.worktree, 'file.txt'), 'needs base blob\n');
+  expect(() => readOperatorTaskDiff(f.input)).toThrow('unavailable');
+  expect(existsSync(marker)).toBe(false);
+  expect(existsSync(join(f.worktree, 'fetch-ran'))).toBe(false);
+  expect(existsSync(object)).toBe(false);
+});
+
+
+test('production worker refuses missing canonical sprint objects without fetching', async () => {
+  const f = fixture();
+  const blob = git(f.root, 'rev-parse', 'HEAD:plans/sprints/diff.sprint.md');
+  const object = join(f.root, '.git', 'objects', blob.slice(0, 2), blob.slice(2));
+  git(f.root, 'config', 'remote.origin.promisor', 'true');
+  git(f.root, 'config', 'remote.origin.url', f.root);
+  git(f.root, 'config', 'remote.origin.uploadpack', 'echo ran > fetch-ran; false');
+  rmSync(object);
+  const { startOperatorServer } = await import('../../src/effects/operator/server');
+  const server = await startOperatorServer({ port: 0, static_root: f.root, env: f.input.env });
+  try {
+    const q = new URLSearchParams({ task_revision: f.input.task_revision, claim_id: f.input.claim_id, generation: '1' });
+    const response = await fetch(`${server.url}/api/v1/fleet/tasks/${f.input.repository_id}/${f.input.task_id}/diff?${q}`);
+    expect(response.status).not.toBe(200);
+    expect(existsSync(join(f.root, 'fetch-ran'))).toBe(false);
+    expect(existsSync(object)).toBe(false);
+  } finally { await server.close(); }
 });
