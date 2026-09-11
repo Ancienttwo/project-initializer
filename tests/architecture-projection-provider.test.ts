@@ -27,6 +27,7 @@ import {
 import { trustedNodeCandidates } from '../src/effects/runtime/node-candidates';
 import { architectureProjectionExitCode, buildArchitectureProjectionCommand } from '../src/cli/commands/architecture-projection';
 import { consumeArchitectureRefreshSignals } from '../src/effects/architecture/refresh-consumer';
+import { PROCESS_TREE_TIMEOUT_MS, termResistantProcessTree } from './helpers/term-resistant-process-tree';
 
 const roots: string[] = [];
 const digest = (value: string) => `sha256:${value.repeat(64).slice(0, 64)}` as const;
@@ -210,42 +211,43 @@ function runner(calls: Array<{ binary: string; args: readonly string[] }>, docs:
 describe('package-local ArchContext projection provider', () => {
   test('bounds a real provider process tree whose descendant keeps captured pipes open', () => {
     const f = fixture();
-    const descendantPidPath = join(f.root, 'descendant.pid');
+    const { descendantPidPath, termReceivedPath, parentScript } = termResistantProcessTree(f.root);
     const node = resolveCompatibleNodeRuntime(process.env);
-    writeFileSync(f.binary, [
-      "const { spawn } = require('node:child_process');",
-      "const { writeFileSync } = require('node:fs');",
-      "const child = spawn(process.execPath, ['-e', \"process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)\"], { stdio: ['ignore', 'inherit', 'inherit'] });",
-      "writeFileSync(process.env.ARCHCTX_DESCENDANT_PID_PATH, String(child.pid));",
-      "setInterval(() => {}, 1000);",
-      '',
-    ].join('\n'));
+    writeFileSync(f.binary, parentScript);
+    // The same deadline covers Node selection and the supervised process tree.
+    const timeoutMs = 2 * PROCESS_TREE_TIMEOUT_MS;
     const providerModule = join(import.meta.dir, '..', 'src', 'effects', 'architecture', 'archctx-provider.ts');
     const script = join(f.root, 'provider-timeout.ts');
     writeFileSync(script, [
       `import { archctxCapabilities } from ${JSON.stringify(providerModule)};`,
+      `import { existsSync, readFileSync } from 'node:fs';`,
       `const started = Date.now();`,
       `try {`,
-      `  archctxCapabilities(${JSON.stringify(f.repoRoot)}, { consumerRoot: ${JSON.stringify(f.consumerRoot)}, policy: { provider: 'archctx', applyMode: 'manual', failureGate: 'advisory', requiredVersion: '${ARCHCTX_REQUIRED_VERSION}', timeoutMs: 500 }, env: { ...process.env, REPO_HARNESS_NODE_BIN: ${JSON.stringify(node)}, ARCHCTX_DESCENDANT_PID_PATH: ${JSON.stringify(descendantPidPath)} }, deadlineMs: Date.now() + 500 });`,
+      `  archctxCapabilities(${JSON.stringify(f.repoRoot)}, { consumerRoot: ${JSON.stringify(f.consumerRoot)}, policy: { provider: 'archctx', applyMode: 'manual', failureGate: 'advisory', requiredVersion: '${ARCHCTX_REQUIRED_VERSION}', timeoutMs: ${timeoutMs} }, env: { ...process.env, REPO_HARNESS_NODE_BIN: ${JSON.stringify(node)} }, deadlineMs: Date.now() + ${timeoutMs} });`,
       `  process.exitCode = 2;`,
       `} catch (error) {`,
-      `  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);`,
-      `  const pid = Number((await import('node:fs')).readFileSync(${JSON.stringify(descendantPidPath)}, 'utf8'));`,
+      `  console.log(String(error));`,
+      `  if (!existsSync(${JSON.stringify(descendantPidPath)})) throw new Error('fixture did not become ready before provider deadline: ' + String(error));`,
+      `  const pid = Number(readFileSync(${JSON.stringify(descendantPidPath)}, 'utf8'));`,
+      `  if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('fixture published an invalid descendant PID');`,
       `  let descendantAlive = true;`,
       `  try { process.kill(pid, 0); } catch { descendantAlive = false; }`,
       `  if (descendantAlive) try { process.kill(pid, 'SIGKILL'); } catch { descendantAlive = false; }`,
-      `  console.log(String(error));`,
+      // Windows taskkill does not deliver a catchable POSIX SIGTERM.
+      `  if (process.platform !== 'win32') console.log('term_received=' + (readFileSync(${JSON.stringify(termReceivedPath)}, 'utf8') === String(pid)));`,
       `  console.log('descendant_alive=' + descendantAlive);`,
       `  console.log('elapsed=' + (Date.now() - started));`,
       `}`,
       '',
     ].join('\n'));
-    const result = spawnSync(process.execPath, [script], { cwd: f.repoRoot, encoding: 'utf8', timeout: 4_000, killSignal: 'SIGKILL' });
+    const result = spawnSync(process.execPath, [script], { cwd: f.repoRoot, encoding: 'utf8', timeout: 20_000, killSignal: 'SIGKILL' });
     expect((result.error as NodeJS.ErrnoException | undefined)?.code).not.toBe('ETIMEDOUT');
     if (result.status !== 0) throw new Error(`provider timeout fixture failed: ${result.stderr || result.stdout}`);
     expect(result.status).toBe(0);
+    expect(result.stdout).toContain('process timed out after');
     expect(result.stdout).toContain('descendant_alive=false');
-  });
+    if (process.platform !== 'win32') expect(result.stdout).toContain('term_received=true');
+  }, 30_000);
 
   test('charges Node runtime selection to the caller deadline', () => {
     const f = fixture();

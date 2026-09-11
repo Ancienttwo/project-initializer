@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
+import { PROCESS_TREE_TIMEOUT_MS, termResistantProcessTree } from '../helpers/term-resistant-process-tree';
 
 const ROOT = join(import.meta.dir, '..', '..');
 const HOOK_ENTRY = join(ROOT, 'src/cli/hook-entry.ts');
@@ -121,7 +122,7 @@ function runBundledSupervisor(
   ], {
     cwd: ROOT,
     encoding: 'utf-8',
-    timeout: 5_000,
+    timeout: 15_000,
     killSignal: 'SIGKILL',
   });
 }
@@ -180,20 +181,13 @@ describe('hook-entry single-file bundle', () => {
     () => {
       const root = temporaryRoot();
       const metadataPath = join(root, 'receipt.json');
-      const descendantPidPath = join(root, 'descendant.pid');
-      const target = [
-        "const { spawn } = require('child_process');",
-        "process.on('SIGTERM', () => {});",
-        `const child = spawn(process.execPath, ['-e', ${JSON.stringify("process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)")}], { stdio: 'inherit' });`,
-        `require('fs').writeFileSync(${JSON.stringify(descendantPidPath)}, String(child.pid));`,
-        'setInterval(() => {}, 1000);',
-      ].join('\n');
+      const { descendantPidPath, termReceivedPath, parentScript } = termResistantProcessTree(root);
       const result = runBundledSupervisor(
         buildBundle('0.0.0-test'),
         metadataPath,
-        100,
+        PROCESS_TREE_TIMEOUT_MS,
         process.execPath,
-        ['-e', target],
+        ['-e', parentScript],
       );
       let processGroupPid: number | null = null;
       try {
@@ -203,11 +197,13 @@ describe('hook-entry single-file bundle', () => {
           processGroupPid: number;
         };
         processGroupPid = receipt.processGroupPid;
+        expect(existsSync(descendantPidPath), `fixture did not become ready: ${JSON.stringify(receipt)}; ${result.stderr}`).toBe(true);
         const descendantPid = Number(readFileSync(descendantPidPath, 'utf-8'));
 
         expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
         expect(receipt).toMatchObject({ timedOut: true, completed: true });
         expect(Number.isSafeInteger(descendantPid) && descendantPid > 0).toBe(true);
+        expect(readFileSync(termReceivedPath, 'utf-8')).toBe(String(descendantPid));
         expect(processExists(descendantPid)).toBe(false);
         expect(processGroupExists(processGroupPid)).toBe(false);
       } finally {
